@@ -20,7 +20,7 @@ import javax.inject.Singleton
  * can access AssetRepository for CDN-downloaded database files.
  *
  * On first launch (empty database), automatically regenerates news.db
- * from bundled source databases (quran.db, fortress_of_the_muslim.db, etc.).
+ * from bundled source databases (quran.db, fortress_of_the_muslim_v2.db, etc.).
  */
 @Module
 @InstallIn(SingletonComponent::class)

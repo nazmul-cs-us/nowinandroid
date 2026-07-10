@@ -406,7 +406,7 @@ class UnifiedSettingsViewModel @Inject constructor(
 
     /**
      * Refresh the News database by regenerating from source databases
-     * (quran.db, fortress_of_the_muslim.db, quranic_duas.db)
+     * (quran.db, fortress_of_the_muslim_v2.db, quranic_duas.db)
      */
     fun refreshNewsDatabase() {
         viewModelScope.launch {

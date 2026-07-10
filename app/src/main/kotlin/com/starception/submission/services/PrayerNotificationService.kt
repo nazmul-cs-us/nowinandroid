@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import javax.inject.Inject
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -1055,7 +1056,8 @@ class PrayerNotificationService : Service() {
                 // Handle fallback case (should rarely happen with new logic)
                 if (currentPrayer == null || nextPrayer == null) {
                     Log.w(TAG, "⚠️ Unexpected: Missing prayer data - using fallback")
-                    val title = "⏰ Next Prayer: ${nextPrayer?.name ?: "Unknown"}"
+                    val nextDisplayName = nextPrayer?.name?.let { getPrayerDisplayName(it, LocalDate.now()) } ?: "Unknown"
+                    val title = "⏰ Next Prayer: $nextDisplayName"
                     val content = nextPrayer?.let { "Next prayer in ${formatTimeRemaining(it.time)}" } ?: "Prayer times calculated"
                     val detailedMessage = buildNextPrayerMessage(prayerTimes, nextPrayer)
                     return@withContext Sextuple(title, content, detailedMessage, "MAKE_TIME", 10, Pair(currentPrayer?.name ?: "Current Prayer", currentPrayer?.time?.toString() ?: LocalTime.now().toString()))
@@ -1066,11 +1068,13 @@ class PrayerNotificationService : Service() {
                 // Calculate prayer time progress
                 val prayerProgress = calculatePrayerProgress(currentPrayer, nextPrayer)
                 
-                // Format notification content based on prayer progress
+                // Format notification content based on prayer progress.
+                // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
+                val currentDisplayName = getPrayerDisplayName(currentPrayer.name, LocalDate.now())
                 val title = when (prayerProgress.phase) {
-                    PrayerPhase.GO_TO_MOSQUE -> "Go to Mosque for ${currentPrayer.name}"
-                    PrayerPhase.BEST_TIME -> "Best Time to Pray ${currentPrayer.name}"
-                    PrayerPhase.MAKE_TIME -> "Make Time for ${currentPrayer.name}"
+                    PrayerPhase.GO_TO_MOSQUE -> "Go to Mosque for $currentDisplayName"
+                    PrayerPhase.BEST_TIME -> "Best Time to Pray $currentDisplayName"
+                    PrayerPhase.MAKE_TIME -> "Make Time for $currentDisplayName"
                 }
                 val content = buildPrayerProgressContent(prayerProgress, currentPrayer)
                 val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
@@ -1383,9 +1387,11 @@ class PrayerNotificationService : Service() {
      */
     private fun buildPrayerProgressContent(progress: PrayerProgress, currentPrayer: PrayerTime): String {
         val elapsedText = formatElapsedTime(progress.elapsedMinutes)
-        
-        // Show elapsed time since prayer started - no redundant guidance text
-        return "$elapsedText since ${currentPrayer.name}"
+
+        // Show elapsed time since prayer started - no redundant guidance text.
+        // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
+        val displayName = getPrayerDisplayName(currentPrayer.name, LocalDate.now())
+        return "$elapsedText since $displayName"
     }
     
     /**
@@ -1398,14 +1404,15 @@ class PrayerNotificationService : Service() {
         progress: PrayerProgress
     ): String {
         return buildString {
-            // Show next prayer countdown
+            // Show next prayer countdown (Jumu'ah instead of Dhuhr on Fridays)
             if (nextPrayer != null) {
                 val timeRemaining = formatTimeRemaining(nextPrayer.time)
-                appendLine("Next • ${nextPrayer.name} in $timeRemaining")
+                val nextDisplayName = getPrayerDisplayName(nextPrayer.name, LocalDate.now())
+                appendLine("Next • $nextDisplayName in $timeRemaining")
             }
         }
     }
-    
+
     /**
      * Build next prayer message when no current prayer
      */
@@ -1413,7 +1420,8 @@ class PrayerNotificationService : Service() {
         return buildString {
             if (nextPrayer != null) {
                 val timeRemaining = formatTimeRemaining(nextPrayer.time)
-                appendLine("Next • ${nextPrayer.name} in $timeRemaining")
+                val nextDisplayName = getPrayerDisplayName(nextPrayer.name, LocalDate.now())
+                appendLine("Next • $nextDisplayName in $timeRemaining")
             } else {
                 appendLine("No upcoming prayers")
             }

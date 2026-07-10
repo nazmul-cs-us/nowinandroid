@@ -37,8 +37,6 @@ BUNDLED_FILES = {
     "country_prayer_methods.json",
     "salah_detector.tflite",
     "salah_norm_params.json",
-    "databases/fortress_of_the_muslim.db",
-    "databases/fortress_of_the_muslim_backup.db",
     # v2 is a local build input for news.db (see scripts/generate_news_db.py); the app
     # never downloads it, so it must NOT be uploaded to the CDN.
     "databases/fortress_of_the_muslim_v2.db",

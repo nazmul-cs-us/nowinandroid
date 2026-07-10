@@ -1,16 +1,16 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8201002144,
-  "total_files": 6427,
+  "total_size": 8315519387,
+  "total_files": 6809,
   "categories": {
     "json_data": {
-      "total_size": 10230232,
+      "total_size": 9886168,
       "file_count": 5,
       "required": true
     },
     "news": {
-      "total_size": 6389760,
+      "total_size": 6393856,
       "file_count": 1,
       "required": true
     },
@@ -125,8 +125,8 @@
       "required": false
     },
     "fortress_audio_arabic": {
-      "total_size": 71427915,
-      "file_count": 132,
+      "total_size": 186301510,
+      "file_count": 383,
       "required": false
     }
   },
@@ -156,20 +156,14 @@
       "required": true
     },
     "databases/news.db": {
-      "size": 6389760,
-      "sha256": "e92405ba96e8901a018b5967fd4f5fba265051b6ebc6fe613dafc994190aad8f",
+      "size": 6393856,
+      "sha256": "9f6e662cca5f4a91fa07cbaca33e3ec4c8ef9389967495e55bbbdeb2d7dd496b",
       "category": "news",
       "required": true
     },
     "databases/quranic_duas.db": {
       "size": 40960,
       "sha256": "dc69b759a2bb91eebc499912f123b64c1523f51af29ac0bff4477b1765d3743d",
-      "category": "json_data",
-      "required": true
-    },
-    "databases/fortress_of_the_muslim.db": {
-      "size": 360448,
-      "sha256": "7c7c83ee8245a9af01ea9be471a130562c4a49bdb0334786f87334c2715cd35f",
       "category": "json_data",
       "required": true
     },
@@ -5381,685 +5375,685 @@
       "category": "quran_audio_arabic",
       "required": false
     },
-    "audio/quran/bengali/001 - Al-Fatihah ( The Opening ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0627\u062a\u062d\u0629.ogg": {
+    "audio/quran/bengali/001 - Al-Fatihah ( The Opening ) - سورة الفاتحة.ogg": {
       "size": 879117,
       "sha256": "2d279a34b3e67907e916b27b541f04b2c7714525c85f6ebe3bdab83995e61b93",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/002 - Al-Baqarah ( The Cow ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0642\u0631\u0629.ogg": {
+    "audio/quran/bengali/002 - Al-Baqarah ( The Cow ) - سورة البقرة.ogg": {
       "size": 137466118,
       "sha256": "e7c024cdd7443cddc2fc3f2446bedd734935c0abfa6a50e23bad009098f7170c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/003 - Al-Imran ( The Family of Imran ) - \u0633\u0648\u0631\u0629 \u0622\u0644 \u0639\u0645\u0631\u0627\u0646.ogg": {
+    "audio/quran/bengali/003 - Al-Imran ( The Family of Imran ) - سورة آل عمران.ogg": {
       "size": 85920957,
       "sha256": "c97c5d9e894d8ea3f82a0df3fce756ccd97774a06fbdf1698951a555af901f6c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/004 - An-Nisa ( The Women ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0633\u0627\u0621.ogg": {
+    "audio/quran/bengali/004 - An-Nisa ( The Women ) - سورة النساء.ogg": {
       "size": 82791582,
       "sha256": "811f075773660a5258e07b8685d03a896755e1edc4f1f00aba55db861f3bb955",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/005 - Al-Maidah ( The Table spread with Food ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0627\u0626\u062f\u0629.ogg": {
+    "audio/quran/bengali/005 - Al-Maidah ( The Table spread with Food ) - سورة المائدة.ogg": {
       "size": 65657326,
       "sha256": "0eeeadd125be843376929841bf669cd71af445dc64cfd073c56f45d76ea76ccd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/006 - Al-An'am ( The Cattle ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0639\u0627\u0645.ogg": {
+    "audio/quran/bengali/006 - Al-An'am ( The Cattle ) - سورة الأنعام.ogg": {
       "size": 74352426,
       "sha256": "3571e4bf06b542c26924f19c8215bf28e04ef2cc64250000b1873ecb59a2ec9c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/007 - Al-A'raf (The Heights ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0639\u0631\u0627\u0641.ogg": {
+    "audio/quran/bengali/007 - Al-A'raf (The Heights ) - سورة الأعراف.ogg": {
       "size": 83075350,
       "sha256": "05a2bcab14772aed05010938e3eb23e9212f32c1e1183780009ea0a9f44d9bdf",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/008 - Al-Anfal ( The Spoils of War ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0641\u0627\u0644.ogg": {
+    "audio/quran/bengali/008 - Al-Anfal ( The Spoils of War ) - سورة الأنفال.ogg": {
       "size": 31317530,
       "sha256": "7180374a5e482a7f4d5267c59fae20796ed7a594333c5c93853ab9d04270224a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/009 - At-Taubah ( The Repentance ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0648\u0628\u0629.ogg": {
+    "audio/quran/bengali/009 - At-Taubah ( The Repentance ) - سورة التوبة.ogg": {
       "size": 60508710,
       "sha256": "78baf13b47b4094e5da5d78b0fb254a6d44ddc4ee324c9b040c9fd721c0e0e50",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/010 - Yunus ( Jonah ) - \u0633\u0648\u0631\u0629 \u064a\u0648\u0646\u0633.ogg": {
+    "audio/quran/bengali/010 - Yunus ( Jonah ) - سورة يونس.ogg": {
       "size": 43997026,
       "sha256": "8e08bb68e80ba26ba188b0282c3f62eea2e06a4fa01b0fe77bc4a737f4424510",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/011 - Hud - \u0633\u0648\u0631\u0629 \u0647\u0648\u062f.ogg": {
+    "audio/quran/bengali/011 - Hud - سورة هود.ogg": {
       "size": 47768153,
       "sha256": "d211e9c9bdeea0f66816c948ecefe70e01f4b04b5fde1d126a62db16c83fa24d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/012 - Yusuf (Joseph ) - \u0633\u0648\u0631\u0629 \u064a\u0648\u0633\u0641.ogg": {
+    "audio/quran/bengali/012 - Yusuf (Joseph ) - سورة يوسف.ogg": {
       "size": 44249202,
       "sha256": "327205ea1216c3ce31453391c0f4b9d309123eca2918c4ba373869cae4f397e4",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/013 - Ar-Ra'd ( The Thunder ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u0639\u062f.ogg": {
+    "audio/quran/bengali/013 - Ar-Ra'd ( The Thunder ) - سورة الرعد.ogg": {
       "size": 21069043,
       "sha256": "5db5a8077e60a5e3cbebb24df346ac98ebc65af7a80cd05278ca27ea9a4614b8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/014 - Ibrahim ( Abraham ) - \u0633\u0648\u0631\u0629 \u0625\u0628\u0631\u0627\u0647\u064a\u0645.ogg": {
+    "audio/quran/bengali/014 - Ibrahim ( Abraham ) - سورة إبراهيم.ogg": {
       "size": 21110223,
       "sha256": "169c59e955065786c28c8efd00fbe32ef6dd5f2fbad5f4d833d016f27ca59419",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/015 - Al-Hijr ( The Rocky Tract ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c\u0631.ogg": {
+    "audio/quran/bengali/015 - Al-Hijr ( The Rocky Tract ) - سورة الحجر.ogg": {
       "size": 16905778,
       "sha256": "0a2d25071b7644158fa90149345d7182a97b407b0b7270a9d0dcb45db990150d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/016 - An-Nahl ( The Bees ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u062d\u0644.ogg": {
+    "audio/quran/bengali/016 - An-Nahl ( The Bees ) - سورة النحل.ogg": {
       "size": 44255075,
       "sha256": "37576e0482dc95d92989d1836ab955f51f71d8c9a012df899f72d68e003af175",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/017 - Al-Isra ( The Night Journey ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u0633\u0631\u0627\u0621.ogg": {
+    "audio/quran/bengali/017 - Al-Isra ( The Night Journey ) - سورة الإسراء.ogg": {
       "size": 35501583,
       "sha256": "766b1edd4e1c98cd4bfee3cf06f85d7a5b17e2e4aeb93886cd842bac10f10d79",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/018 - Al-Kahf ( The Cave ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0647\u0641.ogg": {
+    "audio/quran/bengali/018 - Al-Kahf ( The Cave ) - سورة الكهف.ogg": {
       "size": 36676626,
       "sha256": "b3ef061bd2c7a49fb3990c50547b19d0b6f2531bfa8d399fcfe722f7aebb3d15",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/019 - Maryam ( Mary ) - \u0633\u0648\u0631\u0629 \u0645\u0631\u064a\u0645.ogg": {
+    "audio/quran/bengali/019 - Maryam ( Mary ) - سورة مريم.ogg": {
       "size": 23102368,
       "sha256": "372b00143e92e8aec423c326f3c16cb5c2232380a48471ddca582ba8c48b7386",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/020 - Taha - \u0633\u0648\u0631\u0629 \u0637\u0647.ogg": {
+    "audio/quran/bengali/020 - Taha - سورة طه.ogg": {
       "size": 31286248,
       "sha256": "c4be1bc73154ed7fb64ac4edfe2765ef5c66903fa5119a6bc5100f1f8fd1896b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/021 - Al-Anbiya ( The Prophets ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0628\u064a\u0627\u0621.ogg": {
+    "audio/quran/bengali/021 - Al-Anbiya ( The Prophets ) - سورة الأنبياء.ogg": {
       "size": 28397460,
       "sha256": "64792ec1ae629e2965f0008314aa28e30d7a835da82e18985ddb562634b73908",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/022 - Al-Hajj ( The Pilgrimage ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c.ogg": {
+    "audio/quran/bengali/022 - Al-Hajj ( The Pilgrimage ) - سورة الحج.ogg": {
       "size": 30532926,
       "sha256": "9eabd611581e6ef6d107553ddd0e2f9ed8ba540e86247d6c057e0ce78b55f946",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/023 - Al-Mu'minoon ( The Believers ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0624\u0645\u0646\u0648\u0646.ogg": {
+    "audio/quran/bengali/023 - Al-Mu'minoon ( The Believers ) - سورة المؤمنون.ogg": {
       "size": 25364988,
       "sha256": "a1398e46653958c71126315db4daab8b2f6760bcd60b5ea0361588f925580d14",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/024 - An-Noor ( The Light ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0648\u0631.ogg": {
+    "audio/quran/bengali/024 - An-Noor ( The Light ) - سورة النور.ogg": {
       "size": 32442698,
       "sha256": "c7511b2943370d5d8de3e1b759951c0f666bdc8d1d27ab26fd6d806c6e22c239",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/025 - Al-Furqan (The Criterion ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0631\u0642\u0627\u0646.ogg": {
+    "audio/quran/bengali/025 - Al-Furqan (The Criterion ) - سورة الفرقان.ogg": {
       "size": 21298632,
       "sha256": "8db8b491c7da9d46c2b64209b57ca6b11536568a9a48ce2cbd3f95bc84a8dca9",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/026 - Ash-Shuara ( The Poets ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0639\u0631\u0627\u0621.ogg": {
+    "audio/quran/bengali/026 - Ash-Shuara ( The Poets ) - سورة الشعراء.ogg": {
       "size": 34185329,
       "sha256": "a511d0fa3ca5d45a99b70a6b462f0608d4e0cbdfac3b8a82081f87c829063653",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/027 - An-Naml (The Ants ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0645\u0644.ogg": {
+    "audio/quran/bengali/027 - An-Naml (The Ants ) - سورة النمل.ogg": {
       "size": 29184602,
       "sha256": "81c593858ea515acc273be497d578604c3bb44c556d51bed6c0b384bec734849",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/028 - Al-Qasas ( The Stories ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0635\u0635.ogg": {
+    "audio/quran/bengali/028 - Al-Qasas ( The Stories ) - سورة القصص.ogg": {
       "size": 35376994,
       "sha256": "487aea870a4b70f9e0dede3ed5f79c7c919c8bef23a33eff1d557faad43a8222",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/029 - Al-Ankaboot ( The Spider ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0646\u0643\u0628\u0648\u062a.ogg": {
+    "audio/quran/bengali/029 - Al-Ankaboot ( The Spider ) - سورة العنكبوت.ogg": {
       "size": 23871755,
       "sha256": "a3e5ed602d3fe9e1ea19c44a4debd790381dd1c27fe7d4625e59107a63a31657",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/030 - Ar-Room ( The Romans ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u0648\u0645.ogg": {
+    "audio/quran/bengali/030 - Ar-Room ( The Romans ) - سورة الروم.ogg": {
       "size": 19772532,
       "sha256": "95fa043249cc2c6590a8ad08116fa45073d5f97f43b367d952385a3d905e095b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/031 - Luqman - \u0633\u0648\u0631\u0629 \u0644\u0642\u0645\u0627\u0646.ogg": {
+    "audio/quran/bengali/031 - Luqman - سورة لقمان.ogg": {
       "size": 11958043,
       "sha256": "53e64414c87be8d3e44d1aca578e0dd4ef2e3b6ec1c854398c9ada826c176bfc",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/032 - As-Sajdah ( The Prostration ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0633\u062c\u062f\u0629.ogg": {
+    "audio/quran/bengali/032 - As-Sajdah ( The Prostration ) - سورة السجدة.ogg": {
       "size": 8792797,
       "sha256": "c793a4214568df9a0603083ceb0d40435a09d182ceac0502fa9a2d3aed85b218",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/033 - Al-Ahzab ( The Combined Forces ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u062d\u0632\u0627\u0628.ogg": {
+    "audio/quran/bengali/033 - Al-Ahzab ( The Combined Forces ) - سورة الأحزاب.ogg": {
       "size": 29590102,
       "sha256": "f3067bdf42fb0220f8e6b22116abd7b2618ab78c23fe4a6b0c4d8113aa5dec99",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/034 - Saba ( Sheba ) - \u0633\u0648\u0631\u0629 \u0633\u0628\u0623.ogg": {
+    "audio/quran/bengali/034 - Saba ( Sheba ) - سورة سبأ.ogg": {
       "size": 19362760,
       "sha256": "d38243369116e015ead2f6f12d939d491038649fabafdc63347c4671106eb7bb",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/035 - Fatir ( The Orignator ) - \u0633\u0648\u0631\u0629 \u0641\u0627\u0637\u0631.ogg": {
+    "audio/quran/bengali/035 - Fatir ( The Orignator ) - سورة فاطر.ogg": {
       "size": 17664305,
       "sha256": "8a0ddc8f018146041b7eb2c98d218ba3492bbbb2595e1877240028830286d0ee",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/036 - Ya-seen - \u0633\u0648\u0631\u0629 \u064a\u0633.ogg": {
+    "audio/quran/bengali/036 - Ya-seen - سورة يس.ogg": {
       "size": 18869347,
       "sha256": "ac1a43400f9d93d68863e35fe525cacb46b4f667ef758f4fd27af7481f831f82",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/037 - As-Saaffat ( Those Ranges in Ranks ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0635\u0627\u0641\u0627\u062a.ogg": {
+    "audio/quran/bengali/037 - As-Saaffat ( Those Ranges in Ranks ) - سورة الصافات.ogg": {
       "size": 24585640,
       "sha256": "b24e4bef8b831adbf6187b1d2aa18ccf476014f2bc7979e86d09da732838257c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/038 - Sad ( The Letter Sad ) - \u0633\u0648\u0631\u0629 \u0635.ogg": {
+    "audio/quran/bengali/038 - Sad ( The Letter Sad ) - سورة ص.ogg": {
       "size": 18897931,
       "sha256": "ca6f31dc7dd8df5572fb9ecfd62218146273bf7bec6b053829e2150340b83a07",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/039 - Az-Zumar ( The Groups ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u0645\u0631.ogg": {
+    "audio/quran/bengali/039 - Az-Zumar ( The Groups ) - سورة الزمر.ogg": {
       "size": 28862613,
       "sha256": "3786199a3c5049a520d453b6ea5860e3e0972fb6845b456b9eb14d01c2483a00",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/040 - Ghafir ( The Forgiver God ) - \u0633\u0648\u0631\u0629 \u063a\u0627\u0641\u0631.ogg": {
+    "audio/quran/bengali/040 - Ghafir ( The Forgiver God ) - سورة غافر.ogg": {
       "size": 28832751,
       "sha256": "42b6d7c45b4d456ff9ba2dd81cb2093afc52939209a3ef31aa060812e73f3e00",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/041 - Fussilat ( Explained in Detail ) - \u0633\u0648\u0631\u0629 \u0641\u0635\u0644\u062a.ogg": {
+    "audio/quran/bengali/041 - Fussilat ( Explained in Detail ) - سورة فصلت.ogg": {
       "size": 20557532,
       "sha256": "9f509bc06835a80d5e8f2074cdf0a01dccf4340d51b0fa422f7c529e688526d5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/042 - Ash-Shura (Consultation ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0648\u0631\u0649.ogg": {
+    "audio/quran/bengali/042 - Ash-Shura (Consultation ) - سورة الشورى.ogg": {
       "size": 20469997,
       "sha256": "bb2c30e60461db6b1851747ab145b4fbc29d51d0d805d84952dc1969ee06037e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/043 - Az-Zukhruf ( The Gold Adornment ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u062e\u0631\u0641.ogg": {
+    "audio/quran/bengali/043 - Az-Zukhruf ( The Gold Adornment ) - سورة الزخرف.ogg": {
       "size": 22051227,
       "sha256": "01d390c839d61987398d26e61febd7a6d9a383a521758bf2adeefe01977a59e5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/044 - Ad-Dukhan ( The Smoke ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062f\u062e\u0627\u0646.ogg": {
+    "audio/quran/bengali/044 - Ad-Dukhan ( The Smoke ) - سورة الدخان.ogg": {
       "size": 9609247,
       "sha256": "c86091b7320fedc5e73fc589f61fdcf2c83e2f8f62901f1225d0b9d0face2a48",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/045 - Al-Jathiya ( Crouching ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0627\u062b\u064a\u0629.ogg": {
+    "audio/quran/bengali/045 - Al-Jathiya ( Crouching ) - سورة الجاثية.ogg": {
       "size": 11411241,
       "sha256": "cb658add3ce9a994a38e19d232215aca095d61390fcf2ca66807756a191cfdba",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/046 - Al-Ahqaf ( The Curved Sand-hills ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u062d\u0642\u0627\u0641.ogg": {
+    "audio/quran/bengali/046 - Al-Ahqaf ( The Curved Sand-hills ) - سورة الأحقاف.ogg": {
       "size": 16555211,
       "sha256": "e95d8e762d3bfc5c95b57bad4756534f19a7bd0858a5d3b1039f155e594483ef",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/047 - Muhammad - \u0633\u0648\u0631\u0629 \u0645\u062d\u0645\u062f.ogg": {
+    "audio/quran/bengali/047 - Muhammad - سورة محمد.ogg": {
       "size": 13189105,
       "sha256": "2e1f1549109b5efe7dbb0aa1d8e529e106fd9a83e4cdaeccbb91edefcaf551a1",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/048 - Al-Fath ( The Victory ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u062a\u062d.ogg": {
+    "audio/quran/bengali/048 - Al-Fath ( The Victory ) - سورة الفتح.ogg": {
       "size": 12924631,
       "sha256": "f9442d87e87d9f4a4e21e9b6c6003b3865f7069731084a83039d765fcb890f02",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/049 - Al-Hujurat ( The Dwellings ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c\u0631\u0627\u062a.ogg": {
+    "audio/quran/bengali/049 - Al-Hujurat ( The Dwellings ) - سورة الحجرات.ogg": {
       "size": 8425200,
       "sha256": "4cc635b1400d220c6d66566312a1aedf3bf749fe6a0486baf7eba95652ef5cca",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/050 - Qaf ( The Letter Qaf ) - \u0633\u0648\u0631\u0629 \u0642.ogg": {
+    "audio/quran/bengali/050 - Qaf ( The Letter Qaf ) - سورة ق.ogg": {
       "size": 9417966,
       "sha256": "5b72a4579c97a36136815a4ffbfdee354cea77e4ad46865d4a4a6d036ed2fe7e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/051 - Adh-Dhariyat ( The Wind that Scatter ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0630\u0627\u0631\u064a\u0627\u062a.ogg": {
+    "audio/quran/bengali/051 - Adh-Dhariyat ( The Wind that Scatter ) - سورة الذاريات.ogg": {
       "size": 9506726,
       "sha256": "de800116d113946dd5f3f1a335046303cd149e714b045650db483bf07f35a9fb",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/052 - At-Tur ( The Mount ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0648\u0631.ogg": {
+    "audio/quran/bengali/052 - At-Tur ( The Mount ) - سورة الطور.ogg": {
       "size": 8257141,
       "sha256": "114a4a9d6b5d862ec76129a97679cdd2dce84db4c23de274f50c6e42fcfa2ebe",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/053 - An-Najm ( The Star ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u062c\u0645.ogg": {
+    "audio/quran/bengali/053 - An-Najm ( The Star ) - سورة النجم.ogg": {
       "size": 8539288,
       "sha256": "d0e5921f48a90a7d41992b100171b24c63ce3c48f5862565865369739f6eaa7d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/054 - Al-Qamar ( The Moon ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0645\u0631.ogg": {
+    "audio/quran/bengali/054 - Al-Qamar ( The Moon ) - سورة القمر.ogg": {
       "size": 9037266,
       "sha256": "fd12218fa1bada5d3974ab08fb0aff894dd2865e2ba972ac042ef8e56365ef9a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/055 - Ar-Rahman ( The Most Graciouse ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u062d\u0645\u0646.ogg": {
+    "audio/quran/bengali/055 - Ar-Rahman ( The Most Graciouse ) - سورة الرحمن.ogg": {
       "size": 11628676,
       "sha256": "49a4cffb917b28bcbe54645cfd30a467255a7d03b87316f2826efb5562558296",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/056 - Al-Waqi'ah ( The Event ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0648\u0627\u0642\u0639\u0629.ogg": {
+    "audio/quran/bengali/056 - Al-Waqi'ah ( The Event ) - سورة الواقعة.ogg": {
       "size": 11667496,
       "sha256": "7aba98a9c7a00c079385b2eb3b1aa45acfb78f1eb9cbbaf4cc2004ae067be8ce",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/057 - Al-Hadid ( The Iron ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062f\u064a\u062f.ogg": {
+    "audio/quran/bengali/057 - Al-Hadid ( The Iron ) - سورة الحديد.ogg": {
       "size": 14895223,
       "sha256": "f5fa939c14f3773573098c8b3860a4271e295dbd0d59b9455c9e475b08594aa5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/058 - Al-Mujadilah ( She That Disputeth ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u062c\u0627\u062f\u0644\u0629.ogg": {
+    "audio/quran/bengali/058 - Al-Mujadilah ( She That Disputeth ) - سورة المجادلة.ogg": {
       "size": 10927771,
       "sha256": "fc89c82017e6c196ab3cae2cdabf37a42e8d140771a690bea056ed965af54315",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/059 - Al-Hashr ( The Gathering ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u0634\u0631.ogg": {
+    "audio/quran/bengali/059 - Al-Hashr ( The Gathering ) - سورة الحشر.ogg": {
       "size": 11222970,
       "sha256": "f6dd59e2d0a610e640c043de4e29f5b3ee17d589e947cfe9663b8617aff6e067",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/060 - Al-Mumtahanah ( The Woman to be examined ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0645\u062a\u062d\u0646\u0629.ogg": {
+    "audio/quran/bengali/060 - Al-Mumtahanah ( The Woman to be examined ) - سورة الممتحنة.ogg": {
       "size": 8070283,
       "sha256": "645d21623413bea33ccc921c258494bdd827d2f94ea854c77f68ac5fc4360f4b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/061 - As-Saff ( The Row ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0635\u0641.ogg": {
+    "audio/quran/bengali/061 - As-Saff ( The Row ) - سورة الصف.ogg": {
       "size": 5075622,
       "sha256": "729fcee88b8baf9407c62058ff8dd122f6f87c90a35a464e916428cf71716d18",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/062 - Al-Jumu'ah ( Friday ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0645\u0639\u0629.ogg": {
+    "audio/quran/bengali/062 - Al-Jumu'ah ( Friday ) - سورة الجمعة.ogg": {
       "size": 3861774,
       "sha256": "89d7c9645cf6589cf5d6acd26d395a39bc6a5454687cb8cc3762aee1d0700c6a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/063 - Al-Munafiqoon ( The Hypocrites ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0646\u0627\u0641\u0642\u0648\u0646.ogg": {
+    "audio/quran/bengali/063 - Al-Munafiqoon ( The Hypocrites ) - سورة المنافقون.ogg": {
       "size": 4581482,
       "sha256": "cab440e54c608324480f9af00f2b1db62db80ecc8834a624a57f9d0f8e74d3ad",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/064 - At-Taghabun ( Mutual Loss & Gain ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u063a\u0627\u0628\u0646.ogg": {
+    "audio/quran/bengali/064 - At-Taghabun ( Mutual Loss & Gain ) - سورة التغابن.ogg": {
       "size": 6159538,
       "sha256": "3c54d0cb4b2d4e5cb3cf10eec5eb35b1f68f69ef8e4a4d18b14d428a9eb3c5d8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/065 - At-Talaq ( The Divorce ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0644\u0627\u0642.ogg": {
+    "audio/quran/bengali/065 - At-Talaq ( The Divorce ) - سورة الطلاق.ogg": {
       "size": 6517115,
       "sha256": "a26e44826891a1a85c20c7a03f14c83a3ab9bc4da83e3bfcf7d50e72661982da",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/066 - At-Tahrim ( The Prohibition ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u062d\u0631\u064a\u0645.ogg": {
+    "audio/quran/bengali/066 - At-Tahrim ( The Prohibition ) - سورة التحريم.ogg": {
       "size": 6605565,
       "sha256": "a65596e1ff3dafb7bf7562f557348fc482487cf16c98ca5f327993e93b763661",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/067 - Al-Mulk ( Dominion ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u0643.ogg": {
+    "audio/quran/bengali/067 - Al-Mulk ( Dominion ) - سورة الملك.ogg": {
       "size": 8001098,
       "sha256": "043a2911e2d3b3599b5e013b9c97fadc130deb031bb9be92f7eec0d77b34986c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/068 - Al-Qalam ( The Pen ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0644\u0645.ogg": {
+    "audio/quran/bengali/068 - Al-Qalam ( The Pen ) - سورة القلم.ogg": {
       "size": 8324038,
       "sha256": "fbe7628cb5ea6843071adb1fe88d6231e8c8be1c63c4f92a522ff39f4e054d59",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/069 - Al-Haaqqah ( The Inevitable ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u0627\u0642\u0629.ogg": {
+    "audio/quran/bengali/069 - Al-Haaqqah ( The Inevitable ) - سورة الحاقة.ogg": {
       "size": 7038889,
       "sha256": "eb6203d1543d12de30c71eade7446f57ab2b15d50756521def3c5f7872340452",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/070 - Al-Ma'arij (The Ways of Ascent ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0639\u0627\u0631\u062c.ogg": {
+    "audio/quran/bengali/070 - Al-Ma'arij (The Ways of Ascent ) - سورة المعارج.ogg": {
       "size": 5622742,
       "sha256": "f92334d40fd15bb086168881489db69bc8f5f81cba93db1a5739f5cfa1fe0277",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/071 - Nooh - \u0633\u0648\u0631\u0629 \u0646\u0648\u062d.ogg": {
+    "audio/quran/bengali/071 - Nooh - سورة نوح.ogg": {
       "size": 5279308,
       "sha256": "f1d6a31e0c45cdec9a0af5a14baa2e375587ffe67c46d9f0c1ed5f35837c940a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/072 - Al-Jinn ( The Jinn ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0646.ogg": {
+    "audio/quran/bengali/072 - Al-Jinn ( The Jinn ) - سورة الجن.ogg": {
       "size": 6292537,
       "sha256": "dd2fac5ac3321f67e2b3084e3206e6a7ee157115e1168cc638e66196f1c4aaca",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/073 - Al-Muzzammil (The One wrapped in Garments) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0632\u0645\u0644.ogg": {
+    "audio/quran/bengali/073 - Al-Muzzammil (The One wrapped in Garments) - سورة المزمل.ogg": {
       "size": 4757786,
       "sha256": "8aae2aad4e1b4b9340e95f34b603f5ccccee014e1beeaadd530488a8a61b9581",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/074 - Al-Muddaththir ( The One Enveloped ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u062f\u062b\u0631.ogg": {
+    "audio/quran/bengali/074 - Al-Muddaththir ( The One Enveloped ) - سورة المدثر.ogg": {
       "size": 6544787,
       "sha256": "e7469c743651c2c79587d3700067b655823ea53b9d94830b46c6f1b231045083",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/075 - Al-Qiyamah ( The Resurrection ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u064a\u0627\u0645\u0629.ogg": {
+    "audio/quran/bengali/075 - Al-Qiyamah ( The Resurrection ) - سورة القيامة.ogg": {
       "size": 3954529,
       "sha256": "ad104eabd8704aa25bad585eda476b3653705fcb958917423bfdd31845552b05",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/076 - Al-Insan ( Man ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u0646\u0633\u0627\u0646.ogg": {
+    "audio/quran/bengali/076 - Al-Insan ( Man ) - سورة الإنسان.ogg": {
       "size": 6151294,
       "sha256": "3bc7433f5aeb6f09862f855a5f8490477c75c5b94b36fc4c6273971109ec6046",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/077 - Al-Mursalat ( Those sent forth ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0631\u0633\u0644\u0627\u062a.ogg": {
+    "audio/quran/bengali/077 - Al-Mursalat ( Those sent forth ) - سورة المرسلات.ogg": {
       "size": 5256897,
       "sha256": "b80406b2549dc2374407220df090143765dffe0d823d2d1d4374cb69db2bb688",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/078 - An-Naba' ( The Great News ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0628\u0623.ogg": {
+    "audio/quran/bengali/078 - An-Naba' ( The Great News ) - سورة النبأ.ogg": {
       "size": 4454764,
       "sha256": "fb31032abdd4236450a7c5b49d531c258c95bc90d4513077ab89c0a24de8f8cd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/079 - An-Nazi'at ( Those who Pull Out ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0627\u0632\u0639\u0627\u062a.ogg": {
+    "audio/quran/bengali/079 - An-Nazi'at ( Those who Pull Out ) - سورة النازعات.ogg": {
       "size": 4919244,
       "sha256": "92c37397d4c9c84721a7b8db6c92d959689dbca63926242fd2cf08d1a8546e5b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/080 - Abasa ( He frowned ) - \u0633\u0648\u0631\u0629 \u0639\u0628\u0633.ogg": {
+    "audio/quran/bengali/080 - Abasa ( He frowned ) - سورة عبس.ogg": {
       "size": 4019742,
       "sha256": "ef50c42feda7a975b01fcf38e4fa8cbe2f9f7e63e69de55e0e724f5139458cc9",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/081 - At-Takwir ( The Overthrowing ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0643\u0648\u064a\u0631.ogg": {
+    "audio/quran/bengali/081 - At-Takwir ( The Overthrowing ) - سورة التكوير.ogg": {
       "size": 2581656,
       "sha256": "4fe7bf9d99a37175cb42e39234d9a80dc0cf367c3ab9e091fae1ce072ee935f6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/082 - Al-Infitar ( The Cleaving ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0627\u0646\u0641\u0637\u0627\u0631.ogg": {
+    "audio/quran/bengali/082 - Al-Infitar ( The Cleaving ) - سورة الانفطار.ogg": {
       "size": 2351241,
       "sha256": "0d1dc19c491b198998a7972a9f4f0b436229db2c6b159e6697b5c50d5e2d66c7",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/083 - Al-Mutaffifin (Those Who Deal in Fraud) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0637\u0641\u0641\u064a\u0646.ogg": {
+    "audio/quran/bengali/083 - Al-Mutaffifin (Those Who Deal in Fraud) - سورة المطففين.ogg": {
       "size": 4833187,
       "sha256": "95bb2401dbed4aece3ad95278e17f2a05bfc4f85edd77c2c53370165df0cc2d6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/084 - Al-Inshiqaq (The Splitting Asunder) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0627\u0646\u0634\u0642\u0627\u0642.ogg": {
+    "audio/quran/bengali/084 - Al-Inshiqaq (The Splitting Asunder) - سورة الانشقاق.ogg": {
       "size": 2999702,
       "sha256": "9dfcc6fc5b155f5d80ebcd0964a1fe80f11c5197e5376eb752b88f08a892ae2d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/085 - Al-Burooj ( The Big Stars ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0631\u0648\u062c.ogg": {
+    "audio/quran/bengali/085 - Al-Burooj ( The Big Stars ) - سورة البروج.ogg": {
       "size": 3104040,
       "sha256": "ad162ebe7975d87f8523bda68b964b4ebed64741e7922fd2e3466b706b959dd4",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/086 - At-Tariq ( The Night-Comer ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0627\u0631\u0642.ogg": {
+    "audio/quran/bengali/086 - At-Tariq ( The Night-Comer ) - سورة الطارق.ogg": {
       "size": 1839432,
       "sha256": "c91374c5d75667b2e20b73d57608c336fda5b8baa618da0c84de45f0a3164b66",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/087 - Al-A'la ( The Most High ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0639\u0644\u0649.ogg": {
+    "audio/quran/bengali/087 - Al-A'la ( The Most High ) - سورة الأعلى.ogg": {
       "size": 2064467,
       "sha256": "e620e1d37e89eb3ee6a4caa5685f741694a8aeca7a9b2abed8ff84784c194872",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/088 - Al-Ghashiya ( The Overwhelming ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u063a\u0627\u0634\u064a\u0629.ogg": {
+    "audio/quran/bengali/088 - Al-Ghashiya ( The Overwhelming ) - سورة الغاشية.ogg": {
       "size": 2348079,
       "sha256": "ba41f219453a337a330c0ed4aa8ed9167cae36e879c4d306c73dab8ec81830f6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/089 - Al-Fajr ( The Dawn ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u062c\u0631.ogg": {
+    "audio/quran/bengali/089 - Al-Fajr ( The Dawn ) - سورة الفجر.ogg": {
       "size": 3653192,
       "sha256": "fa050e100dec4e83720f8076578f47dfe033bf7d2dc02f6e998418ed629eeba8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/090 - Al-Balad ( The City ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0644\u062f.ogg": {
+    "audio/quran/bengali/090 - Al-Balad ( The City ) - سورة البلد.ogg": {
       "size": 2000443,
       "sha256": "ea643d31136cd042543a7eb90ce11215b876af3c5bd76118c1554b49cc7c7546",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/091 - Ash-Shams ( The Sun ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0645\u0633.ogg": {
+    "audio/quran/bengali/091 - Ash-Shams ( The Sun ) - سورة الشمس.ogg": {
       "size": 1704929,
       "sha256": "aa9c103e5a4abcb8e085b874155d0da3d18e4c62f55beb209b49c22f896c3592",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/092 - Al-Layl ( The Night ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0644\u064a\u0644.ogg": {
+    "audio/quran/bengali/092 - Al-Layl ( The Night ) - سورة الليل.ogg": {
       "size": 1985624,
       "sha256": "5721467de7bbf904e1f99579c165bdc8cbbb42b331108c0747056fc1f0fabc1c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/093 - Ad-Dhuha ( The Forenoon ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0636\u062d\u0649.ogg": {
+    "audio/quran/bengali/093 - Ad-Dhuha ( The Forenoon ) - سورة الضحى.ogg": {
       "size": 1186846,
       "sha256": "7155839293628d4393b3e2e888aee4ee9b318abd9c2839f9eaa62666a8cfc3aa",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/094 - As-Sharh ( The Opening Forth) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0631\u062d.ogg": {
+    "audio/quran/bengali/094 - As-Sharh ( The Opening Forth) - سورة الشرح.ogg": {
       "size": 769017,
       "sha256": "8c999eaa9b2762cd931788db76ef93756c9d1fd6c501e4ee8d82748d154b2465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/095 - At-Tin ( The Fig ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u064a\u0646.ogg": {
+    "audio/quran/bengali/095 - At-Tin ( The Fig ) - سورة التين.ogg": {
       "size": 1069250,
       "sha256": "2fc4357479f87ea4026e4262dba349c13e929bb7953607576cd379a5ed8ff8e7",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/096 - Al-'alaq ( The Clot ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0644\u0642.ogg": {
+    "audio/quran/bengali/096 - Al-'alaq ( The Clot ) - سورة العلق.ogg": {
       "size": 1864565,
       "sha256": "ffd9edc0ba78b837ad5803562328c718e782e2d5534b24bc0fa6aaa9c9efe1e6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/097 - Al-Qadr ( The Night of Decree ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u062f\u0631.ogg": {
+    "audio/quran/bengali/097 - Al-Qadr ( The Night of Decree ) - سورة القدر.ogg": {
       "size": 777538,
       "sha256": "3fab5fec04e14111bfd9bcc0b33a47e7d2f4c815e76cfae28a13be57f8c4fa5e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/098 - Al-Bayyinah ( The Clear Evidence ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u064a\u0646\u0629.ogg": {
+    "audio/quran/bengali/098 - Al-Bayyinah ( The Clear Evidence ) - سورة البينة.ogg": {
       "size": 2062531,
       "sha256": "5f1e3e09f46e2ab1c4028897b03e5f839377d985e83e0b343fc9d5cf258a0f80",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/099 - Az-Zalzalah ( The Earthquake ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u0644\u0632\u0644\u0629.ogg": {
+    "audio/quran/bengali/099 - Az-Zalzalah ( The Earthquake ) - سورة الزلزلة.ogg": {
       "size": 1012796,
       "sha256": "9b37122685686f2f454260715fb6abf24421fbf85557f83fbacb052763233465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/100 - Al-'adiyat ( Those That Run ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0627\u062f\u064a\u0627\u062a.ogg": {
+    "audio/quran/bengali/100 - Al-'adiyat ( Those That Run ) - سورة العاديات.ogg": {
       "size": 1189321,
       "sha256": "787557f5c85901daebd5ca85b0e8116ba606e6a2a095cb940e9f9a44fdf1d510",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/101 - Al-Qari'ah ( The Striking Hour ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0627\u0631\u0639\u0629.ogg": {
+    "audio/quran/bengali/101 - Al-Qari'ah ( The Striking Hour ) - سورة القارعة.ogg": {
       "size": 996144,
       "sha256": "906b576fc7342d5f58f9abcdaf4cf8ad482d2c98c22d9e9895dc68670ccee3b5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/102 - At-Takathur ( The piling Up ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0643\u0627\u062b\u0631.ogg": {
+    "audio/quran/bengali/102 - At-Takathur ( The piling Up ) - سورة التكاثر.ogg": {
       "size": 1038211,
       "sha256": "83afde6a161b7de80a4b03862a702548bda85f15e6eeaeee77622aa17cc472dd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/103 - Al-Asr ( The Time ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0635\u0631.ogg": {
+    "audio/quran/bengali/103 - Al-Asr ( The Time ) - سورة العصر.ogg": {
       "size": 490820,
       "sha256": "be1b6c42533e790d19b1748e538006b91429950153e0be96675a302962befcc8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/104 - Al-Humazah ( The Slanderer ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0647\u0645\u0632\u0629.ogg": {
+    "audio/quran/bengali/104 - Al-Humazah ( The Slanderer ) - سورة الهمزة.ogg": {
       "size": 955085,
       "sha256": "e01687d5e3a7b4000359df8d99e70affd828bcd14f24bc4d2d82b5636b971eb2",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/105 - Al-Fil ( The Elephant ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u064a\u0644.ogg": {
+    "audio/quran/bengali/105 - Al-Fil ( The Elephant ) - سورة الفيل.ogg": {
       "size": 761374,
       "sha256": "d8f1c7c6869c5b531a027db3792df63ba3695d974c0ddc96f142c7239cde5e2e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/106 - Quraish - \u0633\u0648\u0631\u0629 \u0642\u0631\u064a\u0634.ogg": {
+    "audio/quran/bengali/106 - Quraish - سورة قريش.ogg": {
       "size": 644771,
       "sha256": "a33d2d4ed8a321c9bbf3c7286f27dcba22c6d521953d0469a2e912ebaec8f465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/107 - Al-Ma'un ( Small Kindnesses ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0627\u0639\u0648\u0646.ogg": {
+    "audio/quran/bengali/107 - Al-Ma'un ( Small Kindnesses ) - سورة الماعون.ogg": {
       "size": 889062,
       "sha256": "c7321a628e8711b98fe468c6358c11c338d741ad12087277e6a47e7276c355b1",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/108 - Al-Kauthor ( A River in Paradise) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0648\u062b\u0631.ogg": {
+    "audio/quran/bengali/108 - Al-Kauthor ( A River in Paradise) - سورة الكوثر.ogg": {
       "size": 424621,
       "sha256": "f3931607db3dcce4fa2aba6e95eed02af91554511feac511fc7ea7080405513d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/109 - Al-Kafiroon ( The Disbelievers ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0627\u0641\u0631\u0648\u0646.ogg": {
+    "audio/quran/bengali/109 - Al-Kafiroon ( The Disbelievers ) - سورة الكافرون.ogg": {
       "size": 861223,
       "sha256": "3faf609b589890865716cda062ffc5027dd1c5244fc76d0c5fe28fc31e2c0d74",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/110 - An-Nasr ( The Help ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0635\u0631.ogg": {
+    "audio/quran/bengali/110 - An-Nasr ( The Help ) - سورة النصر.ogg": {
       "size": 610251,
       "sha256": "e8e89672b0b522c788b4827868175aeaf0be300174c25b9662bda5a8640e8259",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/111 - Al-Masad ( The Palm Fibre ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0633\u062f.ogg": {
+    "audio/quran/bengali/111 - Al-Masad ( The Palm Fibre ) - سورة المسد.ogg": {
       "size": 675953,
       "sha256": "0ad78510fbeb45dfce5c3c170e8ca56c1d3b439b1aa3ec07ca1ea8309510ce42",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/112 - Al-Ikhlas ( Sincerity ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u062e\u0644\u0627\u0635.ogg": {
+    "audio/quran/bengali/112 - Al-Ikhlas ( Sincerity ) - سورة الإخلاص.ogg": {
       "size": 455405,
       "sha256": "efcbc86935f78312222a2466b115f63666a4a6c9ca9c0edd042b8a8a7a5c4ce5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/113 - Al-Falaq ( The Daybreak ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0644\u0642.ogg": {
+    "audio/quran/bengali/113 - Al-Falaq ( The Daybreak ) - سورة الفلق.ogg": {
       "size": 616863,
       "sha256": "565fe15febfe7a3c02a161062daa31851bb11129baa3ca05b75151cddd81382a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/114 - An-Nas ( Mankind ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0627\u0633.ogg": {
+    "audio/quran/bengali/114 - An-Nas ( Mankind ) - سورة الناس.ogg": {
       "size": 756570,
       "sha256": "8002f5b793fe6eb305fb92ae662bd4527ad866defe89083f8ed1982faa915a14",
       "category": "quran_audio_bengali",
@@ -39482,6 +39476,1512 @@
     "audio/fortress/arabic/132.mp3": {
       "size": 1043358,
       "sha256": "445c782266dbd3f48997f442666fa02fdf1427cdb4a41e40068b09dc74e5ee72",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/1.mp3": {
+      "size": 255770,
+      "sha256": "d63f0c06418eb5df7deb7f98168cc0d133f1cb79a0009d35ebcf3ba520529412",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/10.mp3": {
+      "size": 253230,
+      "sha256": "61d2463d6bf5b7848dc1bb445004069f876c0859f0b6ca2ea91c7b4a704d2c6a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/100.mp3": {
+      "size": 1140196,
+      "sha256": "adec2492cf77fe557d1418ffd2a28a9ae968beded43eacd0dc1a32a043f385fa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/101.mp3": {
+      "size": 1539347,
+      "sha256": "02fd47ec54740f1a2545c788ddd29a1007505dcf139b22b71ee806df212b09b0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/102.mp3": {
+      "size": 422560,
+      "sha256": "5dabbcdca3882bdcbe0156f695a1f733167dd96e27a32892518fce8f4bcde463",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/103.mp3": {
+      "size": 486508,
+      "sha256": "f011017b6c42184b8b1396c723c697247fd75cd30cf7f33d20453fed8cf43a18",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/11.mp3": {
+      "size": 206382,
+      "sha256": "b30b274f6459fc3c3bb66f6b881931448f1ea52c5e187428e2171832a80918b7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/112.mp3": {
+      "size": 306606,
+      "sha256": "6ae89fea117c8814cb7e5c4d81339d2a7e082d8ddf4493509aeb20209a1a05aa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/113.mp3": {
+      "size": 332718,
+      "sha256": "62636c0ccbc6b15fa5369c0b47290083e5f4b08cccdd8c96b5c2b397e71179b8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/114.mp3": {
+      "size": 502808,
+      "sha256": "4428a13e1790006b411bd357b7db3064369e8dab821a954963a3d044c1ce09f4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/115.mp3": {
+      "size": 242002,
+      "sha256": "167dccb27e4c6f0823552c896136672a64e9431f6e54791f9394ff2c3791295a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/116.mp3": {
+      "size": 843027,
+      "sha256": "0436a8eb64f1192972f997494de5c2a9fe6ac4a52e41b81da3838aa9849863d8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/12.mp3": {
+      "size": 220974,
+      "sha256": "6f6b716b533d3ac984002011cc18eb2219d8905da92d128c56fb0fea402d5552",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/120.mp3": {
+      "size": 950860,
+      "sha256": "fe28ffe44fb2d4ea67e307054070d6a0f6841c925e0c20be457a8d791c48f706",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/121.mp3": {
+      "size": 389541,
+      "sha256": "383443ce904d800e7c7e3ff7b97f45a5cc36df897c6cdc4809baa9d25db2df9f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/122.mp3": {
+      "size": 582220,
+      "sha256": "0f23111ae531230cfad9683f7217a07660f3dfd81dce848d108a6096d1e00a7f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/123.mp3": {
+      "size": 357358,
+      "sha256": "9d04895a0806764c8379cfee7737b4cd1bcceae1a5a2ab114e05c1f1183b8493",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/124.mp3": {
+      "size": 262900,
+      "sha256": "9e4cda39a605d14e6ce3cf60e0a5a1437bdc13bb87ed55bd9a185c895732c1c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/125.mp3": {
+      "size": 259138,
+      "sha256": "83f5c58a45c2404c00a8281f3eb28a503ba3797bd5d11650f901c1b328b0e836",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/126.mp3": {
+      "size": 438442,
+      "sha256": "d99dcecafeefca39cda42bb74a22cc8cc6471e9734794de092e158c84d8085c4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/127.mp3": {
+      "size": 310129,
+      "sha256": "475d77d0f4bf652d5d4a391de79977415ff2ae29c6e1d0ebdf8bdaf65fd8fb69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/128.mp3": {
+      "size": 223193,
+      "sha256": "e8aaf015e6b09ca3fdcf153d0d6f9dbcc1cfdca3a9a68a78a281413454e3cfc4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/129.mp3": {
+      "size": 680441,
+      "sha256": "fdd0791f5a50d44e2473158a4ec55adfd6b624e6753416b484b6ed192a8bb88a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/13.mp3": {
+      "size": 425486,
+      "sha256": "18db47d0cd2fe1ed481d8948304f45b615b874ff679b718782e994a3f59a305e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/130.mp3": {
+      "size": 980953,
+      "sha256": "b5506fae8f65a6993916f9ddf6493a3d5c763b25b2005fc85ac8fb4520a302c2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/131.mp3": {
+      "size": 285294,
+      "sha256": "26c0f45594287a5f9427785d14edb8e338881c547d2ce0f11609bde799a9d449",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/132.mp3": {
+      "size": 223854,
+      "sha256": "b119a3ebdcf6bcc6175293bfd3594b85b8f7a105a4a2e11fe44e54358bdf5a67",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/133.mp3": {
+      "size": 318070,
+      "sha256": "be3d2f657a415e7afd560a4a8f30c67c954cfb1fff5838299f3b3dd7f3723abb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/134.mp3": {
+      "size": 214834,
+      "sha256": "dfa971a467e3d61af59d4c439e030997ea8cc399d68844fd52981dbdf253733c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/135.mp3": {
+      "size": 339386,
+      "sha256": "197d3a80dedd27d58dd9663f30679075b3393d03b1453ee0ee3341c9c3d9ed24",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/136.mp3": {
+      "size": 374913,
+      "sha256": "dd1f69616720bc8c5ee00f39d411ff2cc74422749f2337ef729cfcab66f89da3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/137.mp3": {
+      "size": 425904,
+      "sha256": "56f67d3336440e2f28862b6694886bea92b996deeecd087e02b8572e3b7aec72",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/138.mp3": {
+      "size": 270126,
+      "sha256": "3e3fa5426b41f9b945a6fb4ba2f512675228f506b8458b12ec24084b56850ae1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/139.mp3": {
+      "size": 286830,
+      "sha256": "bce74ef48d31f68ff37cfd5634cff0ae18d7930a650ba3a59e308de2a0aba5f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/14.mp3": {
+      "size": 278364,
+      "sha256": "1b015bb081065f5a90b4d6f4c93c78d545f03d6fb11d266dac2ba577198de2d2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/140.mp3": {
+      "size": 321774,
+      "sha256": "985018fcc6d572ee635c1eb06899aa03546de1bb9e9617778b51a2fa6afc17d8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/141.mp3": {
+      "size": 273767,
+      "sha256": "e4b2a15928910fa3d0a1d70d2cba9c56ea4e0ab42155257f28d8ca9a9626d8b7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/142.mp3": {
+      "size": 184323,
+      "sha256": "f5ea66d90fbb0d05b98075ea0af6c950ec2a4719e95caf2ff4ae6b9f5f9fa415",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/143.mp3": {
+      "size": 206057,
+      "sha256": "7a976255d29a470f356f4f5c60403e7d8d507809e7d7e5299ac940bc071b2f69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/144.mp3": {
+      "size": 238062,
+      "sha256": "ea5a043d5f467e6cdae227fa6b9cc663943dcca1a68946fb3f1225cf68f8ef8d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/145.mp3": {
+      "size": 435054,
+      "sha256": "23cda037a6604e8e8a08a5158d2c0f0e66bb68b3e7aa3dcb4804ad6a23cc8459",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/146.mp3": {
+      "size": 336942,
+      "sha256": "df212f89876da404d98a374333d668aa75641ba7f61cb468e87030ca7a098e4b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/147.mp3": {
+      "size": 321414,
+      "sha256": "8b2179671464ef1e32436751a4dde8eb0d88b1e4e3e84f723a78993c1140a382",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/148.mp3": {
+      "size": 282962,
+      "sha256": "e484e83108b25a5690cf81bb1e9d43da60afa1caf71d403dff4ceef44250ca7e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/149.mp3": {
+      "size": 407214,
+      "sha256": "67ee9456cc59031969babfbb6d4bab9452d29ea742d6d8f629047b9b025d269d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/15.mp3": {
+      "size": 360284,
+      "sha256": "17ccd8c8ea5e4ca86654bf2ac2131d2d12795645adc8bec0e8766e54597877c7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/150.mp3": {
+      "size": 359866,
+      "sha256": "3421b2255ca236c839f82914f482189349e735ef73103f4d28ca9674e88885dc",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/151.mp3": {
+      "size": 440114,
+      "sha256": "05de813932302d42b9b839deab144426d72ec1fc98a40acfa3e7d6c4b0993ad4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/152.mp3": {
+      "size": 616493,
+      "sha256": "1191d9ee8ee357eebdddd01b82a1978a9d69973bca2998d40387a8ac2ae34bf7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/153.mp3": {
+      "size": 254766,
+      "sha256": "d8200a19883c149873e0c90a527d728728f7c1f93750ca8a25ac9dfd251bc993",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/154.mp3": {
+      "size": 306606,
+      "sha256": "9e39c889ff557d578bffb302b4348d8b3c57b0c23db08f7b0cde94676557a14e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/155.mp3": {
+      "size": 402414,
+      "sha256": "ff52f973207026356a5b6a08a5824abd27c313cf3cb8187aadc00e9a09eb2bc0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/156.mp3": {
+      "size": 907811,
+      "sha256": "0dbc4b815419d03f1b1377f94b055b84bdacdbf75321e1ee6866f51892de46fc",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/157.mp3": {
+      "size": 673336,
+      "sha256": "433e478ed5dd3945b828958c3f51f9819b7833934f2cf5bb70cf1af651351553",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/158.mp3": {
+      "size": 505316,
+      "sha256": "5d00fa296e007e10fa055acbadcf7cc5d0e40af140c4870a96f7c2566ce05b89",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/159.mp3": {
+      "size": 455161,
+      "sha256": "74655437523c2ad6f4ab2ff389fc5fce763d3b3f91e27a9a05502a9c7d343c13",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/16.mp3": {
+      "size": 394557,
+      "sha256": "d082def86385868392c6cd3e07c3e1d02b29308282bfa64b05ef8c09e7c79580",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/160.mp3": {
+      "size": 1040722,
+      "sha256": "7425cadd097e25ef3ccead4449ef9c0013da1e49faabfa5a82f3f239007c4bc1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/161.mp3": {
+      "size": 232389,
+      "sha256": "33acd2f0e1f95a201f5a414dc3a9266777df361f0cd669e9c4beb329644b938d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/162.mp3": {
+      "size": 389358,
+      "sha256": "4e1d18e2ec441f54d5affb20b9958dd96db936de28cf69b74f907295c0b486e7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/163.mp3": {
+      "size": 238830,
+      "sha256": "2fe2656eba0d0275780f3d037e78dde6d27c2764eb443edf412ec881272e432a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/164.mp3": {
+      "size": 234990,
+      "sha256": "d413b4664f923e1a73cd2a46216e730946823df0bd7b5bd3d8ff42bcf7a5968a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/165.mp3": {
+      "size": 355182,
+      "sha256": "310f168167fcd444be486f25e3a8e49b071cddaaad4971c036895c1b6bbb549c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/166.mp3": {
+      "size": 359030,
+      "sha256": "1c5d4223503ec7a112c7708eeafcce7c4929217c77770c6cb0545560d5efd8df",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/167.mp3": {
+      "size": 407096,
+      "sha256": "015227d0ac7446c2e82df4289c4dea700056cf089c55df386d42948679721245",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/168.mp3": {
+      "size": 266670,
+      "sha256": "a0fdca9f6ac2379724de6cd26793e9aa547df1b3c98f93a5238f723ac8af8abb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/169.mp3": {
+      "size": 438860,
+      "sha256": "94660d246e283eb37d36c4ab816214e7397e987ed8bd16ed57209b9a13dfcbdf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/17.mp3": {
+      "size": 435099,
+      "sha256": "2b95546a19ec056926ff087d8c3e45ce392b784ac7d0193622134f743ae85612",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/170.mp3": {
+      "size": 295082,
+      "sha256": "1858b07da00111b7079098f7358668924a80d67b821af319a6e58dddc1cb8258",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/171.mp3": {
+      "size": 298426,
+      "sha256": "3e240e5aa20724402576bfa045ba0a52878ee704f6880ee72a924fc459a5542a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/172.mp3": {
+      "size": 228270,
+      "sha256": "ddbe724592a1d861ca9e59e2fe2ffe1dbe098a2613fa69f8c278fdf201d880c4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/173.mp3": {
+      "size": 225582,
+      "sha256": "48d71150d8a5ec494f5ca6e138faa1480108e8763503eb4b16baf3ee5d90126c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/174.mp3": {
+      "size": 282798,
+      "sha256": "63f7978059d2befe10a15273a39903f9dbcb330c73c6b95bfc90145944d9d38d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/175.mp3": {
+      "size": 340782,
+      "sha256": "f7eee017954c13523f58e5f6a6b055f244beddcced2e61c1b8812c285fbecbdf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/176.mp3": {
+      "size": 359448,
+      "sha256": "9e87059df0e6af7e2dd7c179ad01d70911fa967aeb1e32b736bc13104db0cc94",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/177.mp3": {
+      "size": 272931,
+      "sha256": "b7b30ab7d548a2520f3556dcdada178f21ddb4e6462dce780245e9b6601bf294",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/178.mp3": {
+      "size": 390377,
+      "sha256": "943ea5d058939094364691f2bcd3b159057094396192542e5652b1b8b7fd4b33",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/179.mp3": {
+      "size": 475641,
+      "sha256": "d4ea21b6a0253fb272f2ebbc251d6b08fa2e8dbdde3966660cda2ba5d90b2f6e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/18.mp3": {
+      "size": 312750,
+      "sha256": "542fc4c3515277efdd7d60f75f013ab7ca50a6e305f8371270a1895ddbe99123",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/180.mp3": {
+      "size": 412529,
+      "sha256": "fe6b1c49519545d0c397a0cce3f86120aad42d03d41273a26733c13cfb595618",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/181.mp3": {
+      "size": 347327,
+      "sha256": "84b62e717d1c94757d9152cf47a586050aeddff9927a0958a2c9ab50d8d03292",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/182.mp3": {
+      "size": 264750,
+      "sha256": "6c8789f2a61cc377974652ea85f7bf6654e45c8c149f9f44e564d15a6a313372",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/183.mp3": {
+      "size": 257070,
+      "sha256": "0dc2c18cf472408a49adf6ef4cc4053d13e65b5167662271b93574a2a90de0d0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/184.mp3": {
+      "size": 282606,
+      "sha256": "c716de879138c780ed500860d343f32e775f681fe04884fc76ecb6f681cb7623",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/185.mp3": {
+      "size": 319278,
+      "sha256": "5ce6a04cf68e8c3980f48739f7982bf99f7a046c9d13c74b5b7d10c6653614ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/186.mp3": {
+      "size": 235566,
+      "sha256": "e4e82c7928b52a841d322ce33ce6dc7af131b054dc9e280c418b23ecf86f35f2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/187.mp3": {
+      "size": 327534,
+      "sha256": "fac2dd5246774c3e7720590ee082b340f70626c51a1a45aa9a2ed9d8d560ea81",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/188.mp3": {
+      "size": 335406,
+      "sha256": "04d552c2ce164602b12b3310ff47b51e0c11f85aec3090727377959db59e68e4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/189.mp3": {
+      "size": 239406,
+      "sha256": "982f0cd1604372d3ec4ac718e35e5be4edbd8b3eabff7754d6de9c73408be606",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/19.mp3": {
+      "size": 912558,
+      "sha256": "956c7f735724de24d332bda35ab625ffe9f5d446d16eda8af08563a67d334d8a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/190.mp3": {
+      "size": 264174,
+      "sha256": "94b735170778a162d36dcda621fee34350703674bda5a43b2cb6d92550beb97b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/191.mp3": {
+      "size": 393006,
+      "sha256": "71a89b9427a5cadfe45879c794cc9eeca93aa5a28dfd2ec58c90e76389ff8bb4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/192.mp3": {
+      "size": 261870,
+      "sha256": "82346f08ddd342a628241c92e2a69d7b37b9e16b1df5a164a5bc351b4f0cac37",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/193.mp3": {
+      "size": 225390,
+      "sha256": "ecb7d73fdb0b405e68822c6b5a732c2d3c3702035abe3f811ca385d08fc6ccf3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/194.mp3": {
+      "size": 275886,
+      "sha256": "9006915a4e90a4ad91a32d6b667fa993f735173e722572b8f424d0c2e30f7f51",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/195.mp3": {
+      "size": 321390,
+      "sha256": "f67cceba162f3347e7ef1e3b4c5159e3a9cc9309f0dd920ab4b8ba7541398ea1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/196.mp3": {
+      "size": 271854,
+      "sha256": "217f762d76a2b6425bb1e6d14047e3e8db9e584b5ac5bfc1eb13738c2ebd7c43",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/197.mp3": {
+      "size": 210414,
+      "sha256": "cbcc7560dda4fc4948295b6fb808a5d676efc6e3075f40460b04b71e7b97e898",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/198.mp3": {
+      "size": 225198,
+      "sha256": "311bedae04ac625b7b5d45ec0c59343477fa319279abc93f3785438524bbf3e9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/199.mp3": {
+      "size": 284910,
+      "sha256": "698ba3247eda4331eb6e9778153e161273362b4cb134654bf17e6b27cd536be1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/2.mp3": {
+      "size": 661633,
+      "sha256": "a033ef142f2e936b311fbad25b309a9155ffeab45c52017f0be663d0b5583e7f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/20.mp3": {
+      "size": 383406,
+      "sha256": "406c711ff04cbe0775ec72fdf8a894337a53f9ca24983f2ae8b049cb765b2291",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/200.mp3": {
+      "size": 232302,
+      "sha256": "5a155838b8c4c3b65705c84525ebd613bae81bb3ea43dab24a36fb232e99cc48",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/201.mp3": {
+      "size": 226158,
+      "sha256": "23d10f1af4f395f179a7440375cc050fc2bf1516a4f1a1defaa997179ae5f2f8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/202.mp3": {
+      "size": 266286,
+      "sha256": "1dd4562a460fe98cfc56016813c19e3208fe5112d0a4d67d3920b295be45b432",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/203.mp3": {
+      "size": 269166,
+      "sha256": "318b8e6a6ee8eb91f36d9a74e7fc86130427aaef584d088be23587c585b2228e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/204.mp3": {
+      "size": 214830,
+      "sha256": "b359ef2ef34222881e9f26d81f1750c9abf3d08f9bf14106bc48274281d93b2e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/205.mp3": {
+      "size": 272238,
+      "sha256": "8cf2a499dceef7f1b3c9d96dd4f6b0eeb865dd05f3cf57d6b9bbe3ee340e9d1f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/206.mp3": {
+      "size": 515502,
+      "sha256": "7c449b12ac105fb7f70cc9a94dcc8e23a9a4f03234ead075c090563be40739f1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/207.mp3": {
+      "size": 720558,
+      "sha256": "5bd6796919ee77f40b333cd47eca0355537279ed2554e0af3e51e5aecb361bc9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/208.mp3": {
+      "size": 460590,
+      "sha256": "c134f2b098081d7145ccf0cf47c1e1c33312179348c5e365ff5d8c435e87fe69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/209.mp3": {
+      "size": 350382,
+      "sha256": "8482fb61e248718f1c05f2f225cb0d39c348fc67eef707d92e0c82e2629c0f67",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/21.mp3": {
+      "size": 310830,
+      "sha256": "f588144fc327a4fb517a2fac0d14319047904f2c5d25e5ab6a8445708f34cb28",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/210.mp3": {
+      "size": 213486,
+      "sha256": "53b3e35dc0174bb4da8f9de8cd7a1472da929d47793211af1ca113f4dcd656ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/211.mp3": {
+      "size": 238830,
+      "sha256": "eb143d96d16c61a8a7ee51c9bf1eaac02cee7fea19829fd411dfa6a3754499cf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/212.mp3": {
+      "size": 330191,
+      "sha256": "1053704d02e641c0bd3b9e1cb3db4408d6bc1133a7a27194905c55b64d1a6a93",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/213.mp3": {
+      "size": 315562,
+      "sha256": "72d813817c14b787e0be0e1bfbbb67ee60e085491684c35490f3cd92a5084a14",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/214.mp3": {
+      "size": 268398,
+      "sha256": "887482396b4d2590571a08db456b0a293a63394227f65e473f17ca4580f535f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/215.mp3": {
+      "size": 314862,
+      "sha256": "0584af2c870c707f27e89473aad19295e5cc1258d29292d6f40d6278a94d31f7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/216.mp3": {
+      "size": 256302,
+      "sha256": "bb8b24a594e87c42410590042b2d009ac2bff302a875ff55d915833ace8be55b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/217.mp3": {
+      "size": 450990,
+      "sha256": "3afa75c78e9686b47949f5ab35453106e654a8c9d9731a1df5a1cb9cca54bbd0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/218.mp3": {
+      "size": 369966,
+      "sha256": "1007eb7ab5bc1c3bd8a13106c887e171609570b0d70f8e7a2fe5876e11bac110",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/219.mp3": {
+      "size": 377002,
+      "sha256": "157a1dffa9755e7c8baba123d16e9f1ae5a58499dd61e1870554215951355e48",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/22.mp3": {
+      "size": 457251,
+      "sha256": "f06a1544478191cecf5b48d2c388ade08f8f08db0b60470da747c65cc017c032",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/220.mp3": {
+      "size": 375331,
+      "sha256": "c668a17db6634fd4ee90ad49936ed328f44ab67cec104a2d40a0ee9b5a9e56d1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/221.mp3": {
+      "size": 302606,
+      "sha256": "27d19f9b86d12c7fc91c098a0f5db17a381ca38d8da8ee0d4a16cb6e31e233ea",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/222.mp3": {
+      "size": 364046,
+      "sha256": "f252850cfda00d18b826f78e42adbbae888372b19835d498d4a8634148a25e74",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/223.mp3": {
+      "size": 400826,
+      "sha256": "ef5e9a66fe91c85c6ed72942bc9cb60390c29a87d70e27f680f5a331ddd13cab",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/224.mp3": {
+      "size": 553381,
+      "sha256": "62e01db1ebf0697680f30c3e38e15f14d66fcd90a5ff6ce2babc6539ffc7ed21",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/225.mp3": {
+      "size": 407096,
+      "sha256": "0241cb451fbd388c84f19f2e97f51a0788561343fd50a3ce06c6964ebca5711a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/226.mp3": {
+      "size": 647422,
+      "sha256": "4adadbe9f1d3152403dd2215fc5bc225c33144d3338a621321fa0b54eee829fd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/227.mp3": {
+      "size": 238638,
+      "sha256": "f0cee5c3caaadd72116ce6a58da063e20883f9a38b9093e9574608ae60f78af6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/228.mp3": {
+      "size": 345966,
+      "sha256": "da3516f47a9869624cfffbaa1f4388aac34acf759a5d9e48c0463a90cd0bc423",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/229.mp3": {
+      "size": 299502,
+      "sha256": "158131dfd5b60bbc755ff09eaab64d304237a9ea1073cd2ab87d777593ac8152",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/23.mp3": {
+      "size": 516601,
+      "sha256": "12095d4c8dade869884e2e3b2cb7e9ee466c2d97a889ff2f8aafff84fd88271c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/230.mp3": {
+      "size": 292014,
+      "sha256": "c56ff1dca5223690d2abee38556c85864aef2bacf4e1d465b5f4aadbf80cff2b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/231.mp3": {
+      "size": 400494,
+      "sha256": "a1edd33b6efd084be4a8ba73f851f1fc5cf2f999dd2c9df6de173875c1d93439",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/232.mp3": {
+      "size": 305454,
+      "sha256": "c7b1bbe21cb7bb89ab2042286c6b569c8e31459492a3f6a509c0d8476c898700",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/233.mp3": {
+      "size": 332526,
+      "sha256": "4d838e3d7322825769125df588fe50bfae388b860d95656b5e34ffdea7795e33",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/234.mp3": {
+      "size": 266670,
+      "sha256": "58bdce12b3a4f738a90d976a773c169c0fce9a08d6cffc78202432c1c51337ed",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/235.mp3": {
+      "size": 287982,
+      "sha256": "77a81b061f1e2373de6d5d33336de8b72187b041c960a76a2e28d398adc22766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/236.mp3": {
+      "size": 692142,
+      "sha256": "438abbd57bb62017f1383929c168242d779b4ce75b8315cba7eee066946f60f0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/237.mp3": {
+      "size": 337710,
+      "sha256": "cde60a47d19127af7d6f7b40cf7308d2418cf11a22a61f89f500c6e85a38c929",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/238.mp3": {
+      "size": 354414,
+      "sha256": "f5a81a7ddf0d55e577e7b23aa1f64c0fc86b2690d25cca9c7b39f702e903f909",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/239.mp3": {
+      "size": 400494,
+      "sha256": "548208076192dee7b0d7496e96fa1cd8070ca60a469ed1c328dfbf92642bfee4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/240.mp3": {
+      "size": 260810,
+      "sha256": "3dcc789d9867c08d34d639cbb873aaa09a8cc7dbae9c7443a5a4a01b1d3e3d1b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/241.mp3": {
+      "size": 181816,
+      "sha256": "7028ce95bbc76291848d384c8326f749dc3354205a5c0a14d226cebbbd345310",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/242.mp3": {
+      "size": 285870,
+      "sha256": "146e7c1db422057373d2f1194ffdfe8538ad72f8967b19fe2430d748d05e632d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/243.mp3": {
+      "size": 317934,
+      "sha256": "236311f4855ecc517e4bcc5a1f16785197b77071c5e199719896ab2ac7fc0b56",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/244.mp3": {
+      "size": 295662,
+      "sha256": "25643972637dcab9347015b5f91b34a9731bebf1fb32feeb7d37f032e12ba2ba",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/245.mp3": {
+      "size": 217518,
+      "sha256": "de7bc0503995c6c1543d2c70cf1a1af9a44f9ebe817483ea1d1bef965073af45",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/246.mp3": {
+      "size": 261870,
+      "sha256": "e2cf1547d2423b9bcd9fdee3938999561b28a1787bf0a33f4661ad1b72e1c5eb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/247.mp3": {
+      "size": 502254,
+      "sha256": "a902a2928fbe079ad833edbf663858b40067f0b1795be74702c84ce053184466",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/248.mp3": {
+      "size": 406678,
+      "sha256": "24160dfbc37aacb752572bc58cdf300cb0cf812a4b59ea5a4fb813aa8ebd5a3c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/249.mp3": {
+      "size": 364464,
+      "sha256": "1be07ae4679d50f8f4aa5f246ae3e9e6d2b9173a149caee973848d81062c90bd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/250.mp3": {
+      "size": 422978,
+      "sha256": "9bd830ff20130a3548c07aba7a486f5780bd5e7dcd2803257ba1ce5b3b9529f3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/251.mp3": {
+      "size": 406678,
+      "sha256": "28757a0927f684081e046954c3b796c720a73d32daac16af12abcf5f2fb9a489",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/252.mp3": {
+      "size": 327265,
+      "sha256": "5441fc074fc43c969030430640652218cf4bf194a87aeb87a2ccabd86d3d6e96",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/253.mp3": {
+      "size": 344820,
+      "sha256": "788b3edfd775aa9da68ead1806549eb7d7ce235a6719c50d7cfddfd63332b5c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/254.mp3": {
+      "size": 470207,
+      "sha256": "fdb0b3f13349f225408a7470a17cb7e2704d4b560fac6c7f72accfb747212a77",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/255.mp3": {
+      "size": 501972,
+      "sha256": "d81019ebe94ef30dfcf797ef9fda6e3ae8cd7416123eb7c099cfb09d1028b41f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/256.mp3": {
+      "size": 454325,
+      "sha256": "0ea572848cf086bf2f08d2cc7a1512cc8c512e9b7baaff389f9b61a74a19978e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/257.mp3": {
+      "size": 422560,
+      "sha256": "742b7d89090aa9bdefe55fe65824016eef963325604e83e00280068bd049fcac",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/258.mp3": {
+      "size": 581802,
+      "sha256": "8918912660e9de7d5bd8ffb15729870fe743b8a6ec79e9ff832580c984792d6b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/259.mp3": {
+      "size": 326847,
+      "sha256": "5fbc6bee47e8079c4eca2b854a80457cbe36e8cf83f9361b49d11588bee33a4a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/260.mp3": {
+      "size": 486090,
+      "sha256": "2cf929dd048c7d47eb007663e21d624aa156d6b32348a8053331255d62c848ed",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/261.mp3": {
+      "size": 470207,
+      "sha256": "5fdf5a3c3653abe2f2d87dd2b8791729bdbb58558ee89f7a7acd79f3ed81d8f5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/262.mp3": {
+      "size": 916588,
+      "sha256": "d1ab2260c77b76d6b28a90f103feb787a20c8fda16a9fddc667617fc179c16ab",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/263.mp3": {
+      "size": 454325,
+      "sha256": "68cb8b05c1830328623933f7ba6aaebf11ac17bf9f4a6f5e71263846540faf1d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/264.mp3": {
+      "size": 310965,
+      "sha256": "6330fd7d1f1c90200a4f5fcbfa149e8d14be3879146283c231e2ff55271c7dd0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/265.mp3": {
+      "size": 436771,
+      "sha256": "9322ec53a6db44fbcbac7cf285a8355ee9d73d4b6c864faa03d51845c21a3a32",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/266.mp3": {
+      "size": 287598,
+      "sha256": "207a4e485c35161d506ff791f0144a08d5213bd564f9e518f1c7c82b09ad478a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/267.mp3": {
+      "size": 995164,
+      "sha256": "0e9b4f82e51e3a4d05910d5e1c3ed2f66170ad7dcf9c6c34a9e2064f2c31b7f5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/27.mp3": {
+      "size": 598103,
+      "sha256": "57d19e83a452cbc7970123ea18bd0e92a47710d5d563c63d4150a8631ad734d1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/28.mp3": {
+      "size": 346491,
+      "sha256": "c26040ec9c8c9b8fd68207f0615b0a090dbb65a934c9fcf737139e01bb5b2573",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/29.mp3": {
+      "size": 1428170,
+      "sha256": "5d9937bc4777a61847620c1cd569e6ad0ca852ac50c937724d99630b241adccd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/3.mp3": {
+      "size": 326847,
+      "sha256": "dcd101a6a0b119e5e6e4ac614928280c1bda78b8f3b57becc7373e7449ead64d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/30.mp3": {
+      "size": 630286,
+      "sha256": "2ebdba133c2b23321ebe2cf754aa3aba5d7cec25be33819bffe881931bb339d4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/31.mp3": {
+      "size": 678351,
+      "sha256": "2173ea741dd9c1be089148a3666b57216115ecdfb224085c6ef4f67d3e0f9fac",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/32.mp3": {
+      "size": 1693156,
+      "sha256": "27662bc53ed9dc5d2df71d580a8be0087d5fc62438de8fde4da3c62606c51744",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/33.mp3": {
+      "size": 313891,
+      "sha256": "f55484719560dc63d6daeac6dc1a46bd0ef81cf2712d4624c1656f118ba744d6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/34.mp3": {
+      "size": 266661,
+      "sha256": "be4b9708c000857435efcaff9562098386e05c201e6d7038bef98ef7a780ac50",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/35.mp3": {
+      "size": 248689,
+      "sha256": "0be5922c3cda17c48c2849928cb7bc66b3c7f0a7d6144f38d95c8b3ae2d0b5f2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/36.mp3": {
+      "size": 422560,
+      "sha256": "931a6aaf0f0cf90c1d4c0f65b52916fc8d46ad923e2c8908108747ee2aba2dcf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/37.mp3": {
+      "size": 267079,
+      "sha256": "fc9c14c4504d37be7339b5e8079fa1477cf9c6b7cece951f02481cf4c9b6b42e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/38.mp3": {
+      "size": 279200,
+      "sha256": "a7c369d995517f1bbeb455ce4df448d27f9717b7d290ae29f32b6ad7edd43858",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/39.mp3": {
+      "size": 274184,
+      "sha256": "5b56700258ffe62a2d891b76fbc2919244163f10c41044c9836b472c5aaa6943",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/4.mp3": {
+      "size": 5346955,
+      "sha256": "f276925bd911a457b5fed4e5b12022aa4df0e2e6944bc3adb67b73f9a23fe9c7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/40.mp3": {
+      "size": 667066,
+      "sha256": "30c3971e5d87dd237cc8d136234f4e6817a5f4b230e49dee08e51c9acf3f02c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/41.mp3": {
+      "size": 305531,
+      "sha256": "e26368fbbeb4d363c0f621644da1ab56ce38de5f6e90c23a1c9a6bbe43fea624",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/42.mp3": {
+      "size": 263736,
+      "sha256": "fe4aa3537374faa060ba4b3cf4a4a4595d17869ff40f5bf766b00be818ac9eeb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/43.mp3": {
+      "size": 247853,
+      "sha256": "5a7798a35ec47bef49a55598204f0df58815e0f3ef59e2a66c03e2d2be1d2f43",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/44.mp3": {
+      "size": 470625,
+      "sha256": "f3839903ca8e0e117b60ffe5f1bc1b398d8290139402f6349e6d955da07cffa9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/45.mp3": {
+      "size": 263736,
+      "sha256": "1e0c3c80b818424061322f2fcba3b7499ba81addb0ed98883acd696db41a33b8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/46.mp3": {
+      "size": 352343,
+      "sha256": "cc60210a0fd24290285e61d007a127756926cf5f726a2671c0dd8d1732347dae",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/47.mp3": {
+      "size": 464356,
+      "sha256": "9772bf300d2e8051a01005957a62a27b35a19e8405fd6a3f0eef9db38f5c4402",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/48.mp3": {
+      "size": 336042,
+      "sha256": "300e9f78edb4a7fea521be1a95f1a80cb6675e93a99a16ff50a8c11496a23610",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/49.mp3": {
+      "size": 359030,
+      "sha256": "08b896eeb6b0f1e33e8ad1eb2fa762eb858823e74012b570473445a88891af4f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/5.mp3": {
+      "size": 267054,
+      "sha256": "f547b76ffe76f13c5a4a2a612e0f5fca676ca666a4d8cd6a4de87d14634eb699",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/50.mp3": {
+      "size": 461848,
+      "sha256": "0885c908438dc98fd83726f2c55e9cfaa67e0de726c0805cf4cd15f04f9ce766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/51.mp3": {
+      "size": 419216,
+      "sha256": "d7c066af1bdc227e2756ea7d63968ca740c42fece0548da5fcac49bd0919056e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/52.mp3": {
+      "size": 418350,
+      "sha256": "4a0017363fc6138198ca5b0ed9eecda20840e3f96984daa2cd0dce7d6bb2ee6b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/53.mp3": {
+      "size": 748150,
+      "sha256": "eb86f16ff5ab91b70ad1f0b342f5e80c8160e8edfcc30d525db70845977af125",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/54.mp3": {
+      "size": 534573,
+      "sha256": "0c7712ed713ca48a87eea5b7c9b8eb2e868f541c2f2245d7e2c26c6e5a942192",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/55.mp3": {
+      "size": 534991,
+      "sha256": "d25a120a072d07ab3a28842f1f5eb85924167d1fdb30a1767b85866a0e7775d7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/56.mp3": {
+      "size": 471043,
+      "sha256": "bee3d7f295c75321b2054e695f24ea00fb2d09f8cd8f8de29cc6339645a48248",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/57.mp3": {
+      "size": 422978,
+      "sha256": "56d785b6393c1a835ab722caa21099cabed45e3cb58ee7aaa6dbbd6e394ea343",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/58.mp3": {
+      "size": 518691,
+      "sha256": "861a8180525a70fe8153c66e3c600e501b941d3bd544824ad89752ae1b707e5a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/59.mp3": {
+      "size": 247435,
+      "sha256": "2d16ca7655ed72525b8d461c1a1e939afab9214575f9325ca8773f461ee0582f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/6.mp3": {
+      "size": 313902,
+      "sha256": "9e99bc67a8694fd8e038d75d84f26b09ed9ce2c3695a7e01c5a09de71e19d3e7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/60.mp3": {
+      "size": 455161,
+      "sha256": "da34ab66824803e32d95a4ed5adad503889eb9df800179d1a781eb712b2a16a7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/61.mp3": {
+      "size": 237822,
+      "sha256": "8425af6a03e29d840e8d0fa5ddddb3f30d6f8240507a8f3863bd958c2d8ac143",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/62.mp3": {
+      "size": 1285646,
+      "sha256": "088f0481bc74c5781a178165669abb953972270b0604103e02be64282630d5a6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/63.mp3": {
+      "size": 486926,
+      "sha256": "1434544269b3cc0d31e0734e25fc0baad391d4854d35b5384579153bd9b851c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/64.mp3": {
+      "size": 598939,
+      "sha256": "637daaf75af6a5c27a3a58980ee0ea0f88ab9801150395af26fcee0a793489e0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/65.mp3": {
+      "size": 416291,
+      "sha256": "94595d67a571bd7bb94953467d66162df8c923021f51f519ca52bcd8fbd8f660",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/66.mp3": {
+      "size": 486090,
+      "sha256": "89f26483c51e9a7f5efcb40793e5fb6c400e01742d43de4466720c317aad6d0b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/67.mp3": {
+      "size": 518273,
+      "sha256": "ed9edb505aab272c149b4eb826957545d939fa3cbfb472db9e27386c6edb996f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/68.mp3": {
+      "size": 725162,
+      "sha256": "9f1ea016fec235366f4003343c03b3e7df372e3928c471cb062ece6b4ce21a03",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/69.mp3": {
+      "size": 534155,
+      "sha256": "018cf1ad59a9a82a00f0632aa5fc765238d9a561b669426a2890c7bbfa74e0d0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/7.mp3": {
+      "size": 307203,
+      "sha256": "25f7f97dcd2fec484e18aa9ffbeda4ead699c30f386cbc53ea890bf42000622c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/70.mp3": {
+      "size": 1586158,
+      "sha256": "4eaedc5eddf9b0fee6c23d1c62e3119b844f393ca6494a2e94c51f8b27474cc0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/71.mp3": {
+      "size": 1092967,
+      "sha256": "8f53c6331daee9cc16ee92e08d20f8e674a56faf3ac46e33589b035590af8294",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/72.mp3": {
+      "size": 454325,
+      "sha256": "e32726be1a874abea97b9bc42adcc1245b930fa798106bcb7062df20f031c6cf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/73.mp3": {
+      "size": 374495,
+      "sha256": "bf283c69f838a250c299e6feac24f4a6ccfbb6464bd5c541fdcded2cd5fca32a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/74.mp3": {
+      "size": 1065774,
+      "sha256": "2658dec5e698f16b60419cc8c9da04a074ed27651f6707c455b03f5aa7f66935",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/75.mp3": {
+      "size": 1347922,
+      "sha256": "f4013b5035e4108afd8d1a47376a11520cb74a7da0b307e8555a0d744392359b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/76.mp3": {
+      "size": 1603295,
+      "sha256": "8c5493937b4bb7e8976fe07f1b6fcf1c3ac583be77232aca40b9b3a5b432e55e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/77.mp3": {
+      "size": 1012718,
+      "sha256": "3ddb2c1f13058cfe2ede03231d6aa964a1bf973b6fe01aa6f07a8e8ca83d6244",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/78.mp3": {
+      "size": 518273,
+      "sha256": "b654dcbdc2e76ac893b2b098d767634f8342102fe587c2e082b5b4d5b0f16509",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/79.mp3": {
+      "size": 582220,
+      "sha256": "a97f8c9b98712bddd5c50c8d33f1128028d92033ee3485728d1c37b9ac995766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/8.mp3": {
+      "size": 283798,
+      "sha256": "3c30ebb61caa060332977fe42ea9926584b2bbbb0e2c1240ceec523b7afddb96",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/80.mp3": {
+      "size": 550456,
+      "sha256": "caecbd39ce40617a6970da63316f57115d8438998ded1426b9a0242df98c1012",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/81.mp3": {
+      "size": 326847,
+      "sha256": "36833e94a06a40671b5d74a4e17a366a5d90982a72a8ddf5e59593fb4f05684c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/82.mp3": {
+      "size": 662051,
+      "sha256": "a92359c5def750f6801dd3138e6aa8f786b78b213f07c8af865bbdaaa7a3e65c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/83.mp3": {
+      "size": 310965,
+      "sha256": "043e01a9fce0b1a96d0aa5ce34d5de12d2e77191329a208d7f9c08c0533479a1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/84.mp3": {
+      "size": 725580,
+      "sha256": "7349914e738eabfff35ffc2d7c5ebe1df3de5243e3600f9c8d7be192031054c3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/85.mp3": {
+      "size": 598103,
+      "sha256": "864f0e5d804ceb874de0e1c9716aa9ce1c81ba26a88297b6bc8d0f0e274501d2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/86.mp3": {
+      "size": 342730,
+      "sha256": "ba25e2c40ea87b9e9f767a2f0c5da71c38205bd4a8fecfbb652f8a957810c99c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/87.mp3": {
+      "size": 359030,
+      "sha256": "8991c6c180ecc7f4f969f4909e4464af977668991d5db63546cabb1f4f6b524e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/88.mp3": {
+      "size": 390795,
+      "sha256": "0ab04832456d070e7e3154cbb3a064a4f60371181b1be332824944387f697e7e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/89.mp3": {
+      "size": 486508,
+      "sha256": "586b112b608afb04e4fd56e0284d4d24f7b9c49287e1abb3e9a1fcf9e2e8ecc1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/9.mp3": {
+      "size": 219246,
+      "sha256": "5b7c875d5358f2148cc18b7dbc904fd95f38f4d3d61fcd54a3ffc0e01d8174e4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/90.mp3": {
+      "size": 518273,
+      "sha256": "037ee1f00288d7fc35611461cc2bcc8a52c065c6b7cb75127258b9e56a130f4a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/91.mp3": {
+      "size": 231135,
+      "sha256": "1b743aafba753a144f72761044876f8036c485bcf6ccd4a9abf942c28318b444",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/92.mp3": {
+      "size": 438442,
+      "sha256": "10e5fad258ee7f39f7c891a38c66df99460620a06289b902a7430c6758c84a59",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/93.mp3": {
+      "size": 390795,
+      "sha256": "a0b274af9c3006334f6a09c8632542f6310cab8bbaf2b662287a714eea0e1b39",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/94.mp3": {
+      "size": 406678,
+      "sha256": "767b1db4e25319c31ad0e5fc526549c4c3c235b3445938e178428db8035b40c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/95.mp3": {
+      "size": 342730,
+      "sha256": "b9683e27a735c77d0fdf402e54af2db50c03dd1f26539507612cf016e20419de",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/96.mp3": {
+      "size": 279200,
+      "sha256": "056b361984d4550623043cca7c3599c9caf4d5008fa75ed1fa568abb69c30db5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/99.mp3": {
+      "size": 1938080,
+      "sha256": "57d9be074d4d46830d1846105da27d6a9cd692e5d439b6ef9c694e5db204fae6",
       "category": "fortress_audio_arabic",
       "required": false
     }

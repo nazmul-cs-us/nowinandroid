@@ -195,7 +195,7 @@ class AssetDownloadViewModel @Inject constructor(
                 Log.i(TAG, "Required downloads complete")
 
                 // Regenerate news.db from CDN-downloaded source databases
-                // (quran.db, fortress_of_the_muslim.db, quranic_duas.db, sahih_bukhari.json)
+                // (quran.db, fortress_of_the_muslim_v2.db, quranic_duas.db, sahih_bukhari.json)
                 try {
                     Log.i(TAG, "Regenerating news.db from downloaded sources...")
                     val result = withContext(Dispatchers.IO) {

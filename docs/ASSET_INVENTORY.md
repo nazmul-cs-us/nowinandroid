@@ -70,8 +70,7 @@ context.assets.open("$HADITH_DB_PATH$databaseFile").use { input ->
 #### Dua & Islamic Databases
 | File | Size | Description | Used By |
 |------|------|-------------|---------|
-| `databases/fortress_of_the_muslim.db` | 360KB | Hisnul Muslim duas | `DuaDatabase.kt` |
-| `databases/fortress_of_the_muslim_backup.db` | 131KB | Backup | Backup |
+| `databases/fortress_of_the_muslim_v2.db` | 328KB | Hisnul Muslim duas (clean text, per-dua audio, hadith refs) | `DuaDatabase.kt` |
 | `databases/quranic_duas.db` | 41KB | Quranic duas | `QuranicDuaDatabase.kt` |
 | `databases/topics.db` | 16KB | Topics database | `TopicsDatabase.kt` |
 | `databases/news.db` | 5.9MB | Generated news content | `DuaDetailScreen.kt` |
@@ -271,7 +270,7 @@ Quick lookup by code file:
 | `HadithDetailScreen.kt` | `bukhari_audio_bn/*.ogg`, `bukhari_audio_bn/*.mp3` |
 | `HadithDatabase.kt` | `databases/hadith/*.db` |
 | `QuranEnhancedDatabase.kt` | `databases/quran.db`, `databases/quran_enhanced.db` |
-| `DuaDatabase.kt` | `databases/fortress_of_the_muslim.db` |
+| `DuaDatabase.kt` | `databases/fortress_of_the_muslim_v2.db` |
 | `QuranicDuaDatabase.kt` | `databases/quranic_duas.db` |
 | `TopicsDatabase.kt` | `databases/topics.db` |
 | `DuaDetailScreen.kt` | `databases/news.db` |

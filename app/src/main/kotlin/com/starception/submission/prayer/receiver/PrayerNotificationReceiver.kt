@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.starception.submission.MainActivity
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -20,6 +21,7 @@ import com.starception.submission.prayer.silent.PrayerSilentModeController
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.prayer.util.FileLogger
 import kotlinx.serialization.json.Json
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
@@ -157,6 +159,10 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             // Create notification channel
             createNotificationChannel(context)
 
+            // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
+            // The notification fires on the prayer's own day, so today's date is the right key.
+            val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
 
             // Create PendingIntent to open app when notification is tapped
@@ -176,10 +182,10 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 // Prayer time notification - when it's actually prayer time
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$prayerName Prayer")
-                    .setContentText("It's time for $prayerName • $prayerTime")
+                    .setContentTitle("$displayName Prayer")
+                    .setContentText("It's time for $displayName • $prayerTime")
                     .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("$prayerName Prayer Time\n\n" +
+                        .bigText("$displayName Prayer Time\n\n" +
                                 "Time: $prayerTime\n" +
                                 "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                                 "(O Allah, accept from us)"))
@@ -195,10 +201,10 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             } else {
                 // Prayer reminder notification - X minutes before prayer (user configurable)
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$prayerName in $priorMinutes min")
+                    .setContentTitle("$displayName in $priorMinutes min")
                     .setContentText("Starts at $prayerTime")
                     .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("$prayerName Prayer in $priorMinutes minutes\n\n" +
+                        .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
                                 "Time: $prayerTime\n"))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setLargeIcon(largeIcon)

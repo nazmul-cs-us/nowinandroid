@@ -920,16 +920,20 @@ fun DuaDetailScreen(
     val arabicFontFamily = getArabicFontFamilyForDua(selectedFont)
     val scope = rememberCoroutineScope()
 
-    // Chapter recitation audio (one chapter at a time), via the shared process-wide
-    // ChapterAudioController — same player the news cards use, so it downloads-and-caches
-    // from the CDN and drives the global media mini-bar. The route title is "{Chapter}: Dua N",
-    // so the chapter title is everything before the first colon.
+    // Per-dua recitation audio, via the shared process-wide ChapterAudioController — same player
+    // the news cards use, so it downloads-and-caches from the CDN and drives the global media
+    // mini-bar/notification. The route title is "{Chapter}: Dua N", so we parse the chapter title
+    // (before the colon) and the dua position (after "Dua "). Prefer the DUA's own clip; fall back
+    // to the whole-chapter recitation only if a dua has no per-dua audio.
     var chapterAudioUrl by remember(title) { mutableStateOf<String?>(null) }
     LaunchedEffect(title) {
         val chTitle = title.substringBefore(":").trim()
+        val position = Regex("""Dua\s+(\d+)""").find(title)?.groupValues?.get(1)?.toIntOrNull()
         chapterAudioUrl = withContext(Dispatchers.IO) {
             runCatching {
-                DuaDatabase.getInstance(context).duaDao().getChapterAudioByTitle(chTitle)
+                val dao = DuaDatabase.getInstance(context).duaDao()
+                val perDua = if (position != null) dao.getDuaAudioByTitleAndPosition(chTitle, position) else null
+                perDua ?: dao.getChapterAudioByTitle(chTitle)
             }.getOrNull()
         }
     }

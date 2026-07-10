@@ -16,6 +16,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import com.starception.submission.R
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -163,6 +164,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
         // Play Adhan sound
         playAdhanSound()
 
+        // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
+        // The notification fires on the prayer's own day, so today's date is the right key.
+        val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
@@ -170,10 +175,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
         val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("$prayerName Prayer")
-            .setContentText("It's time for $prayerName • $prayerTime")
+            .setContentTitle("$displayName Prayer")
+            .setContentText("It's time for $displayName • $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("$prayerName Prayer Time\n\n" +
+                .bigText("$displayName Prayer Time\n\n" +
                         "Time: $prayerTime\n" +
                         "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                         "(O Allah, accept from us)"))
@@ -225,14 +230,17 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private fun showPrayerReminderNotification(prayerName: String, prayerTime: String, priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {
+        // On Fridays the midday (Dhuhr) reminder is for Jumu'ah — show that name to the user.
+        val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
         val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
-            .setContentTitle("$prayerName in $priorMinutes min")
+            .setContentTitle("$displayName in $priorMinutes min")
             .setContentText("Starts at $prayerTime")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("$prayerName Prayer in $priorMinutes minutes\n\n" +
+                .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
                         "Time: $prayerTime\n"))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)

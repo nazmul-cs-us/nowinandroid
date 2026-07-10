@@ -15,7 +15,7 @@ import java.io.FileOutputStream
  * Room Database for Fortress of the Muslim (Hisnul Muslim)
  * Contains Islamic duas and supplications for various occasions
  *
- * Database file: fortress_of_the_muslim.db (128KB)
+ * Database file: fortress_of_the_muslim_v2.db
  * Features:
  * - 129 chapters covering various occasions
  * - 282 invocations (duas) with Arabic, transliteration, and translation

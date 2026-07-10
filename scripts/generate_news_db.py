@@ -287,7 +287,9 @@ def generate_fortress_duas(conn):
                i.translation, i.context, i.instruction, i.note, i.post_context,
                (SELECT h.reference_str FROM hadith_references h
                   WHERE h.invocation_id = i.id LIMIT 1) AS reference,
-               c.audio_url
+               -- Per-dua audio so each dua card plays its OWN recitation; fall back to the
+               -- whole-chapter recitation only if a dua has no per-dua clip.
+               COALESCE(i.audio_url, c.audio_url) AS audio_url
         FROM chapters c
         JOIN invocations i ON c.id = i.chapter_id
         ORDER BY c.id, i.position

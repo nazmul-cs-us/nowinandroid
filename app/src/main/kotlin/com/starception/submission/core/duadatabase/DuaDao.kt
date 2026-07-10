@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
  * Data Access Object for Fortress of the Muslim database
  * Provides queries for chapters, invocations (duas), and footnotes
  *
- * Database: fortress_of_the_muslim.db
+ * Database: fortress_of_the_muslim_v2.db
  * Tables: metadata, chapters, invocations, footnotes
  */
 @Dao
@@ -49,6 +49,17 @@ interface DuaDao {
      */
     @Query("SELECT audio_url FROM chapters WHERE title = :title LIMIT 1")
     suspend fun getChapterAudioByTitle(title: String): String?
+
+    /**
+     * Per-DUA recitation audio URL, looked up by chapter title + dua position.
+     * Falls back (in the caller) to the chapter audio when a dua has none.
+     */
+    @Query("""
+        SELECT i.audio_url FROM invocations i
+        JOIN chapters c ON c.id = i.chapter_id
+        WHERE c.title = :title AND i.position = :position LIMIT 1
+    """)
+    suspend fun getDuaAudioByTitleAndPosition(title: String, position: Int): String?
 
     /**
      * Get all chapters with dua count

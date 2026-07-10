@@ -1,11 +1,11 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8129054037,
-  "total_files": 6427,
+  "total_size": 8128705877,
+  "total_files": 6426,
   "categories": {
     "json_data": {
-      "total_size": 10230232,
+      "total_size": 9898456,
       "file_count": 5,
       "required": true
     },
@@ -159,12 +159,6 @@
     "databases/quranic_duas.db": {
       "size": 40960,
       "sha256": "dc69b759a2bb91eebc499912f123b64c1523f51af29ac0bff4477b1765d3743d",
-      "category": "json_data",
-      "required": true
-    },
-    "databases/fortress_of_the_muslim.db": {
-      "size": 360448,
-      "sha256": "7c7c83ee8245a9af01ea9be471a130562c4a49bdb0334786f87334c2715cd35f",
       "category": "json_data",
       "required": true
     },
@@ -5376,685 +5370,685 @@
       "category": "quran_audio_arabic",
       "required": false
     },
-    "audio/quran/bengali/001 - Al-Fatihah ( The Opening ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0627\u062a\u062d\u0629.ogg": {
+    "audio/quran/bengali/001 - Al-Fatihah ( The Opening ) - سورة الفاتحة.ogg": {
       "size": 879117,
       "sha256": "2d279a34b3e67907e916b27b541f04b2c7714525c85f6ebe3bdab83995e61b93",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/002 - Al-Baqarah ( The Cow ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0642\u0631\u0629.ogg": {
+    "audio/quran/bengali/002 - Al-Baqarah ( The Cow ) - سورة البقرة.ogg": {
       "size": 137466118,
       "sha256": "e7c024cdd7443cddc2fc3f2446bedd734935c0abfa6a50e23bad009098f7170c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/003 - Al-Imran ( The Family of Imran ) - \u0633\u0648\u0631\u0629 \u0622\u0644 \u0639\u0645\u0631\u0627\u0646.ogg": {
+    "audio/quran/bengali/003 - Al-Imran ( The Family of Imran ) - سورة آل عمران.ogg": {
       "size": 85920957,
       "sha256": "c97c5d9e894d8ea3f82a0df3fce756ccd97774a06fbdf1698951a555af901f6c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/004 - An-Nisa ( The Women ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0633\u0627\u0621.ogg": {
+    "audio/quran/bengali/004 - An-Nisa ( The Women ) - سورة النساء.ogg": {
       "size": 82791582,
       "sha256": "811f075773660a5258e07b8685d03a896755e1edc4f1f00aba55db861f3bb955",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/005 - Al-Maidah ( The Table spread with Food ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0627\u0626\u062f\u0629.ogg": {
+    "audio/quran/bengali/005 - Al-Maidah ( The Table spread with Food ) - سورة المائدة.ogg": {
       "size": 65657326,
       "sha256": "0eeeadd125be843376929841bf669cd71af445dc64cfd073c56f45d76ea76ccd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/006 - Al-An'am ( The Cattle ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0639\u0627\u0645.ogg": {
+    "audio/quran/bengali/006 - Al-An'am ( The Cattle ) - سورة الأنعام.ogg": {
       "size": 74352426,
       "sha256": "3571e4bf06b542c26924f19c8215bf28e04ef2cc64250000b1873ecb59a2ec9c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/007 - Al-A'raf (The Heights ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0639\u0631\u0627\u0641.ogg": {
+    "audio/quran/bengali/007 - Al-A'raf (The Heights ) - سورة الأعراف.ogg": {
       "size": 83075350,
       "sha256": "05a2bcab14772aed05010938e3eb23e9212f32c1e1183780009ea0a9f44d9bdf",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/008 - Al-Anfal ( The Spoils of War ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0641\u0627\u0644.ogg": {
+    "audio/quran/bengali/008 - Al-Anfal ( The Spoils of War ) - سورة الأنفال.ogg": {
       "size": 31317530,
       "sha256": "7180374a5e482a7f4d5267c59fae20796ed7a594333c5c93853ab9d04270224a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/009 - At-Taubah ( The Repentance ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0648\u0628\u0629.ogg": {
+    "audio/quran/bengali/009 - At-Taubah ( The Repentance ) - سورة التوبة.ogg": {
       "size": 60508710,
       "sha256": "78baf13b47b4094e5da5d78b0fb254a6d44ddc4ee324c9b040c9fd721c0e0e50",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/010 - Yunus ( Jonah ) - \u0633\u0648\u0631\u0629 \u064a\u0648\u0646\u0633.ogg": {
+    "audio/quran/bengali/010 - Yunus ( Jonah ) - سورة يونس.ogg": {
       "size": 43997026,
       "sha256": "8e08bb68e80ba26ba188b0282c3f62eea2e06a4fa01b0fe77bc4a737f4424510",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/011 - Hud - \u0633\u0648\u0631\u0629 \u0647\u0648\u062f.ogg": {
+    "audio/quran/bengali/011 - Hud - سورة هود.ogg": {
       "size": 47768153,
       "sha256": "d211e9c9bdeea0f66816c948ecefe70e01f4b04b5fde1d126a62db16c83fa24d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/012 - Yusuf (Joseph ) - \u0633\u0648\u0631\u0629 \u064a\u0648\u0633\u0641.ogg": {
+    "audio/quran/bengali/012 - Yusuf (Joseph ) - سورة يوسف.ogg": {
       "size": 44249202,
       "sha256": "327205ea1216c3ce31453391c0f4b9d309123eca2918c4ba373869cae4f397e4",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/013 - Ar-Ra'd ( The Thunder ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u0639\u062f.ogg": {
+    "audio/quran/bengali/013 - Ar-Ra'd ( The Thunder ) - سورة الرعد.ogg": {
       "size": 21069043,
       "sha256": "5db5a8077e60a5e3cbebb24df346ac98ebc65af7a80cd05278ca27ea9a4614b8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/014 - Ibrahim ( Abraham ) - \u0633\u0648\u0631\u0629 \u0625\u0628\u0631\u0627\u0647\u064a\u0645.ogg": {
+    "audio/quran/bengali/014 - Ibrahim ( Abraham ) - سورة إبراهيم.ogg": {
       "size": 21110223,
       "sha256": "169c59e955065786c28c8efd00fbe32ef6dd5f2fbad5f4d833d016f27ca59419",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/015 - Al-Hijr ( The Rocky Tract ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c\u0631.ogg": {
+    "audio/quran/bengali/015 - Al-Hijr ( The Rocky Tract ) - سورة الحجر.ogg": {
       "size": 16905778,
       "sha256": "0a2d25071b7644158fa90149345d7182a97b407b0b7270a9d0dcb45db990150d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/016 - An-Nahl ( The Bees ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u062d\u0644.ogg": {
+    "audio/quran/bengali/016 - An-Nahl ( The Bees ) - سورة النحل.ogg": {
       "size": 44255075,
       "sha256": "37576e0482dc95d92989d1836ab955f51f71d8c9a012df899f72d68e003af175",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/017 - Al-Isra ( The Night Journey ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u0633\u0631\u0627\u0621.ogg": {
+    "audio/quran/bengali/017 - Al-Isra ( The Night Journey ) - سورة الإسراء.ogg": {
       "size": 35501583,
       "sha256": "766b1edd4e1c98cd4bfee3cf06f85d7a5b17e2e4aeb93886cd842bac10f10d79",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/018 - Al-Kahf ( The Cave ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0647\u0641.ogg": {
+    "audio/quran/bengali/018 - Al-Kahf ( The Cave ) - سورة الكهف.ogg": {
       "size": 36676626,
       "sha256": "b3ef061bd2c7a49fb3990c50547b19d0b6f2531bfa8d399fcfe722f7aebb3d15",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/019 - Maryam ( Mary ) - \u0633\u0648\u0631\u0629 \u0645\u0631\u064a\u0645.ogg": {
+    "audio/quran/bengali/019 - Maryam ( Mary ) - سورة مريم.ogg": {
       "size": 23102368,
       "sha256": "372b00143e92e8aec423c326f3c16cb5c2232380a48471ddca582ba8c48b7386",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/020 - Taha - \u0633\u0648\u0631\u0629 \u0637\u0647.ogg": {
+    "audio/quran/bengali/020 - Taha - سورة طه.ogg": {
       "size": 31286248,
       "sha256": "c4be1bc73154ed7fb64ac4edfe2765ef5c66903fa5119a6bc5100f1f8fd1896b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/021 - Al-Anbiya ( The Prophets ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0646\u0628\u064a\u0627\u0621.ogg": {
+    "audio/quran/bengali/021 - Al-Anbiya ( The Prophets ) - سورة الأنبياء.ogg": {
       "size": 28397460,
       "sha256": "64792ec1ae629e2965f0008314aa28e30d7a835da82e18985ddb562634b73908",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/022 - Al-Hajj ( The Pilgrimage ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c.ogg": {
+    "audio/quran/bengali/022 - Al-Hajj ( The Pilgrimage ) - سورة الحج.ogg": {
       "size": 30532926,
       "sha256": "9eabd611581e6ef6d107553ddd0e2f9ed8ba540e86247d6c057e0ce78b55f946",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/023 - Al-Mu'minoon ( The Believers ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0624\u0645\u0646\u0648\u0646.ogg": {
+    "audio/quran/bengali/023 - Al-Mu'minoon ( The Believers ) - سورة المؤمنون.ogg": {
       "size": 25364988,
       "sha256": "a1398e46653958c71126315db4daab8b2f6760bcd60b5ea0361588f925580d14",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/024 - An-Noor ( The Light ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0648\u0631.ogg": {
+    "audio/quran/bengali/024 - An-Noor ( The Light ) - سورة النور.ogg": {
       "size": 32442698,
       "sha256": "c7511b2943370d5d8de3e1b759951c0f666bdc8d1d27ab26fd6d806c6e22c239",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/025 - Al-Furqan (The Criterion ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0631\u0642\u0627\u0646.ogg": {
+    "audio/quran/bengali/025 - Al-Furqan (The Criterion ) - سورة الفرقان.ogg": {
       "size": 21298632,
       "sha256": "8db8b491c7da9d46c2b64209b57ca6b11536568a9a48ce2cbd3f95bc84a8dca9",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/026 - Ash-Shuara ( The Poets ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0639\u0631\u0627\u0621.ogg": {
+    "audio/quran/bengali/026 - Ash-Shuara ( The Poets ) - سورة الشعراء.ogg": {
       "size": 34185329,
       "sha256": "a511d0fa3ca5d45a99b70a6b462f0608d4e0cbdfac3b8a82081f87c829063653",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/027 - An-Naml (The Ants ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0645\u0644.ogg": {
+    "audio/quran/bengali/027 - An-Naml (The Ants ) - سورة النمل.ogg": {
       "size": 29184602,
       "sha256": "81c593858ea515acc273be497d578604c3bb44c556d51bed6c0b384bec734849",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/028 - Al-Qasas ( The Stories ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0635\u0635.ogg": {
+    "audio/quran/bengali/028 - Al-Qasas ( The Stories ) - سورة القصص.ogg": {
       "size": 35376994,
       "sha256": "487aea870a4b70f9e0dede3ed5f79c7c919c8bef23a33eff1d557faad43a8222",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/029 - Al-Ankaboot ( The Spider ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0646\u0643\u0628\u0648\u062a.ogg": {
+    "audio/quran/bengali/029 - Al-Ankaboot ( The Spider ) - سورة العنكبوت.ogg": {
       "size": 23871755,
       "sha256": "a3e5ed602d3fe9e1ea19c44a4debd790381dd1c27fe7d4625e59107a63a31657",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/030 - Ar-Room ( The Romans ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u0648\u0645.ogg": {
+    "audio/quran/bengali/030 - Ar-Room ( The Romans ) - سورة الروم.ogg": {
       "size": 19772532,
       "sha256": "95fa043249cc2c6590a8ad08116fa45073d5f97f43b367d952385a3d905e095b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/031 - Luqman - \u0633\u0648\u0631\u0629 \u0644\u0642\u0645\u0627\u0646.ogg": {
+    "audio/quran/bengali/031 - Luqman - سورة لقمان.ogg": {
       "size": 11958043,
       "sha256": "53e64414c87be8d3e44d1aca578e0dd4ef2e3b6ec1c854398c9ada826c176bfc",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/032 - As-Sajdah ( The Prostration ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0633\u062c\u062f\u0629.ogg": {
+    "audio/quran/bengali/032 - As-Sajdah ( The Prostration ) - سورة السجدة.ogg": {
       "size": 8792797,
       "sha256": "c793a4214568df9a0603083ceb0d40435a09d182ceac0502fa9a2d3aed85b218",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/033 - Al-Ahzab ( The Combined Forces ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u062d\u0632\u0627\u0628.ogg": {
+    "audio/quran/bengali/033 - Al-Ahzab ( The Combined Forces ) - سورة الأحزاب.ogg": {
       "size": 29590102,
       "sha256": "f3067bdf42fb0220f8e6b22116abd7b2618ab78c23fe4a6b0c4d8113aa5dec99",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/034 - Saba ( Sheba ) - \u0633\u0648\u0631\u0629 \u0633\u0628\u0623.ogg": {
+    "audio/quran/bengali/034 - Saba ( Sheba ) - سورة سبأ.ogg": {
       "size": 19362760,
       "sha256": "d38243369116e015ead2f6f12d939d491038649fabafdc63347c4671106eb7bb",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/035 - Fatir ( The Orignator ) - \u0633\u0648\u0631\u0629 \u0641\u0627\u0637\u0631.ogg": {
+    "audio/quran/bengali/035 - Fatir ( The Orignator ) - سورة فاطر.ogg": {
       "size": 17664305,
       "sha256": "8a0ddc8f018146041b7eb2c98d218ba3492bbbb2595e1877240028830286d0ee",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/036 - Ya-seen - \u0633\u0648\u0631\u0629 \u064a\u0633.ogg": {
+    "audio/quran/bengali/036 - Ya-seen - سورة يس.ogg": {
       "size": 18869347,
       "sha256": "ac1a43400f9d93d68863e35fe525cacb46b4f667ef758f4fd27af7481f831f82",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/037 - As-Saaffat ( Those Ranges in Ranks ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0635\u0627\u0641\u0627\u062a.ogg": {
+    "audio/quran/bengali/037 - As-Saaffat ( Those Ranges in Ranks ) - سورة الصافات.ogg": {
       "size": 24585640,
       "sha256": "b24e4bef8b831adbf6187b1d2aa18ccf476014f2bc7979e86d09da732838257c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/038 - Sad ( The Letter Sad ) - \u0633\u0648\u0631\u0629 \u0635.ogg": {
+    "audio/quran/bengali/038 - Sad ( The Letter Sad ) - سورة ص.ogg": {
       "size": 18897931,
       "sha256": "ca6f31dc7dd8df5572fb9ecfd62218146273bf7bec6b053829e2150340b83a07",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/039 - Az-Zumar ( The Groups ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u0645\u0631.ogg": {
+    "audio/quran/bengali/039 - Az-Zumar ( The Groups ) - سورة الزمر.ogg": {
       "size": 28862613,
       "sha256": "3786199a3c5049a520d453b6ea5860e3e0972fb6845b456b9eb14d01c2483a00",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/040 - Ghafir ( The Forgiver God ) - \u0633\u0648\u0631\u0629 \u063a\u0627\u0641\u0631.ogg": {
+    "audio/quran/bengali/040 - Ghafir ( The Forgiver God ) - سورة غافر.ogg": {
       "size": 28832751,
       "sha256": "42b6d7c45b4d456ff9ba2dd81cb2093afc52939209a3ef31aa060812e73f3e00",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/041 - Fussilat ( Explained in Detail ) - \u0633\u0648\u0631\u0629 \u0641\u0635\u0644\u062a.ogg": {
+    "audio/quran/bengali/041 - Fussilat ( Explained in Detail ) - سورة فصلت.ogg": {
       "size": 20557532,
       "sha256": "9f509bc06835a80d5e8f2074cdf0a01dccf4340d51b0fa422f7c529e688526d5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/042 - Ash-Shura (Consultation ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0648\u0631\u0649.ogg": {
+    "audio/quran/bengali/042 - Ash-Shura (Consultation ) - سورة الشورى.ogg": {
       "size": 20469997,
       "sha256": "bb2c30e60461db6b1851747ab145b4fbc29d51d0d805d84952dc1969ee06037e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/043 - Az-Zukhruf ( The Gold Adornment ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u062e\u0631\u0641.ogg": {
+    "audio/quran/bengali/043 - Az-Zukhruf ( The Gold Adornment ) - سورة الزخرف.ogg": {
       "size": 22051227,
       "sha256": "01d390c839d61987398d26e61febd7a6d9a383a521758bf2adeefe01977a59e5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/044 - Ad-Dukhan ( The Smoke ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062f\u062e\u0627\u0646.ogg": {
+    "audio/quran/bengali/044 - Ad-Dukhan ( The Smoke ) - سورة الدخان.ogg": {
       "size": 9609247,
       "sha256": "c86091b7320fedc5e73fc589f61fdcf2c83e2f8f62901f1225d0b9d0face2a48",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/045 - Al-Jathiya ( Crouching ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0627\u062b\u064a\u0629.ogg": {
+    "audio/quran/bengali/045 - Al-Jathiya ( Crouching ) - سورة الجاثية.ogg": {
       "size": 11411241,
       "sha256": "cb658add3ce9a994a38e19d232215aca095d61390fcf2ca66807756a191cfdba",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/046 - Al-Ahqaf ( The Curved Sand-hills ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u062d\u0642\u0627\u0641.ogg": {
+    "audio/quran/bengali/046 - Al-Ahqaf ( The Curved Sand-hills ) - سورة الأحقاف.ogg": {
       "size": 16555211,
       "sha256": "e95d8e762d3bfc5c95b57bad4756534f19a7bd0858a5d3b1039f155e594483ef",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/047 - Muhammad - \u0633\u0648\u0631\u0629 \u0645\u062d\u0645\u062f.ogg": {
+    "audio/quran/bengali/047 - Muhammad - سورة محمد.ogg": {
       "size": 13189105,
       "sha256": "2e1f1549109b5efe7dbb0aa1d8e529e106fd9a83e4cdaeccbb91edefcaf551a1",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/048 - Al-Fath ( The Victory ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u062a\u062d.ogg": {
+    "audio/quran/bengali/048 - Al-Fath ( The Victory ) - سورة الفتح.ogg": {
       "size": 12924631,
       "sha256": "f9442d87e87d9f4a4e21e9b6c6003b3865f7069731084a83039d765fcb890f02",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/049 - Al-Hujurat ( The Dwellings ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062c\u0631\u0627\u062a.ogg": {
+    "audio/quran/bengali/049 - Al-Hujurat ( The Dwellings ) - سورة الحجرات.ogg": {
       "size": 8425200,
       "sha256": "4cc635b1400d220c6d66566312a1aedf3bf749fe6a0486baf7eba95652ef5cca",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/050 - Qaf ( The Letter Qaf ) - \u0633\u0648\u0631\u0629 \u0642.ogg": {
+    "audio/quran/bengali/050 - Qaf ( The Letter Qaf ) - سورة ق.ogg": {
       "size": 9417966,
       "sha256": "5b72a4579c97a36136815a4ffbfdee354cea77e4ad46865d4a4a6d036ed2fe7e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/051 - Adh-Dhariyat ( The Wind that Scatter ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0630\u0627\u0631\u064a\u0627\u062a.ogg": {
+    "audio/quran/bengali/051 - Adh-Dhariyat ( The Wind that Scatter ) - سورة الذاريات.ogg": {
       "size": 9506726,
       "sha256": "de800116d113946dd5f3f1a335046303cd149e714b045650db483bf07f35a9fb",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/052 - At-Tur ( The Mount ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0648\u0631.ogg": {
+    "audio/quran/bengali/052 - At-Tur ( The Mount ) - سورة الطور.ogg": {
       "size": 8257141,
       "sha256": "114a4a9d6b5d862ec76129a97679cdd2dce84db4c23de274f50c6e42fcfa2ebe",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/053 - An-Najm ( The Star ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u062c\u0645.ogg": {
+    "audio/quran/bengali/053 - An-Najm ( The Star ) - سورة النجم.ogg": {
       "size": 8539288,
       "sha256": "d0e5921f48a90a7d41992b100171b24c63ce3c48f5862565865369739f6eaa7d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/054 - Al-Qamar ( The Moon ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0645\u0631.ogg": {
+    "audio/quran/bengali/054 - Al-Qamar ( The Moon ) - سورة القمر.ogg": {
       "size": 9037266,
       "sha256": "fd12218fa1bada5d3974ab08fb0aff894dd2865e2ba972ac042ef8e56365ef9a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/055 - Ar-Rahman ( The Most Graciouse ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0631\u062d\u0645\u0646.ogg": {
+    "audio/quran/bengali/055 - Ar-Rahman ( The Most Graciouse ) - سورة الرحمن.ogg": {
       "size": 11628676,
       "sha256": "49a4cffb917b28bcbe54645cfd30a467255a7d03b87316f2826efb5562558296",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/056 - Al-Waqi'ah ( The Event ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0648\u0627\u0642\u0639\u0629.ogg": {
+    "audio/quran/bengali/056 - Al-Waqi'ah ( The Event ) - سورة الواقعة.ogg": {
       "size": 11667496,
       "sha256": "7aba98a9c7a00c079385b2eb3b1aa45acfb78f1eb9cbbaf4cc2004ae067be8ce",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/057 - Al-Hadid ( The Iron ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u062f\u064a\u062f.ogg": {
+    "audio/quran/bengali/057 - Al-Hadid ( The Iron ) - سورة الحديد.ogg": {
       "size": 14895223,
       "sha256": "f5fa939c14f3773573098c8b3860a4271e295dbd0d59b9455c9e475b08594aa5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/058 - Al-Mujadilah ( She That Disputeth ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u062c\u0627\u062f\u0644\u0629.ogg": {
+    "audio/quran/bengali/058 - Al-Mujadilah ( She That Disputeth ) - سورة المجادلة.ogg": {
       "size": 10927771,
       "sha256": "fc89c82017e6c196ab3cae2cdabf37a42e8d140771a690bea056ed965af54315",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/059 - Al-Hashr ( The Gathering ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u0634\u0631.ogg": {
+    "audio/quran/bengali/059 - Al-Hashr ( The Gathering ) - سورة الحشر.ogg": {
       "size": 11222970,
       "sha256": "f6dd59e2d0a610e640c043de4e29f5b3ee17d589e947cfe9663b8617aff6e067",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/060 - Al-Mumtahanah ( The Woman to be examined ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0645\u062a\u062d\u0646\u0629.ogg": {
+    "audio/quran/bengali/060 - Al-Mumtahanah ( The Woman to be examined ) - سورة الممتحنة.ogg": {
       "size": 8070283,
       "sha256": "645d21623413bea33ccc921c258494bdd827d2f94ea854c77f68ac5fc4360f4b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/061 - As-Saff ( The Row ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0635\u0641.ogg": {
+    "audio/quran/bengali/061 - As-Saff ( The Row ) - سورة الصف.ogg": {
       "size": 5075622,
       "sha256": "729fcee88b8baf9407c62058ff8dd122f6f87c90a35a464e916428cf71716d18",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/062 - Al-Jumu'ah ( Friday ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0645\u0639\u0629.ogg": {
+    "audio/quran/bengali/062 - Al-Jumu'ah ( Friday ) - سورة الجمعة.ogg": {
       "size": 3861774,
       "sha256": "89d7c9645cf6589cf5d6acd26d395a39bc6a5454687cb8cc3762aee1d0700c6a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/063 - Al-Munafiqoon ( The Hypocrites ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0646\u0627\u0641\u0642\u0648\u0646.ogg": {
+    "audio/quran/bengali/063 - Al-Munafiqoon ( The Hypocrites ) - سورة المنافقون.ogg": {
       "size": 4581482,
       "sha256": "cab440e54c608324480f9af00f2b1db62db80ecc8834a624a57f9d0f8e74d3ad",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/064 - At-Taghabun ( Mutual Loss & Gain ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u063a\u0627\u0628\u0646.ogg": {
+    "audio/quran/bengali/064 - At-Taghabun ( Mutual Loss & Gain ) - سورة التغابن.ogg": {
       "size": 6159538,
       "sha256": "3c54d0cb4b2d4e5cb3cf10eec5eb35b1f68f69ef8e4a4d18b14d428a9eb3c5d8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/065 - At-Talaq ( The Divorce ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0644\u0627\u0642.ogg": {
+    "audio/quran/bengali/065 - At-Talaq ( The Divorce ) - سورة الطلاق.ogg": {
       "size": 6517115,
       "sha256": "a26e44826891a1a85c20c7a03f14c83a3ab9bc4da83e3bfcf7d50e72661982da",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/066 - At-Tahrim ( The Prohibition ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u062d\u0631\u064a\u0645.ogg": {
+    "audio/quran/bengali/066 - At-Tahrim ( The Prohibition ) - سورة التحريم.ogg": {
       "size": 6605565,
       "sha256": "a65596e1ff3dafb7bf7562f557348fc482487cf16c98ca5f327993e93b763661",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/067 - Al-Mulk ( Dominion ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u0643.ogg": {
+    "audio/quran/bengali/067 - Al-Mulk ( Dominion ) - سورة الملك.ogg": {
       "size": 8001098,
       "sha256": "043a2911e2d3b3599b5e013b9c97fadc130deb031bb9be92f7eec0d77b34986c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/068 - Al-Qalam ( The Pen ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0644\u0645.ogg": {
+    "audio/quran/bengali/068 - Al-Qalam ( The Pen ) - سورة القلم.ogg": {
       "size": 8324038,
       "sha256": "fbe7628cb5ea6843071adb1fe88d6231e8c8be1c63c4f92a522ff39f4e054d59",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/069 - Al-Haaqqah ( The Inevitable ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062d\u0627\u0642\u0629.ogg": {
+    "audio/quran/bengali/069 - Al-Haaqqah ( The Inevitable ) - سورة الحاقة.ogg": {
       "size": 7038889,
       "sha256": "eb6203d1543d12de30c71eade7446f57ab2b15d50756521def3c5f7872340452",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/070 - Al-Ma'arij (The Ways of Ascent ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0639\u0627\u0631\u062c.ogg": {
+    "audio/quran/bengali/070 - Al-Ma'arij (The Ways of Ascent ) - سورة المعارج.ogg": {
       "size": 5622742,
       "sha256": "f92334d40fd15bb086168881489db69bc8f5f81cba93db1a5739f5cfa1fe0277",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/071 - Nooh - \u0633\u0648\u0631\u0629 \u0646\u0648\u062d.ogg": {
+    "audio/quran/bengali/071 - Nooh - سورة نوح.ogg": {
       "size": 5279308,
       "sha256": "f1d6a31e0c45cdec9a0af5a14baa2e375587ffe67c46d9f0c1ed5f35837c940a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/072 - Al-Jinn ( The Jinn ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062c\u0646.ogg": {
+    "audio/quran/bengali/072 - Al-Jinn ( The Jinn ) - سورة الجن.ogg": {
       "size": 6292537,
       "sha256": "dd2fac5ac3321f67e2b3084e3206e6a7ee157115e1168cc638e66196f1c4aaca",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/073 - Al-Muzzammil (The One wrapped in Garments) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0632\u0645\u0644.ogg": {
+    "audio/quran/bengali/073 - Al-Muzzammil (The One wrapped in Garments) - سورة المزمل.ogg": {
       "size": 4757786,
       "sha256": "8aae2aad4e1b4b9340e95f34b603f5ccccee014e1beeaadd530488a8a61b9581",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/074 - Al-Muddaththir ( The One Enveloped ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u062f\u062b\u0631.ogg": {
+    "audio/quran/bengali/074 - Al-Muddaththir ( The One Enveloped ) - سورة المدثر.ogg": {
       "size": 6544787,
       "sha256": "e7469c743651c2c79587d3700067b655823ea53b9d94830b46c6f1b231045083",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/075 - Al-Qiyamah ( The Resurrection ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u064a\u0627\u0645\u0629.ogg": {
+    "audio/quran/bengali/075 - Al-Qiyamah ( The Resurrection ) - سورة القيامة.ogg": {
       "size": 3954529,
       "sha256": "ad104eabd8704aa25bad585eda476b3653705fcb958917423bfdd31845552b05",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/076 - Al-Insan ( Man ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u0646\u0633\u0627\u0646.ogg": {
+    "audio/quran/bengali/076 - Al-Insan ( Man ) - سورة الإنسان.ogg": {
       "size": 6151294,
       "sha256": "3bc7433f5aeb6f09862f855a5f8490477c75c5b94b36fc4c6273971109ec6046",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/077 - Al-Mursalat ( Those sent forth ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0631\u0633\u0644\u0627\u062a.ogg": {
+    "audio/quran/bengali/077 - Al-Mursalat ( Those sent forth ) - سورة المرسلات.ogg": {
       "size": 5256897,
       "sha256": "b80406b2549dc2374407220df090143765dffe0d823d2d1d4374cb69db2bb688",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/078 - An-Naba' ( The Great News ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0628\u0623.ogg": {
+    "audio/quran/bengali/078 - An-Naba' ( The Great News ) - سورة النبأ.ogg": {
       "size": 4454764,
       "sha256": "fb31032abdd4236450a7c5b49d531c258c95bc90d4513077ab89c0a24de8f8cd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/079 - An-Nazi'at ( Those who Pull Out ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0627\u0632\u0639\u0627\u062a.ogg": {
+    "audio/quran/bengali/079 - An-Nazi'at ( Those who Pull Out ) - سورة النازعات.ogg": {
       "size": 4919244,
       "sha256": "92c37397d4c9c84721a7b8db6c92d959689dbca63926242fd2cf08d1a8546e5b",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/080 - Abasa ( He frowned ) - \u0633\u0648\u0631\u0629 \u0639\u0628\u0633.ogg": {
+    "audio/quran/bengali/080 - Abasa ( He frowned ) - سورة عبس.ogg": {
       "size": 4019742,
       "sha256": "ef50c42feda7a975b01fcf38e4fa8cbe2f9f7e63e69de55e0e724f5139458cc9",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/081 - At-Takwir ( The Overthrowing ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0643\u0648\u064a\u0631.ogg": {
+    "audio/quran/bengali/081 - At-Takwir ( The Overthrowing ) - سورة التكوير.ogg": {
       "size": 2581656,
       "sha256": "4fe7bf9d99a37175cb42e39234d9a80dc0cf367c3ab9e091fae1ce072ee935f6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/082 - Al-Infitar ( The Cleaving ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0627\u0646\u0641\u0637\u0627\u0631.ogg": {
+    "audio/quran/bengali/082 - Al-Infitar ( The Cleaving ) - سورة الانفطار.ogg": {
       "size": 2351241,
       "sha256": "0d1dc19c491b198998a7972a9f4f0b436229db2c6b159e6697b5c50d5e2d66c7",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/083 - Al-Mutaffifin (Those Who Deal in Fraud) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0637\u0641\u0641\u064a\u0646.ogg": {
+    "audio/quran/bengali/083 - Al-Mutaffifin (Those Who Deal in Fraud) - سورة المطففين.ogg": {
       "size": 4833187,
       "sha256": "95bb2401dbed4aece3ad95278e17f2a05bfc4f85edd77c2c53370165df0cc2d6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/084 - Al-Inshiqaq (The Splitting Asunder) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0627\u0646\u0634\u0642\u0627\u0642.ogg": {
+    "audio/quran/bengali/084 - Al-Inshiqaq (The Splitting Asunder) - سورة الانشقاق.ogg": {
       "size": 2999702,
       "sha256": "9dfcc6fc5b155f5d80ebcd0964a1fe80f11c5197e5376eb752b88f08a892ae2d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/085 - Al-Burooj ( The Big Stars ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0631\u0648\u062c.ogg": {
+    "audio/quran/bengali/085 - Al-Burooj ( The Big Stars ) - سورة البروج.ogg": {
       "size": 3104040,
       "sha256": "ad162ebe7975d87f8523bda68b964b4ebed64741e7922fd2e3466b706b959dd4",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/086 - At-Tariq ( The Night-Comer ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0637\u0627\u0631\u0642.ogg": {
+    "audio/quran/bengali/086 - At-Tariq ( The Night-Comer ) - سورة الطارق.ogg": {
       "size": 1839432,
       "sha256": "c91374c5d75667b2e20b73d57608c336fda5b8baa618da0c84de45f0a3164b66",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/087 - Al-A'la ( The Most High ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0623\u0639\u0644\u0649.ogg": {
+    "audio/quran/bengali/087 - Al-A'la ( The Most High ) - سورة الأعلى.ogg": {
       "size": 2064467,
       "sha256": "e620e1d37e89eb3ee6a4caa5685f741694a8aeca7a9b2abed8ff84784c194872",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/088 - Al-Ghashiya ( The Overwhelming ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u063a\u0627\u0634\u064a\u0629.ogg": {
+    "audio/quran/bengali/088 - Al-Ghashiya ( The Overwhelming ) - سورة الغاشية.ogg": {
       "size": 2348079,
       "sha256": "ba41f219453a337a330c0ed4aa8ed9167cae36e879c4d306c73dab8ec81830f6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/089 - Al-Fajr ( The Dawn ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u062c\u0631.ogg": {
+    "audio/quran/bengali/089 - Al-Fajr ( The Dawn ) - سورة الفجر.ogg": {
       "size": 3653192,
       "sha256": "fa050e100dec4e83720f8076578f47dfe033bf7d2dc02f6e998418ed629eeba8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/090 - Al-Balad ( The City ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u0644\u062f.ogg": {
+    "audio/quran/bengali/090 - Al-Balad ( The City ) - سورة البلد.ogg": {
       "size": 2000443,
       "sha256": "ea643d31136cd042543a7eb90ce11215b876af3c5bd76118c1554b49cc7c7546",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/091 - Ash-Shams ( The Sun ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0645\u0633.ogg": {
+    "audio/quran/bengali/091 - Ash-Shams ( The Sun ) - سورة الشمس.ogg": {
       "size": 1704929,
       "sha256": "aa9c103e5a4abcb8e085b874155d0da3d18e4c62f55beb209b49c22f896c3592",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/092 - Al-Layl ( The Night ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0644\u064a\u0644.ogg": {
+    "audio/quran/bengali/092 - Al-Layl ( The Night ) - سورة الليل.ogg": {
       "size": 1985624,
       "sha256": "5721467de7bbf904e1f99579c165bdc8cbbb42b331108c0747056fc1f0fabc1c",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/093 - Ad-Dhuha ( The Forenoon ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0636\u062d\u0649.ogg": {
+    "audio/quran/bengali/093 - Ad-Dhuha ( The Forenoon ) - سورة الضحى.ogg": {
       "size": 1186846,
       "sha256": "7155839293628d4393b3e2e888aee4ee9b318abd9c2839f9eaa62666a8cfc3aa",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/094 - As-Sharh ( The Opening Forth) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0634\u0631\u062d.ogg": {
+    "audio/quran/bengali/094 - As-Sharh ( The Opening Forth) - سورة الشرح.ogg": {
       "size": 769017,
       "sha256": "8c999eaa9b2762cd931788db76ef93756c9d1fd6c501e4ee8d82748d154b2465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/095 - At-Tin ( The Fig ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u064a\u0646.ogg": {
+    "audio/quran/bengali/095 - At-Tin ( The Fig ) - سورة التين.ogg": {
       "size": 1069250,
       "sha256": "2fc4357479f87ea4026e4262dba349c13e929bb7953607576cd379a5ed8ff8e7",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/096 - Al-'alaq ( The Clot ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0644\u0642.ogg": {
+    "audio/quran/bengali/096 - Al-'alaq ( The Clot ) - سورة العلق.ogg": {
       "size": 1864565,
       "sha256": "ffd9edc0ba78b837ad5803562328c718e782e2d5534b24bc0fa6aaa9c9efe1e6",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/097 - Al-Qadr ( The Night of Decree ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u062f\u0631.ogg": {
+    "audio/quran/bengali/097 - Al-Qadr ( The Night of Decree ) - سورة القدر.ogg": {
       "size": 777538,
       "sha256": "3fab5fec04e14111bfd9bcc0b33a47e7d2f4c815e76cfae28a13be57f8c4fa5e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/098 - Al-Bayyinah ( The Clear Evidence ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0628\u064a\u0646\u0629.ogg": {
+    "audio/quran/bengali/098 - Al-Bayyinah ( The Clear Evidence ) - سورة البينة.ogg": {
       "size": 2062531,
       "sha256": "5f1e3e09f46e2ab1c4028897b03e5f839377d985e83e0b343fc9d5cf258a0f80",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/099 - Az-Zalzalah ( The Earthquake ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0632\u0644\u0632\u0644\u0629.ogg": {
+    "audio/quran/bengali/099 - Az-Zalzalah ( The Earthquake ) - سورة الزلزلة.ogg": {
       "size": 1012796,
       "sha256": "9b37122685686f2f454260715fb6abf24421fbf85557f83fbacb052763233465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/100 - Al-'adiyat ( Those That Run ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0627\u062f\u064a\u0627\u062a.ogg": {
+    "audio/quran/bengali/100 - Al-'adiyat ( Those That Run ) - سورة العاديات.ogg": {
       "size": 1189321,
       "sha256": "787557f5c85901daebd5ca85b0e8116ba606e6a2a095cb940e9f9a44fdf1d510",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/101 - Al-Qari'ah ( The Striking Hour ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0642\u0627\u0631\u0639\u0629.ogg": {
+    "audio/quran/bengali/101 - Al-Qari'ah ( The Striking Hour ) - سورة القارعة.ogg": {
       "size": 996144,
       "sha256": "906b576fc7342d5f58f9abcdaf4cf8ad482d2c98c22d9e9895dc68670ccee3b5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/102 - At-Takathur ( The piling Up ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u062a\u0643\u0627\u062b\u0631.ogg": {
+    "audio/quran/bengali/102 - At-Takathur ( The piling Up ) - سورة التكاثر.ogg": {
       "size": 1038211,
       "sha256": "83afde6a161b7de80a4b03862a702548bda85f15e6eeaeee77622aa17cc472dd",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/103 - Al-Asr ( The Time ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0639\u0635\u0631.ogg": {
+    "audio/quran/bengali/103 - Al-Asr ( The Time ) - سورة العصر.ogg": {
       "size": 490820,
       "sha256": "be1b6c42533e790d19b1748e538006b91429950153e0be96675a302962befcc8",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/104 - Al-Humazah ( The Slanderer ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0647\u0645\u0632\u0629.ogg": {
+    "audio/quran/bengali/104 - Al-Humazah ( The Slanderer ) - سورة الهمزة.ogg": {
       "size": 955085,
       "sha256": "e01687d5e3a7b4000359df8d99e70affd828bcd14f24bc4d2d82b5636b971eb2",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/105 - Al-Fil ( The Elephant ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u064a\u0644.ogg": {
+    "audio/quran/bengali/105 - Al-Fil ( The Elephant ) - سورة الفيل.ogg": {
       "size": 761374,
       "sha256": "d8f1c7c6869c5b531a027db3792df63ba3695d974c0ddc96f142c7239cde5e2e",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/106 - Quraish - \u0633\u0648\u0631\u0629 \u0642\u0631\u064a\u0634.ogg": {
+    "audio/quran/bengali/106 - Quraish - سورة قريش.ogg": {
       "size": 644771,
       "sha256": "a33d2d4ed8a321c9bbf3c7286f27dcba22c6d521953d0469a2e912ebaec8f465",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/107 - Al-Ma'un ( Small Kindnesses ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0627\u0639\u0648\u0646.ogg": {
+    "audio/quran/bengali/107 - Al-Ma'un ( Small Kindnesses ) - سورة الماعون.ogg": {
       "size": 889062,
       "sha256": "c7321a628e8711b98fe468c6358c11c338d741ad12087277e6a47e7276c355b1",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/108 - Al-Kauthor ( A River in Paradise) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0648\u062b\u0631.ogg": {
+    "audio/quran/bengali/108 - Al-Kauthor ( A River in Paradise) - سورة الكوثر.ogg": {
       "size": 424621,
       "sha256": "f3931607db3dcce4fa2aba6e95eed02af91554511feac511fc7ea7080405513d",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/109 - Al-Kafiroon ( The Disbelievers ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0643\u0627\u0641\u0631\u0648\u0646.ogg": {
+    "audio/quran/bengali/109 - Al-Kafiroon ( The Disbelievers ) - سورة الكافرون.ogg": {
       "size": 861223,
       "sha256": "3faf609b589890865716cda062ffc5027dd1c5244fc76d0c5fe28fc31e2c0d74",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/110 - An-Nasr ( The Help ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0635\u0631.ogg": {
+    "audio/quran/bengali/110 - An-Nasr ( The Help ) - سورة النصر.ogg": {
       "size": 610251,
       "sha256": "e8e89672b0b522c788b4827868175aeaf0be300174c25b9662bda5a8640e8259",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/111 - Al-Masad ( The Palm Fibre ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0645\u0633\u062f.ogg": {
+    "audio/quran/bengali/111 - Al-Masad ( The Palm Fibre ) - سورة المسد.ogg": {
       "size": 675953,
       "sha256": "0ad78510fbeb45dfce5c3c170e8ca56c1d3b439b1aa3ec07ca1ea8309510ce42",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/112 - Al-Ikhlas ( Sincerity ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0625\u062e\u0644\u0627\u0635.ogg": {
+    "audio/quran/bengali/112 - Al-Ikhlas ( Sincerity ) - سورة الإخلاص.ogg": {
       "size": 455405,
       "sha256": "efcbc86935f78312222a2466b115f63666a4a6c9ca9c0edd042b8a8a7a5c4ce5",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/113 - Al-Falaq ( The Daybreak ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0641\u0644\u0642.ogg": {
+    "audio/quran/bengali/113 - Al-Falaq ( The Daybreak ) - سورة الفلق.ogg": {
       "size": 616863,
       "sha256": "565fe15febfe7a3c02a161062daa31851bb11129baa3ca05b75151cddd81382a",
       "category": "quran_audio_bengali",
       "required": false
     },
-    "audio/quran/bengali/114 - An-Nas ( Mankind ) - \u0633\u0648\u0631\u0629 \u0627\u0644\u0646\u0627\u0633.ogg": {
+    "audio/quran/bengali/114 - An-Nas ( Mankind ) - سورة الناس.ogg": {
       "size": 756570,
       "sha256": "8002f5b793fe6eb305fb92ae662bd4527ad866defe89083f8ed1982faa915a14",
       "category": "quran_audio_bengali",

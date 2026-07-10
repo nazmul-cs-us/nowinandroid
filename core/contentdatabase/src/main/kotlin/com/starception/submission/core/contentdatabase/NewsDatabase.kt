@@ -61,7 +61,7 @@ abstract class NewsDatabase : RoomDatabase() {
                     builder.createFromFile(dbFile)
                 }
                 // No bundled fallback needed - Room will create empty schema,
-                // then regenerateFromSources() populates it from quran.db, fortress_of_the_muslim.db, etc.
+                // then regenerateFromSources() populates it from quran.db, fortress_of_the_muslim_v2.db, etc.
 
                 val instance = builder
                     .fallbackToDestructiveMigration()
@@ -119,7 +119,7 @@ abstract class NewsDatabase : RoomDatabase() {
         }
 
         /**
-         * Regenerate news.db from source databases (quran.db, fortress_of_the_muslim.db, quranic_duas.db)
+         * Regenerate news.db from source databases (quran.db, fortress_of_the_muslim_v2.db, quranic_duas.db)
          * Uses Room DAO to update the existing database, which works with singleton injected instances.
          *
          * @param context Application context

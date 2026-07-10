@@ -16,7 +16,7 @@ import java.util.Locale
 /**
  * Helper class to synchronize duas databases with news database
  *
- * This ensures that when new duas are added to fortress_of_the_muslim.db or quranic_duas.db,
+ * This ensures that when new duas are added to fortress_of_the_muslim_v2.db or quranic_duas.db,
  * they will appear in the app after refreshing databases.
  */
 object DatabaseSyncHelper {

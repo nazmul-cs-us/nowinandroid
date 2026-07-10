@@ -23,19 +23,26 @@ BASE = "https://www.islamawareness.net/Dua/Fortress/"
 # hisnmuslim.com directly. The MP3s are fetched + uploaded by scripts/download_fortress_audio.py;
 # here we just emit the resulting CDN URL so a rebuilt v2 db already points at the CDN.
 AUDIO_CDN_FMT = "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/audio/fortress/arabic/{:03d}.mp3"
+# Per-dua recitation: each individual dua has its own clip (keyed by the wafaaelmaandy dua id),
+# so a dua card plays audio matching its own Arabic (not the whole-chapter recitation).
+AUDIO_DUA_CDN_FMT = "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev/audio/fortress/arabic/dua/{}.mp3"
 WAF_URL = "https://raw.githubusercontent.com/wafaaelmaandy/Hisn-Muslim-Json/master/husn_en.json"
 UA = {"User-Agent": "Mozilla/5.0 (fortress-parser)"}
 N_CHAPTERS = 132
 
 
-def load_waf_arabic():
-    """{chapter_id: [arabic per dua]} from wafaaelmaandy's JSON — used to fill the
-    Arabic that islamawareness omits for ~100 chapters (dua counts align 1:1)."""
+def load_waf():
+    """{chapter_id: [(arabic, dua_audio_id) per dua]} from wafaaelmaandy's JSON.
+    Used to (a) fill the Arabic that islamawareness omits and (b) map each dua to its own
+    per-dua recitation id (TEXT[].ID → hisnmuslim.com/audio/ar/<id>.mp3)."""
     raw = fetch(WAF_URL, encoding="utf-8").lstrip("﻿")
     data = json.loads(raw)["English"]
     out = {}
     for ch in data:
-        out[ch["ID"]] = [collapse(t.get("ARABIC_TEXT", "")) for t in ch.get("TEXT", [])]
+        out[ch["ID"]] = [
+            (collapse(t.get("ARABIC_TEXT", "")), t.get("ID"))
+            for t in ch.get("TEXT", [])
+        ]
     return out
 
 
@@ -201,21 +208,28 @@ def main():
         print(f"  ch {num:3d} [{titles.get(num,'?')[:34]:34}] duas={len(duas)}")
         time.sleep(0.15)
 
-    # Fill Arabic that islamawareness omits, from wafaaelmaandy (counts align 1:1).
+    # From wafaaelmaandy: (a) fill missing Arabic (only when counts match, safe), and
+    # (b) assign each dua its own per-dua audio id by position. zip() maps our leading duas to
+    # waf's leading duas in order; when waf has extras (4 chapters) they're simply unused, so
+    # every one of our duas still gets a correct, in-order per-dua clip.
     filled = 0
+    audio_mapped = 0
     try:
-        waf = load_waf_arabic()
+        waf = load_waf()
         for num, title, audio, duas in all_chapters:
             war = waf.get(num, [])
-            if len(war) != len(duas):
-                continue  # only fill when the dua counts match exactly (safe)
-            for d, ar in zip(duas, war):
-                if not d["arabic"] and ar:
+            counts_match = len(war) == len(duas)
+            for d, (ar, dua_id) in zip(duas, war):
+                if counts_match and not d["arabic"] and ar:
                     d["arabic"] = ar
                     filled += 1
+                if dua_id is not None:
+                    d["audio_dua_id"] = dua_id
+                    audio_mapped += 1
         print(f"filled {filled} missing Arabic from wafaaelmaandy")
+        print(f"mapped {audio_mapped} per-dua audio ids from wafaaelmaandy")
     except Exception as e:
-        print(f"  ! arabic fill skipped: {e}")
+        print(f"  ! wafaaelmaandy load skipped: {e}")
 
     if limit < N_CHAPTERS:
         for num, title, audio, duas in all_chapters:
@@ -247,7 +261,7 @@ def build_db(all_chapters):
         CREATE TABLE invocations (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, chapter_id INTEGER NOT NULL, position INTEGER NOT NULL,
             arabic TEXT, transliteration TEXT, translation TEXT, context TEXT, instruction TEXT, note TEXT,
-            post_context TEXT, description TEXT, source_ids TEXT,
+            post_context TEXT, description TEXT, source_ids TEXT, audio_url TEXT,
             FOREIGN KEY (chapter_id) REFERENCES chapters(id));
         CREATE TABLE footnotes (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, chapter_id INTEGER NOT NULL, term TEXT, definition TEXT,
@@ -264,10 +278,15 @@ def build_db(all_chapters):
     for num, title, audio, duas in all_chapters:
         c.execute("INSERT INTO chapters (id, title, audio_url) VALUES (?, ?, ?)", (num, title, audio))
         for pos, d in enumerate(duas, 1):
+            dua_audio = None
+            dua_id = d.get("audio_dua_id")
+            if dua_id is not None:
+                dua_audio = AUDIO_DUA_CDN_FMT.format(dua_id)
             c.execute("""INSERT INTO invocations (chapter_id, position, arabic, transliteration, translation,
-                         context, instruction, note, post_context, description, source_ids)
-                         VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL)""",
-                      (num, pos, d["arabic"] or None, d["transliteration"] or None, d["translation"] or None))
+                         context, instruction, note, post_context, description, source_ids, audio_url)
+                         VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, ?)""",
+                      (num, pos, d["arabic"] or None, d["transliteration"] or None, d["translation"] or None,
+                       dua_audio))
             inv_id = c.lastrowid
             if d["reference"]:
                 c.execute("INSERT INTO hadith_references (invocation_id, reference_str) VALUES (?, ?)",

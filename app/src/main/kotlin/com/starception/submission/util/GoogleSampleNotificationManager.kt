@@ -35,6 +35,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.R
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.logging.Level
@@ -754,11 +756,13 @@ object GoogleSampleNotificationManager {
         // Option 1: Dismiss the notification entirely
         // dismissNotification()
         
-        // Option 2: Update notification to show completion status
+        // Option 2: Update notification to show completion status.
+        // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
+        val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
         val completionNotification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_prayer)
             .setContentTitle("Prayer Completed ✅")
-            .setContentText("$prayerName has been marked as completed")
+            .setContentText("$displayName has been marked as completed")
             .setAutoCancel(true) // Allow user to dismiss by tapping
             .setOngoing(false) // Not ongoing anymore
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

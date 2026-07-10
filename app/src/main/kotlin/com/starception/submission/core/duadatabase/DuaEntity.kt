@@ -97,7 +97,11 @@ data class DuaInvocationEntity(
     val description: String?,
 
     @ColumnInfo(name = "source_ids")
-    val sourceIds: String?
+    val sourceIds: String?,
+
+    // Per-dua recitation audio (added alongside chapter-level chapters.audio_url).
+    @ColumnInfo(name = "audio_url")
+    val audioUrl: String? = null
 )
 
 /**
