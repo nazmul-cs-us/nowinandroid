@@ -402,51 +402,7 @@ fun PullToSyncContainer(
         // Media controls, download text, and sync indicators all render here.
         // For media, fill the full height of the revealed area and center content vertically.
         if (wobbleIntensity > 0.05f) {
-            if (isTtsPreparing) {
-                // TTS is generating speech (initial request or the gap between
-                // long-text chunks) — takes precedence over the media bar so the
-                // user sees why audio is paused.
-                Column(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                        .padding(top = (wobbleIntensity * 8f).dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Canvas(
-                            modifier = Modifier.size(18.dp)
-                        ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
-                                color = indicatorColor,
-                                startAngle = spinAngle,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Preparing audio…",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor
-                        )
-                    }
-                }
-            } else if (mediaState.isVisible) {
+            if (mediaState.isVisible) {
                 // --- Media Mini-Bar fills the sage area ---
                 // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
                 // (via titleDragModifier) so playback button taps are not swallowed.
@@ -503,6 +459,7 @@ fun PullToSyncContainer(
                             state = mediaState,
                             onAction = onMediaAction,
                             onTitleClick = onMediaTitleClick,
+                            preparingAudio = isTtsPreparing,
                             titleDragModifier = Modifier.pointerInput(Unit) {
                                 var totalDrag = 0f
                                 detectVerticalDragGestures(
@@ -714,6 +671,41 @@ fun PullToSyncContainer(
                             color = indicatorColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else if (isTtsPreparing) {
+                    // TTS generating with no media session visible yet — show the
+                    // spinner banner (once the media bar appears, the status moves
+                    // into its subtitle instead).
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Canvas(
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawArc(
+                                color = indicatorColor,
+                                startAngle = spinAngle,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round
+                                ),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokeWidth,
+                                    size.height - strokeWidth
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Preparing audio…",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor
                         )
                     }
                 } else if (isRefreshing) {

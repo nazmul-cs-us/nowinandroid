@@ -45,6 +45,7 @@ fun MediaMiniBar(
     modifier: Modifier = Modifier,
     titleDragModifier: Modifier = Modifier,
     onTitleClick: () -> Unit = {},
+    preparingAudio: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
     val playback = state.playback
@@ -78,9 +79,12 @@ fun MediaMiniBar(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (playback.subtitle.isNotEmpty()) {
+            // While TTS is generating (initial request or the gap between long-text
+            // chunks) the subtitle line explains why audio is paused.
+            val subtitleText = if (preparingAudio) "Preparing audio…" else playback.subtitle
+            if (subtitleText.isNotEmpty()) {
                 Text(
-                    text = playback.subtitle,
+                    text = subtitleText,
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 13.sp,
                     color = subtitleColor,
