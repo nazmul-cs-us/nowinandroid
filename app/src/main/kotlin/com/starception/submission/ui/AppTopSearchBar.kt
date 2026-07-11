@@ -81,6 +81,7 @@ import com.google.android.material.search.SearchBar
 import com.google.android.material.search.SearchView
 import com.starception.submission.R
 import com.starception.submission.core.data.model.RecentSearchQuery
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
@@ -1211,8 +1212,9 @@ private fun addSurahItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        // Same Twemoji icon as the Holy Quran topic; colorful, so no tint.
+        setImageResource(topicIconResFor("quran") ?: R.drawable.ic_app_search_home_24)
+        imageTintList = null
     }
     val name = surah.nameEnglish?.takeIf { it.isNotBlank() }
         ?: surah.nameTranslation?.takeIf { it.isNotBlank() }
@@ -1253,8 +1255,9 @@ private fun addAyahItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        // Same Twemoji icon as the Holy Quran topic; colorful, so no tint.
+        setImageResource(topicIconResFor("quran") ?: R.drawable.ic_app_search_home_24)
+        imageTintList = null
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = "${ayah.surahNumber}:${ayah.numberInSurah}"
@@ -1287,8 +1290,9 @@ private fun addQuranicDuaItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        // Same Twemoji icon as the Quranic Duas topic; colorful, so no tint.
+        setImageResource(topicIconResFor("dua") ?: R.drawable.ic_app_search_home_24)
+        imageTintList = null
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = "Dua ${dua.duaNumber}: ${dua.title}"
@@ -1323,8 +1327,9 @@ private fun addFortressDuaItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        // Same Twemoji icon as the Quranic Duas topic; colorful, so no tint.
+        setImageResource(topicIconResFor("dua") ?: R.drawable.ic_app_search_home_24)
+        imageTintList = null
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = dua.chapterTitle.ifBlank { "Dua" }
@@ -1360,8 +1365,15 @@ private fun addTopicItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        val topicIconRes = topicIconResFor(name)
+        if (topicIconRes != null) {
+            // Same Twemoji icon as the Interests screen; colorful, so no tint.
+            setImageResource(topicIconRes)
+            imageTintList = null
+        } else {
+            setImageResource(R.drawable.ic_app_search_home_24)
+            imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        }
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = name
@@ -1393,8 +1405,17 @@ private fun addNewsItem(
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
     val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
-        setImageResource(R.drawable.ic_app_search_home_24)
-        imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        // Articles are topical ("Quranic Dua 4: …"), so reuse the topic keyword →
+        // Twemoji mapping; colorful icons take no tint. Unmatched titles keep the
+        // home glyph.
+        val topicIconRes = topicIconResFor(title)
+        if (topicIconRes != null) {
+            setImageResource(topicIconRes)
+            imageTintList = null
+        } else {
+            setImageResource(R.drawable.ic_app_search_home_24)
+            imageTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        }
     }
     view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
         text = title

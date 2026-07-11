@@ -15,8 +15,8 @@
 
     <ImageView
         android:id="@+id/app_search_suggestion_icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_width="24dp"
+        android:layout_height="24dp" />
 
     <LinearLayout
         android:layout_width="wrap_content"

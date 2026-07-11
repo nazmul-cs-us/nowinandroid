@@ -197,7 +197,9 @@ abstract class DuaDatabase : RoomDatabase() {
                             note = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("note")),
                             postContext = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("post_context")),
                             description = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("description")),
-                            sourceIds = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("source_ids"))
+                            sourceIds = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("source_ids")),
+                            audioUrl = invocationsCursor.getColumnIndex("audio_url")
+                                .takeIf { it >= 0 }?.let { invocationsCursor.getString(it) }
                         ))
                     }
                     invocationsCursor.close()

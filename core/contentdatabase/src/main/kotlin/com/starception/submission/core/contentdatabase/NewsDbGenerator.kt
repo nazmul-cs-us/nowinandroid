@@ -191,11 +191,6 @@ object NewsDbGenerator {
         val startTime = System.currentTimeMillis()
 
         return try {
-            // Clear existing data
-            dao.deleteAllNewsTopics()
-            dao.deleteAllNewsResources()
-            Log.d(TAG, "Cleared existing news data")
-
             val now = getCurrentTimestamp()
             val newsResources = mutableListOf<NewsResourceEntity>()
             val crossRefs = mutableListOf<NewsTopicCrossRef>()
@@ -352,14 +347,29 @@ object NewsDbGenerator {
                 val fortressDb = SQLiteDatabase.openDatabase(fortressDbPath, null, SQLiteDatabase.OPEN_READONLY)
                 var newsId = 1001
                 try {
+                    // Older copies of the v2 database (e.g. the bundled asset) predate the
+                    // per-dua audio_url column, so probe before referencing it — a missing
+                    // column would abort the whole regeneration.
+                    fun hasColumn(table: String, column: String): Boolean =
+                        fortressDb.rawQuery("PRAGMA table_info($table)", null).use { c ->
+                            generateSequence { if (c.moveToNext()) c.getString(1) else null }
+                                .any { it == column }
+                        }
+                    // Per-dua audio so each dua card plays its OWN recitation; fall back
+                    // to the whole-chapter recitation only when a dua has no per-dua clip.
+                    val audioExpr = when {
+                        hasColumn("invocations", "audio_url") && hasColumn("chapters", "audio_url") ->
+                            "COALESCE(i.audio_url, c.audio_url)"
+                        hasColumn("chapters", "audio_url") -> "c.audio_url"
+                        hasColumn("invocations", "audio_url") -> "i.audio_url"
+                        else -> "NULL"
+                    }
                     val cursor = fortressDb.rawQuery(
                         """SELECT c.id, c.title, i.id, i.position, i.arabic, i.transliteration,
                            i.translation, i.context, i.instruction, i.note, i.post_context,
                            (SELECT h.reference_str FROM hadith_references h
                               WHERE h.invocation_id = i.id LIMIT 1) AS reference,
-                           -- Per-dua audio so each dua card plays its OWN recitation; fall back
-                           -- to the whole-chapter recitation only when a dua has no per-dua clip.
-                           COALESCE(i.audio_url, c.audio_url) AS audio_url
+                           $audioExpr AS audio_url
                            FROM chapters c
                            JOIN invocations i ON c.id = i.chapter_id
                            ORDER BY c.id, i.position""",
@@ -494,7 +504,11 @@ object NewsDbGenerator {
                 Log.e(TAG, "Failed to generate Bukhari hadiths", e)
             }
 
-            // Insert all data via Room
+            // Clear and insert only after all sources generated cleanly, so a failed
+            // generation never leaves news.db emptier than it started.
+            dao.deleteAllNewsTopics()
+            dao.deleteAllNewsResources()
+            Log.d(TAG, "Cleared existing news data")
             dao.insertNewsResources(newsResources)
             dao.insertNewsTopicCrossRefs(crossRefs)
 
