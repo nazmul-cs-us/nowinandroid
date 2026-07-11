@@ -301,11 +301,13 @@ private fun EmptyFeedContent(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Thin gradient-stroke illustration matching the Saved page's empty-state style.
-        Image(
-            painter = painterResource(id = R.drawable.feature_foryou_img_empty_feed),
+        // Same news icon as the detail pane's "select a news item" placeholder,
+        // so both sides of the two-pane layout read as one consistent feature.
+        Icon(
+            imageVector = NiaIcons.Upcoming,
             contentDescription = null,
-            modifier = Modifier.size(110.dp),
+            modifier = Modifier.size(96.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         )
         Spacer(Modifier.height(32.dp))
         Text(
