@@ -55,11 +55,25 @@ class WhisperVoiceService(
         private const val TAG = "WhisperVoiceService"
         private const val MODEL_ASSET_PATH = "models/ggml-tiny.en.bin"
         private const val RECORDING_FILE = "whisper_recording.wav"
+
+        // End-pointing: recording stops automatically once the user has spoken
+        // and then stayed quiet for END_SILENCE_MS. Amplitude is the recorder's
+        // normalized RMS (0..1). Rooms and mics vary too much for a fixed cutoff
+        // (measured ambient on a Pixel 9 Pro: 0.02-0.06), so speech is detected
+        // relative to a continuously tracked noise floor: drops to the quietest
+        // recent level instantly, creeps back up slowly.
+        private const val SPEECH_OVER_NOISE_FACTOR = 2.5f
+        private const val MIN_SPEECH_THRESHOLD = 0.05f
+        private const val NOISE_FLOOR_RISE_PER_TICK = 0.0005f
+        private const val END_SILENCE_MS = 1_500L
+        private const val NO_SPEECH_TIMEOUT_MS = 6_000L
+        private const val MAX_RECORDING_DURATION_MS = 15_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var initJob: Job? = null
     private var recordJob: Job? = null
+    private var autoStopJob: Job? = null
 
     private var whisperContext: WhisperContext? = null
     private var recorder: Recorder? = null
@@ -133,14 +147,23 @@ class WhisperVoiceService(
 
     private fun initializeWhisper(): Boolean {
         try {
-            Log.i(TAG, "Initializing whisper.cpp from asset: $MODEL_ASSET_PATH")
             Log.i(TAG, "System info: ${WhisperContext.getSystemInfo()}")
 
-            // Load model directly from assets using whisper.cpp
-            whisperContext = WhisperContext.createContextFromAsset(
-                context.assets,
-                MODEL_ASSET_PATH
-            )
+            // Load model from bundled assets first, then the CDN download location
+            // (Settings > Content & Storage / asset download manager puts it there).
+            whisperContext = try {
+                Log.i(TAG, "Initializing whisper.cpp from asset: $MODEL_ASSET_PATH")
+                WhisperContext.createContextFromAsset(context.assets, MODEL_ASSET_PATH)
+            } catch (e: Exception) {
+                val cdnFile = cdnModelFile()
+                if (cdnFile.exists() && cdnFile.length() > 100_000) {
+                    Log.i(TAG, "Loading model from CDN download: ${cdnFile.absolutePath}")
+                    WhisperContext.createContextFromFile(cdnFile.absolutePath)
+                } else {
+                    Log.e(TAG, "Whisper model not found in assets or CDN downloads")
+                    throw e
+                }
+            }
 
             // Initialize recorder
             recorder = Recorder()
@@ -152,6 +175,23 @@ class WhisperVoiceService(
             Log.e(TAG, "Error in initializeWhisper", e)
             return false
         }
+    }
+
+    private fun cdnModelFile(): File =
+        File(File(context.filesDir, "cdn_assets"), MODEL_ASSET_PATH)
+
+    /**
+     * True when the Whisper model file exists (bundled in the APK or downloaded
+     * from the CDN), without loading it. Lets callers distinguish "model missing,
+     * offer the download" from "model present but not yet initialized".
+     */
+    fun isModelAvailable(): Boolean {
+        val bundled = try {
+            context.assets.open(MODEL_ASSET_PATH).use { true }
+        } catch (_: Exception) {
+            false
+        }
+        return bundled || cdnModelFile().let { it.exists() && it.length() > 100_000 }
     }
 
     private fun getRecordingFile(): File {
@@ -250,6 +290,43 @@ class WhisperVoiceService(
             }
         }
 
+        // End-pointing: watch the live amplitude and stop automatically once the
+        // user has spoken and then gone quiet — without this the recording never
+        // ends and no transcription ever runs.
+        autoStopJob?.cancel()
+        autoStopJob = scope.launch {
+            val startedAt = System.currentTimeMillis()
+            var lastSpeechAt = 0L
+            var noiseFloor = Float.MAX_VALUE
+            while (_isListening.value) {
+                kotlinx.coroutines.delay(100)
+                val now = System.currentTimeMillis()
+                val level = _voiceLevel.value
+                // Track the ambient floor: follow drops immediately, rise slowly
+                // so brief speech doesn't get absorbed into the floor.
+                noiseFloor = if (level < noiseFloor) level else noiseFloor + NOISE_FLOOR_RISE_PER_TICK
+                val speechThreshold =
+                    maxOf(noiseFloor * SPEECH_OVER_NOISE_FACTOR, MIN_SPEECH_THRESHOLD)
+                if (level >= speechThreshold) lastSpeechAt = now
+                val elapsed = now - startedAt
+                val shouldStop = when {
+                    lastSpeechAt != 0L && now - lastSpeechAt >= END_SILENCE_MS -> true
+                    lastSpeechAt == 0L && elapsed >= NO_SPEECH_TIMEOUT_MS -> true
+                    elapsed >= MAX_RECORDING_DURATION_MS -> true
+                    else -> false
+                }
+                if (shouldStop) {
+                    Log.i(
+                        TAG,
+                        "Auto-stopping recording (spoke=${lastSpeechAt != 0L}, " +
+                            "elapsed=${elapsed}ms, noiseFloor=$noiseFloor)",
+                    )
+                    stopListening()
+                    break
+                }
+            }
+        }
+
         Log.i(TAG, "Started listening for voice input (whisper.cpp)")
     }
 
@@ -257,6 +334,8 @@ class WhisperVoiceService(
      * Stop listening and start transcription
      */
     fun stopListening() {
+        autoStopJob?.cancel()
+        autoStopJob = null
         if (_isListening.value) {
             _statusMessage.value = "Processing..."
 
@@ -375,6 +454,7 @@ class WhisperVoiceService(
             cancel()
             initJob?.cancel()
             recordJob?.cancel()
+            autoStopJob?.cancel()
 
             try {
                 whisperContext?.release()

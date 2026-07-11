@@ -11,6 +11,7 @@ import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.model.data.UserSearchResult
 import com.starception.submission.core.qurandatabase.AyahEntity
 import com.starception.submission.core.qurandatabase.QuranDao
+import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.InMemorySearchService
 import com.starception.submission.ui.search.SearchTokenizer
@@ -41,7 +42,11 @@ class TopBarSearchViewModel @Inject constructor(
     private val duaRepository: DuaRepository,
     private val quranDao: QuranDao,
     private val inMemorySearchService: InMemorySearchService,
+    private val assetDownloadManager: AssetDownloadManager,
 ) : ViewModel() {
+
+    /** For the mic's missing-voice-model download card ([MissingContentCard]). */
+    fun getDownloadManager(): AssetDownloadManager = assetDownloadManager
 
     val recentSearches: StateFlow<List<RecentSearchQuery>> =
         getRecentSearchQueriesUseCase(limit = 20)

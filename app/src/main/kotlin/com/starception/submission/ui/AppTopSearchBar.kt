@@ -32,11 +32,21 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -83,6 +94,7 @@ import com.starception.submission.R
 import com.starception.submission.core.data.model.RecentSearchQuery
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.feature.search.VoiceSearchService
@@ -153,7 +165,6 @@ fun AppTopSearchBar(
     LaunchedEffect(Unit) { SearchHintAnimator.ensureStarted() }
     val animatedHint by SearchHintAnimator.hintText.collectAsStateWithLifecycle()
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
-    val cloudVoiceService = remember(context) { VoiceSearchService(context.applicationContext) }
     var isListening by remember { mutableStateOf(false) }
     // SearchBar's bounds inside the AndroidView, used to position the
     // Gemini-style listening glow overlay precisely around the pill.
@@ -164,9 +175,18 @@ fun AppTopSearchBar(
     var isSearchViewOpen by remember { mutableStateOf(false) }
 
     DisposableEffect(whisperService) {
-        whisperService.initialize()
+        // Warm the model only when its file is actually present (bundled or
+        // CDN-downloaded); otherwise the mic tap offers the download instead.
+        if (whisperService.isModelAvailable()) whisperService.initialize()
         onDispose { whisperService.release() }
     }
+
+    // Mic tapped with no Whisper model on disk: show the standard missing-content
+    // download card (same UI as missing hadith collections) so the user can fetch
+    // the offline voice recognition model — never fall back to Google's cloud
+    // recognizer.
+    var showVoiceModelDownload by remember { mutableStateOf(false) }
+    val promptVoiceModelDownload: () -> Unit = remember { { showVoiceModelDownload = true } }
 
     // Stable holder so the bus collector (Composable-scope) can reach the
     // SearchView that the AndroidView factory creates exactly once.
@@ -193,8 +213,8 @@ fun AppTopSearchBar(
                     ctx = context,
                     searchView = sv,
                     whisper = whisperService,
-                    cloud = cloudVoiceService,
                     onListeningChanged = { isListening = it },
+                    onModelMissing = promptVoiceModelDownload,
                 )
             }
         } else {
@@ -283,8 +303,8 @@ fun AppTopSearchBar(
                         ctx = ctx,
                         searchView = searchView,
                         whisper = whisperService,
-                        cloud = cloudVoiceService,
                         onListeningChanged = { isListening = it },
+                        onModelMissing = promptVoiceModelDownload,
                     )
                 } else {
                     micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -560,12 +580,11 @@ fun AppTopSearchBar(
         searchBarBoundsPx
     }
     if (isListening && bounds != null) {
-        // Live microphone level (0..1) from whichever engine is capturing,
-        // smoothed so the glow and wave move organically rather than jittering.
+        // Live microphone level (0..1) from the Whisper recorder, smoothed so
+        // the glow and wave move organically rather than jittering.
         val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
-        val cloudLevel by cloudVoiceService.voiceLevel.collectAsStateWithLifecycle()
         val smoothedLevel by animateFloatAsState(
-            targetValue = maxOf(whisperLevel, cloudLevel).coerceIn(0f, 1f),
+            targetValue = whisperLevel.coerceIn(0f, 1f),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = 450f,
@@ -582,6 +601,56 @@ fun AppTopSearchBar(
             level = smoothedLevel,
             modifier = Modifier.matchParentSize(),
         )
+    }
+    if (showVoiceModelDownload) {
+        // Full-screen missing-content page — same layout as the hadith detail
+        // screen's download prompt: solid surface, centered card, circular back.
+        BackHandler { showVoiceModelDownload = false }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                MissingContentCard(
+                    resourceName = "Voice Recognition",
+                    category = "model_whisper",
+                    description = "The offline voice recognition model needs to be downloaded. " +
+                        "Voice search then runs fully on-device.",
+                    downloadManager = viewModel.getDownloadManager(),
+                    onDownloadComplete = {
+                        whisperService.initialize()
+                        showVoiceModelDownload = false
+                        Toast.makeText(
+                            context,
+                            "Voice recognition ready — tap the mic to try it",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    },
+                )
+            }
+            // Back button
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                IconButton(onClick = { showVoiceModelDownload = false }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
     }
     }
 }
@@ -1570,22 +1639,35 @@ private fun dp(ctx: Context, value: Int): Int =
     (value * ctx.resources.displayMetrics.density).toInt()
 
 /**
- * Mic tap: try offline Whisper first (private, low-latency), fall back to the
- * cloud SpeechRecognizer if Whisper isn't initialised. Result opens the in-place
- * SearchView with the transcribed text so the user can review and pick a
- * suggestion or submit via IME.
+ * Mic tap: offline Whisper only (private, on-device — never Google's cloud
+ * recognizer). When the model file isn't on disk yet, [onModelMissing] fires so
+ * the caller can offer the one-time download via the asset download manager.
+ * Result opens the in-place SearchView with the transcribed text so the user
+ * can review and pick a suggestion or submit via IME.
  */
 private fun startVoiceCapture(
     ctx: Context,
     searchView: SearchView,
     whisper: WhisperVoiceService,
-    cloud: VoiceSearchService,
     onListeningChanged: (Boolean) -> Unit,
+    onModelMissing: () -> Unit,
 ) {
     if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
         != PackageManager.PERMISSION_GRANTED
     ) {
         Toast.makeText(ctx, "Microphone permission required", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    // Second tap while listening = stop now and transcribe what was said
+    // (recording also auto-stops on its own after a pause in speech).
+    if (whisper.isListening.value) {
+        whisper.stopListening()
+        return
+    }
+
+    if (!whisper.isInitialized.value && !whisper.isModelAvailable()) {
+        onModelMissing()
         return
     }
 
@@ -1612,14 +1694,14 @@ private fun startVoiceCapture(
             is VoiceSearchService.VoiceSearchResult.Error -> {
                 Toast.makeText(ctx, result.message, Toast.LENGTH_SHORT).show()
             }
-            VoiceSearchService.VoiceSearchResult.Cancelled -> Unit
+            VoiceSearchService.VoiceSearchResult.Cancelled -> {
+                Toast.makeText(ctx, "Didn't catch that — try again", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     onListeningChanged(true)
-    if (whisper.isInitialized.value) {
-        whisper.startListening(handleResult)
-    } else {
-        cloud.startListening(handleResult)
-    }
+    // startListening self-initializes when the model file is present but the
+    // context hasn't been loaded yet (e.g. right after the download finished).
+    whisper.startListening(handleResult)
 }
