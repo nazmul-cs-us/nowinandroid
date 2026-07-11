@@ -14,7 +14,7 @@ fun topicIconResFor(name: String): Int? {
     return when {
         "bukhari" in n || "hadith" in n -> R.drawable.topic_sahih_bukhari
         "dua" in n -> R.drawable.topic_quranic_duas
-        "quran" in n -> R.drawable.topic_holy_quran
+        "quran" in n || "surah" in n -> R.drawable.topic_holy_quran
         "morning" in n || "evening" in n -> R.drawable.topic_morning_evening
         "prayer" in n -> R.drawable.topic_prayer
         "home" in n -> R.drawable.topic_home_daily

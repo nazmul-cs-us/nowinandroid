@@ -127,19 +127,43 @@ fun NiaNavHost(
     val searchNavCallbacks = com.starception.submission.ui.SearchNavCallbacks(
         onTopicClick = navController::navigateToTopic,
         onNewsClick = { userNewsResource ->
-            val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
-                ?.groupValues?.get(1)?.toIntOrNull()
-                ?: Regex("#(\\d+)").find(userNewsResource.title)
-                    ?.groupValues?.get(1)?.toIntOrNull()
-                ?: 1
-            navController.navigateToDuaDetail(
+            // Route by article type like the For You feed does: surah articles
+            // open the Surah reader, hadith articles the Hadith detail; only
+            // actual dua articles fall through to the Dua detail pager.
+            val surahNumber = com.starception.submission.core.ui.extractSurahNumber(
                 title = userNewsResource.title,
-                content = userNewsResource.content,
-                quranReference = null,
-                duaNumber = duaNumber,
-                newsResourceId = userNewsResource.id,
-                topicId = "",
+                url = userNewsResource.url,
+                type = userNewsResource.type,
             )
+            val hadithInfo = com.starception.submission.core.ui.extractHadithInfo(userNewsResource.url)
+            when {
+                surahNumber != null -> {
+                    navController.navigateToSurah(surahNumber, userNewsResource.id)
+                }
+                hadithInfo != null -> {
+                    val (databaseFile, hadithNumber) = hadithInfo
+                    val collectionName = databaseFile.removeSuffix(".db")
+                        .replace("_", " ")
+                        .split(" ")
+                        .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                    navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
+                }
+                else -> {
+                    val duaNumber = Regex("Dua (\\d+)").find(userNewsResource.title)
+                        ?.groupValues?.get(1)?.toIntOrNull()
+                        ?: Regex("#(\\d+)").find(userNewsResource.title)
+                            ?.groupValues?.get(1)?.toIntOrNull()
+                        ?: 1
+                    navController.navigateToDuaDetail(
+                        title = userNewsResource.title,
+                        content = userNewsResource.content,
+                        quranReference = null,
+                        duaNumber = duaNumber,
+                        newsResourceId = userNewsResource.id,
+                        topicId = "",
+                    )
+                }
+            }
         },
         onFortressDuaClick = { dua ->
             // Pass title in the "{Chapter}: Dua N" format the pager's title-match
