@@ -515,6 +515,12 @@ private fun NiaMainContent(
             ?: com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
         val appLevelIslamicEventState = if (!isOnHome) rawIslamicEventState
             else com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
+        val isTtsPreparing = if (mainViewModel != null) {
+            val preparing by mainViewModel.isTtsPreparing.collectAsStateWithLifecycle()
+            preparing
+        } else {
+            false
+        }
         PullToSyncContainer(
             // Suppress the outer visual on Home (the inner container in
             // PrayerTimesScreen renders it there). When the user navigates away
@@ -525,6 +531,7 @@ private fun NiaMainContent(
             enabled = !isOnHome,
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,
+            isTtsPreparing = isTtsPreparing,
             mediaState = appLevelMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             onMediaTitleClick = {

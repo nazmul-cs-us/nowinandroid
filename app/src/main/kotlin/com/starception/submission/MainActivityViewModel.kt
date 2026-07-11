@@ -80,6 +80,10 @@ class MainActivityViewModel @Inject constructor(
     val contentDownloadProgress: StateFlow<Float> = downloadManager.globalDownloadProgress
     val contentDownloadLabel: StateFlow<String> = downloadManager.globalDownloadLabel
 
+    // TTS is generating audio for playback (hadith reading etc.) — shows a
+    // "Preparing audio" banner in the pull-to-sync container.
+    val isTtsPreparing: StateFlow<Boolean> = sherpaOnnxTts.isPreparingAudio
+
     // Global media controller — persistent across all screens
     val globalMedia = GlobalMediaViewModel(context, viewModelScope)
 

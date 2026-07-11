@@ -74,6 +74,12 @@ class SherpaOnnxTtsService @Inject constructor(
     // Mutex for thread-safe access to TTS engine (prevents native crashes)
     private val ttsMutex = Mutex()
 
+    // True from the moment playback is requested until audio actually starts
+    // (or the request ends) — drives the "Preparing audio" banner in the
+    // pull-to-sync container so users see generation is in progress.
+    private val _isPreparingAudio = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isPreparingAudio: kotlinx.coroutines.flow.StateFlow<Boolean> get() = _isPreparingAudio
+
     // Flag to track if generation is in progress (for safe release)
     @Volatile
     private var isGenerating = false
@@ -313,15 +319,32 @@ class SherpaOnnxTtsService @Inject constructor(
         speakerId: Int = DEFAULT_SPEAKER_ID,
         onComplete: (() -> Unit)? = null
     ): Boolean {
+        _isPreparingAudio.value = true
         if (!isInitialized) {
             val initialized = initialize()
             if (!initialized) {
                 Log.e(TAG, "TTS not initialized")
+                _isPreparingAudio.value = false
                 onComplete?.invoke()
                 return false
             }
         }
 
+        return try {
+            speakInternal(text, speed, speakerId, onComplete)
+        } finally {
+            // Covers every exit (success, failure, cancellation); during normal
+            // playback the flag already cleared when audio started.
+            _isPreparingAudio.value = false
+        }
+    }
+
+    private suspend fun speakInternal(
+        text: String,
+        speed: Float,
+        speakerId: Int,
+        onComplete: (() -> Unit)?
+    ): Boolean {
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
                 // Use mutex to prevent concurrent TTS access (native library is not thread-safe)
@@ -380,6 +403,10 @@ class SherpaOnnxTtsService @Inject constructor(
 
                         for ((batchIndex, batch) in batches.withIndex()) {
                             val batchSamples = mutableListOf<Float>()
+
+                            // Generating the next chunk while audio is paused —
+                            // resurface the "Preparing audio" banner for the gap.
+                            _isPreparingAudio.value = true
 
                             for ((sentenceIndex, sentence) in batch.withIndex()) {
                                 val globalIndex = batchIndex * BATCH_SIZE + sentenceIndex + 1
@@ -500,6 +527,8 @@ class SherpaOnnxTtsService @Inject constructor(
      * Uses a single AudioTrack for smooth playback.
      */
     private fun playAudioSamples(samples: FloatArray, sampleRate: Int) {
+        // Audio is about to start — the "Preparing audio" banner can go away.
+        _isPreparingAudio.value = false
         try {
             // Stop any existing playback
             stopAudioTrack()
@@ -560,6 +589,7 @@ class SherpaOnnxTtsService @Inject constructor(
      * Stop current speech playback.
      */
     fun stopSpeaking() {
+        _isPreparingAudio.value = false
         stopAudioTrack()
     }
 
@@ -788,6 +818,10 @@ class SherpaOnnxTtsService @Inject constructor(
         onComplete: (() -> Unit)? = null
     ): Boolean {
         val textHash = text.hashCode()
+        // Show "Preparing audio" while the cache is checked/loaded; cleared when
+        // playback starts (playAudioSamples) or by speak()'s finally on the
+        // generate path.
+        _isPreparingAudio.value = true
 
         // Check memory cache first
         var cached = audioCache[textHash]

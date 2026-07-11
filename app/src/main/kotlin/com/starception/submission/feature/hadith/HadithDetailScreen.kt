@@ -59,8 +59,12 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -228,8 +232,12 @@ fun HadithDetailScreen(
     val ttsPrefs = remember {
         context.getSharedPreferences("tts_settings", android.content.Context.MODE_PRIVATE)
     }
-    val selectedVoiceName = ttsPrefs.getString("selected_voice", TtsVoice.KOKORO_EN.name) ?: TtsVoice.KOKORO_EN.name
-    val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+    // Reactive so the voice-selection bottom sheet (toolbar ⋮) takes effect
+    // immediately; every change is persisted to the same prefs Settings uses.
+    var selectedVoiceName by remember {
+        mutableStateOf(ttsPrefs.getString("selected_voice", TtsVoice.KOKORO_EN.name) ?: TtsVoice.KOKORO_EN.name)
+    }
+    var selectedSpeakerId by remember { mutableStateOf(ttsPrefs.getInt("selected_speaker_id", 0)) }
     val selectedVoice = remember(selectedVoiceName) {
         try {
             TtsVoice.valueOf(selectedVoiceName)
@@ -248,6 +256,12 @@ fun HadithDetailScreen(
     var showDownloadPrompt by remember { mutableStateOf(false) }
     var downloadCategory by remember { mutableStateOf("") }
     var reloadTrigger by remember { mutableStateOf(0) }
+    // Play tapped in English but the selected Sherpa TTS voice model isn't on
+    // disk: show the standard missing-content download page for that voice.
+    var showTtsModelDownload by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(showTtsModelDownload) { showTtsModelDownload = false }
+    // Toolbar ⋮ opens the voice-selection bottom sheet (like the Surah page's ⋮ sheet).
+    var showVoiceSheet by remember { mutableStateOf(false) }
 
     // Per-hadith cache so the AnimatedContent swipe transition can render the
     // exiting page with its original data while the new page slides in with its
@@ -511,6 +525,48 @@ fun HadithDetailScreen(
             onNavigateToNextHadith = handleSkipNext
         ) {
             when {
+                // Play tapped in English with the selected TTS voice model missing —
+                // same missing-content layout as the hadith-DB download prompt below.
+                showTtsModelDownload -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            com.starception.submission.download.MissingContentCard(
+                                resourceName = "${selectedVoice.displayName} Voice",
+                                category = ttsVoiceDownloadCategory(selectedVoice),
+                                description = "The ${selectedVoice.displayName} text-to-speech voice needs to be downloaded to read this hadith aloud.",
+                                downloadManager = downloadManager,
+                                onDownloadComplete = {
+                                    showTtsModelDownload = false
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Voice ready — tap play to listen",
+                                        android.widget.Toast.LENGTH_LONG,
+                                    ).show()
+                                },
+                            )
+                        }
+                        // Back button
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                                .size(40.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            IconButton(onClick = { showTtsModelDownload = false }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
                 // Show shimmer only on first load (no hadith yet). During swipe/mini-bar
                 // navigation, keep the previous hadith visible while the new one loads.
                 isLoading && hadith == null -> {
@@ -708,15 +764,22 @@ fun HadithDetailScreen(
                                     // For non-English languages, fall back to Android TTS
                                     val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
                                     if (selectedLanguage == "en") {
-                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
-                                        playWithSherpaOnnxTts(
-                                            sherpaOnnxTts = sherpaOnnxTts,
-                                            text = textToSpeak,
-                                            hadithNumber = hadithNumber,
-                                            selectedVoice = selectedVoice,
-                                            speakerId = selectedSpeakerId,
-                                            onPlayingChanged = { isPlaying = it }
-                                        )
+                                        if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
+                                            // Selected voice model not downloaded — show the
+                                            // asset download page instead of failing silently.
+                                            android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
+                                            showTtsModelDownload = true
+                                        } else {
+                                            android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
+                                            playWithSherpaOnnxTts(
+                                                sherpaOnnxTts = sherpaOnnxTts,
+                                                text = textToSpeak,
+                                                hadithNumber = hadithNumber,
+                                                selectedVoice = selectedVoice,
+                                                speakerId = selectedSpeakerId,
+                                                onPlayingChanged = { isPlaying = it }
+                                            )
+                                        }
                                     } else {
                                         // Non-English languages use Android TTS (has more language support)
                                         android.util.Log.i("HadithDetailScreen", "🔊 Using Android TTS for $selectedLanguage")
@@ -811,6 +874,7 @@ fun HadithDetailScreen(
                                 isTranslating = if (num == hadithNumber) isTranslating else false,
                                 selectedLanguage = selectedLanguage,
                                 onLanguageClick = { showLanguageDialog = true },
+                                onMoreClick = { showVoiceSheet = true },
                                 isLandscape = isLandscape,
                                 isPlaying = if (num == hadithNumber) isPlaying else false,
                                 onPlayClick = handlePlayClick,
@@ -942,6 +1006,38 @@ fun HadithDetailScreen(
             }
         )
     }
+
+    // Voice-selection bottom sheet (toolbar ⋮) — same slide-up minimal style
+    // as the Surah page's options sheet. Persists to the prefs Settings uses.
+    if (showVoiceSheet) {
+        VoiceSelectionSheet(
+            selectedVoice = selectedVoice,
+            selectedSpeakerId = selectedSpeakerId,
+            isVoiceAvailable = { isTtsVoiceModelAvailable(context, it) },
+            onVoiceSelected = { voice ->
+                if (voice.name != selectedVoiceName) {
+                    selectedVoiceName = voice.name
+                    selectedSpeakerId = 0
+                    ttsPrefs.edit()
+                        .putString("selected_voice", voice.name)
+                        .putInt("selected_speaker_id", 0)
+                        .apply()
+                    // Cached audio was generated with the previous voice — the
+                    // cache key is text-only, so without this the old voice keeps
+                    // playing and the change appears not to stick.
+                    sherpaOnnxTts.clearCache()
+                }
+            },
+            onSpeakerChanged = { speakerId ->
+                selectedSpeakerId = speakerId
+                ttsPrefs.edit().putInt("selected_speaker_id", speakerId).apply()
+                // Same reason as voice change: drop text-keyed cache entries
+                // generated with the previous speaker.
+                sherpaOnnxTts.clearCache()
+            },
+            onDismiss = { showVoiceSheet = false },
+        )
+    }
 }
 
 @Composable
@@ -957,6 +1053,7 @@ private fun HadithContent(
     isTranslating: Boolean = false,
     selectedLanguage: String = "en",
     onLanguageClick: () -> Unit = {},
+    onMoreClick: () -> Unit = {},
     isLandscape: Boolean = false,
     isPlaying: Boolean = false,
     onPlayClick: () -> Unit = {},
@@ -1491,9 +1588,9 @@ private fun HadithContent(
                         )
                     }
 
-                    // More options menu (always shown)
+                    // More options — opens the voice-selection bottom sheet
                     IconButton(
-                        onClick = { /* TODO: More options */ },
+                        onClick = onMoreClick,
                         modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
@@ -2488,4 +2585,186 @@ private fun HadithPlayerControls(
             }
         }
     }
+}
+
+/**
+ * Voice-selection bottom sheet opened from the toolbar's ⋮ — same slide-up
+ * minimal style as the Surah page's options sheet: plain rows, selection via
+ * primary color, no boxed chips. Speaker stepper appears for the multi-speaker
+ * voices; all changes persist immediately via the callbacks.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceSelectionSheet(
+    selectedVoice: TtsVoice,
+    selectedSpeakerId: Int,
+    isVoiceAvailable: (TtsVoice) -> Boolean,
+    onVoiceSelected: (TtsVoice) -> Unit,
+    onSpeakerChanged: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        dragHandle = null,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(16.dp),
+                tonalElevation = 0.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                ) {
+                    Text(
+                        text = "Voice",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Used when reading this hadith aloud in English",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TtsVoice.entries.forEach { voice ->
+                        val selected = voice == selectedVoice
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onVoiceSelected(voice) }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = voice.icon,
+                                contentDescription = null,
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = voice.displayName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                                Text(
+                                    text = if (isVoiceAvailable(voice)) {
+                                        voice.description
+                                    } else {
+                                        "Not downloaded — tap play to download"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedVoice.isMultiSpeaker) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Speaker",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = "${selectedVoice.totalSpeakers} voices available",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            val total = selectedVoice.totalSpeakers
+                            IconButton(
+                                onClick = { onSpeakerChanged((selectedSpeakerId - 1 + total) % total) },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronLeft,
+                                    contentDescription = "Previous speaker",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = "$selectedSpeakerId",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            IconButton(
+                                onClick = { onSpeakerChanged((selectedSpeakerId + 1) % total) },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Next speaker",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * True when the selected Sherpa TTS voice's model is on disk (extracted cache,
+ * CDN download, or bundled asset) — mirrors UnifiedSettingsViewModel's check so
+ * the play button and Settings > Text-to-Speech agree on availability.
+ */
+private fun isTtsVoiceModelAvailable(context: android.content.Context, voice: TtsVoice): Boolean {
+    val modelFile = voice.modelFile
+    return try {
+        val extractedFile = java.io.File(java.io.File(context.filesDir, "tts_model"), modelFile)
+        if (extractedFile.exists() && extractedFile.length() > 1024) return true
+
+        val cdnFile = java.io.File(java.io.File(context.filesDir, "cdn_assets"), "models/tts/$modelFile")
+        if (cdnFile.exists() && cdnFile.length() > 1024) return true
+
+        context.assets.open("tts/$modelFile").use { it.available() > 0 }
+    } catch (e: Exception) {
+        false
+    }
+}
+
+/** CDN category for a TTS voice — keep in sync with UnifiedSettingsViewModel. */
+private fun ttsVoiceDownloadCategory(voice: TtsVoice): String = when (voice) {
+    TtsVoice.KOKORO_EN -> "model_tts_kokoro"
+    TtsVoice.VITS_VCTK -> "model_tts_vits"
 }

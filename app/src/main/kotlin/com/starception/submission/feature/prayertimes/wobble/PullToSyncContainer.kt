@@ -115,6 +115,7 @@ fun PullToSyncContainer(
     enabled: Boolean = true,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
+    isTtsPreparing: Boolean = false,
     refreshingHoldFraction: Float = 0.50f,
     downloadingHoldFraction: Float = 0.50f,
     mediaState: MediaControllerUiState = MediaControllerUiState(),
@@ -227,8 +228,8 @@ fun PullToSyncContainer(
     val stackedHoldFraction = 0.72f
     val isMushafActive = mushafState != null
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading, mediaState.isVisible, isPrayerAlert, isSilentMode, isIslamicEvent, isMushafActive) {
-        if (isRefreshing || isDownloading) {
+    LaunchedEffect(isRefreshing, isDownloading, isTtsPreparing, mediaState.isVisible, isPrayerAlert, isSilentMode, isIslamicEvent, isMushafActive) {
+        if (isRefreshing || isDownloading || isTtsPreparing) {
             refreshingOffset.snapTo(
                 if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
             )
@@ -401,7 +402,51 @@ fun PullToSyncContainer(
         // Media controls, download text, and sync indicators all render here.
         // For media, fill the full height of the revealed area and center content vertically.
         if (wobbleIntensity > 0.05f) {
-            if (mediaState.isVisible) {
+            if (isTtsPreparing) {
+                // TTS is generating speech (initial request or the gap between
+                // long-text chunks) — takes precedence over the media bar so the
+                // user sees why audio is paused.
+                Column(
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = (wobbleIntensity * 8f).dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Canvas(
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawArc(
+                                color = indicatorColor,
+                                startAngle = spinAngle,
+                                sweepAngle = 270f,
+                                useCenter = false,
+                                style = Stroke(
+                                    width = strokeWidth,
+                                    cap = StrokeCap.Round
+                                ),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+                                size = androidx.compose.ui.geometry.Size(
+                                    size.width - strokeWidth,
+                                    size.height - strokeWidth
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Preparing audio…",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                            color = indicatorColor
+                        )
+                    }
+                }
+            } else if (mediaState.isVisible) {
                 // --- Media Mini-Bar fills the sage area ---
                 // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
                 // (via titleDragModifier) so playback button taps are not swallowed.
@@ -624,7 +669,7 @@ fun PullToSyncContainer(
                         onNext = onMushafNext,
                     )
                 }
-            } else if (isRefreshing || isDownloading || rawWobbleIntensity > 0.01f) {
+            } else if (isRefreshing || isDownloading || isTtsPreparing || rawWobbleIntensity > 0.01f) {
             // Only show sync/download indicators when actively dragging or syncing/downloading.
             // Skip during settle-back animation after media dismiss (rawWobbleIntensity == 0).
             Column(
