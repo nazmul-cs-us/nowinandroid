@@ -38,14 +38,17 @@ class Recorder(private val audioManager: AudioManager? = null) {
      * @param outputFile File to save the recording
      * @param onError Error callback
      * @param onAmplitude Callback with normalized amplitude (0.0 to 1.0) called ~60 times per second
+     * @param onSamples Optional callback with each raw chunk as normalized floats
+     *   (-1..1), invoked on the recording thread — e.g. for live VAD
      */
     suspend fun startRecordingWithAmplitude(
         outputFile: File,
         onError: (Exception) -> Unit,
-        onAmplitude: (Float) -> Unit
+        onAmplitude: (Float) -> Unit,
+        onSamples: ((FloatArray) -> Unit)? = null
     ) = withContext(scope.coroutineContext) {
         val isBluetoothMode = audioManager?.mode == AudioManager.MODE_IN_COMMUNICATION
-        recorder = AudioRecordThread(outputFile, onError, onAmplitude, audioManager, isBluetoothMode)
+        recorder = AudioRecordThread(outputFile, onError, onAmplitude, audioManager, isBluetoothMode, onSamples)
         recorder?.start()
     }
 
@@ -62,7 +65,8 @@ private class AudioRecordThread(
     private val onError: (Exception) -> Unit,
     private val onAmplitude: ((Float) -> Unit)?,
     private val audioManager: AudioManager? = null,
-    private val isBluetoothMode: Boolean = false
+    private val isBluetoothMode: Boolean = false,
+    private val onSamples: ((FloatArray) -> Unit)? = null
 ) :
     Thread("AudioRecorder") {
     private var quit = AtomicBoolean(false)
@@ -195,6 +199,12 @@ private class AudioRecordThread(
 
                         // Emit amplitude to callback
                         onAmplitude?.invoke(amplitude)
+
+                        // Emit raw normalized samples (e.g. for live VAD)
+                        onSamples?.let { cb ->
+                            val floats = FloatArray(read) { i -> buffer[i] / 32768f }
+                            cb(floats)
+                        }
                     } else {
                         throw java.lang.RuntimeException("audioRecord.read returned $read")
                     }
@@ -245,19 +255,22 @@ private class AudioRecordThread(
         // }
         Log.i(TAG, "⚠️ AcousticEchoCanceler DISABLED for voice capture testing")
 
-        // DISABLED: AGC might be interfering with audio capture on some devices
-        // Keeping all audio effects disabled until we confirm mic is working
-        // if (AutomaticGainControl.isAvailable()) {
-        //     try {
-        //         automaticGainControl = AutomaticGainControl.create(audioSessionId)?.apply {
-        //             enabled = true
-        //             Log.i(TAG, "✅ AutomaticGainControl enabled")
-        //         }
-        //     } catch (e: Exception) {
-        //         Log.w(TAG, "⚠️ Failed to create AutomaticGainControl: ${e.message}")
-        //     }
-        // }
-        Log.i(TAG, "⚠️ AutomaticGainControl DISABLED for voice capture testing")
+        // AGC keeps speech level steady when the user talks from arm's length or
+        // farther — without it, words fade to ambient level (~0.02-0.04 RMS) and
+        // no end-pointing threshold can separate them from room noise.
+        // (NoiseSuppressor/AEC stay disabled: they clipped the user's voice.)
+        if (AutomaticGainControl.isAvailable()) {
+            try {
+                automaticGainControl = AutomaticGainControl.create(audioSessionId)?.apply {
+                    enabled = true
+                    Log.i(TAG, "✅ AutomaticGainControl enabled")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Failed to create AutomaticGainControl: ${e.message}")
+            }
+        } else {
+            Log.i(TAG, "⚠️ AutomaticGainControl not available on this device")
+        }
     }
 
     /**
@@ -297,7 +310,11 @@ private class AudioRecordThread(
         // VOICE_RECOGNITION was returning silent audio (amplitude=0.0000) on some devices
         // MIC provides raw microphone input without system-level preprocessing
         Log.i(TAG, "🎤 Using MIC audio source (VOICE_RECOGNITION was returning silence)")
-        val audioSource = MediaRecorder.AudioSource.MIC
+        // VOICE_RECOGNITION, not MIC: the default MIC source goes through the
+        // device's adaptive processing (observed on Pixel 9 Pro suppressing the
+        // user's voice to below-ambient level ~3s into a capture, after the
+        // first few words). VOICE_RECOGNITION is the raw, ASR-tuned path.
+        val audioSource = MediaRecorder.AudioSource.VOICE_RECOGNITION
 
         // On Android 6.0+ (API 23+), use AudioRecord.Builder for better control
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

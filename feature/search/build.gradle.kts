@@ -31,6 +31,11 @@ dependencies {
     // Whisper TFLite for offline speech recognition
     implementation(projects.whisper)
 
+    // Sherpa-onnx classes for Silero VAD (speech-based end-pointing).
+    // compileOnly: the app module ships the same AAR at runtime, so bundling
+    // it here too would duplicate classes.
+    compileOnly(files("$rootDir/app/libs/sherpa-onnx-1.12.26.aar"))
+
     testImplementation(projects.core.testing)
 
     androidTestImplementation(libs.bundles.androidx.compose.ui.test)

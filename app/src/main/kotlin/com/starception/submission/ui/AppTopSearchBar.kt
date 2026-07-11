@@ -165,7 +165,10 @@ fun AppTopSearchBar(
     LaunchedEffect(Unit) { SearchHintAnimator.ensureStarted() }
     val animatedHint by SearchHintAnimator.hintText.collectAsStateWithLifecycle()
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
-    var isListening by remember { mutableStateOf(false) }
+    // Drive the listening UI (wave + glow + hidden chrome) from the service's
+    // actual recording state so it ends the instant recording stops — during
+    // transcription the field must not look like it's still capturing.
+    val isListening by whisperService.isListening.collectAsStateWithLifecycle()
     // SearchBar's bounds inside the AndroidView, used to position the
     // Gemini-style listening glow overlay precisely around the pill.
     var searchBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
@@ -213,7 +216,6 @@ fun AppTopSearchBar(
                     ctx = context,
                     searchView = sv,
                     whisper = whisperService,
-                    onListeningChanged = { isListening = it },
                     onModelMissing = promptVoiceModelDownload,
                 )
             }
@@ -303,7 +305,6 @@ fun AppTopSearchBar(
                         ctx = ctx,
                         searchView = searchView,
                         whisper = whisperService,
-                        onListeningChanged = { isListening = it },
                         onModelMissing = promptVoiceModelDownload,
                     )
                 } else {
@@ -580,11 +581,13 @@ fun AppTopSearchBar(
         searchBarBoundsPx
     }
     if (isListening && bounds != null) {
-        // Live microphone level (0..1) from the Whisper recorder, smoothed so
-        // the glow and wave move organically rather than jittering.
+        // Live microphone level from the Whisper recorder, smoothed so the glow
+        // and wave move organically rather than jittering. The raw
+        // VOICE_RECOGNITION source registers speech around 0.01-0.03 RMS, so
+        // scale up for a visible wave.
         val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
         val smoothedLevel by animateFloatAsState(
-            targetValue = whisperLevel.coerceIn(0f, 1f),
+            targetValue = (whisperLevel * 15f).coerceIn(0f, 1f),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = 450f,
@@ -1649,7 +1652,6 @@ private fun startVoiceCapture(
     ctx: Context,
     searchView: SearchView,
     whisper: WhisperVoiceService,
-    onListeningChanged: (Boolean) -> Unit,
     onModelMissing: () -> Unit,
 ) {
     if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
@@ -1674,7 +1676,6 @@ private fun startVoiceCapture(
     Toast.makeText(ctx, "Listening…", Toast.LENGTH_SHORT).show()
 
     val handleResult: (VoiceSearchService.VoiceSearchResult) -> Unit = { result ->
-        onListeningChanged(false)
         when (result) {
             is VoiceSearchService.VoiceSearchResult.Success -> {
                 val text = result.text.trim()
@@ -1700,8 +1701,8 @@ private fun startVoiceCapture(
         }
     }
 
-    onListeningChanged(true)
     // startListening self-initializes when the model file is present but the
     // context hasn't been loaded yet (e.g. right after the download finished).
+    // The listening UI follows whisper.isListening, so no manual state here.
     whisper.startListening(handleResult)
 }
