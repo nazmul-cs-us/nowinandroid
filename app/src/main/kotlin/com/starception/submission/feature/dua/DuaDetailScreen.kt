@@ -18,6 +18,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
@@ -126,6 +128,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -1850,6 +1853,102 @@ fun DuaDetailScreen(
                         }
                     }
 
+
+                        // Floating play button at the banner/content boundary — same
+                        // affordance as the Surah and Hadith detail pages. Rides up
+                        // with the parallax header and hides once the header scrolls
+                        // away. Uses this PAGE's dua audio (per-dua clip, falling back
+                        // to the whole-chapter recitation).
+                        var pageAudioUrl by remember(dua.title) { mutableStateOf<String?>(null) }
+                        LaunchedEffect(dua.title) {
+                            val chTitle = dua.title.substringBefore(":").trim()
+                            val position = Regex("""Dua\s+(\d+)""").find(dua.title)
+                                ?.groupValues?.get(1)?.toIntOrNull()
+                            pageAudioUrl = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val dao = DuaDatabase.getInstance(context).duaDao()
+                                    val perDua = if (position != null) {
+                                        dao.getDuaAudioByTitleAndPosition(chTitle, position)
+                                    } else {
+                                        null
+                                    }
+                                    perDua ?: dao.getChapterAudioByTitle(chTitle)
+                                }.getOrNull()
+                            }
+                        }
+                        pageAudioUrl?.let { audioUrl ->
+                            // Anchor to the REAL banner-image height: the header is
+                            // aspectRatio(4:3) in portrait (width * 3/4) and 160dp in
+                            // landscape — see the parallax header item above. The FAB
+                            // stays PINNED at the boundary (like Surah/Hadith) and
+                            // show/hide follows scroll direction with a gentle
+                            // scale+fade, matching the Surah page exactly.
+                            val headerHeight = if (isLandscape) {
+                                160.dp
+                            } else {
+                                configuration.screenWidthDp.dp * 3f / 4f
+                            }
+                            var fabVisible by remember { mutableStateOf(true) }
+                            var prevIndex by remember { mutableStateOf(0) }
+                            var prevOffset by remember { mutableStateOf(0) }
+                            LaunchedEffect(
+                                lazyListState.firstVisibleItemIndex,
+                                lazyListState.firstVisibleItemScrollOffset,
+                            ) {
+                                val index = lazyListState.firstVisibleItemIndex
+                                val offset = lazyListState.firstVisibleItemScrollOffset
+                                val delta = (index * 1000 + offset) - (prevIndex * 1000 + prevOffset)
+                                if (kotlin.math.abs(delta) > 10) {
+                                    fabVisible = if (index == 0 && offset < 100) {
+                                        true // at top: always show
+                                    } else {
+                                        delta < 0 // scrolling up → show, down → hide
+                                    }
+                                    prevIndex = index
+                                    prevOffset = offset
+                                }
+                            }
+                            AnimatedVisibility(
+                                visible = fabVisible,
+                                enter = scaleIn(
+                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                                exit = scaleOut(
+                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    // Centered on the artwork/card boundary — measured to
+                                    // match the Hadith page's FAB (center exactly at the
+                                    // banner's bottom edge).
+                                    .offset(x = (-12).dp, y = headerHeight - 28.dp),
+                            ) {
+                                val isThisPlaying = ChapterAudioController.currentUrl == audioUrl &&
+                                    ChapterAudioController.isPlaying
+                                val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
+                                FloatingActionButton(
+                                    onClick = {
+                                        ChapterAudioController.currentTitle = dua.title
+                                        ChapterAudioController.toggle(audioUrl)
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    if (isThisLoading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (isThisPlaying) "Pause recitation" else "Play recitation",
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 

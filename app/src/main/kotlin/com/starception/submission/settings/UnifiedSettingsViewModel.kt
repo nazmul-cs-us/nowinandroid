@@ -1213,7 +1213,20 @@ class UnifiedSettingsViewModel @Inject constructor(
             try {
                 val manifest = downloadManager.loadManifest() ?: return@launch
                 downloadManager.deleteCategory(categoryKey, manifest)
+                // TTS voices also leave an extracted copy + cached audio that
+                // deleteCategory doesn't touch — purge them so the voice really
+                // becomes unavailable (play then shows the download prompt).
+                val voice = when (categoryKey) {
+                    "model_tts_kokoro" -> TtsVoice.KOKORO_EN
+                    "model_tts_vits" -> TtsVoice.VITS_VCTK
+                    else -> null
+                }
+                if (voice != null) {
+                    withContext(Dispatchers.IO) { ttsService.purgeVoice(voice) }
+                }
                 refreshContentCategories(manifest)
+                // Reflect the new (unavailable) state in the TTS settings card.
+                loadTtsSettings()
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting category $categoryKey", e)
             }

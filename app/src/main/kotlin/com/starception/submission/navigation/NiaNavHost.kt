@@ -109,6 +109,10 @@ fun NiaNavHost(
         val s by mainViewModel.isSyncing.collectAsStateWithLifecycle()
         s
     } else false
+    val homeTtsPreparing = if (mainViewModel != null) {
+        val p by mainViewModel.isTtsPreparing.collectAsStateWithLifecycle()
+        p
+    } else false
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -396,10 +400,12 @@ fun NiaNavHost(
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
+            onMediaSourceClick = { source -> navController.navigateToMediaSourceDetail(source) },
             downloadProgress = homeDownloadProgress,
             downloadLabel = homeDownloadLabel,
             mediaState = homeMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
+            isTtsPreparing = homeTtsPreparing,
             onPrayerAlertChanged = { state -> mainViewModel?.updatePrayerAlert(state) },
             prayerAlertOverride = homePrayerAlertOverride,
             isSyncingExternal = homeIsSyncing,
@@ -490,5 +496,43 @@ fun NiaNavHost(
             }
         )
     }
+    }
+}
+
+/**
+ * Opens the detail page for whatever the media mini-bar is playing — Quran
+ * surah, hadith TTS, or a Fortress dua recitation. Shared by the app-level
+ * PullToSyncContainer (NiaApp) and the Home screen's inner container.
+ */
+fun androidx.navigation.NavController.navigateToMediaSourceDetail(
+    source: com.starception.submission.media.MediaSource,
+) {
+    when (source) {
+        is com.starception.submission.media.MediaSource.Quran -> {
+            navigateToSurah(source.surahIndex + 1)
+        }
+        is com.starception.submission.media.MediaSource.Hadith -> {
+            // Only Bukhari flows through hadith TTS playback today.
+            navigateToHadithDetail(
+                collectionName = source.collectionName,
+                hadithNumber = source.hadithNumber,
+                databaseFile = "sahih_bukhari.db",
+            )
+        }
+        is com.starception.submission.media.MediaSource.Fortress -> {
+            // Title is the "{Chapter}: Dua N" format the DuaDetail pager's
+            // title-match fallback recognizes.
+            val duaNumber = Regex("Dua (\\d+)").find(source.title)
+                ?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            navigateToDuaDetail(
+                title = source.title,
+                content = "",
+                quranReference = null,
+                duaNumber = duaNumber,
+                newsResourceId = "",
+                topicId = "",
+            )
+        }
+        else -> Unit
     }
 }

@@ -361,8 +361,12 @@ fun HadithDetailScreen(
             textToSpeech?.stop()
             textToSpeech?.shutdown()
             textToSpeech = null
-            // Notify global media controller that hadith playback stopped
-            GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(false, hadithNumber, collectionName, "")
+            // Sherpa TTS is app-scoped and keeps reading after this screen is
+            // gone — keep the mini-bar alive in that case so the user can see
+            // and stop the playback; only clear it when nothing is speaking.
+            if (!sherpaOnnxTts.isSpeaking()) {
+                GlobalMediaViewModel.onHadithPlaybackChanged?.invoke(false, hadithNumber, collectionName, "")
+            }
         }
     }
 

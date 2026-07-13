@@ -84,6 +84,18 @@ class SherpaOnnxTtsService @Inject constructor(
     @Volatile
     private var isGenerating = false
 
+    // Set by stopSpeaking(): aborts the pipelined producer/consumer loops so a
+    // stop actually cancels in-flight generation instead of letting it finish.
+    @Volatile
+    private var stopRequested = false
+
+    // True while a speak request is in flight (generating or playing) — lets
+    // callers (e.g. HadithDetailScreen's dispose) know audio will keep going.
+    @Volatile
+    private var isSpeakingNow = false
+
+    fun isSpeaking(): Boolean = isSpeakingNow
+
     // Flag to cancel ongoing background pre-generation when voice prompt needs priority
     @Volatile
     private var cancelBackgroundGeneration = false
@@ -320,6 +332,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onComplete: (() -> Unit)? = null
     ): Boolean {
         _isPreparingAudio.value = true
+        stopRequested = false
         if (!isInitialized) {
             val initialized = initialize()
             if (!initialized) {
@@ -331,11 +344,13 @@ class SherpaOnnxTtsService @Inject constructor(
         }
 
         return try {
+            isSpeakingNow = true
             speakInternal(text, speed, speakerId, onComplete)
         } finally {
             // Covers every exit (success, failure, cancellation); during normal
             // playback the flag already cleared when audio started.
             _isPreparingAudio.value = false
+            isSpeakingNow = false
         }
     }
 
@@ -373,13 +388,19 @@ class SherpaOnnxTtsService @Inject constructor(
                     }
 
                     // Hybrid approach:
-                    // - Short text (<=10 sentences): Generate all first for smooth playback
-                    // - Long text (>10 sentences): Batch of 5 for faster start with some gaps
+                    // - Very short text (<=3 sentences): generate everything first,
+                    //   one gap-free clip.
+                    // - Everything else: PIPELINED — a small first batch starts
+                    //   playback fast, then the producer keeps generating the next
+                    //   batches WHILE audio plays, so the old strict
+                    //   generate→play→generate alternation (with its mid-playback
+                    //   silences) overlaps away. Gaps now only appear when
+                    //   generation is genuinely slower than playback.
                     val sampleRate = tts?.sampleRate() ?: 22050
                     var playedAnySamples = false
 
-                    if (sentences.size <= 10) {
-                        // Short text: generate all first for gap-free playback
+                    if (sentences.size <= 3) {
+                        // Very short text: generate all first for gap-free playback
                         Log.d(TAG, "Short text (${sentences.size} sentences) - generating all first")
                         val allSamples = mutableListOf<Float>()
 
@@ -396,32 +417,56 @@ class SherpaOnnxTtsService @Inject constructor(
                             playedAnySamples = true
                         }
                     } else {
-                        // Long text: batch of 5 sentences for faster initial response
+                        val FIRST_BATCH_SIZE = 2
                         val BATCH_SIZE = 5
-                        val batches = sentences.chunked(BATCH_SIZE)
-                        Log.d(TAG, "Long text (${sentences.size} sentences) - ${batches.size} batches of $BATCH_SIZE")
+                        val batches = listOf(sentences.take(FIRST_BATCH_SIZE)) +
+                            sentences.drop(FIRST_BATCH_SIZE).chunked(BATCH_SIZE)
+                        Log.d(TAG, "Pipelined TTS: ${sentences.size} sentences in ${batches.size} batches")
 
-                        for ((batchIndex, batch) in batches.withIndex()) {
-                            val batchSamples = mutableListOf<Float>()
-
-                            // Generating the next chunk while audio is paused —
-                            // resurface the "Preparing audio" banner for the gap.
-                            _isPreparingAudio.value = true
-
-                            for ((sentenceIndex, sentence) in batch.withIndex()) {
-                                val globalIndex = batchIndex * BATCH_SIZE + sentenceIndex + 1
-                                val audio = generateSentence(sentence, speakerId, speed, globalIndex, sentences.size)
-                                if (audio != null && audio.samples.isNotEmpty()) {
-                                    batchSamples.addAll(audio.samples.toList())
+                        // Producer: generates batches ahead (up to 2 buffered) while
+                        // the consumer below plays. Generation is the only engine
+                        // user inside this mutex-held section, so overlap is safe.
+                        val channel = kotlinx.coroutines.channels.Channel<FloatArray>(capacity = 2)
+                        var globalIndex = 0
+                        val producer = scope.launch {
+                            try {
+                                producerLoop@ for (batch in batches) {
+                                    val batchSamples = mutableListOf<Float>()
+                                    for (sentence in batch) {
+                                        if (stopRequested) break@producerLoop
+                                        globalIndex += 1
+                                        val audio = generateSentence(sentence, speakerId, speed, globalIndex, sentences.size)
+                                        if (audio != null && audio.samples.isNotEmpty()) {
+                                            batchSamples.addAll(audio.samples.toList())
+                                        }
+                                    }
+                                    if (batchSamples.isNotEmpty()) {
+                                        channel.send(batchSamples.toFloatArray())
+                                    }
                                 }
-                            }
-
-                            if (batchSamples.isNotEmpty()) {
-                                Log.d(TAG, "Playing batch ${batchIndex + 1}/${batches.size}")
-                                playAudioSamples(batchSamples.toFloatArray(), sampleRate)
-                                playedAnySamples = true
+                            } finally {
+                                channel.close()
                             }
                         }
+
+                        // Consumer: play batches as they become ready.
+                        var batchNumber = 0
+                        while (!stopRequested) {
+                            // Non-blocking check first: if nothing is buffered we're
+                            // about to go silent while the producer works — surface
+                            // the "Preparing audio" state for the wait.
+                            var result = channel.tryReceive()
+                            if (result.isFailure && !result.isClosed) {
+                                _isPreparingAudio.value = true
+                                result = channel.receiveCatching()
+                            }
+                            val samples = result.getOrNull() ?: break
+                            batchNumber++
+                            Log.d(TAG, "Playing batch $batchNumber/${batches.size}")
+                            playAudioSamples(samples, sampleRate)
+                            playedAnySamples = true
+                        }
+                        producer.cancel()
                     }
 
                     if (!playedAnySamples) {
@@ -590,6 +635,8 @@ class SherpaOnnxTtsService @Inject constructor(
      */
     fun stopSpeaking() {
         _isPreparingAudio.value = false
+        stopRequested = true
+        isSpeakingNow = false
         stopAudioTrack()
     }
 
@@ -826,15 +873,18 @@ class SherpaOnnxTtsService @Inject constructor(
         // Check memory cache first
         var cached = audioCache[textHash]
 
-        // If not in memory, try loading from disk
+        // If not in memory, try loading from disk — off the main thread since
+        // the caller invokes this from Dispatchers.Main.
         if (cached == null) {
-            val files = cacheDir.listFiles { file ->
-                file.name.startsWith("${textHash}_") && file.extension == "pcm"
-            }
-            if (files != null && files.isNotEmpty()) {
-                if (loadSingleFileFromDisk(files.first())) {
-                    cached = audioCache[textHash]
+            cached = withContext(Dispatchers.IO) {
+                val files = cacheDir.listFiles { file ->
+                    file.name.startsWith("${textHash}_") && file.extension == "pcm"
+                }
+                if (files != null && files.isNotEmpty() && loadSingleFileFromDisk(files.first())) {
                     Log.i(TAG, "📂 Loaded from disk cache: hash=$textHash")
+                    audioCache[textHash]
+                } else {
+                    null
                 }
             }
         }
@@ -844,7 +894,17 @@ class SherpaOnnxTtsService @Inject constructor(
             // DON'T remove from memory cache - keep for potential replay
             // But DO delete the disk file to allow new hadith caching
             deleteDiskCache(textHash)
-            playAudioSamples(cached.samples, cached.sampleRate)
+            try {
+                isSpeakingNow = true
+                // playAudioSamples blocks (Thread.sleep) for the whole clip. The
+                // caller invokes this from Dispatchers.Main, so run the playback
+                // on IO — otherwise the main thread sleeps and the app ANRs.
+                withContext(Dispatchers.IO) {
+                    playAudioSamples(cached.samples, cached.sampleRate)
+                }
+            } finally {
+                isSpeakingNow = false
+            }
             audioCache.remove(textHash) // Remove from memory after playing
             onComplete?.invoke()
             return true
@@ -1189,6 +1249,29 @@ class SherpaOnnxTtsService @Inject constructor(
         }
 
         releaseInternal()
+    }
+
+    /**
+     * Fully removes a voice: stops playback, releases the engine, clears the
+     * cached audio, and deletes the extracted model files. Needed because
+     * deleting the voice's download from Content & Storage only removes the CDN
+     * copy — the extracted `tts_model/<voice>` dir would otherwise keep the
+     * voice "available" (so no download prompt) and cached PCM would keep
+     * playing the deleted voice.
+     */
+    fun purgeVoice(voice: com.starception.submission.settings.components.TtsVoice) {
+        stopSpeaking()
+        releaseInternal()
+        clearCache()
+        try {
+            val voiceDir = File(modelDir, voice.modelFile.substringBefore("/"))
+            if (voiceDir.exists()) {
+                voiceDir.deleteRecursively()
+                Log.i(TAG, "🗑️ Deleted extracted TTS model: ${voiceDir.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting extracted TTS model for ${voice.name}", e)
+        }
     }
 
     /**

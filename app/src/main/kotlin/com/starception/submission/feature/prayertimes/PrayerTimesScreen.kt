@@ -48,6 +48,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.HistoryEdu
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
@@ -289,10 +294,14 @@ fun PrayerTimesScreen(
     onSettingsClick: () -> Unit = {},
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    // Full media-source router for the mini-bar title tap (surah/hadith/dua);
+    // when null, falls back to the legacy surah-only behavior.
+    onMediaSourceClick: ((com.starception.submission.media.MediaSource) -> Unit)? = null,
     downloadProgress: Float = 0f,
     downloadLabel: String = "Downloading content",
     mediaState: com.starception.submission.media.MediaControllerUiState = com.starception.submission.media.MediaControllerUiState(),
     onMediaAction: (com.starception.submission.media.MediaAction) -> Unit = {},
+    isTtsPreparing: Boolean = false,
     onPrayerAlertChanged: (com.starception.submission.feature.prayertimes.wobble.PrayerAlertState) -> Unit = {},
     prayerAlertOverride: com.starception.submission.feature.prayertimes.wobble.PrayerAlertState = com.starception.submission.feature.prayertimes.wobble.PrayerAlertState(),
     onSearchSubmit: (query: String) -> Unit = {},
@@ -1425,9 +1434,15 @@ fun PrayerTimesScreen(
                 downloadLabel = downloadLabel,
                 mediaState = mediaState,
                 onMediaAction = onMediaAction,
+                isTtsPreparing = isTtsPreparing,
                 onMediaTitleClick = {
-                    (mediaState.playback.source as? com.starception.submission.media.MediaSource.Quran)
-                        ?.let { onSurahClick(it.surahIndex + 1) }
+                    val source = mediaState.playback.source
+                    if (onMediaSourceClick != null) {
+                        onMediaSourceClick.invoke(source)
+                    } else {
+                        (source as? com.starception.submission.media.MediaSource.Quran)
+                            ?.let { onSurahClick(it.surahIndex + 1) }
+                    }
                 },
                 prayerAlertState = prayerAlertState,
                 silentModeState = silentModeState,
@@ -2734,4 +2749,3 @@ private fun getLocationWithCountryCode(
 // calculatePrayerAlertState moved to wobble/PrayerAlertCalculator.kt so MainActivityViewModel's
 // app-wide minute ticker can reuse the exact same logic (keeps the banner countdown live on
 // every screen, not just Home).
-

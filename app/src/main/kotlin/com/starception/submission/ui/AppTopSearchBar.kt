@@ -204,6 +204,17 @@ fun AppTopSearchBar(
         }
     }
 
+    // Voice-search requests from ambient surfaces (home bottom Ask bar): run the
+    // exact same flow as the search bar's own mic button. The tap handler is
+    // created in the AndroidView factory (it needs the SearchView), so it's
+    // published through this holder.
+    val micTapHolder = remember { mutableStateOf<(() -> Unit)?>(null) }
+    LaunchedEffect(Unit) {
+        com.starception.submission.ui.search.SearchPrefillBus.voiceRequests.collect {
+            micTapHolder.value?.invoke()
+        }
+    }
+
     // Mic tap with no RECORD_AUDIO permission triggers this system request; on
     // grant we immediately start capture using the SearchView created by the
     // AndroidView factory (reachable via searchViewHolder from this scope).
@@ -279,6 +290,8 @@ fun AppTopSearchBar(
             searchView.addTransitionListener { _, _, newState ->
                 isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
                     newState == SearchView.TransitionState.SHOWING
+                // Ambient surfaces (home Ask bar) hide while search is open.
+                com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(isSearchViewOpen)
             }
 
             // Hint will be overwritten on every `update` pass from the
@@ -311,6 +324,7 @@ fun AppTopSearchBar(
                     micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
             }
+            micTapHolder.value = onMicTap
             searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
             searchBar.setOnMenuItemClickListener { item ->
                 if (item.itemId == R.id.action_mic) {

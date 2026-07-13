@@ -17,9 +17,26 @@
 package com.starception.submission.ui
 
 import android.content.res.Configuration
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -66,7 +83,15 @@ import com.starception.submission.auth.ProfileSheet
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -101,6 +126,7 @@ import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.navigation.NiaNavHost
 import com.starception.submission.feature.surah.navigation.navigateToSurah
+import com.starception.submission.navigation.navigateToMediaSourceDetail
 import com.starception.submission.settings.navigation.navigateToSettings
 import com.starception.submission.navigation.TopLevelDestination
 import kotlin.reflect.KClass
@@ -293,37 +319,10 @@ internal fun NiaAppContent(
             deepLinkCourseId = deepLinkCourseId,
         )
     } else {
-        // Portrait mode: use standard NiaNavigationSuiteScaffold
-        NiaNavigationSuiteScaffold(
-            navigationSuiteItems = {
-                appState.topLevelDestinations.forEach { destination ->
-                    val hasUnread = unreadDestinations.contains(destination)
-                    val selected = currentDestination
-                        .isRouteInHierarchy(destination.baseRoute)
-                    item(
-                        selected = selected,
-                        onClick = { appState.navigateToTopLevelDestination(destination) },
-                        icon = {
-                            Icon(
-                                imageVector = destination.unselectedIcon,
-                                contentDescription = null,
-                            )
-                        },
-                        selectedIcon = {
-                            Icon(
-                                imageVector = destination.selectedIcon,
-                                contentDescription = null,
-                            )
-                        },
-                        label = { Text(stringResource(destination.iconTextId)) },
-                        modifier = Modifier
-                            .testTag("NiaNavItem")
-                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
-                    )
-                }
-            },
-            windowAdaptiveInfo = windowAdaptiveInfo,
-        ) {
+        // Portrait mode: content fills the screen and the navigation is a
+        // floating pill bar (reference design) overlaid at the bottom, with
+        // the circular voice-search button beside it.
+        Box(modifier = Modifier.fillMaxSize()) {
             NiaMainContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
@@ -333,6 +332,195 @@ internal fun NiaAppContent(
                 mainViewModel = mainViewModel,
                 deepLinkCourseId = deepLinkCourseId,
             )
+            NiaFloatingBottomBar(
+                appState = appState,
+                unreadDestinations = unreadDestinations,
+                currentDestination = currentDestination,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+/**
+ * Floating pill bottom navigation (reference design): the existing top-level
+ * destinations in a rounded floating container — the selected tab gets its own
+ * tinted bubble — plus the circular voice-search button. Hidden while the
+ * search overlay is open so it never floats over the results list.
+ */
+@Composable
+private fun NiaFloatingBottomBar(
+    appState: NiaAppState,
+    unreadDestinations: Set<TopLevelDestination>,
+    currentDestination: NavDestination?,
+    modifier: Modifier = Modifier,
+) {
+    val isSearchOpen by com.starception.submission.ui.search.SearchPrefillBus
+        .isSearchOpen.collectAsStateWithLifecycle()
+    if (isSearchOpen) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            modifier = Modifier.weight(1f),
+        ) {
+            val destinations = appState.topLevelDestinations
+            val selectedIndex = destinations.indexOfFirst { destination ->
+                currentDestination.isRouteInHierarchy(destination.baseRoute)
+            }
+            BoxWithConstraints(
+                modifier = Modifier
+                    .height(64.dp)
+                    .padding(horizontal = 6.dp),
+            ) {
+                val itemWidth = maxWidth / destinations.size
+                val bubbleTarget = itemWidth * selectedIndex.coerceAtLeast(0)
+                // Fluid (gooey/metaball) selection: two bubbles race to the
+                // selected tab — a fast leader and a lazy follower — and the
+                // blur + alpha-threshold RenderEffect merges them into one
+                // stretching droplet that pinches off and snaps together.
+                val leaderX by animateDpAsState(
+                    targetValue = bubbleTarget,
+                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 1400f),
+                    label = "navBubbleLeader",
+                )
+                val followerX by animateDpAsState(
+                    targetValue = bubbleTarget,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f),
+                    label = "navBubbleFollower",
+                )
+                val bubbleAlpha by animateFloatAsState(
+                    // Hidden when no top-level tab is selected (detail screens).
+                    targetValue = if (selectedIndex >= 0) 1f else 0f,
+                    animationSpec = tween(200),
+                    label = "navBubbleAlpha",
+                )
+                val bubbleColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                // Blur then steeply re-threshold the layer's alpha (a*50 - 5000
+                // in 0..255 space) — the classic gooey-effect chain. API 31+.
+                val gooEffect = remember {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        android.graphics.RenderEffect.createChainEffect(
+                            android.graphics.RenderEffect.createColorFilterEffect(
+                                android.graphics.ColorMatrixColorFilter(
+                                    android.graphics.ColorMatrix(
+                                        floatArrayOf(
+                                            1f, 0f, 0f, 0f, 0f,
+                                            0f, 1f, 0f, 0f, 0f,
+                                            0f, 0f, 1f, 0f, 0f,
+                                            0f, 0f, 0f, 50f, -5000f,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            android.graphics.RenderEffect.createBlurEffect(
+                                60f, 60f, android.graphics.Shader.TileMode.DECAL,
+                            ),
+                        ).asComposeRenderEffect()
+                    } else {
+                        null
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            renderEffect = gooEffect
+                            alpha = bubbleAlpha
+                        },
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = leaderX)
+                            .width(itemWidth)
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(bubbleColor),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = followerX)
+                            .width(itemWidth)
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(bubbleColor),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    destinations.forEach { destination ->
+                        val hasUnread = unreadDestinations.contains(destination)
+                        val selected = currentDestination
+                            .isRouteInHierarchy(destination.baseRoute)
+                        val contentTint by animateColorAsState(
+                            targetValue = if (selected) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            animationSpec = tween(250),
+                            label = "navItemTint",
+                        )
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(50))
+                                .clickable { appState.navigateToTopLevelDestination(destination) }
+                                .padding(vertical = 9.dp)
+                                .testTag("NiaNavItem")
+                                .then(if (hasUnread) Modifier.notificationDot() else Modifier),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                                contentDescription = null,
+                                tint = contentTint,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Text(
+                                text = stringResource(destination.iconTextId),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = contentTint,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Circular voice-search button — same on-device Whisper flow as the
+        // search bar's mic, via the bus.
+        Surface(
+            onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.onSurface,
+            shadowElevation = 8.dp,
+            modifier = Modifier.size(60.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Outlined.GraphicEq,
+                    contentDescription = "Voice search",
+                    tint = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }
@@ -515,12 +703,15 @@ private fun NiaMainContent(
             ?: com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
         val appLevelIslamicEventState = if (!isOnHome) rawIslamicEventState
             else com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
-        val isTtsPreparing = if (mainViewModel != null) {
+        val rawTtsPreparing = if (mainViewModel != null) {
             val preparing by mainViewModel.isTtsPreparing.collectAsStateWithLifecycle()
             preparing
         } else {
             false
         }
+        // Home renders its own PullToSyncContainer — suppress the app-level
+        // strip there like media/prayer alerts, or two strips stack.
+        val isTtsPreparing = if (isOnHome) false else rawTtsPreparing
         PullToSyncContainer(
             // Suppress the outer visual on Home (the inner container in
             // PrayerTimesScreen renders it there). When the user navigates away
@@ -535,8 +726,11 @@ private fun NiaMainContent(
             mediaState = appLevelMediaState,
             onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
             onMediaTitleClick = {
-                (appLevelMediaState.playback.source as? com.starception.submission.media.MediaSource.Quran)
-                    ?.let { appState.navController.navigateToSurah(it.surahIndex + 1) }
+                // Route by playback source so every mini-bar title opens its
+                // detail page (surah, hadith, or fortress dua), not just Quran.
+                appState.navController.navigateToMediaSourceDetail(
+                    appLevelMediaState.playback.source,
+                )
             },
             prayerAlertState = appLevelPrayerAlert,
             silentModeState = appLevelSilentModeState,

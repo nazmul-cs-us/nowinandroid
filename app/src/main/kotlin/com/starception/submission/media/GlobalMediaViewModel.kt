@@ -61,6 +61,13 @@ class GlobalMediaViewModel(
         var onHadithSkipNextRequested: (() -> Unit)? = null
         var onHadithSkipPreviousRequested: (() -> Unit)? = null
 
+        /**
+         * Fallback stop for hadith TTS when the HadithDetailScreen (which owns
+         * the play/pause callbacks) is no longer composed but Sherpa audio is
+         * still speaking. Wired by MainActivityViewModel to stop the TTS engine.
+         */
+        var onHadithFallbackStop: (() -> Unit)? = null
+
         // ---- Fortress (chapter recitation) — mirrors the hadith callback pattern ----
         /** Notify state changes from ChapterAudioController (via the app bridge). */
         var onFortressPlaybackChanged: ((isPlaying: Boolean, title: String) -> Unit)? = null
@@ -369,7 +376,7 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.resume()
-            is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
+            is MediaSource.Hadith -> toggleHadithOrFallbackStop()
             is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
         }
@@ -380,9 +387,24 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.togglePlayPause()
             is MediaSource.DrivingMode -> drivingService?.pause()
-            is MediaSource.Hadith -> onHadithPlayPauseRequested?.invoke()
+            is MediaSource.Hadith -> toggleHadithOrFallbackStop()
             is MediaSource.Fortress -> onFortressPlayPauseRequested?.invoke()
             is MediaSource.None -> {}
+        }
+    }
+
+    /**
+     * Hadith play/pause: normally handled by HadithDetailScreen's registered
+     * callback. If that screen is gone (user navigated away while Sherpa TTS
+     * keeps reading), stop the TTS engine directly and clear the mini-bar.
+     */
+    private fun toggleHadithOrFallbackStop() {
+        val callback = onHadithPlayPauseRequested
+        if (callback != null) {
+            callback.invoke()
+        } else {
+            onHadithFallbackStop?.invoke()
+            onHadithPlaybackChanged?.invoke(false, 0, "", "")
         }
     }
 

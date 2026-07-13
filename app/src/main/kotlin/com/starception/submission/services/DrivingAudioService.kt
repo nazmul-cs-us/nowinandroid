@@ -135,6 +135,16 @@ class DrivingAudioService : Service() {
         private const val NOTIFICATION_ID = 3001
         private const val CHANNEL_ID = "driving_audio_channel"
 
+        /**
+         * True while the service exists (onCreate..onDestroy). Lets app-session
+         * logic (e.g. MainActivityViewModel's orphaned-TTS guard) distinguish
+         * driving-mode speech — which must never be stopped by the activity —
+         * from activity-bound hadith reading that shares the same TTS singleton.
+         */
+        @Volatile
+        var isRunning = false
+            private set
+
         const val ACTION_PLAY = "com.starception.submission.DRIVING_PLAY"
         const val ACTION_PAUSE = "com.starception.submission.DRIVING_PAUSE"
         const val ACTION_STOP = "com.starception.submission.DRIVING_STOP"
@@ -185,6 +195,7 @@ class DrivingAudioService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service created")
+        isRunning = true
         createNotificationChannel()
         acquireWakeLock()
         initializeMediaSession()
@@ -1507,6 +1518,7 @@ class DrivingAudioService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
+        isRunning = false
 
         mediaSession?.isActive = false
         mediaSession?.release()

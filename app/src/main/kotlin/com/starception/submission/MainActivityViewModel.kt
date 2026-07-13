@@ -87,6 +87,30 @@ class MainActivityViewModel @Inject constructor(
     // Global media controller — persistent across all screens
     val globalMedia = GlobalMediaViewModel(context, viewModelScope)
 
+    init {
+        // Hadith TTS keeps reading after HadithDetailScreen is disposed; the
+        // mini-bar's pause must still be able to stop it (fallback path when the
+        // screen's own callbacks are unregistered).
+        GlobalMediaViewModel.onHadithFallbackStop = { sherpaOnnxTts.stopSpeaking() }
+
+        // Orphan guard: if a previous activity session died mid-read, the
+        // singleton TTS keeps speaking with no media session or controls in
+        // this new session — only a bare "Preparing audio" banner. Stop it.
+        // Delayed so foreground sources (driving mode, recitation service) can
+        // re-publish their state first and are never touched.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1500)
+            val source = globalMedia.controllerState.value.playback.source
+            if (sherpaOnnxTts.isSpeaking() &&
+                source is com.starception.submission.media.MediaSource.None &&
+                !com.starception.submission.services.DrivingAudioService.isRunning
+            ) {
+                android.util.Log.i("MainActivityVM", "Stopping orphaned TTS from previous session")
+                sherpaOnnxTts.stopSpeaking()
+            }
+        }
+    }
+
     // Triggers a background sync via WorkManager — used by app-level pull-to-sync
     fun requestSync() = syncManager.requestSync()
 
@@ -373,6 +397,16 @@ class MainActivityViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        // Hadith TTS reading is bound to this activity session (no foreground
+        // service): if the activity is torn down mid-generation/mid-read, the
+        // singleton TTS would keep going orphaned — next launch shows a bare
+        // "Preparing audio" with no title and no controls. Stop it. Driving-mode
+        // TTS runs its own foreground service and is not affected here.
+        if (globalMedia.controllerState.value.playback.source is com.starception.submission.media.MediaSource.Hadith &&
+            !com.starception.submission.services.DrivingAudioService.isRunning
+        ) {
+            sherpaOnnxTts.stopSpeaking()
+        }
         globalMedia.cleanup()
     }
 }
