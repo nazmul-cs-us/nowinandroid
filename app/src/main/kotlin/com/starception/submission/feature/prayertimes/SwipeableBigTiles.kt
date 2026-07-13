@@ -71,6 +71,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.draggable2D
+import androidx.compose.foundation.gestures.rememberDraggable2DState
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
@@ -1045,11 +1048,15 @@ fun SwipeableBigTiles(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
-    // Swipeable Big Tiles - HorizontalPager with 3 tiles and infinite scroll
-    val pagerState = rememberPagerState(
-        pageCount = { Int.MAX_VALUE }, // Enable infinite scrolling
-        initialPage = (Int.MAX_VALUE / 2 / 4) * 4 // Start in middle, adjusted to show Smart Prediction tile (index 0) first
-    )
+    // Swipeable Big Tiles — card DECK with the 4 tiles and infinite cycling.
+    // The top card can be tossed away horizontally OR vertically (stacked-cards
+    // interaction); the next card waits underneath. Tile visuals unchanged.
+    var currentTile by remember { mutableStateOf(0) }
+    val deckOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    var deckSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    // Set while a dot-tap toss is running so the revealed card is the target
+    var pendingBehind by remember { mutableStateOf<Int?>(null) }
+    val view = LocalView.current
 
     // Coroutine scope for animated scroll when dots are tapped
     val coroutineScope = rememberCoroutineScope()
@@ -1085,9 +1092,9 @@ fun SwipeableBigTiles(
 
     // Request Activity Recognition permission and ensure detection is running when on Smart Tracking tile (page 1)
     // Also track tile focus for sound/vibration notification suppression
-    // Use settledPage instead of currentPage to avoid triggering during swipe animation
-    LaunchedEffect(pagerState.settledPage) {
-        val actualPage = pagerState.settledPage % 4
+    // currentTile only changes once a toss settles, so this fires post-swipe
+    LaunchedEffect(currentTile) {
+        val actualPage = currentTile
 
         if (actualPage == 1) {
             // User is on Smart Tracking tile - ensure detection is running
@@ -1127,24 +1134,13 @@ fun SwipeableBigTiles(
                 .height(200.dp) // Fixed height in portrait
         }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = pagerModifier,
-            pageSpacing = if (isLandscape) 12.dp else 16.dp,
-            contentPadding = PaddingValues(horizontal = if (isLandscape) 4.dp else 8.dp),
-            // Performance optimizations for smooth swiping
-            beyondViewportPageCount = 1, // Preload 1 page on each side for smoother transitions
-            key = { page -> page % 4 }, // Stable keys help avoid unnecessary recomposition
-            flingBehavior = PagerDefaults.flingBehavior(
-                state = pagerState,
-                snapPositionalThreshold = 0.35f // Snap earlier (35% instead of 50%) for snappier feel
-            )
-        ) { page ->
-            val actualPage = page % 4 // Map infinite pages to our 4 actual tiles
+        // One tile card (shadow wrapper + content), reused for the deck layers.
+        @Composable
+        fun TileCard(actualPage: Int, modifier: Modifier = Modifier) {
             val tileShape = RoundedCornerShape(32.dp)
 
             // Outer wrapper with shadow for sharp edges (like Material Components)
-            Box(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+            Box(modifier = modifier.fillMaxSize().padding(4.dp)) {
                 // Shadow layer rendered outside content
                 Box(
                     modifier = Modifier
@@ -1214,15 +1210,102 @@ fun SwipeableBigTiles(
                         3 -> QiblaGlobeTile(
                             prayerTimes = prayerTimes,
                             onFullscreenClick = { showGlobePopup = true },
-                            isActiveTile = pagerState.settledPage % 4 == 3,
+                            isActiveTile = currentTile == 3,
                         )
                     }
                 }
             }
         }
         
+        // Toss the top card straight up and land on [index] (used by the dots
+        // and the hint-row swipes).
+        val tossTo: suspend (Int) -> Unit = { index ->
+            if (index != currentTile) {
+                pendingBehind = index
+                val h = deckSize.height.toFloat().coerceAtLeast(1f)
+                deckOffset.animateTo(Offset(0f, -h * 1.3f), tween(240))
+                currentTile = index
+                deckOffset.snapTo(Offset.Zero)
+                pendingBehind = null
+            }
+        }
+
+        // The deck: the next card sits underneath while the top card follows
+        // the finger in BOTH axes; release past the threshold to toss it away.
+        Box(
+            modifier = pagerModifier
+                .padding(horizontal = if (isLandscape) 4.dp else 8.dp)
+                .onSizeChanged { deckSize = it }
+                .draggable2D(
+                    state = rememberDraggable2DState { delta ->
+                        coroutineScope.launch {
+                            deckOffset.snapTo(deckOffset.value + delta)
+                        }
+                    },
+                    onDragStopped = { velocity ->
+                        val o = deckOffset.value
+                        val w = deckSize.width.toFloat().coerceAtLeast(1f)
+                        val h = deckSize.height.toFloat().coerceAtLeast(1f)
+                        val toss = kotlin.math.abs(o.x) > w * 0.22f ||
+                            kotlin.math.abs(o.y) > h * 0.28f ||
+                            kotlin.math.abs(velocity.x) > 1500f ||
+                            kotlin.math.abs(velocity.y) > 1500f
+                        coroutineScope.launch {
+                            if (toss && o != Offset.Zero) {
+                                // Dominant drag axis decides forward/backward
+                                val forward = if (kotlin.math.abs(o.x) >= kotlin.math.abs(o.y)) o.x < 0f else o.y < 0f
+                                val next = if (forward) (currentTile + 1) % 4 else (currentTile + 3) % 4
+                                val dist = kotlin.math.sqrt(o.x * o.x + o.y * o.y).coerceAtLeast(1f)
+                                val target = Offset(
+                                    o.x / dist * (w * 1.4f),
+                                    o.y / dist * (h * 1.4f),
+                                )
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                deckOffset.animateTo(target, tween(200))
+                                currentTile = next
+                                deckOffset.snapTo(Offset.Zero)
+                            } else {
+                                deckOffset.animateTo(
+                                    Offset.Zero,
+                                    spring(stiffness = Spring.StiffnessMediumLow),
+                                )
+                            }
+                        }
+                    },
+                )
+        ) {
+            val dragging = deckOffset.value != Offset.Zero
+            if (dragging) {
+                // Card waiting underneath — grows to full size as the top card leaves
+                val behindIndex = pendingBehind ?: run {
+                    val o = deckOffset.value
+                    val forward = if (kotlin.math.abs(o.x) >= kotlin.math.abs(o.y)) o.x <= 0f else o.y <= 0f
+                    if (forward) (currentTile + 1) % 4 else (currentTile + 3) % 4
+                }
+                TileCard(
+                    actualPage = behindIndex,
+                    modifier = Modifier.graphicsLayer {
+                        val o = deckOffset.value
+                        val w = size.width.coerceAtLeast(1f)
+                        val progress = (kotlin.math.sqrt(o.x * o.x + o.y * o.y) / (w * 0.5f)).coerceIn(0f, 1f)
+                        val s = 0.94f + 0.06f * progress
+                        scaleX = s
+                        scaleY = s
+                    },
+                )
+            }
+            // Top card follows the finger in both axes with a slight tilt
+            TileCard(
+                actualPage = currentTile,
+                modifier = Modifier.graphicsLayer {
+                    translationX = deckOffset.value.x
+                    translationY = deckOffset.value.y
+                    rotationZ = (deckOffset.value.x / size.width.coerceAtLeast(1f)) * 6f
+                },
+            )
+        }
+
         // Page indicators for swipeable tiles - compact in landscape, CLICKABLE & SWIPEABLE to navigate
-        val view = LocalView.current
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1235,11 +1318,10 @@ fun SwipeableBigTiles(
                         onDragEnd = {
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
-                                val direction = if (totalDrag < 0) 1 else -1 // Swipe left = next, right = previous
-                                val targetPage = pagerState.currentPage + direction
+                                val target = if (totalDrag < 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    pagerState.animateScrollToPage(targetPage)
+                                    tossTo(target)
                                 }
                             }
                         },
@@ -1251,10 +1333,8 @@ fun SwipeableBigTiles(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Use derivedStateOf to reduce recomposition during swipe
-            val currentPageIndex by remember { derivedStateOf { pagerState.currentPage % 4 } }
             repeat(4) { index ->
-                val isSelected = currentPageIndex == index
+                val isSelected = currentTile == index
                 // Smaller indicators in landscape
                 val selectedSize = if (isLandscape) 8.dp else 12.dp
                 val unselectedSize = if (isLandscape) 6.dp else 8.dp
@@ -1269,19 +1349,12 @@ fun SwipeableBigTiles(
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                         )
                         .clickable {
-                            // Calculate target page for infinite scroll
-                            // Find the closest page number that maps to the clicked index
-                            val currentPage = pagerState.currentPage
-                            val currentIndex = currentPage % 4
-                            val diff = index - currentIndex
-                            val targetPage = currentPage + diff
-
                             // Haptic feedback on tap
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 
-                            // Animate scroll to the target page
+                            // Toss the deck onto the tapped tile
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(targetPage)
+                                tossTo(index)
                             }
                         }
                 )
@@ -1304,11 +1377,10 @@ fun SwipeableBigTiles(
                         onDragEnd = {
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
-                                val direction = if (totalDrag < 0) 1 else -1 // Swipe left = next, right = previous
-                                val targetPage = pagerState.currentPage + direction
+                                val target = if (totalDrag < 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    pagerState.animateScrollToPage(targetPage)
+                                    tossTo(target)
                                 }
                             }
                         },
