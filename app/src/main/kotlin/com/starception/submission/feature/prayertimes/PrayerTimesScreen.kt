@@ -915,6 +915,13 @@ fun PrayerTimesScreen(
             label = "expressiveTileScale"
         )
         
+        // Device-tilt parallax — shared sensor (one listener for all tiles). Each tile
+        // gets a slightly different depth so the grid reads as layered, not a flat sheet.
+        val tilt by com.starception.submission.feature.prayertimes.components.rememberParallaxTilt()
+        val tileDepth = 0.7f + 0.3f * ((kotlin.math.abs(prayerName.hashCode()) % 100) / 100f)
+        val parallaxMaxPx = with(LocalDensity.current) { 6.dp.toPx() } * tileDepth
+        val parallaxShift = Offset(tilt.x * parallaxMaxPx, tilt.y * parallaxMaxPx)
+
         // Debug logging
         android.util.Log.d("PrayerCard", "🔄 Rendering InteractivePrayerCard for $prayerName, isInEditMode=$isInEditMode, scale=$scale")
         
@@ -1102,10 +1109,12 @@ fun PrayerTimesScreen(
                     }
                 },
                 modifier = modifier
-                    .graphicsLayer(
-                        scaleX = scale,
+                    .graphicsLayer {
+                        scaleX = scale
                         scaleY = scale
-                    )
+                        translationX = parallaxShift.x
+                        translationY = parallaxShift.y
+                    }
             ) {
                 // Card content inside SwipeToRevealCard with crisp border definition
                 val prayerStatus = PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)
@@ -1922,7 +1931,7 @@ fun PrayerTimesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // First prayer tile
                     if (orderedPrayers.isNotEmpty()) {
@@ -2014,7 +2023,7 @@ fun PrayerTimesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Third prayer tile
                     if (orderedPrayers.size > 2) {

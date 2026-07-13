@@ -71,8 +71,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.draggable2D
-import androidx.compose.foundation.gestures.rememberDraggable2DState
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -150,6 +151,7 @@ import androidx.core.content.ContextCompat
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
+import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
 import java.time.LocalTime
@@ -1052,10 +1054,7 @@ fun SwipeableBigTiles(
     // The top card can be tossed away horizontally OR vertically (stacked-cards
     // interaction); the next card waits underneath. Tile visuals unchanged.
     var currentTile by remember { mutableStateOf(0) }
-    val deckOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     var deckSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
-    // Set while a dot-tap toss is running so the revealed card is the target
-    var pendingBehind by remember { mutableStateOf<Int?>(null) }
     val view = LocalView.current
 
     // Coroutine scope for animated scroll when dots are tapped
@@ -1120,7 +1119,7 @@ fun SwipeableBigTiles(
     // Use dynamic height based on orientation - wrapped in Box for popup overlay
     Box(modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 2.dp),
             modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
         ) {
         // In landscape, pager takes most height but leaves room for indicators
@@ -1131,12 +1130,22 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(200.dp) // Fixed height in portrait
+                .height(214.dp) // Card height + just enough for the bottom fan peek
         }
 
         // One tile card (shadow wrapper + content), reused for the deck layers.
+        // Muted opaque tone for the BEHIND (fan) cards only, so they read as solid
+        // stacked cards without bleed-through. The FRONT card keeps its own real
+        // background untouched (no injected color).
+        val fanFill = MaterialTheme.colorScheme.surfaceContainerHighest
+
         @Composable
-        fun TileCard(actualPage: Int, modifier: Modifier = Modifier) {
+        fun TileCard(
+            actualPage: Int,
+            modifier: Modifier = Modifier,
+            isActiveOverride: Boolean? = null,
+            solidFill: androidx.compose.ui.graphics.Color? = null,
+        ) {
             val tileShape = RoundedCornerShape(32.dp)
 
             // Outer wrapper with shadow for sharp edges (like Material Components)
@@ -1153,7 +1162,18 @@ fun SwipeableBigTiles(
                             this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f)
                         }
                 )
-                // Content layer with subtle top-lit bevel drawn on top (clipped to tile shape)
+                // Behind/fan cards: draw as a SOLID opaque card (no content) so nothing
+                // bleeds through and they read as clean stacked edges.
+                if (solidFill != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(tileShape)
+                            .background(solidFill)
+                    )
+                    return@Box
+                }
+                // Front card: real content, clipped to tile shape (its own bg is opaque enough).
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1210,99 +1230,179 @@ fun SwipeableBigTiles(
                         3 -> QiblaGlobeTile(
                             prayerTimes = prayerTimes,
                             onFullscreenClick = { showGlobePopup = true },
-                            isActiveTile = currentTile == 3,
+                            isActiveTile = isActiveOverride ?: (currentTile == 3),
                         )
                     }
                 }
             }
         }
         
-        // Toss the top card straight up and land on [index] (used by the dots
-        // and the hint-row swipes).
-        val tossTo: suspend (Int) -> Unit = { index ->
-            if (index != currentTile) {
-                pendingBehind = index
-                val h = deckSize.height.toFloat().coerceAtLeast(1f)
-                deckOffset.animateTo(Offset(0f, -h * 1.3f), tween(240))
-                currentTile = index
-                deckOffset.snapTo(Offset.Zero)
-                pendingBehind = null
+        // CARD-STACKING microinteraction (Dribbble reference): a fanned deck whose
+        // extra cards peek out at the BOTTOM. Swiping SPREADS the cards apart, then
+        // they RESTACK into the new order. Fully contained — the deck Box clips.
+        val density = LocalDensity.current
+
+        // Device-tilt parallax — tilting the phone shifts each layer by a depth-scaled
+        // amount so the deck gains real 3D depth. Front card moves most (feels closest),
+        // fanned cards move less. Max shift in dp per full tilt, per layer.
+        val tilt by rememberParallaxTilt()
+        val parallaxFrontDp = if (isLandscape) 8.dp else 12.dp
+        val parallaxMidDp = parallaxFrontDp * 0.6f
+        val parallaxBackDp = parallaxFrontDp * 0.3f
+
+        // Resting fan geometry — each card behind the front one is shifted DOWN,
+        // inset horizontally, scaled down and dimmed (bottom edges peek out).
+        val fanStepRest = if (isLandscape) 12.dp else 18.dp   // downward offset per layer
+        val fanInsetRest = if (isLandscape) 8.dp else 12.dp    // horizontal narrowing per layer
+        val scaleStep = 0.05f                                   // scale drop per layer
+
+        // The FRONT card tracks the finger 1:1 (real drag). `drag` holds its live
+        // offset in px; `progress` (0..1) is how far it's travelled toward a throw,
+        // which lifts the fanned cards behind it up into place. Professional deck feel.
+        val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+
+        // VERTICAL advance: the top card slides UP and FADES away, revealing the next
+        // card which scales up into place. `dir` +1 = forward (up), -1 = backward (down).
+        // `durationMs` lets a momentum fling run several fast steps back-to-back.
+        val scrollTo: suspend (Int, Int) -> Unit = { dir, durationMs ->
+            val h = deckSize.height.toFloat().coerceAtLeast(1f)
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            val targetY = if (dir >= 0) -h * 0.9f else h * 0.9f
+            drag.animateTo(
+                Offset(0f, targetY),
+                tween(durationMs, easing = FastOutSlowInEasing),
+            )
+            currentTile = if (dir >= 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
+            drag.snapTo(Offset.Zero) // new front card starts centered; fan already in place
+        }
+
+        // Momentum fling — advance MULTIPLE tiles from a flick, decelerating like a wheel.
+        val flingTo: suspend (Int, Float) -> Unit = { dir, speed ->
+            // More velocity => more steps (capped). Each step slower than the last.
+            val steps = (1 + (kotlin.math.abs(speed) / 2600f).toInt()).coerceIn(1, 5)
+            var dur = 150
+            for (i in 0 until steps) {
+                scrollTo(dir, dur)
+                dur = (dur * 1.35f).toInt().coerceAtMost(300) // decelerate
             }
         }
 
-        // The deck: the next card sits underneath while the top card follows
-        // the finger in BOTH axes; release past the threshold to toss it away.
         Box(
             modifier = pagerModifier
                 .padding(horizontal = if (isLandscape) 4.dp else 8.dp)
                 .onSizeChanged { deckSize = it }
-                .draggable2D(
-                    state = rememberDraggable2DState { delta ->
+                // NOTE: no hard clip — a rectangular clip cuts the card's top off while
+                // it lifts. Each TileCard is rounded by its own shape.
+                // VERTICAL draggable: drag UP => top tile vanishes & next reveals.
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = rememberDraggableState { deltaY ->
                         coroutineScope.launch {
-                            deckOffset.snapTo(deckOffset.value + delta)
+                            // 1:1 finger tracking on Y only; X stays put.
+                            drag.snapTo(Offset(0f, drag.value.y + deltaY))
                         }
                     },
                     onDragStopped = { velocity ->
-                        val o = deckOffset.value
-                        val w = deckSize.width.toFloat().coerceAtLeast(1f)
+                        val o = drag.value
                         val h = deckSize.height.toFloat().coerceAtLeast(1f)
-                        val toss = kotlin.math.abs(o.x) > w * 0.22f ||
-                            kotlin.math.abs(o.y) > h * 0.28f ||
-                            kotlin.math.abs(velocity.x) > 1500f ||
-                            kotlin.math.abs(velocity.y) > 1500f
+                        val advance = kotlin.math.abs(o.y) > h * 0.22f ||
+                            kotlin.math.abs(velocity) > 900f
                         coroutineScope.launch {
-                            if (toss && o != Offset.Zero) {
-                                // Dominant drag axis decides forward/backward
-                                val forward = if (kotlin.math.abs(o.x) >= kotlin.math.abs(o.y)) o.x < 0f else o.y < 0f
-                                val next = if (forward) (currentTile + 1) % 4 else (currentTile + 3) % 4
-                                val dist = kotlin.math.sqrt(o.x * o.x + o.y * o.y).coerceAtLeast(1f)
-                                val target = Offset(
-                                    o.x / dist * (w * 1.4f),
-                                    o.y / dist * (h * 1.4f),
-                                )
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                deckOffset.animateTo(target, tween(200))
-                                currentTile = next
-                                deckOffset.snapTo(Offset.Zero)
+                            if (advance && o.y != 0f) {
+                                // Direction from the flick (fall back to drag direction).
+                                val dir = if (kotlin.math.abs(velocity) > 200f) {
+                                    if (velocity < 0f) 1 else -1
+                                } else {
+                                    if (o.y < 0f) 1 else -1
+                                }
+                                // Momentum: fast flick coasts through several tiles.
+                                flingTo(dir, velocity)
                             } else {
-                                deckOffset.animateTo(
+                                // Snap back with a natural spring.
+                                drag.animateTo(
                                     Offset.Zero,
-                                    spring(stiffness = Spring.StiffnessMediumLow),
+                                    spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium,
+                                    ),
                                 )
                             }
                         }
                     },
                 )
         ) {
-            val dragging = deckOffset.value != Offset.Zero
-            if (dragging) {
-                // Card waiting underneath — grows to full size as the top card leaves
-                val behindIndex = pendingBehind ?: run {
-                    val o = deckOffset.value
-                    val forward = if (kotlin.math.abs(o.x) >= kotlin.math.abs(o.y)) o.x <= 0f else o.y <= 0f
-                    if (forward) (currentTile + 1) % 4 else (currentTile + 3) % 4
-                }
+            val o = drag.value
+            val h = deckSize.height.toFloat().coerceAtLeast(1f)
+            // 0..1 how far the top card has been dragged toward vanishing.
+            val progress = (kotlin.math.abs(o.y) / (h * 0.5f)).coerceIn(0f, 1f)
+
+            val frontIndex = currentTile
+            // Which card is revealed underneath depends on drag DIRECTION:
+            // dragging up (forward) reveals the NEXT tile; dragging down (backward)
+            // reveals the PREVIOUS tile. Default to forward when at rest.
+            val goingBack = o.y > 0f
+            val midIndex = if (goingBack) (currentTile + 3) % 4 else (currentTile + 1) % 4
+            val backIndex = (currentTile + 2) % 4
+
+            // Reserve just enough bottom room for the fan peek (no dead space below it).
+            val fanReserve = fanStepRest + 6.dp
+            with(density) {
+                val fanPx = fanStepRest.toPx()
+                // Parallax shift per layer (px) from device tilt.
+                val pFront = parallaxFrontDp.toPx()
+                val pMid = parallaxMidDp.toPx()
+                val pBack = parallaxBackDp.toPx()
+
+                // BACK card — real content; rises toward the middle slot as the top card leaves.
                 TileCard(
-                    actualPage = behindIndex,
-                    modifier = Modifier.graphicsLayer {
-                        val o = deckOffset.value
-                        val w = size.width.coerceAtLeast(1f)
-                        val progress = (kotlin.math.sqrt(o.x * o.x + o.y * o.y) / (w * 0.5f)).coerceIn(0f, 1f)
-                        val s = 0.94f + 0.06f * progress
-                        scaleX = s
-                        scaleY = s
-                    },
+                    actualPage = backIndex,
+                    isActiveOverride = false,
+                    modifier = Modifier
+                        .padding(
+                            start = fanInsetRest * 2 * (1f - progress) + fanInsetRest * progress,
+                            end = fanInsetRest * 2 * (1f - progress) + fanInsetRest * progress,
+                            bottom = fanReserve,
+                        )
+                        .graphicsLayer {
+                            translationX = tilt.x * pBack
+                            translationY = fanPx * (2f - progress) + tilt.y * pBack
+                            val sc = (1f - scaleStep * 2f) + scaleStep * progress
+                            scaleX = sc; scaleY = sc
+                        }
+                )
+                // MIDDLE card — real content; scales UP into the FRONT slot as the top card vanishes.
+                TileCard(
+                    actualPage = midIndex,
+                    isActiveOverride = false,
+                    modifier = Modifier
+                        .padding(
+                            start = fanInsetRest * (1f - progress),
+                            end = fanInsetRest * (1f - progress),
+                            bottom = fanReserve,
+                        )
+                        .graphicsLayer {
+                            translationX = tilt.x * pMid
+                            translationY = fanPx * (1f - progress) + tilt.y * pMid
+                            val sc = (1f - scaleStep) + scaleStep * progress
+                            scaleX = sc; scaleY = sc
+                        }
+                )
+                // FRONT (top) card — follows the finger vertically, SLIDES UP and FADES away
+                // to reveal the next card. clip+shape keeps corners rounded while it moves.
+                TileCard(
+                    actualPage = frontIndex,
+                    modifier = Modifier
+                        .padding(bottom = fanReserve)
+                        .graphicsLayer {
+                            translationX = tilt.x * pFront
+                            translationY = o.y + tilt.y * pFront
+                            // Fade faster than it moves so it "vanishes" cleanly.
+                            alpha = 1f - progress
+                            shape = RoundedCornerShape(32.dp)
+                            clip = true
+                        }
                 )
             }
-            // Top card follows the finger in both axes with a slight tilt
-            TileCard(
-                actualPage = currentTile,
-                modifier = Modifier.graphicsLayer {
-                    translationX = deckOffset.value.x
-                    translationY = deckOffset.value.y
-                    rotationZ = (deckOffset.value.x / size.width.coerceAtLeast(1f)) * 6f
-                },
-            )
         }
 
         // Page indicators for swipeable tiles - compact in landscape, CLICKABLE & SWIPEABLE to navigate
@@ -1318,10 +1418,9 @@ fun SwipeableBigTiles(
                         onDragEnd = {
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
-                                val target = if (totalDrag < 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    tossTo(target)
+                                    scrollTo(if (totalDrag < 0) 1 else -1, 240)
                                 }
                             }
                         },
@@ -1352,9 +1451,15 @@ fun SwipeableBigTiles(
                             // Haptic feedback on tap
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 
-                            // Toss the deck onto the tapped tile
+                            // Scroll the deck onto the tapped tile via the shortest path,
+                            // one contained step at a time.
                             coroutineScope.launch {
-                                tossTo(index)
+                                var guard = 0
+                                while (currentTile != index && guard < 4) {
+                                    val fwd = ((index - currentTile) + 4) % 4
+                                    scrollTo(if (fwd <= 2) 1 else -1, 240)
+                                    guard++
+                                }
                             }
                         }
                 )
@@ -1377,10 +1482,9 @@ fun SwipeableBigTiles(
                         onDragEnd = {
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
-                                val target = if (totalDrag < 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    tossTo(target)
+                                    scrollTo(if (totalDrag < 0) 1 else -1, 240)
                                 }
                             }
                         },
