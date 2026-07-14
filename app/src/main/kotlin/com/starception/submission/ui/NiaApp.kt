@@ -36,7 +36,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -118,7 +120,6 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaBackground
 import com.starception.submission.core.designsystem.component.NiaGradientBackground
-import com.starception.submission.core.designsystem.component.NiaNavigationRailItem
 import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
 import com.starception.submission.core.designsystem.component.NiaTopAppBar
 import com.starception.submission.core.designsystem.icon.NiaIcons
@@ -343,10 +344,14 @@ internal fun NiaAppContent(
 }
 
 /**
- * Floating pill bottom navigation (reference design): the existing top-level
+ * Floating pill navigation (reference design): the existing top-level
  * destinations in a rounded floating container — the selected tab gets its own
  * tinted bubble — plus the circular voice-search button. Hidden while the
  * search overlay is open so it never floats over the results list.
+ *
+ * Lays out horizontally along the screen bottom in portrait, and vertically
+ * along the left edge in landscape ([vertical] = true) where it replaces the
+ * old navigation rail.
  */
 @Composable
 private fun NiaFloatingBottomBar(
@@ -354,44 +359,52 @@ private fun NiaFloatingBottomBar(
     unreadDestinations: Set<TopLevelDestination>,
     currentDestination: NavDestination?,
     modifier: Modifier = Modifier,
+    vertical: Boolean = false,
 ) {
     val isSearchOpen by com.starception.submission.ui.search.SearchPrefillBus
         .isSearchOpen.collectAsStateWithLifecycle()
     if (isSearchOpen) return
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+
+    // The rounded pill holding the destination items with the gooey selection
+    // bubble. [sizeModifier] carries the scope-specific main-axis sizing —
+    // weight(1f) from the portrait Row, width(64.dp) from the landscape Column —
+    // since weight() can only be resolved inside the calling Row/Column scope.
+    val pill = @Composable { sizeModifier: Modifier ->
         Surface(
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 8.dp,
-            modifier = Modifier.weight(1f),
+            modifier = sizeModifier,
         ) {
             val destinations = appState.topLevelDestinations
             val selectedIndex = destinations.indexOfFirst { destination ->
                 currentDestination.isRouteInHierarchy(destination.baseRoute)
             }
             BoxWithConstraints(
-                modifier = Modifier
-                    .height(64.dp)
-                    .padding(horizontal = 6.dp),
+                modifier = if (vertical) {
+                    Modifier.width(64.dp).padding(vertical = 6.dp)
+                } else {
+                    Modifier.height(64.dp).padding(horizontal = 6.dp)
+                },
             ) {
-                val itemWidth = maxWidth / destinations.size
-                val bubbleTarget = itemWidth * selectedIndex.coerceAtLeast(0)
+                // Size of a single item cell along the main axis, and the
+                // bubble's target position for the selected tab.
+                val itemExtent = if (vertical) {
+                    maxHeight / destinations.size
+                } else {
+                    maxWidth / destinations.size
+                }
+                val bubbleTarget = itemExtent * selectedIndex.coerceAtLeast(0)
                 // Fluid (gooey/metaball) selection: two bubbles race to the
                 // selected tab — a fast leader and a lazy follower — and the
                 // blur + alpha-threshold RenderEffect merges them into one
                 // stretching droplet that pinches off and snaps together.
-                val leaderX by animateDpAsState(
+                val leaderPos by animateDpAsState(
                     targetValue = bubbleTarget,
                     animationSpec = spring(dampingRatio = 0.9f, stiffness = 1400f),
                     label = "navBubbleLeader",
                 )
-                val followerX by animateDpAsState(
+                val followerPos by animateDpAsState(
                     targetValue = bubbleTarget,
                     animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f),
                     label = "navBubbleFollower",
@@ -436,76 +449,102 @@ private fun NiaFloatingBottomBar(
                             alpha = bubbleAlpha
                         },
                 ) {
+                    // Each bubble spans one item cell; it slides along the main
+                    // axis (Y in landscape, X in portrait) toward the selection.
+                    val bubbleModifier = @Composable { pos: Dp ->
+                        if (vertical) {
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = pos)
+                                .height(itemExtent)
+                                .width(50.dp)
+                        } else {
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(x = pos)
+                                .width(itemExtent)
+                                .height(50.dp)
+                        }
+                    }
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = leaderX)
-                            .width(itemWidth)
-                            .height(50.dp)
+                        modifier = bubbleModifier(leaderPos)
                             .clip(RoundedCornerShape(50))
                             .background(bubbleColor),
                     )
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = followerX)
-                            .width(itemWidth)
-                            .height(50.dp)
+                        modifier = bubbleModifier(followerPos)
                             .clip(RoundedCornerShape(50))
                             .background(bubbleColor),
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    destinations.forEach { destination ->
-                        val hasUnread = unreadDestinations.contains(destination)
-                        val selected = currentDestination
-                            .isRouteInHierarchy(destination.baseRoute)
-                        val contentTint by animateColorAsState(
-                            targetValue = if (selected) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            animationSpec = tween(250),
-                            label = "navItemTint",
+
+                // A single destination cell (icon + label). Weighted along the
+                // main axis of its parent so all cells share the pill evenly.
+                val itemCell = @Composable { destination: TopLevelDestination, weight: Modifier ->
+                    val hasUnread = unreadDestinations.contains(destination)
+                    val selected = currentDestination
+                        .isRouteInHierarchy(destination.baseRoute)
+                    val contentTint by animateColorAsState(
+                        targetValue = if (selected) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        animationSpec = tween(250),
+                        label = "navItemTint",
+                    )
+                    Column(
+                        modifier = weight
+                            .clip(RoundedCornerShape(50))
+                            .clickable { appState.navigateToTopLevelDestination(destination) }
+                            .padding(vertical = 9.dp)
+                            .testTag("NiaNavItem")
+                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                            contentDescription = null,
+                            tint = contentTint,
+                            modifier = Modifier.size(22.dp),
                         )
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(50))
-                                .clickable { appState.navigateToTopLevelDestination(destination) }
-                                .padding(vertical = 9.dp)
-                                .testTag("NiaNavItem")
-                                .then(if (hasUnread) Modifier.notificationDot() else Modifier),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Icon(
-                                imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                                contentDescription = null,
-                                tint = contentTint,
-                                modifier = Modifier.size(22.dp),
-                            )
-                            Text(
-                                text = stringResource(destination.iconTextId),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                maxLines = 1,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = contentTint,
-                            )
+                        Text(
+                            text = stringResource(destination.iconTextId),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = contentTint,
+                        )
+                    }
+                }
+
+                if (vertical) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        destinations.forEach { destination ->
+                            itemCell(destination, Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        destinations.forEach { destination ->
+                            itemCell(destination, Modifier.weight(1f))
                         }
                     }
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // Circular voice-search button — same on-device Whisper flow as the
-        // search bar's mic, via the bus.
+    // Circular voice-search button — same on-device Whisper flow as the
+    // search bar's mic, via the bus.
+    val voiceButton = @Composable {
         Surface(
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
             shape = CircleShape,
@@ -523,10 +562,45 @@ private fun NiaFloatingBottomBar(
             }
         }
     }
+
+    if (vertical) {
+        // Left edge: pill + voice button stacked and vertically centered,
+        // respecting the camera cutout / system bars on the start/top/bottom.
+        Column(
+            modifier = modifier
+                .fillMaxHeight()
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom,
+                    ),
+                )
+                .padding(start = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            pill(Modifier.width(64.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+            voiceButton()
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            pill(Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(10.dp))
+            voiceButton()
+        }
+    }
 }
 
 /**
- * Custom landscape layout with centered NavigationRail.
+ * Custom landscape layout: the content fills the screen and the vertical
+ * floating pill bar (the same reference design used at the bottom in portrait)
+ * is overlaid on the left edge, replacing the old navigation rail.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
@@ -540,58 +614,23 @@ private fun NiaLandscapeLayout(
     mainViewModel: MainActivityViewModel? = null,
     deepLinkCourseId: String? = null,
 ) {
-    Row(modifier = Modifier.fillMaxSize()) {
-        // Centered NavigationRail - use Box to center the rail vertically
-        // Apply safeDrawing insets to respect camera cutout
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom)),
-            contentAlignment = Alignment.Center,
-        ) {
-            // Use Column with wrapContentHeight to group items together
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                appState.topLevelDestinations.forEach { destination ->
-                    val hasUnread = unreadDestinations.contains(destination)
-                    val selected = currentDestination
-                        .isRouteInHierarchy(destination.baseRoute)
-                    NiaNavigationRailItem(
-                        selected = selected,
-                        onClick = { appState.navigateToTopLevelDestination(destination) },
-                        icon = {
-                            Icon(
-                                imageVector = destination.unselectedIcon,
-                                contentDescription = null,
-                            )
-                        },
-                        selectedIcon = {
-                            Icon(
-                                imageVector = destination.selectedIcon,
-                                contentDescription = null,
-                            )
-                        },
-                        label = { Text(stringResource(destination.iconTextId)) },
-                        modifier = Modifier
-                            .testTag("NiaNavItem")
-                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
-                    )
-                }
-            }
-        }
-        // Content
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            NiaMainContent(
-                appState = appState,
-                snackbarHostState = snackbarHostState,
-                onTopAppBarActionClick = onTopAppBarActionClick,
-                modifier = modifier,
-                isLandscape = true,
-                mainViewModel = mainViewModel,
-                deepLinkCourseId = deepLinkCourseId,
-            )
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
+        NiaMainContent(
+            appState = appState,
+            snackbarHostState = snackbarHostState,
+            onTopAppBarActionClick = onTopAppBarActionClick,
+            modifier = modifier,
+            isLandscape = true,
+            mainViewModel = mainViewModel,
+            deepLinkCourseId = deepLinkCourseId,
+        )
+        NiaFloatingBottomBar(
+            appState = appState,
+            unreadDestinations = unreadDestinations,
+            currentDestination = currentDestination,
+            vertical = true,
+            modifier = Modifier.align(Alignment.CenterStart),
+        )
     }
 }
 

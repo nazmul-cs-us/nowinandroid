@@ -108,6 +108,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
@@ -1127,7 +1128,7 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(238.dp) // Card height + just enough for the bottom fan peek
+                .height(233.dp) // Card (~213dp) + 10.dp shadow clearance top & bottom
         }
 
         // One tile card (shadow wrapper + content), reused for every deck layer.
@@ -1140,43 +1141,54 @@ fun SwipeableBigTiles(
             modifier: Modifier = Modifier,
             isActiveOverride: Boolean? = null,
             depth: () -> Float = { 0f },
+            elevated: Boolean = true,
         ) {
-            val tileShape = RoundedCornerShape(22.dp)
-
-            // Outer wrapper with shadow for sharp edges (like Material Components)
-            Box(modifier = modifier.fillMaxSize().padding(4.dp)) {
-                // Shadow layer rendered outside content. Same treatment as the
-                // floating bottom nav bar (plain Material shadow, default tint,
-                // no outline) so both elements read identically; the peek lips
-                // carry a lighter shadow so the underside stays one soft shadow.
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer {
-                            val d = depth().coerceIn(0f, 3f)
-                            this.shadowElevation = 8.dp.toPx() * (1f - 0.28f * d).coerceAtLeast(0.12f)
-                            this.shape = tileShape
-                            this.clip = false
-                        }
-                )
-                // Card content on an opaque base (stacked cards must never bleed
-                // through each other), clipped to the tile shape.
-                Box(
+            // The card floats on an EVEN drop shadow (equal on all four edges). The
+            // platform elevation shadow (Surface.shadowElevation) casts DOWNWARD, so
+            // it pools a heavy dark band at the bottom and almost nothing at the top —
+            // making the top/bottom edges look inconsistent with the left/right. To
+            // avoid that we draw our OWN symmetric shadow: a shadow-tinted rounded box
+            // sized to the card, uniformly blurred, sitting directly behind it (no
+            // vertical offset) so the soft halo is identical top/bottom/left/right.
+            // 10.dp inset gives the blur room to render fully rounded on every side.
+            val scrimColor = MaterialTheme.colorScheme.surface
+            val evenShadowColor = Color.Black.copy(alpha = 0.16f)
+            Box(modifier = modifier.fillMaxSize().padding(10.dp)) {
+                if (elevated) {
+                    // Inset the shadow box a few dp INSIDE the card so the card's
+                    // opaque surface fully covers the shadow's solid core. Otherwise
+                    // the un-blurred edge of the tint box shows as a hard dark seam
+                    // right at the card's straight edges (the corners hid it, the
+                    // straight sides didn't). With the inset, only the soft blurred
+                    // halo bleeds out past the card — even on all sides.
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .padding(4.dp)
+                            .blur(8.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                            .background(evenShadowColor, RoundedCornerShape(28.dp)),
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(32.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 0.dp,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                  Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(tileShape)
-                        .background(MaterialTheme.colorScheme.surface)
                         .drawWithContent {
                             drawContent()
-                            // Depth dim — the peek lips show each card's REAL face,
-                            // just slightly shaded the deeper it sits in the deck.
-                            // Read here so it animates without recomposing the tile.
-                            val d = depth().coerceIn(0f, 3f)
-                            if (d > 0.005f) {
-                                drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.05f * d))
-                            }
-                        }
-                ) {
+                            // Behind-cards in the fan show a clean surface-colored face
+                            // instead of their real content (so the black globe card,
+                            // etc. never peeks as a harsh dark lip). Ramps in across the
+                            // first depth unit so a card promoting to front reveals its
+                            // real face smoothly.
+                            val cover = depth().coerceIn(0f, 1f)
+                            if (cover > 0.005f) drawRect(scrimColor.copy(alpha = cover))
+                        },
+                  ) {
                     when (actualPage) {
                                 0 -> NextPrayerTile(
                             prayerTimes = prayerTimes,
@@ -1220,10 +1232,11 @@ fun SwipeableBigTiles(
                             isActiveTile = isActiveOverride ?: (currentTile == 3),
                         )
                     }
+                  }
                 }
             }
         }
-        
+
         // ── CARD DECK ENGINE ────────────────────────────────────────────────
         // Stacked-cards microinteraction (Dribbble reference): the extra cards
         // peek out BELOW the front card. Swiping up lifts the front card off
@@ -1247,15 +1260,27 @@ fun SwipeableBigTiles(
         val parallaxFrontPx = with(density) { (if (isLandscape) 8.dp else 12.dp).toPx() }
         val parallaxBackPx = parallaxFrontPx * 0.3f
 
-        // Resting geometry: each card behind the front peeks exactly `fanStep`
-        // below the one above it (the bottom-edge pivot makes the peek lip
-        // scale-proof) and narrows by `scaleStep` — thin ticket-style slivers,
-        // per the reference. All FOUR tiles are visible at rest: the front card
-        // plus three peek lips.
-        val fanStep = if (isLandscape) 6.dp else 7.dp
-        val fanPx = with(density) { fanStep.toPx() }
-        val scaleStep = 0.09f   // ~9% narrower per layer — the reference's strong taper
-        val fanReserve = fanStep * 3 + 4.dp
+        // Resting geometry: a RIGHT-TO-LEFT fan. The front card sits in place; each
+        // card behind it steps to the LEFT only (no vertical offset) and tapers
+        // slightly smaller, so the deck peeks out on the LEFT side while the TOP and
+        // BOTTOM edges stay single & clean — matching the left/right edges instead of
+        // showing stacked horizontal "ledge" borders. Reserve space on the left so
+        // the fanned cards aren't clipped.
+        // fanX must exceed the shadow blur radius (8.dp) so each card steps far
+        // enough left to clear the card-in-front's shadow halo — otherwise the next
+        // card sits flush inside that halo and occludes it, leaving the front card's
+        // left edge a hard cut with no visible shadow (unlike its other edges). With
+        // a step wider than the blur, every card (including the front) shows an even
+        // soft shadow on its left edge, so all the left edges match.
+        val fanX = if (isLandscape) 14.dp else 16.dp   // leftward step per slot (> blur radius)
+        val fanY = 0.dp                                // no vertical offset — clean top/bottom
+        val fanXPx = with(density) { fanX.toPx() }
+        val fanYPx = with(density) { fanY.toPx() }
+        val scaleStep = 0.035f   // subtle taper — deeper cards read slightly smaller
+        // Kept for the flight math below (bottom peek band no longer used at rest).
+        val fanStep = 0.dp
+        val fanPx = 0f
+        val fanReserve = 0.dp
 
         // Flight tuning for the travelling card.
         val liftFraction = 0.32f   // apex height as a fraction of the deck height
@@ -1304,7 +1329,13 @@ fun SwipeableBigTiles(
 
         Box(
             modifier = pagerModifier
-                .padding(horizontal = if (isLandscape) 4.dp else 2.dp)
+                // Reserve room on the START (left) so the right-to-left fan of
+                // behind-cards has space to peek left without being clipped. No top
+                // reserve — the fan is horizontal, so top/bottom edges stay clean.
+                .padding(
+                    start = fanX * 3,
+                    end = if (isLandscape) 4.dp else 2.dp,
+                )
                 .onSizeChanged { deckSize = it }
                 // NOTE: no hard clip — the travelling card must rise above the
                 // deck. Every card clips itself to its own rounded shape.
@@ -1370,6 +1401,10 @@ fun SwipeableBigTiles(
                     TileCard(
                         actualPage = page,
                         isActiveOverride = if (position == 0) null else false,
+                        // Every card in the fan casts a shadow so the stack reads with
+                        // real depth (they're offset up-left, so shadows don't leak as
+                        // a hard line behind the front card).
+                        elevated = true,
                         depth = {
                             val v = deckProgress.value.coerceIn(-1f, 1f)
                             if (isFlying) {
@@ -1405,25 +1440,24 @@ fun SwipeableBigTiles(
                                     } else {
                                         val t = FastOutSlowInEasing.transform((q - flightSplit) / (1f - flightSplit))
                                         val par = lerp(parallaxFrontPx, parallaxBackPx, t)
-                                        val gap = fanPx * (0.55f + 0.45f * kotlin.math.abs(tilt.y).coerceAtMost(1f))
-                                        translationX = tilt.x * par
-                                        translationY = lerp(-lift, gap * 3f, t) + tilt.y * par
+                                        // Descend into the deepest fan slot (slot 3):
+                                        // up-and-left, matching the resting fan.
+                                        translationX = lerp(0f, -fanXPx * 3f, t) + tilt.x * par
+                                        translationY = lerp(-lift, -fanYPx * 3f, t) + tilt.y * par
                                         val s = lerp(apexScale, 1f - scaleStep * 3f, t)
                                         scaleX = s; scaleY = s
                                         rotationX = apexTilt * (1f - t)
                                     }
                                 } else {
-                                    // STACK: hold this slot, promoted toward the front
-                                    // (or demoted back) as the flight progresses. The
-                                    // gap between lips breathes with device tilt: lying
-                                    // flat compresses the stack, holding the phone up
-                                    // fans it open (paired with the parallax shift).
+                                    // STACK: diagonal right-to-left fan. `slot` runs 0
+                                    // (front) .. 3 (deepest); each step shifts the card
+                                    // up-and-to-the-left and tapers it smaller, so the
+                                    // deck opens toward the top-left like a fanned hand.
                                     val slot = (if (v >= 0f) position - promote(v) else position + promote(-v))
                                         .coerceIn(0f, 3f)
                                     val par = lerp(parallaxFrontPx, parallaxBackPx, slot / 3f)
-                                    val gap = fanPx * (0.55f + 0.45f * kotlin.math.abs(tilt.y).coerceAtMost(1f))
-                                    translationX = tilt.x * par
-                                    translationY = gap * slot + tilt.y * par
+                                    translationX = -fanXPx * slot + tilt.x * par
+                                    translationY = -fanYPx * slot + tilt.y * par
                                     val s = 1f - scaleStep * slot
                                     scaleX = s; scaleY = s
                                 }
@@ -1582,11 +1616,14 @@ private fun NextPrayerTile(
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
     if (mainPrayer != null || prayerTimes != null) {
+        // Match the deck's outer card exactly: 32dp corners, NO border. The inner
+        // tile previously used 22dp + a 1.5dp border, which showed as a darker rim
+        // and a mismatched corner against the 32dp outer card. Keep only the colored
+        // fill + tonal elevation.
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             tonalElevation = 4.dp
         ) {
             // Shared compass interaction state
@@ -1894,11 +1931,11 @@ private fun SmartInfoTile(
     // State for bubble popup
     var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }
     val view = LocalView.current
+    // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
         tonalElevation = 4.dp
     ) {
         Column(
@@ -2248,11 +2285,11 @@ private fun QiblaGlobeTile(
         drawContent()
     }
 
+    // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(32.dp),
         color = surfaceColor,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
         tonalElevation = 4.dp
     ) {
         Box(
@@ -2449,11 +2486,11 @@ private fun DailyStatsTile(
         }
     }
 
+    // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)),
         tonalElevation = 4.dp
     ) {
         if (showSurahList) {
