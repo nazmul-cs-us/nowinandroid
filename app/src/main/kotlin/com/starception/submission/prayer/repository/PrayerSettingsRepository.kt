@@ -108,6 +108,7 @@ class PrayerSettingsRepository @Inject constructor(
         // NOTIFICATION SETTINGS - Alert preferences (kept separate for simplicity)
         private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"    // Master notification toggle
         private const val KEY_NOTIFY_BEFORE_MINUTES = "notify_before_minutes"   // Minutes before prayer to notify
+        private const val KEY_DND_PROMPT_SHOWN = "dnd_prompt_shown"             // One-time first-run DND access prompt
         
         // PRAYER TIMES CACHE KEYS - For instant app startup
         private const val KEY_CACHED_PRAYER_DATE = "cached_prayer_date"          // Date prayers were calculated for
@@ -3205,7 +3206,16 @@ class PrayerSettingsRepository @Inject constructor(
         return PrayerNotificationPreferences(
             notificationsEnabled = true,
             notificationSound = "default",
-            vibrationEnabled = true
+            vibrationEnabled = true,
+            silentDuringPrayerEnabled = true
         )
+    }
+
+    /** Whether the one-time first-run "grant Do Not Disturb access" prompt has been shown. */
+    fun hasShownDndPrompt(): Boolean = prefs.getBoolean(KEY_DND_PROMPT_SHOWN, false)
+
+    /** Mark the one-time DND-access prompt as shown so it never appears again. */
+    fun markDndPromptShown() {
+        prefs.edit().putBoolean(KEY_DND_PROMPT_SHOWN, true).apply()
     }
 }

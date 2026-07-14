@@ -539,6 +539,49 @@ fun PrayerTimesScreen(
     // Observe notification preferences for per-prayer notification toggles
     val notificationPreferences = repository.notificationPreferencesFlow.collectAsState().value
 
+    // FIRST-RUN: if "Silent During Prayer" is on (default) but the app lacks Do-Not-Disturb
+    // access, show a one-time explainer that opens the DND access settings.
+    var showDndDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(notificationPreferences.silentDuringPrayerEnabled) {
+        val nm = screenContext.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        if (notificationPreferences.silentDuringPrayerEnabled &&
+            !nm.isNotificationPolicyAccessGranted &&
+            !repository.hasShownDndPrompt()
+        ) {
+            showDndDialog = true
+        }
+    }
+    if (showDndDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                repository.markDndPromptShown()
+                showDndDialog = false
+            },
+            title = { Text("Silence phone during prayer?") },
+            text = {
+                Text(
+                    "Now in Android can automatically turn on Do Not Disturb at prayer time " +
+                        "so you're not interrupted, then restore it afterward. This needs " +
+                        "Do Not Disturb access — you can grant it on the next screen."
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    repository.markDndPromptShown()
+                    showDndDialog = false
+                    com.starception.submission.prayer.silent.openDndAccessSettings(screenContext)
+                }) { Text("Allow") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    repository.markDndPromptShown()
+                    showDndDialog = false
+                }) { Text("Not now") }
+            },
+        )
+    }
+
     // Log whenever calculationSettings changes (BEFORE extracting offsets)
     LaunchedEffect(calculationSettings) {
         android.util.Log.d("PrayerTimesScreen", "📥 CALCULATION SETTINGS RECEIVED FROM FLOW:")

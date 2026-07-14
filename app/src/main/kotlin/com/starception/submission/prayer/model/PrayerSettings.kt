@@ -116,8 +116,9 @@ data class PrayerNotificationPreferences(
     val maghribGoToMosqueDuration: Int = 10,  // Maghrib go-to-mosque phase duration (shorter due to short window)
     val ishaGoToMosqueDuration: Int = 20,     // Isha go-to-mosque phase duration
 
-    // SILENT-DURING-PRAYER: auto-enable DND when prayer time arrives, restore after N minutes
-    val silentDuringPrayerEnabled: Boolean = false,
+    // SILENT-DURING-PRAYER: auto-enable DND when prayer time arrives, restore after N minutes.
+    // Defaults ON — fresh installs silence during prayer once the user grants DND access.
+    val silentDuringPrayerEnabled: Boolean = true,
     val silentDuringPrayerMinutes: Int = 20
 ) {
     /**

@@ -37,10 +37,14 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -191,6 +195,26 @@ private fun SilentDuringPrayerSection(
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
 ) {
     val context = LocalContext.current
+    fun dndGranted(): Boolean {
+        val nm = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
+            as android.app.NotificationManager
+        return nm.isNotificationPolicyAccessGranted
+    }
+    // Track DND access, re-checked whenever the screen resumes (e.g. back from settings).
+    var hasDndAccess by remember { mutableStateOf(dndGranted()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) hasDndAccess = dndGranted()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    fun openDndAccessSettings() {
+        // Deep-links straight to this app's DND detail page on API 30+ (single toggle),
+        // falling back to the generic list on older devices.
+        com.starception.submission.prayer.silent.openDndAccessSettings(context)
+    }
     CollapsibleSubSection(
         title = "Silent During Prayer",
         subtitle = "Auto-enable Do Not Disturb at prayer time",
@@ -210,17 +234,28 @@ private fun SilentDuringPrayerSection(
             Switch(
                 checked = preferences.silentDuringPrayerEnabled,
                 onCheckedChange = { enabled ->
-                    val nm = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
-                        as android.app.NotificationManager
-                    if (enabled && !nm.isNotificationPolicyAccessGranted) {
-                        val intent = android.content.Intent(
-                            android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS,
-                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
+                    if (enabled && !dndGranted()) {
+                        openDndAccessSettings()
                         return@Switch
                     }
                     onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
                 },
+            )
+        }
+        // Grant-access hint: shown when the feature is on but DND access is still missing.
+        AnimatedVisibility(
+            visible = preferences.silentDuringPrayerEnabled && !hasDndAccess,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Text(
+                text = "Needs Do Not Disturb access — tap to grant",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { openDndAccessSettings() }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
         AnimatedVisibility(
