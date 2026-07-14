@@ -615,11 +615,14 @@ private fun NiaLandscapeLayout(
     deepLinkCourseId: String? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+        // Inset the content to the RIGHT of the vertical floating nav bar so the bar
+        // never overlaps tile content. The bar is a 64.dp pill with 12.dp start
+        // padding plus safe-area start inset; reserve ~92.dp so content clears it.
         NiaMainContent(
             appState = appState,
             snackbarHostState = snackbarHostState,
             onTopAppBarActionClick = onTopAppBarActionClick,
-            modifier = modifier,
+            modifier = modifier.padding(start = 92.dp),
             isLandscape = true,
             mainViewModel = mainViewModel,
             deepLinkCourseId = deepLinkCourseId,
