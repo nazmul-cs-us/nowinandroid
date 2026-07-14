@@ -1,46 +1,40 @@
 /**
  * SWIPEABLE BIG TILES COMPONENT
- * 
- * This file contains the main swipeable tiles component for the Prayer Times screen.
- * It provides an interactive horizontal pager with three distinct tiles showing different
- * prayer-related information with Material 3 design and infinite scrolling.
- * 
+ *
+ * The four dashboard tiles of the Prayer Times screen, presented as a vertical
+ * CARD DECK: the front card is live while the cards behind it peek out at the
+ * bottom. Swiping up lifts the front card off the deck and tucks it in at the
+ * back; swiping down plays the same flight in reverse, bringing the previous
+ * card back onto the front. The whole transition is driven by one progress
+ * value, so it is fully scrubbable and can be caught mid-flight and reversed.
+ *
  * WHAT IT DOES:
- * - Creates a horizontal swipeable pager with 3 tiles (infinite scroll enabled)
- * - Shows Next Prayer, Smart Info, and Daily Stats tiles
- * - Displays page indicators and swipe hints for better UX
- * - Uses asymmetrical Material 3 shapes for visual appeal
- * - Provides real-time prayer status and progress tracking
- * 
+ * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles as a deck
+ * - Vertical drag/fling with spring physics and flick momentum carry-over
+ * - True restack: the tossed card visibly returns to the back of the deck
+ * - Device-tilt parallax gives the stack real 3D depth
+ * - Clickable page-indicator dots and a swipe-hint row for navigation
+ *
  * WHERE IT'S USED:
- * - PrayerTimesScreen.kt: Main prayer times screen (line ~481-502)
- * - Replaces ~308 lines of inline swipeable tiles code
- * - Called through SwipeableBigTiles() composable function
- * 
+ * - PrayerTimesScreen.kt: main prayer times screen, via SwipeableBigTiles()
+ *
  * COMPONENTS INCLUDED:
  * - SwipeableBigTiles(): Main composable function (exported)
  * - NextPrayerTile(): Shows current/next prayer with countdown timer
  * - SmartInfoTile(): Context-aware content based on time of day
  * - DailyStatsTile(): Prayer completion progress and statistics
- * 
- * FEATURES:
- * - HorizontalPager with infinite scrolling (Int.MAX_VALUE pages)
- * - Material 3 asymmetrical shapes and elevated surfaces
- * - Real-time countdown timers with circular progress indicators
- * - Dynamic content that changes based on current time and prayer status
- * - Professional page indicators and swipe hints
- * - Responsive layout with proper spacing (12dp between elements)
- * 
+ * - QiblaGlobeTile(): 3D globe with the great-circle path to the Kaaba
+ *
+ * PERFORMANCE:
+ * - Every continuous value (drag offset, flight path, parallax, depth dim) is
+ *   read inside graphicsLayer/draw lambdas, so a moving deck redraws without
+ *   recomposing any tile content
+ * - Tiles are keyed by page, so their internal state survives deck rotation
+ *
  * DEPENDENCIES:
  * - PrayerTimeHelpers.kt: For prayer time calculations and formatting
  * - SmartContentUtils.kt: For smart content generation and progress tracking
  * - DayPrayerTimes model: Prayer times data structure
- * 
- * DESIGN PATTERNS:
- * - Component extraction: Moved from inline code to reusable component
- * - Function parameters: Accepts lambda functions for data access
- * - Material 3 design: Uses elevated cards with custom corner radius
- * - Infinite scrolling: Modulo arithmetic for seamless tile cycling
  */
 package com.starception.submission.feature.prayertimes
 
@@ -120,6 +114,9 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalView
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.graphics.Brush
@@ -1050,9 +1047,9 @@ fun SwipeableBigTiles(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
-    // Swipeable Big Tiles — card DECK with the 4 tiles and infinite cycling.
-    // The top card can be tossed away horizontally OR vertically (stacked-cards
-    // interaction); the next card waits underneath. Tile visuals unchanged.
+    // Swipeable Big Tiles — vertical card DECK with the 4 tiles and infinite
+    // cycling. Swipe up to toss the front card to the back of the deck; swipe
+    // down to bring the previous card back onto the front. Tile visuals unchanged.
     var currentTile by remember { mutableStateOf(0) }
     var deckSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
     val view = LocalView.current
@@ -1130,64 +1127,54 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(214.dp) // Card height + just enough for the bottom fan peek
+                .height(238.dp) // Card height + just enough for the bottom fan peek
         }
 
-        // One tile card (shadow wrapper + content), reused for the deck layers.
-        // Muted opaque tone for the BEHIND (fan) cards only, so they read as solid
-        // stacked cards without bleed-through. The FRONT card keeps its own real
-        // background untouched (no injected color).
-        val fanFill = MaterialTheme.colorScheme.surfaceContainerHighest
-
+        // One tile card (shadow wrapper + content), reused for every deck layer.
+        // `depth` (0 front .. 3 back) shades and de-shadows the stacked cards
+        // progressively so the deck reads with physical depth; it is read at
+        // draw time, never at composition.
         @Composable
         fun TileCard(
             actualPage: Int,
             modifier: Modifier = Modifier,
             isActiveOverride: Boolean? = null,
-            solidFill: androidx.compose.ui.graphics.Color? = null,
+            depth: () -> Float = { 0f },
         ) {
-            val tileShape = RoundedCornerShape(32.dp)
+            val tileShape = RoundedCornerShape(22.dp)
 
             // Outer wrapper with shadow for sharp edges (like Material Components)
             Box(modifier = modifier.fillMaxSize().padding(4.dp)) {
-                // Shadow layer rendered outside content
+                // Shadow layer rendered outside content. Same treatment as the
+                // floating bottom nav bar (plain Material shadow, default tint,
+                // no outline) so both elements read identically; the peek lips
+                // carry a lighter shadow so the underside stays one soft shadow.
                 Box(
                     modifier = Modifier
                         .matchParentSize()
                         .graphicsLayer {
-                            this.shadowElevation = 24.dp.toPx()
+                            val d = depth().coerceIn(0f, 3f)
+                            this.shadowElevation = 8.dp.toPx() * (1f - 0.28f * d).coerceAtLeast(0.12f)
                             this.shape = tileShape
                             this.clip = false
-                            this.ambientShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.28f)
-                            this.spotShadowColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f)
                         }
                 )
-                // Behind/fan cards: draw as a SOLID opaque card (no content) so nothing
-                // bleeds through and they read as clean stacked edges.
-                if (solidFill != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(tileShape)
-                            .background(solidFill)
-                    )
-                    return@Box
-                }
-                // Front card: real content, clipped to tile shape (its own bg is opaque enough).
+                // Card content on an opaque base (stacked cards must never bleed
+                // through each other), clipped to the tile shape.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(tileShape)
+                        .background(MaterialTheme.colorScheme.surface)
                         .drawWithContent {
                             drawContent()
-                            // Soft top-to-bottom shading only — no hard top stroke.
-                            drawRect(
-                                brush = Brush.verticalGradient(
-                                    0f to androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f),
-                                    0.35f to androidx.compose.ui.graphics.Color.Transparent,
-                                    1f to androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.10f)
-                                )
-                            )
+                            // Depth dim — the peek lips show each card's REAL face,
+                            // just slightly shaded the deeper it sits in the deck.
+                            // Read here so it animates without recomposing the tile.
+                            val d = depth().coerceIn(0f, 3f)
+                            if (d > 0.005f) {
+                                drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.05f * d))
+                            }
                         }
                 ) {
                     when (actualPage) {
@@ -1237,171 +1224,212 @@ fun SwipeableBigTiles(
             }
         }
         
-        // CARD-STACKING microinteraction (Dribbble reference): a fanned deck whose
-        // extra cards peek out at the BOTTOM. Swiping SPREADS the cards apart, then
-        // they RESTACK into the new order. Fully contained — the deck Box clips.
+        // ── CARD DECK ENGINE ────────────────────────────────────────────────
+        // Stacked-cards microinteraction (Dribbble reference): the extra cards
+        // peek out BELOW the front card. Swiping up lifts the front card off
+        // the deck, lays it back, and tucks it in at the BACK while the cards
+        // behind promote one slot — a true restack, no card ever fades out of
+        // existence. Swiping down plays the exact same flight in reverse: the
+        // card at the back rises behind the deck and lands on the front.
+        //
+        // One progress value drives every card:
+        //     0 at rest      +1 forward cycle done      -1 backward cycle done
+        // Drag, release-spring and commit all travel the same curve, so the
+        // deck is fully scrubbable and can be caught mid-flight and reversed.
+        // Every continuous value is read inside graphicsLayer/draw lambdas —
+        // a moving deck redraws but never recomposes.
         val density = LocalDensity.current
+        val deckProgress = remember { Animatable(0f) }
 
-        // Device-tilt parallax — tilting the phone shifts each layer by a depth-scaled
-        // amount so the deck gains real 3D depth. Front card moves most (feels closest),
-        // fanned cards move less. Max shift in dp per full tilt, per layer.
+        // Device-tilt parallax — tilting the phone shifts each layer by a
+        // depth-scaled amount so the deck gains real 3D depth.
         val tilt by rememberParallaxTilt()
-        val parallaxFrontDp = if (isLandscape) 8.dp else 12.dp
-        val parallaxMidDp = parallaxFrontDp * 0.6f
-        val parallaxBackDp = parallaxFrontDp * 0.3f
+        val parallaxFrontPx = with(density) { (if (isLandscape) 8.dp else 12.dp).toPx() }
+        val parallaxBackPx = parallaxFrontPx * 0.3f
 
-        // Resting fan geometry — each card behind the front one is shifted DOWN,
-        // inset horizontally, scaled down and dimmed (bottom edges peek out).
-        val fanStepRest = if (isLandscape) 12.dp else 18.dp   // downward offset per layer
-        val fanInsetRest = if (isLandscape) 8.dp else 12.dp    // horizontal narrowing per layer
-        val scaleStep = 0.05f                                   // scale drop per layer
+        // Resting geometry: each card behind the front peeks exactly `fanStep`
+        // below the one above it (the bottom-edge pivot makes the peek lip
+        // scale-proof) and narrows by `scaleStep` — thin ticket-style slivers,
+        // per the reference. All FOUR tiles are visible at rest: the front card
+        // plus three peek lips.
+        val fanStep = if (isLandscape) 6.dp else 7.dp
+        val fanPx = with(density) { fanStep.toPx() }
+        val scaleStep = 0.09f   // ~9% narrower per layer — the reference's strong taper
+        val fanReserve = fanStep * 3 + 4.dp
 
-        // The FRONT card tracks the finger 1:1 (real drag). `drag` holds its live
-        // offset in px; `progress` (0..1) is how far it's travelled toward a throw,
-        // which lifts the fanned cards behind it up into place. Professional deck feel.
-        val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+        // Flight tuning for the travelling card.
+        val liftFraction = 0.32f   // apex height as a fraction of the deck height
+        val apexScale = 0.90f      // card size at the apex
+        val apexTilt = 32f         // rotationX at the apex — the card "lies back" in flight
+        val flightSplit = 0.5f     // progress where the card crosses the deck (z-order flips)
 
-        // VERTICAL advance: the top card slides UP and FADES away, revealing the next
-        // card which scales up into place. `dir` +1 = forward (up), -1 = backward (down).
-        // `durationMs` lets a momentum fling run several fast steps back-to-back.
-        val scrollTo: suspend (Int, Int) -> Unit = { dir, durationMs ->
-            val h = deckSize.height.toFloat().coerceAtLeast(1f)
+        // Promotion easing — ease-in, so the deck holds its shape while the
+        // travelling card lifts clear (the "spread"), then restacks briskly.
+        fun promote(x: Float) = x * x
+
+        // Finger travel equal to one full cycle; keeps the lift ~1:1 with the finger.
+        fun dragDistancePx() = (deckSize.height * 0.7f).coerceAtLeast(1f)
+        var pastThreshold by remember { mutableStateOf(false) }
+
+        // Toss ONE card in `dir` (+1 forward, -1 backward) with the given spring,
+        // carrying `velocity` (progress units/sec) into the flight, then commit
+        // with a haptic tick as the card lands.
+        val settleSpring = spring(dampingRatio = 0.85f, stiffness = 340f, visibilityThreshold = 0.001f)
+        val spinSpring = spring(dampingRatio = 1f, stiffness = 700f, visibilityThreshold = 0.001f)
+        val tossOne: suspend (Int, Float, AnimationSpec<Float>) -> Unit = { dir, velocity, spec ->
+            deckProgress.animateTo(dir.toFloat(), spec, initialVelocity = velocity)
+            currentTile = (currentTile + if (dir > 0) 1 else 3) % 4
+            deckProgress.snapTo(0f)
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            val targetY = if (dir >= 0) -h * 0.9f else h * 0.9f
-            drag.animateTo(
-                Offset(0f, targetY),
-                tween(durationMs, easing = FastOutSlowInEasing),
-            )
-            currentTile = if (dir >= 0) (currentTile + 1) % 4 else (currentTile + 3) % 4
-            drag.snapTo(Offset.Zero) // new front card starts centered; fan already in place
         }
 
-        // Momentum fling — advance MULTIPLE tiles from a flick, decelerating like a wheel.
-        val flingTo: suspend (Int, Float) -> Unit = { dir, speed ->
-            // More velocity => more steps (capped). Each step slower than the last.
-            val steps = (1 + (kotlin.math.abs(speed) / 2600f).toInt()).coerceIn(1, 5)
-            var dur = 150
-            for (i in 0 until steps) {
-                scrollTo(dir, dur)
-                dur = (dur * 1.35f).toInt().coerceAtMost(300) // decelerate
+        // Single deliberate advance (dots, hint row, gentle swipes).
+        val advance: suspend (Int, Float) -> Unit = { dir, velocity ->
+            tossOne(dir, velocity, settleSpring)
+        }
+
+        // WHEEL fling — a hard flick spins several cards past like a flicked
+        // wheel. Each card ticks by on a stiff spring whose entry velocity
+        // decays step to step, so the spin audibly and visibly decelerates;
+        // the last card lands on the soft settle spring.
+        val flingWheel: suspend (Int, Float) -> Unit = { dir, speed ->
+            // Cap at 3 — all four would spin a full loop back to the same tile.
+            val cards = (1 + (kotlin.math.abs(speed) / 5f).toInt()).coerceIn(1, 3)
+            var vel = speed.coerceIn(-14f, 14f)
+            for (i in 0 until cards) {
+                tossOne(dir, vel, if (i == cards - 1) settleSpring else spinSpring)
+                vel *= 0.55f
             }
         }
 
         Box(
             modifier = pagerModifier
-                .padding(horizontal = if (isLandscape) 4.dp else 8.dp)
+                .padding(horizontal = if (isLandscape) 4.dp else 2.dp)
                 .onSizeChanged { deckSize = it }
-                // NOTE: no hard clip — a rectangular clip cuts the card's top off while
-                // it lifts. Each TileCard is rounded by its own shape.
-                // VERTICAL draggable: drag UP => top tile vanishes & next reveals.
+                // NOTE: no hard clip — the travelling card must rise above the
+                // deck. Every card clips itself to its own rounded shape.
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { deltaY ->
-                        coroutineScope.launch {
-                            // 1:1 finger tracking on Y only; X stays put.
-                            drag.snapTo(Offset(0f, drag.value.y + deltaY))
+                        // The finger scrubs the transition directly (up = forward);
+                        // clamped to one cycle per gesture. A tick marks the point
+                        // of no return.
+                        val next = (deckProgress.value - deltaY / dragDistancePx()).coerceIn(-1f, 1f)
+                        val crossed = kotlin.math.abs(next) > 0.3f
+                        if (crossed && !pastThreshold) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                         }
+                        pastThreshold = crossed
+                        coroutineScope.launch { deckProgress.snapTo(next) }
                     },
                     onDragStopped = { velocity ->
-                        val o = drag.value
-                        val h = deckSize.height.toFloat().coerceAtLeast(1f)
-                        val advance = kotlin.math.abs(o.y) > h * 0.22f ||
-                            kotlin.math.abs(velocity) > 900f
+                        pastThreshold = false
+                        // Velocity in progress units/sec; up = forward = positive.
+                        val v = -velocity / dragDistancePx()
+                        val here = deckProgress.value
+                        val dir = when {
+                            v > 1.6f -> 1                   // decisive flick up
+                            v < -1.6f -> -1                 // decisive flick down
+                            here > 0.3f && v > -0.4f -> 1   // carried far enough, not flicked back
+                            here < -0.3f && v < 0.4f -> -1
+                            else -> 0
+                        }
                         coroutineScope.launch {
-                            if (advance && o.y != 0f) {
-                                // Direction from the flick (fall back to drag direction).
-                                val dir = if (kotlin.math.abs(velocity) > 200f) {
-                                    if (velocity < 0f) 1 else -1
-                                } else {
-                                    if (o.y < 0f) 1 else -1
-                                }
-                                // Momentum: fast flick coasts through several tiles.
-                                flingTo(dir, velocity)
+                            if (dir != 0) {
+                                flingWheel(dir, v)
                             } else {
-                                // Snap back with a natural spring.
-                                drag.animateTo(
-                                    Offset.Zero,
-                                    spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMedium,
-                                    ),
+                                // Not enough intent — spring home with the leftover momentum.
+                                deckProgress.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f, visibilityThreshold = 0.001f),
+                                    initialVelocity = v,
                                 )
                             }
                         }
                     },
                 )
         ) {
-            val o = drag.value
-            val h = deckSize.height.toFloat().coerceAtLeast(1f)
-            // 0..1 how far the top card has been dragged toward vanishing.
-            val progress = (kotlin.math.abs(o.y) / (h * 0.5f)).coerceIn(0f, 1f)
+            // The only discrete state the deck recomposes on: which card is in
+            // flight (drag direction) and which side of the deck it is on.
+            val forward by remember { derivedStateOf { deckProgress.value >= 0f } }
+            val flyingOnTop by remember {
+                derivedStateOf {
+                    val v = deckProgress.value
+                    (if (v >= 0f) v else 1f + v) < flightSplit
+                }
+            }
 
-            val frontIndex = currentTile
-            // Which card is revealed underneath depends on drag DIRECTION:
-            // dragging up (forward) reveals the NEXT tile; dragging down (backward)
-            // reveals the PREVIOUS tile. Default to forward when at rest.
-            val goingBack = o.y > 0f
-            val midIndex = if (goingBack) (currentTile + 3) % 4 else (currentTile + 1) % 4
-            val backIndex = (currentTile + 2) % 4
+            repeat(4) { position ->
+                val page = (currentTile + position) % 4
+                val isFlying = if (forward) position == 0 else position == 3
 
-            // Reserve just enough bottom room for the fan peek (no dead space below it).
-            val fanReserve = fanStepRest + 6.dp
-            with(density) {
-                val fanPx = fanStepRest.toPx()
-                // Parallax shift per layer (px) from device tilt.
-                val pFront = parallaxFrontDp.toPx()
-                val pMid = parallaxMidDp.toPx()
-                val pBack = parallaxBackDp.toPx()
-
-                // BACK card — real content; rises toward the middle slot as the top card leaves.
-                TileCard(
-                    actualPage = backIndex,
-                    isActiveOverride = false,
-                    modifier = Modifier
-                        .padding(
-                            start = fanInsetRest * 2 * (1f - progress) + fanInsetRest * progress,
-                            end = fanInsetRest * 2 * (1f - progress) + fanInsetRest * progress,
-                            bottom = fanReserve,
-                        )
-                        .graphicsLayer {
-                            translationX = tilt.x * pBack
-                            translationY = fanPx * (2f - progress) + tilt.y * pBack
-                            val sc = (1f - scaleStep * 2f) + scaleStep * progress
-                            scaleX = sc; scaleY = sc
-                        }
-                )
-                // MIDDLE card — real content; scales UP into the FRONT slot as the top card vanishes.
-                TileCard(
-                    actualPage = midIndex,
-                    isActiveOverride = false,
-                    modifier = Modifier
-                        .padding(
-                            start = fanInsetRest * (1f - progress),
-                            end = fanInsetRest * (1f - progress),
-                            bottom = fanReserve,
-                        )
-                        .graphicsLayer {
-                            translationX = tilt.x * pMid
-                            translationY = fanPx * (1f - progress) + tilt.y * pMid
-                            val sc = (1f - scaleStep) + scaleStep * progress
-                            scaleX = sc; scaleY = sc
-                        }
-                )
-                // FRONT (top) card — follows the finger vertically, SLIDES UP and FADES away
-                // to reveal the next card. clip+shape keeps corners rounded while it moves.
-                TileCard(
-                    actualPage = frontIndex,
-                    modifier = Modifier
-                        .padding(bottom = fanReserve)
-                        .graphicsLayer {
-                            translationX = tilt.x * pFront
-                            translationY = o.y + tilt.y * pFront
-                            // Fade faster than it moves so it "vanishes" cleanly.
-                            alpha = 1f - progress
-                            shape = RoundedCornerShape(32.dp)
-                            clip = true
-                        }
-                )
+                // Keyed by page: when the deck order rotates on commit, Compose
+                // MOVES each tile's subtree instead of rebuilding it, so tile
+                // state (players, sensors, the GL globe) survives every toss.
+                key(page) {
+                    TileCard(
+                        actualPage = page,
+                        isActiveOverride = if (position == 0) null else false,
+                        depth = {
+                            val v = deckProgress.value.coerceIn(-1f, 1f)
+                            if (isFlying) {
+                                val q = if (v >= 0f) v else 1f + v
+                                if (q < flightSplit) 0f
+                                else 3f * FastOutSlowInEasing.transform((q - flightSplit) / (1f - flightSplit))
+                            } else {
+                                val slot = if (v >= 0f) position - promote(v) else position + promote(-v)
+                                slot.coerceIn(0f, 3f)
+                            }
+                        },
+                        modifier = Modifier
+                            .zIndex(if (!isFlying) 6f - position else if (flyingOnTop) 10f else 2f)
+                            .padding(bottom = fanReserve)
+                            .graphicsLayer {
+                                val v = deckProgress.value.coerceIn(-1f, 1f)
+                                transformOrigin = TransformOrigin(0.5f, 1f)
+                                if (isFlying) {
+                                    // FLIGHT: lift off ~1:1 with the finger, lie back
+                                    // and shrink to the apex, then descend behind the
+                                    // deck into the back slot. Backward runs q from 1
+                                    // to 0 — the same path, time-reversed.
+                                    cameraDistance = 20f * this.density
+                                    val q = if (v >= 0f) v else 1f + v
+                                    val lift = deckSize.height * liftFraction
+                                    if (q < flightSplit) {
+                                        val t = q / flightSplit
+                                        translationX = tilt.x * parallaxFrontPx
+                                        translationY = -lift * t + tilt.y * parallaxFrontPx
+                                        val s = 1f - (1f - apexScale) * t
+                                        scaleX = s; scaleY = s
+                                        rotationX = apexTilt * t
+                                    } else {
+                                        val t = FastOutSlowInEasing.transform((q - flightSplit) / (1f - flightSplit))
+                                        val par = lerp(parallaxFrontPx, parallaxBackPx, t)
+                                        val gap = fanPx * (0.55f + 0.45f * kotlin.math.abs(tilt.y).coerceAtMost(1f))
+                                        translationX = tilt.x * par
+                                        translationY = lerp(-lift, gap * 3f, t) + tilt.y * par
+                                        val s = lerp(apexScale, 1f - scaleStep * 3f, t)
+                                        scaleX = s; scaleY = s
+                                        rotationX = apexTilt * (1f - t)
+                                    }
+                                } else {
+                                    // STACK: hold this slot, promoted toward the front
+                                    // (or demoted back) as the flight progresses. The
+                                    // gap between lips breathes with device tilt: lying
+                                    // flat compresses the stack, holding the phone up
+                                    // fans it open (paired with the parallax shift).
+                                    val slot = (if (v >= 0f) position - promote(v) else position + promote(-v))
+                                        .coerceIn(0f, 3f)
+                                    val par = lerp(parallaxFrontPx, parallaxBackPx, slot / 3f)
+                                    val gap = fanPx * (0.55f + 0.45f * kotlin.math.abs(tilt.y).coerceAtMost(1f))
+                                    translationX = tilt.x * par
+                                    translationY = gap * slot + tilt.y * par
+                                    val s = 1f - scaleStep * slot
+                                    scaleX = s; scaleY = s
+                                }
+                            },
+                    )
+                }
             }
         }
 
@@ -1420,7 +1448,7 @@ fun SwipeableBigTiles(
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    scrollTo(if (totalDrag < 0) 1 else -1, 240)
+                                    advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
                             }
                         },
@@ -1451,13 +1479,13 @@ fun SwipeableBigTiles(
                             // Haptic feedback on tap
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 
-                            // Scroll the deck onto the tapped tile via the shortest path,
-                            // one contained step at a time.
+                            // Toss the deck onto the tapped tile via the shortest
+                            // path, one card at a time.
                             coroutineScope.launch {
                                 var guard = 0
                                 while (currentTile != index && guard < 4) {
                                     val fwd = ((index - currentTile) + 4) % 4
-                                    scrollTo(if (fwd <= 2) 1 else -1, 240)
+                                    advance(if (fwd <= 2) 1 else -1, 0f)
                                     guard++
                                 }
                             }
@@ -1484,7 +1512,7 @@ fun SwipeableBigTiles(
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    scrollTo(if (totalDrag < 0) 1 else -1, 240)
+                                    advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
                             }
                         },
@@ -1556,7 +1584,7 @@ private fun NextPrayerTile(
     if (mainPrayer != null || prayerTimes != null) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(32.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
             tonalElevation = 4.dp
@@ -1815,7 +1843,7 @@ private fun NextPrayerTile(
         // Fallback if no prayer data - Beautiful loading state
         Surface(
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(32.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
@@ -1868,7 +1896,7 @@ private fun SmartInfoTile(
     val view = LocalView.current
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
         tonalElevation = 4.dp
@@ -2222,7 +2250,7 @@ private fun QiblaGlobeTile(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(22.dp),
         color = surfaceColor,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
         tonalElevation = 4.dp
@@ -2232,12 +2260,23 @@ private fun QiblaGlobeTile(
             contentAlignment = Alignment.Center
         ) {
             prayerTimes?.location?.let { locationData ->
-                QiblaGlobeView(
-                    userLatitude = locationData.latitude,
-                    userLongitude = locationData.longitude,
-                    modifier = Modifier.fillMaxSize(),
-                    isActiveTile = isActiveTile,
-                )
+                if (isActiveTile) {
+                    QiblaGlobeView(
+                        userLatitude = locationData.latitude,
+                        userLongitude = locationData.longitude,
+                        modifier = Modifier.fillMaxSize(),
+                        isActiveTile = true,
+                    )
+                } else {
+                    // Static stand-in while stacked behind other tiles: the live
+                    // globe is a GL SurfaceView, which ignores Compose clipping
+                    // and scaling and would bleed through the deck lips.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF070B10))
+                    )
+                }
 
                 // Fullscreen button in top-left corner (with liquid glass effect)
                 Box(
@@ -2412,7 +2451,7 @@ private fun DailyStatsTile(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(32.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)),
         tonalElevation = 4.dp
