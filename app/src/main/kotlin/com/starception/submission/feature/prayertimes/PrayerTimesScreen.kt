@@ -1565,6 +1565,9 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
+                        // Landscape doesn't scroll, so the gesture-nav bar inset must be
+                        // reserved here or the location card / prayer grid sit under it.
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                         .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

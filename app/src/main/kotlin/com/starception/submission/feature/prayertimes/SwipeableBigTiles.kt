@@ -3,14 +3,14 @@
  *
  * The four dashboard tiles of the Prayer Times screen, presented as a vertical
  * CARD DECK: the front card is live while the cards behind it peek out at the
- * bottom. Swiping up lifts the front card off the deck and tucks it in at the
- * back; swiping down plays the same flight in reverse, bringing the previous
- * card back onto the front. The whole transition is driven by one progress
- * value, so it is fully scrubbable and can be caught mid-flight and reversed.
+ * bottom. Swiping up or left lifts the front card off the deck and tucks it in
+ * at the back; swiping down or right plays the same flight in reverse, bringing
+ * the previous card back onto the front. The whole transition is driven by one
+ * progress value, so it is fully scrubbable and can be caught mid-flight and reversed.
  *
  * WHAT IT DOES:
  * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles as a deck
- * - Vertical drag/fling with spring physics and flick momentum carry-over
+ * - 2-axis drag/fling with spring physics; hard flicks wheel-shuffle multiple cards
  * - True restack: the tossed card visibly returns to the back of the deck
  * - Device-tilt parallax gives the stack real 3D depth
  * - Clickable page-indicator dots and a swipe-hint row for navigation
@@ -38,6 +38,7 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
@@ -64,10 +65,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1053,6 +1052,21 @@ fun SwipeableBigTiles(
     // down to bring the previous card back onto the front. Tile visuals unchanged.
     var currentTile by remember { mutableStateOf(0) }
     var deckSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    // The GL globe (tile 3) is created/disposed when it enters/leaves the front
+    // slot. Doing that mid-flight stalls the deck animation (measured 60+ms
+    // frames at restack), so the live/static swap is DEFERRED until the deck
+    // settles: while a toss/wheel is animating the globe keeps its static face,
+    // and a wheel merely passing through tile 3 never touches the GL view.
+    var deckAnimating by remember { mutableStateOf(false) }
+    var globeLive by remember { mutableStateOf(false) }
+    LaunchedEffect(deckAnimating, currentTile) {
+        if (!deckAnimating) globeLive = currentTile == 3
+    }
+    // The one in-flight deck animation (wheel spin, advance, spring home).
+    // Every gesture/tap that moves the deck cancels this job first, so a new
+    // flick never fights a wheel that is still spinning — it takes over from
+    // wherever the cards are.
+    var deckJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val view = LocalView.current
 
     // Coroutine scope for animated scroll when dots are tapped
@@ -1151,7 +1165,16 @@ fun SwipeableBigTiles(
             // sized to the card, uniformly blurred, sitting directly behind it (no
             // vertical offset) so the soft halo is identical top/bottom/left/right.
             // 10.dp inset gives the blur room to render fully rounded on every side.
-            val scrimColor = MaterialTheme.colorScheme.surface
+            // Behind-cards are covered with a clean face in the tile's OWN
+            // container color (matching each tile's real background) — raw
+            // content would peek as a busy/dark lip, but a generic surface
+            // scrim made every card in the stack look white.
+            val scrimColor = when (actualPage) {
+                0 -> MaterialTheme.colorScheme.primaryContainer
+                1 -> MaterialTheme.colorScheme.secondaryContainer
+                2 -> MaterialTheme.colorScheme.tertiaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerHigh
+            }
             val evenShadowColor = Color.Black.copy(alpha = 0.16f)
             Box(modifier = modifier.fillMaxSize().padding(10.dp)) {
                 if (elevated) {
@@ -1179,16 +1202,25 @@ fun SwipeableBigTiles(
                     modifier = Modifier
                         .fillMaxSize()
                         .drawWithContent {
-                            drawContent()
-                            // Behind-cards in the fan show a clean surface-colored face
-                            // instead of their real content (so the black globe card,
-                            // etc. never peeks as a harsh dark lip). Ramps in across the
-                            // first depth unit so a card promoting to front reveals its
-                            // real face smoothly.
+                            // Behind-cards in the fan show a clean face in their own
+                            // container color instead of their real content (so the
+                            // black globe card, etc. never peeks as a harsh dark lip).
+                            // Ramps in across the first depth unit so a card promoting
+                            // to front reveals its real face smoothly.
                             val cover = depth().coerceIn(0f, 1f)
+                            // Fully covered cards skip their content ENTIRELY —
+                            // re-recording four full tile draw trees on every
+                            // animation frame was the deck's main per-frame cost
+                            // (13-25ms UI-thread frames during flings).
+                            if (cover < 0.999f) drawContent()
                             if (cover > 0.005f) drawRect(scrimColor.copy(alpha = cover))
                         },
                   ) {
+                    // Own layer boundary: the scrim draw above re-executes on
+                    // every animation frame, and without this layer each pass
+                    // re-issued the tile's entire draw tree; with it, the pass
+                    // just re-references the cached layer.
+                    Box(Modifier.fillMaxSize().graphicsLayer()) {
                     when (actualPage) {
                                 0 -> NextPrayerTile(
                             prayerTimes = prayerTimes,
@@ -1229,8 +1261,11 @@ fun SwipeableBigTiles(
                         3 -> QiblaGlobeTile(
                             prayerTimes = prayerTimes,
                             onFullscreenClick = { showGlobePopup = true },
-                            isActiveTile = isActiveOverride ?: (currentTile == 3),
+                            // Live only when front AND the deck is at rest — the GL
+                            // view swap is too heavy to run mid-flight.
+                            isActiveTile = (isActiveOverride ?: true) && globeLive,
                         )
+                    }
                     }
                   }
                 }
@@ -1300,30 +1335,75 @@ fun SwipeableBigTiles(
         // carrying `velocity` (progress units/sec) into the flight, then commit
         // with a haptic tick as the card lands.
         val settleSpring = spring(dampingRatio = 0.85f, stiffness = 340f, visibilityThreshold = 0.001f)
-        val spinSpring = spring(dampingRatio = 1f, stiffness = 700f, visibilityThreshold = 0.001f)
         val tossOne: suspend (Int, Float, AnimationSpec<Float>) -> Unit = { dir, velocity, spec ->
+            val t0 = android.os.SystemClock.uptimeMillis()
+            val from = deckProgress.value
             deckProgress.animateTo(dir.toFloat(), spec, initialVelocity = velocity)
             currentTile = (currentTile + if (dir > 0) 1 else 3) % 4
             deckProgress.snapTo(0f)
+            Log.d(
+                "DeckFling",
+                "🃏 tossOne dir=$dir vel=%.2f from=%.2f flight=%dms -> tile=$currentTile"
+                    .format(velocity, from, android.os.SystemClock.uptimeMillis() - t0),
+            )
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
 
         // Single deliberate advance (dots, hint row, gentle swipes).
         val advance: suspend (Int, Float) -> Unit = { dir, velocity ->
-            tossOne(dir, velocity, settleSpring)
+            deckAnimating = true
+            try {
+                tossOne(dir, velocity, settleSpring)
+            } finally {
+                deckAnimating = false
+            }
         }
 
-        // WHEEL fling — a hard flick spins several cards past like a flicked
-        // wheel. Each card ticks by on a stiff spring whose entry velocity
-        // decays step to step, so the spin audibly and visibly decelerates;
-        // the last card lands on the soft settle spring.
+        // ROULETTE fling — a continuous decelerating spin across every card.
+        // Per-card spring flights gave the wheel a pulsing fast-slow-fast
+        // rhythm (each spring decelerates into its own landing). Instead the
+        // velocity is the through-line: intermediate cards fly at constant
+        // speed matched to the finger, friction decays it card to card, and
+        // only the last card decelerates — one spin, ticking past like a
+        // roulette wheel under friction (haptic per tick).
         val flingWheel: suspend (Int, Float) -> Unit = { dir, speed ->
             // Cap at 3 — all four would spin a full loop back to the same tile.
-            val cards = (1 + (kotlin.math.abs(speed) / 5f).toInt()).coerceIn(1, 3)
-            var vel = speed.coerceIn(-14f, 14f)
-            for (i in 0 until cards) {
-                tossOne(dir, vel, if (i == cards - 1) settleSpring else spinSpring)
-                vel *= 0.55f
+            val cards = (1 + (kotlin.math.abs(speed) / 3f).toInt()).coerceIn(1, 3)
+            deckAnimating = true
+            Log.d("DeckFling", "🎡 wheel start: speed=%.2f cards=$cards".format(speed))
+            // DEBUG frame monitor: flags any frame gap over ~2 vsyncs while the
+            // wheel spins — catches heavy tiles (GL globe restack, etc.)
+            // stalling the flight at card boundaries.
+            val monitor = coroutineScope.launch {
+                var last = androidx.compose.runtime.withFrameNanos { it }
+                while (true) {
+                    val now = androidx.compose.runtime.withFrameNanos { it }
+                    val ms = (now - last) / 1_000_000
+                    if (ms > 20) Log.w("DeckFling", "🐢 SLOW FRAME ${ms}ms during wheel (tile=$currentTile)")
+                    last = now
+                }
+            }
+            try {
+                // Each intermediate card flies at CONSTANT velocity, its tween
+                // duration derived from the live speed — so every card enters
+                // exactly as fast as the previous one left (no per-card spring
+                // landings, no pulsing). Friction decays the speed card to
+                // card, and the LAST card spring-settles from the remaining
+                // velocity, gliding the wheel to rest.
+                var vel = kotlin.math.abs(speed).coerceAtMost(8f)
+                for (i in 0 until cards - 1) {
+                    // Remaining distance of this cycle (first card may already
+                    // be partly carried by the finger).
+                    val distance = 1f - (deckProgress.value * dir).coerceIn(0f, 1f)
+                    val ms = (1000f * distance / vel).toInt().coerceIn(40, 400)
+                    tossOne(dir, dir * vel, tween(ms, easing = LinearEasing))
+                    vel *= 0.7f
+                }
+                tossOne(dir, dir * vel, settleSpring)
+            } finally {
+                monitor.cancel()
+                deckAnimating = false
+                Log.d("DeckFling", "🎡 wheel done at tile=$currentTile")
             }
         }
 
@@ -1339,46 +1419,90 @@ fun SwipeableBigTiles(
                 .onSizeChanged { deckSize = it }
                 // NOTE: no hard clip — the travelling card must rise above the
                 // deck. Every card clips itself to its own rounded shape.
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { deltaY ->
-                        // The finger scrubs the transition directly (up = forward);
-                        // clamped to one cycle per gesture. A tick marks the point
-                        // of no return.
-                        val next = (deckProgress.value - deltaY / dragDistancePx()).coerceIn(-1f, 1f)
-                        val crossed = kotlin.math.abs(next) > 0.3f
-                        if (crossed && !pastThreshold) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        }
-                        pastThreshold = crossed
-                        coroutineScope.launch { deckProgress.snapTo(next) }
-                    },
-                    onDragStopped = { velocity ->
-                        pastThreshold = false
-                        // Velocity in progress units/sec; up = forward = positive.
-                        val v = -velocity / dragDistancePx()
-                        val here = deckProgress.value
-                        val dir = when {
-                            v > 1.6f -> 1                   // decisive flick up
-                            v < -1.6f -> -1                 // decisive flick down
-                            here > 0.3f && v > -0.4f -> 1   // carried far enough, not flicked back
-                            here < -0.3f && v < 0.4f -> -1
-                            else -> 0
-                        }
-                        coroutineScope.launch {
-                            if (dir != 0) {
-                                flingWheel(dir, v)
-                            } else {
-                                // Not enough intent — spring home with the leftover momentum.
-                                deckProgress.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f, visibilityThreshold = 0.001f),
-                                    initialVelocity = v,
-                                )
+                // 2-AXIS TOSS: both axes scrub the deck — up OR LEFT tosses the
+                // front card back (matching the leftward fan and the ‹ › hint row),
+                // down or right brings the previous card forward. A gentle carry
+                // settles one card on the spring; a hard flick hands off to the
+                // wheel and keeps the stack shuffling, more cards for harder flicks.
+                .pointerInput(Unit) {
+                    val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                    // Scrub target accumulated locally: reading deckProgress.value
+                    // per event lags behind the queued snapTo coroutines and makes
+                    // fast scrubs feel rubbery.
+                    var target = 0f
+                    detectDragGestures(
+                        onDragStart = {
+                            // Catch the deck mid-flight: stop the wheel/settle so
+                            // the finger scrubs from wherever the cards are now.
+                            deckJob?.cancel()
+                            tracker.resetTracking()
+                            target = deckProgress.value
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            // Up (−y) and left (−x) both advance; clamped to one
+                            // cycle per gesture. A tick marks the point of no return.
+                            target = (target - (dragAmount.y + dragAmount.x) / dragDistancePx())
+                                .coerceIn(-1f, 1f)
+                            val next = target
+                            val crossed = kotlin.math.abs(next) > 0.3f
+                            if (crossed && !pastThreshold) {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             }
-                        }
-                    },
-                )
+                            pastThreshold = crossed
+                            coroutineScope.launch { deckProgress.snapTo(next) }
+                        },
+                        onDragEnd = {
+                            pastThreshold = false
+                            // Velocity in progress units/sec; up or left = forward = positive.
+                            val pxPerSec = tracker.calculateVelocity()
+                            val v = (-(pxPerSec.y + pxPerSec.x) / dragDistancePx()).coerceIn(-8f, 8f)
+                            val here = target
+                            val dir = when {
+                                v > 0.8f -> 1                    // flick up/left
+                                v < -0.8f -> -1                  // flick down/right
+                                here > 0.25f && v > -0.4f -> 1   // carried far enough, not flicked back
+                                here < -0.25f && v < 0.4f -> -1
+                                else -> 0
+                            }
+                            Log.d(
+                                "DeckFling",
+                                "👆 release: px/s=(%.0f, %.0f) v=%.2f here=%.2f dir=$dir -> %s"
+                                    .format(
+                                        pxPerSec.x, pxPerSec.y, v, here,
+                                        when {
+                                            dir == 0 -> "spring home"
+                                            kotlin.math.abs(v) > 0.8f -> "WHEEL"
+                                            else -> "single advance"
+                                        },
+                                    ),
+                            )
+                            deckJob = coroutineScope.launch {
+                                if (dir != 0) {
+                                    if (kotlin.math.abs(v) > 0.8f) {
+                                        // FAST FLING: harder flicks shuffle more cards.
+                                        flingWheel(dir, v)
+                                    } else {
+                                        // Slow carry past the commit point — soft spring settle.
+                                        advance(dir, v)
+                                    }
+                                } else {
+                                    // Not enough intent — spring home with the leftover momentum.
+                                    deckProgress.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f, visibilityThreshold = 0.001f),
+                                        initialVelocity = v,
+                                    )
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            pastThreshold = false
+                            deckJob = coroutineScope.launch { deckProgress.animateTo(0f, settleSpring) }
+                        },
+                    )
+                }
         ) {
             // The only discrete state the deck recomposes on: which card is in
             // flight (drag direction) and which side of the deck it is on.
@@ -1481,7 +1605,8 @@ fun SwipeableBigTiles(
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                coroutineScope.launch {
+                                deckJob?.cancel()
+                                deckJob = coroutineScope.launch {
                                     advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
                             }
@@ -1515,7 +1640,8 @@ fun SwipeableBigTiles(
 
                             // Toss the deck onto the tapped tile via the shortest
                             // path, one card at a time.
-                            coroutineScope.launch {
+                            deckJob?.cancel()
+                            deckJob = coroutineScope.launch {
                                 var guard = 0
                                 while (currentTile != index && guard < 4) {
                                     val fwd = ((index - currentTile) + 4) % 4
@@ -1545,7 +1671,8 @@ fun SwipeableBigTiles(
                             // Swipe threshold: 50 pixels
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                coroutineScope.launch {
+                                deckJob?.cancel()
+                                deckJob = coroutineScope.launch {
                                     advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
                             }

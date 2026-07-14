@@ -64,7 +64,14 @@ object ParallaxTiltSource {
             }
             smoothX += ALPHA * (rollN - smoothX)
             smoothY += ALPHA * (pitchN - smoothY)
-            _tilt.value = Offset(smoothX, smoothY)
+            // Deadband: the low-pass output never stops changing at float
+            // precision, so publishing every event invalidates every parallax
+            // layer at sensor rate (~50Hz) even with the device at rest on a
+            // desk. Only publish visible movement (~0.1px at typical depths).
+            val next = Offset(smoothX, smoothY)
+            if ((next - _tilt.value).getDistance() > 0.003f) {
+                _tilt.value = next
+            }
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

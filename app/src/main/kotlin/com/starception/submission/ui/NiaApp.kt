@@ -382,7 +382,14 @@ private fun NiaFloatingBottomBar(
             }
             BoxWithConstraints(
                 modifier = if (vertical) {
-                    Modifier.width(64.dp).padding(vertical = 6.dp)
+                    // Fixed height (56.dp per item + the 6.dp paddings) so the pill
+                    // wraps its items compactly; without it the inner fillMaxSize
+                    // Column stretches the pill to the full screen height and pushes
+                    // the voice button off-screen.
+                    Modifier
+                        .width(64.dp)
+                        .height((destinations.size * 56 + 12).dp)
+                        .padding(vertical = 6.dp)
                 } else {
                     Modifier.height(64.dp).padding(horizontal = 6.dp)
                 },
@@ -617,12 +624,16 @@ private fun NiaLandscapeLayout(
     Box(modifier = Modifier.fillMaxSize()) {
         // Inset the content to the RIGHT of the vertical floating nav bar so the bar
         // never overlaps tile content. The bar is a 64.dp pill with 12.dp start
-        // padding plus safe-area start inset; reserve ~92.dp so content clears it.
+        // padding, itself shifted right by the safe-area start inset (camera cutout
+        // sits on the left edge in landscape), so the content must reserve that same
+        // inset PLUS ~92.dp to clear the pill.
         NiaMainContent(
             appState = appState,
             snackbarHostState = snackbarHostState,
             onTopAppBarActionClick = onTopAppBarActionClick,
-            modifier = modifier.padding(start = 92.dp),
+            modifier = modifier
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                .padding(start = 92.dp),
             isLandscape = true,
             mainViewModel = mainViewModel,
             deepLinkCourseId = deepLinkCourseId,
