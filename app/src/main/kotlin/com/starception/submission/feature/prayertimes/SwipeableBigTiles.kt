@@ -1150,7 +1150,10 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(233.dp) // Card (~213dp) + 10.dp shadow clearance top & bottom
+                // Card (~211dp) + 10.dp shadow clearance top & bottom; trimmed
+                // 2dp so the home column's location card clears the floating
+                // nav pill comfortably.
+                .height(231.dp)
         }
 
         // One tile card (shadow wrapper + content), reused for every deck layer.

@@ -1521,10 +1521,13 @@ fun PrayerTimesScreen(
             // Apply syncState.pullModifier here so the inner ComposeView's scrollable
             // feeds the outer PullToSyncContainer's NestedScrollConnection. Without
             // this the View↔Compose boundary swallows the drag events.
+            // Hoisted so "Show All Prayers" can keep its button on screen while
+            // the grid expands (see the LaunchedEffect next to showAllPrayers).
+            val homeScrollState = rememberScrollState()
             Column(modifier = Modifier
                 .fillMaxSize()
                 .then(syncState.pullModifier)
-                .then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
+                .then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(homeScrollState))) {
             // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
@@ -1907,7 +1910,20 @@ fun PrayerTimesScreen(
 
                 // Expandable prayer layout - smart default view with expand option
                 var showAllPrayers by remember { mutableStateOf(false) }
-                
+
+                // Keep the bottom of the page (Show Less button + location card)
+                // on screen while the grid expands: pin the scroll to max for the
+                // duration of the expand animation so the page follows the growth
+                // instead of leaving the button cut off below the fold.
+                LaunchedEffect(showAllPrayers) {
+                    if (showAllPrayers) {
+                        val start = withFrameNanos { it }
+                        while (withFrameNanos { it } - start < 500_000_000L) {
+                            homeScrollState.scrollTo(homeScrollState.maxValue)
+                        }
+                    }
+                }
+
                 // Material 3 expressive tile height animation with spring physics
                 val tileHeight by animateDpAsState(
                     targetValue = if (showAllPrayers) 120.dp else 140.dp,
@@ -2442,6 +2458,15 @@ fun PrayerTimesScreen(
                         )
                     }
                 }
+
+                // Clear the floating bottom nav: the pill (64dp + 8dp bottom
+                // margin + nav-bar inset) is OVERLAID on this scroll content,
+                // so without this reserve the location card ends up underneath it.
+                Spacer(
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                        .height(80.dp)
+                )
             }
             } // End of portrait layout else block
         }
