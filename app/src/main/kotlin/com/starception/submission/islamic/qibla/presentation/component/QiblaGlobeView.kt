@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Path as ComposePath
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -185,8 +186,14 @@ fun QiblaGlobeView(
         }
     }
 
-    // Sensor manager for compass - only active when user is NOT touching
-    DisposableEffect(context) {
+    // Sensor manager for compass - only active when user is NOT touching.
+    // Also keyed on isActiveTile: while the card is stacked behind others the
+    // globe is hidden, so compass work would be wasted — sensors unregister
+    // and re-register when the card lands on front again.
+    DisposableEffect(context, isActiveTile) {
+        if (!isActiveTile) {
+            return@DisposableEffect onDispose { }
+        }
         val sensorManager = context.getSystemService(AndroidContext.SENSOR_SERVICE) as SensorManager
         // Use TYPE_ORIENTATION for stable heading (same as Smart Prediction tile)
         // TYPE_ORIENTATION is deprecated but provides pre-filtered, stable values
@@ -264,8 +271,8 @@ fun QiblaGlobeView(
     // Prediction globe. Regenerates the marker bitmap at ~20fps with a varying dot
     // radius while the tile is in the foreground; the cone and white ring stay
     // constant and the fill stays the accuracy-driven color — only the dot scales.
-    LaunchedEffect(isInForeground) {
-        if (!isInForeground) return@LaunchedEffect
+    LaunchedEffect(isInForeground, isActiveTile) {
+        if (!isInForeground || !isActiveTile) return@LaunchedEffect
         val cycleMs = 2200f
         while (true) {
             val phase = (System.currentTimeMillis() % cycleMs.toLong()) / cycleMs
@@ -328,12 +335,41 @@ fun QiblaGlobeView(
         }
     }
 
+    // ONE live globe across deck shuffles: while the card is stacked behind
+    // others, the GL surface is HIDDEN (un-punching its hole so it can't bleed
+    // through the transformed deck cards) and the render thread paused; when
+    // the card lands on the front the surface is shown and nudged to redraw.
+    // The EGL context is preserved across the pause, so coming back is a fast
+    // redraw with warm textures — not the black-flashing cold recreate the
+    // old live/static composition swap caused.
+    // ONE live globe across deck shuffles. The surface is PARKED off-screen
+    // while the card is stacked — NOT hidden: an INVISIBLE SurfaceView
+    // destroys its surface, and the next show waits several frames for a
+    // fresh buffer (a black/white gap on landing). A parked surface keeps
+    // its last rendered frame, so translating it back is instant. While
+    // parked, sensors and redraw loops are gated off, so the GL thread
+    // (render-on-demand) stays idle and costs nothing.
+    LaunchedEffect(isActiveTile, worldWindowRef) {
+        val ww = worldWindowRef ?: return@LaunchedEffect
+        if (isActiveTile) {
+            android.util.Log.d("GlobeSurface", "⬅️ UNPARK (translationX=0) @${android.os.SystemClock.uptimeMillis()}")
+            ww.translationX = 0f
+            ww.requestRedraw()
+        } else {
+            android.util.Log.d("GlobeSurface", "➡️ PARK (translationX=100000) @${android.os.SystemClock.uptimeMillis()}")
+            ww.translationX = 100_000f
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()  // Fill both width and height from parent constraints
             // Removed clip - can interfere with touch handling on AndroidView
+            // Space-black, not theme surface: this backs the GL hole, so it must
+            // match the globe scene — a light theme color here flashes white
+            // while a fresh surface waits for its first frame.
             .background(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = Color(0xFF070B10),
                 shape = RoundedCornerShape(16.dp)
             )
     ) {
@@ -377,6 +413,29 @@ fun QiblaGlobeView(
                     worldWindow.isClickable = false
                     worldWindow.setOnTouchListener { _, _ -> false }
 
+                    // Survive app pause/resume without re-uploading textures.
+                    worldWindow.preserveEGLContextOnPause = true
+
+                    // DEBUG: trace the GL surface lifecycle to find black-frame gaps.
+                    android.util.Log.d("GlobeSurface", "🏗️ WorldWindow CREATED @${android.os.SystemClock.uptimeMillis()}")
+                    worldWindow.holder.addCallback(object : android.view.SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                            android.util.Log.d("GlobeSurface", "🟢 surfaceCreated @${android.os.SystemClock.uptimeMillis()}")
+                        }
+                        override fun surfaceChanged(holder: android.view.SurfaceHolder, format: Int, width: Int, height: Int) {
+                            android.util.Log.d("GlobeSurface", "🔄 surfaceChanged ${width}x$height @${android.os.SystemClock.uptimeMillis()}")
+                        }
+                        override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                            android.util.Log.d("GlobeSurface", "🔴 surfaceDestroyed @${android.os.SystemClock.uptimeMillis()}")
+                        }
+                    })
+                    if (!isActiveTile) {
+                        // Composed while stacked: start parked off-screen; the
+                        // isActiveTile effect slides it in when the card lands
+                        // on front. The surface stays alive the whole time.
+                        worldWindow.translationX = 100_000f
+                    }
+
                     // Add lifecycle observer to properly manage GLSurfaceView
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -404,6 +463,7 @@ fun QiblaGlobeView(
                     }
                 },
                 onRelease = { worldWindow ->
+                    android.util.Log.d("GlobeSurface", "🗑️ WorldWindow RELEASED @${android.os.SystemClock.uptimeMillis()}")
                     worldWindow.onPause()
                     worldWindowRef = null
                 }

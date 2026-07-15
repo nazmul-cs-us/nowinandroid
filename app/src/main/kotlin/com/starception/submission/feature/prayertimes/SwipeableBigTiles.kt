@@ -1052,21 +1052,29 @@ fun SwipeableBigTiles(
     // down to bring the previous card back onto the front. Tile visuals unchanged.
     var currentTile by remember { mutableStateOf(0) }
     var deckSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
-    // The GL globe (tile 3) is created/disposed when it enters/leaves the front
-    // slot. Doing that mid-flight stalls the deck animation (measured 60+ms
-    // frames at restack), so the live/static swap is DEFERRED until the deck
-    // settles: while a toss/wheel is animating the globe keeps its static face,
-    // and a wheel merely passing through tile 3 never touches the GL view.
+    // The GL globe (tile 3) shows/hides its surface when it enters/leaves the
+    // front slot (a SurfaceView ignores the deck's transforms, so it can't be
+    // visible mid-flight). The toggle is DEFERRED until the deck settles:
+    // while a toss/wheel is animating the globe stays hidden, and a wheel
+    // merely passing through tile 3 never touches it.
     var deckAnimating by remember { mutableStateOf(false) }
+    // Where the current toss/wheel will land. Lets the globe surface unpark
+    // the moment the deck COMMITS onto tile 3 — the exact instant motion
+    // stops — instead of also waiting out the settle spring's invisible tail,
+    // while a wheel merely PASSING THROUGH tile 3 keeps it parked.
+    var deckTargetTile by remember { mutableStateOf(0) }
     var globeLive by remember { mutableStateOf(false) }
-    LaunchedEffect(deckAnimating, currentTile) {
-        if (!deckAnimating) globeLive = currentTile == 3
+    LaunchedEffect(deckAnimating, currentTile, deckTargetTile) {
+        globeLive = currentTile == 3 && (!deckAnimating || deckTargetTile == 3)
     }
     // The one in-flight deck animation (wheel spin, advance, spring home).
     // Every gesture/tap that moves the deck cancels this job first, so a new
     // flick never fights a wheel that is still spinning — it takes over from
     // wherever the cards are.
     var deckJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // True while a finger is scrubbing the deck — gates the self-healer so it
+    // never commits a card out from under an active drag.
+    var deckDragging by remember { mutableStateOf(false) }
     val view = LocalView.current
 
     // Coroutine scope for animated scroll when dots are tapped
@@ -1173,7 +1181,9 @@ fun SwipeableBigTiles(
                 0 -> MaterialTheme.colorScheme.primaryContainer
                 1 -> MaterialTheme.colorScheme.secondaryContainer
                 2 -> MaterialTheme.colorScheme.tertiaryContainer
-                else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                // The globe card is a space scene — its face is space-black,
+                // so the reveal never flashes a light frame around the globe.
+                else -> Color(0xFF070B10)
             }
             val evenShadowColor = Color.Black.copy(alpha = 0.16f)
             Box(modifier = modifier.fillMaxSize().padding(10.dp)) {
@@ -1261,8 +1271,9 @@ fun SwipeableBigTiles(
                         3 -> QiblaGlobeTile(
                             prayerTimes = prayerTimes,
                             onFullscreenClick = { showGlobePopup = true },
-                            // Live only when front AND the deck is at rest — the GL
-                            // view swap is too heavy to run mid-flight.
+                            // Surface visible only when front AND the deck is at
+                            // rest — a SurfaceView ignores the deck's transforms,
+                            // so it must never punch through mid-flight.
                             isActiveTile = (isActiveOverride ?: true) && globeLive,
                         )
                     }
@@ -1308,7 +1319,11 @@ fun SwipeableBigTiles(
         // a step wider than the blur, every card (including the front) shows an even
         // soft shadow on its left edge, so all the left edges match.
         val fanX = if (isLandscape) 14.dp else 16.dp   // leftward step per slot (> blur radius)
-        val fanY = 0.dp                                // no vertical offset — clean top/bottom
+        // Upward step per slot: slightly more than the bottom-anchored scale
+        // taper pulls tops down (~7.5dp/slot), so each deeper card's top edge
+        // peeks a couple of dp above the one in front — the stack reads as a
+        // diagonal from top-left (back) to bottom-right (front).
+        val fanY = 10.dp
         val fanXPx = with(density) { fanX.toPx() }
         val fanYPx = with(density) { fanY.toPx() }
         val scaleStep = 0.035f   // subtle taper — deeper cards read slightly smaller
@@ -1369,6 +1384,7 @@ fun SwipeableBigTiles(
         val flingWheel: suspend (Int, Float) -> Unit = { dir, speed ->
             // Cap at 3 — all four would spin a full loop back to the same tile.
             val cards = (1 + (kotlin.math.abs(speed) / 3f).toInt()).coerceIn(1, 3)
+            deckTargetTile = (((currentTile + dir * cards) % 4) + 4) % 4
             deckAnimating = true
             Log.d("DeckFling", "🎡 wheel start: speed=%.2f cards=$cards".format(speed))
             // DEBUG frame monitor: flags any frame gap over ~2 vsyncs while the
@@ -1407,13 +1423,42 @@ fun SwipeableBigTiles(
             }
         }
 
+        // SELF-HEALER: a release/tap job cancelled in the wrong window can
+        // strand the deck displaced without a commit — worst case fully
+        // promoted (|progress| ≈ 1), where the card the user SEES in front is
+        // not the card `currentTile` says (dots point at the wrong tile and
+        // the globe never activates). Whenever the deck sits idle displaced,
+        // finish the toss it was on (or spring home from a small displacement).
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(300)
+                if (deckDragging || deckAnimating) continue
+                if (deckJob?.isActive == true || deckProgress.isRunning) continue
+                val p = deckProgress.value
+                if (kotlin.math.abs(p) < 0.02f) continue
+                Log.w("DeckFling", "🩹 heal: deck stranded at %.2f — reconciling".format(p))
+                deckJob = coroutineScope.launch {
+                    if (kotlin.math.abs(p) > 0.5f) {
+                        val dir = if (p > 0f) 1 else -1
+                        deckTargetTile = (((currentTile + dir) % 4) + 4) % 4
+                        advance(dir, 0f)
+                    } else {
+                        deckProgress.animateTo(0f, settleSpring)
+                    }
+                }
+            }
+        }
+
         Box(
             modifier = pagerModifier
                 // Reserve room on the START (left) so the right-to-left fan of
-                // behind-cards has space to peek left without being clipped. No top
-                // reserve — the fan is horizontal, so top/bottom edges stay clean.
+                // behind-cards has space to peek left without being clipped.
+                // 2.5 steps is enough: the bottom-center scale taper pulls the
+                // deep cards back in, so the fan never reaches the full 3-step
+                // extent even with the blur halo — the saved space goes to
+                // card width.
                 .padding(
-                    start = fanX * 3,
+                    start = fanX * 2.5f,
                     end = if (isLandscape) 4.dp else 2.dp,
                 )
                 .onSizeChanged { deckSize = it }
@@ -1435,6 +1480,7 @@ fun SwipeableBigTiles(
                             // Catch the deck mid-flight: stop the wheel/settle so
                             // the finger scrubs from wherever the cards are now.
                             deckJob?.cancel()
+                            deckDragging = true
                             tracker.resetTracking()
                             target = deckProgress.value
                         },
@@ -1455,6 +1501,7 @@ fun SwipeableBigTiles(
                         },
                         onDragEnd = {
                             pastThreshold = false
+                            deckDragging = false
                             // Velocity in progress units/sec; up or left = forward = positive.
                             val pxPerSec = tracker.calculateVelocity()
                             val v = (-(pxPerSec.y + pxPerSec.x) / dragDistancePx()).coerceIn(-8f, 8f)
@@ -1485,6 +1532,7 @@ fun SwipeableBigTiles(
                                         flingWheel(dir, v)
                                     } else {
                                         // Slow carry past the commit point — soft spring settle.
+                                        deckTargetTile = (((currentTile + dir) % 4) + 4) % 4
                                         advance(dir, v)
                                     }
                                 } else {
@@ -1499,6 +1547,7 @@ fun SwipeableBigTiles(
                         },
                         onDragCancel = {
                             pastThreshold = false
+                            deckDragging = false
                             deckJob = coroutineScope.launch { deckProgress.animateTo(0f, settleSpring) }
                         },
                     )
@@ -1606,6 +1655,7 @@ fun SwipeableBigTiles(
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 deckJob?.cancel()
+                                deckTargetTile = (((currentTile + if (totalDrag < 0) 1 else -1) % 4) + 4) % 4
                                 deckJob = coroutineScope.launch {
                                     advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
@@ -1638,9 +1688,17 @@ fun SwipeableBigTiles(
                             // Haptic feedback on tap
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 
+                            // Tap on the tile that's already front with the deck
+                            // at rest: nothing to do — and cancelling deckJob here
+                            // could kill another toss's pending commit.
+                            if (index == currentTile && kotlin.math.abs(deckProgress.value) < 0.02f) {
+                                return@clickable
+                            }
+
                             // Toss the deck onto the tapped tile via the shortest
                             // path, one card at a time.
                             deckJob?.cancel()
+                            deckTargetTile = index
                             deckJob = coroutineScope.launch {
                                 var guard = 0
                                 while (currentTile != index && guard < 4) {
@@ -1672,6 +1730,7 @@ fun SwipeableBigTiles(
                             if (kotlin.math.abs(totalDrag) > 50) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 deckJob?.cancel()
+                                deckTargetTile = (((currentTile + if (totalDrag < 0) 1 else -1) % 4) + 4) % 4
                                 deckJob = coroutineScope.launch {
                                     advance(if (totalDrag < 0) 1 else -1, 0f)
                                 }
@@ -2424,23 +2483,18 @@ private fun QiblaGlobeTile(
             contentAlignment = Alignment.Center
         ) {
             prayerTimes?.location?.let { locationData ->
-                if (isActiveTile) {
-                    QiblaGlobeView(
-                        userLatitude = locationData.latitude,
-                        userLongitude = locationData.longitude,
-                        modifier = Modifier.fillMaxSize(),
-                        isActiveTile = true,
-                    )
-                } else {
-                    // Static stand-in while stacked behind other tiles: the live
-                    // globe is a GL SurfaceView, which ignores Compose clipping
-                    // and scaling and would bleed through the deck lips.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF070B10))
-                    )
-                }
+                // ONE live globe for the lifetime of the deck. Stacking the tile
+                // no longer swaps the GL view for a static box (the recreate
+                // flashed black every time the card came back); instead the view
+                // stays composed and QiblaGlobeView hides its surface + pauses
+                // its render thread and sensors while inactive, then shows and
+                // refreshes when the card lands on front.
+                QiblaGlobeView(
+                    userLatitude = locationData.latitude,
+                    userLongitude = locationData.longitude,
+                    modifier = Modifier.fillMaxSize(),
+                    isActiveTile = isActiveTile,
+                )
 
                 // Fullscreen button in top-left corner (with liquid glass effect)
                 Box(

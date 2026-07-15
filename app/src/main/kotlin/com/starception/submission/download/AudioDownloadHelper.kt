@@ -83,8 +83,13 @@ class AudioDownloadHelper @Inject constructor(
         val surah = QuranData.surahs.getOrNull(surahIndex) ?: return null
         return when (language) {
             AudioLanguage.ARABIC_ONLY -> {
-                // CDN key matches the fileName field: "001-al-fatihah.ogg"
-                "audio/quran/arabic/${surah.fileName}"
+                // Look up by numeric prefix — several CDN spellings drift from
+                // QuranData.fileName (051 adh-dhariyat, 073 al-muzammil,
+                // 074 al-muddaththir, 098 al-baiyyinah, 108 al-kauthar), and a
+                // reconstructed key that misses the manifest simply never plays.
+                // Fall back to the fileName form when no manifest is cached.
+                findCdnKeyByNumericPrefix("audio/quran/arabic/", surah.number)
+                    ?: "audio/quran/arabic/${surah.fileName}"
             }
             AudioLanguage.BENGALI_TRANSLATION -> {
                 // Bengali uses fileNameBengali: "001 - Al-Fatihah ( The Opening ) - سورة الفاتحة.ogg"
@@ -152,7 +157,11 @@ class AudioDownloadHelper @Inject constructor(
         val surah = QuranData.surahs.getOrNull(surahIndex) ?: return null
         return when (language) {
             AudioLanguage.ARABIC_ONLY -> {
-                File(SD_QURAN_ARABIC, surah.fileName)
+                // Match by number like the English path — on-disk spellings can
+                // differ from QuranData.fileName (e.g. 074 muddathir vs muddaththir).
+                val pattern = String.format("%03d", surah.number)
+                File(SD_QURAN_ARABIC).listFiles()?.find { it.name.startsWith(pattern) }
+                    ?: File(SD_QURAN_ARABIC, surah.fileName)
             }
             AudioLanguage.BENGALI_TRANSLATION -> {
                 val bengaliDir = File(SD_QURAN_BENGALI)

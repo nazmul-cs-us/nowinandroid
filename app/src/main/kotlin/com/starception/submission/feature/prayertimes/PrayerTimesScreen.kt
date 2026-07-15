@@ -87,6 +87,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
@@ -1800,6 +1801,18 @@ fun PrayerTimesScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Let the tile deck BLEED 9dp into each side margin
+                        // (24dp screen padding → 15dp effective for the deck)
+                        // so the cards read wider than the rest of the column.
+                        .layout { measurable, constraints ->
+                            val extra = 18.dp.roundToPx()
+                            val placeable = measurable.measure(
+                                constraints.copy(maxWidth = constraints.maxWidth + extra),
+                            )
+                            layout(placeable.width - extra, placeable.height) {
+                                placeable.place(-extra / 2, 0)
+                            }
+                        }
                 ) {
                     SwipeableBigTiles(
                     prayerTimes = prayerTimes,
