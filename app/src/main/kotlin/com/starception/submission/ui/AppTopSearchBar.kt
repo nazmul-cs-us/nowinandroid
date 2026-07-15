@@ -13,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.util.TypedValue
 import android.view.Gravity
@@ -22,7 +23,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -60,15 +60,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
@@ -169,8 +170,21 @@ fun AppTopSearchBar(
     // actual recording state so it ends the instant recording stops — during
     // transcription the field must not look like it's still capturing.
     val isListening by whisperService.isListening.collectAsStateWithLifecycle()
+    // Single progress driving the fluid listening transition: chrome (mic +
+    // magnifier + hint) fades out and the voice wave slides up as this animates
+    // 0 → 1, and the reverse on stop. A light spring gives it an organic settle.
+    // Read inside the AndroidView update block, it animates the View chrome
+    // frame-by-frame.
+    val listenProgress by animateFloatAsState(
+        targetValue = if (isListening) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = Spring.StiffnessLow,
+        ),
+        label = "listenProgress",
+    )
     // SearchBar's bounds inside the AndroidView, used to position the
-    // Gemini-style listening glow overlay precisely around the pill.
+    // voice wave overlay precisely around the pill.
     var searchBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
     // Bounds of the expanded SearchView's input toolbar — when the search page
     // is open the glow must wrap that full-width bar, not the collapsed pill.
@@ -402,14 +416,14 @@ fun AppTopSearchBar(
             // SearchView shows its own static placeholder when expanded.
             // While voice capture is live the hints are cleared so the centered
             // voice wave owns the field without text bleeding through it.
-            if (isListening) {
-                searchBar.hint = ""
-                searchView.hint = ""
-            } else {
-                searchBar.hint = animatedHint
-                searchView.hint = SearchHints.hintFor()
-            }
-            searchBar.textView?.setHintTextColor(pillTextColor)
+            // Hints stay set through the transition and fade via their text-color
+            // alpha (chromeVisible) so the field hands off to the wave smoothly
+            // instead of blanking instantly.
+            val chromeVisible = (1f - listenProgress).coerceIn(0f, 1f)
+            searchBar.hint = animatedHint
+            searchView.hint = SearchHints.hintFor()
+            val fadedHintColor = (pillTextColor and 0x00FFFFFF) or ((chromeVisible * 255f).toInt() shl 24)
+            searchBar.textView?.setHintTextColor(fadedHintColor)
             searchBar.textView?.setTextColor(pillTextColor)
             // Native View icons read tints from the Activity's Configuration
             // (system dark mode), not from the user's app-level Dark pref — so
@@ -478,18 +492,37 @@ fun AppTopSearchBar(
             }
             searchView.toolbar.navigationIcon?.mutate()?.setTint(titleColor)
 
-            // While voice capture is live the field belongs to the wave alone:
-            // hide the back arrow, mic icons and text cursor; everything is
-            // restored on the next pass once listening ends.
-            val chromeAlpha = if (isListening) 0 else 255
+            // Fade the pill's chrome (magnifier nav icon, back arrow, and mic menu
+            // icon) in lockstep with the listening transition so it hands off to /
+            // from the wave fluidly. Menu items stay present (just transparent)
+            // until fully listening, so their icons fade rather than pop out.
+            val chromeAlpha = (chromeVisible * 255f).toInt()
             searchView.toolbar.navigationIcon?.mutate()?.alpha = chromeAlpha
             searchBar.navigationIcon?.mutate()?.alpha = chromeAlpha
+            val menuHidden = listenProgress > 0.995f
             for (i in 0 until searchView.toolbar.menu.size()) {
-                searchView.toolbar.menu.getItem(i).isVisible = !isListening
+                val item = searchView.toolbar.menu.getItem(i)
+                item.isVisible = !menuHidden
+                item.icon?.mutate()?.alpha = chromeAlpha
             }
             for (i in 0 until searchBar.menu.size()) {
-                searchBar.menu.getItem(i).isVisible = !isListening
+                val item = searchBar.menu.getItem(i)
+                item.isVisible = !menuHidden
+                item.icon?.mutate()?.alpha = chromeAlpha
             }
+            // "Dive into the wave": as listening begins, translate the mic,
+            // magnifier / back arrow and hint downward so the chrome appears to
+            // sink into the rising wave — and surface back up on stop. The fade is
+            // the alpha above; this adds the vertical motion where the host views
+            // are reachable (a no-op otherwise, so the fade still applies). The
+            // Toolbar clips its children, so the icons are cut off as they pass the
+            // pill's bottom edge, completing the "vanish" illusion.
+            val sinkPx = searchBar.height * 0.7f * listenProgress
+            searchBar.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
+            searchBar.firstImageButtonChild()?.translationY = sinkPx
+            searchBar.textView?.translationY = sinkPx
+            searchView.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
+            searchView.toolbar.firstImageButtonChild()?.translationY = sinkPx
             searchView.getEditText().isCursorVisible = !isListening
 
             appBar.setPadding(0, topInsetPx, 0, 0)
@@ -584,21 +617,23 @@ fun AppTopSearchBar(
             }
         },
     )
-    // Gemini-style listening glow: a multi-color gradient that flows around
-    // the SearchBar pill while the mic is capturing. The overlay sits above
-    // the AndroidView so the SearchBar stays interactive when not listening.
-    // On the search page the glow wraps the SearchView's full input bar; on the
-    // home page it wraps the collapsed pill.
+    // Voice wave overlay: the animated visualization that fills the SearchBar
+    // pill while the mic is capturing. It sits above the AndroidView so the
+    // SearchBar stays interactive when not listening. On the search page it
+    // spans the SearchView's full input bar; on the home page the collapsed pill.
     val bounds = if (isSearchViewOpen) {
         searchViewBarBoundsPx ?: searchBarBoundsPx
     } else {
         searchBarBoundsPx
     }
-    if (isListening && bounds != null) {
-        // Live microphone level from the Whisper recorder, smoothed so the glow
-        // and wave move organically rather than jittering. The raw
-        // VOICE_RECOGNITION source registers speech around 0.01-0.03 RMS, so
-        // scale up for a visible wave.
+    // Keep the wave composed through the whole transition (progress > 0), not
+    // just while actively listening, so it can slide and fade out gracefully on
+    // stop instead of vanishing the instant recording ends.
+    if (bounds != null && listenProgress > 0.001f) {
+        // Live microphone level from the Whisper recorder, smoothed so the wave
+        // moves organically rather than jittering. The raw VOICE_RECOGNITION
+        // source registers speech around 0.01-0.03 RMS, so scale up for a
+        // visible wave.
         val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
         val smoothedLevel by animateFloatAsState(
             targetValue = (whisperLevel * 15f).coerceIn(0f, 1f),
@@ -608,14 +643,10 @@ fun AppTopSearchBar(
             ),
             label = "voiceLevel",
         )
-        ListeningEdgeGlow(
-            bounds = bounds,
-            level = smoothedLevel,
-            modifier = Modifier.matchParentSize(),
-        )
         VoiceWaveOverlay(
             bounds = bounds,
             level = smoothedLevel,
+            appearProgress = listenProgress,
             modifier = Modifier.matchParentSize(),
         )
     }
@@ -672,116 +703,21 @@ fun AppTopSearchBar(
     }
 }
 
-@Composable
-private fun ListeningEdgeGlow(
-    bounds: Rect,
-    level: Float,
-    modifier: Modifier = Modifier,
-) {
-    val transition = rememberInfiniteTransition(label = "listenGlow")
-    // Continuous rotation of the sweep gradient — the light travels around the
-    // pill instead of smearing across it horizontally.
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "angle",
-    )
-    // Slow breathing for the halo; subtle so it reads as "alive", not blinking.
-    val breath by transition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "breath",
-    )
-
-    // Ring colors come from the active theme so the glow matches the bar and
-    // wave on every brand/custom palette — nothing hardcoded.
-    val ringPrimary = MaterialTheme.colorScheme.primary
-    val ringSecondary = MaterialTheme.colorScheme.secondary
-    val ringTertiary = MaterialTheme.colorScheme.tertiary
-
-    Canvas(modifier = modifier) {
-        if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
-
-        val cx = bounds.center.x
-        val cy = bounds.center.y
-        val glowColors = intArrayOf(
-            ringPrimary.toArgb(),
-            ringSecondary.toArgb(),
-            ringTertiary.toArgb(),
-            ringPrimary.toArgb(), // wrap
-        )
-        val sweepShader = android.graphics.SweepGradient(cx, cy, glowColors, null).apply {
-            setLocalMatrix(android.graphics.Matrix().apply { setRotate(angle, cx, cy) })
-        }
-
-        // Drawn via the native canvas so the halo can use a real BlurMaskFilter
-        // glow (no-op below API 28, crisp fallback). insetPx positions the
-        // stroke's center relative to the bar edge: 0 = straddling the edge so
-        // the blur blooms outward and the bar itself appears to emit the light.
-        fun drawGlowRing(strokePx: Float, blurPx: Float, alpha: Float, insetPx: Float) {
-            val radius = (bounds.height / 2f - insetPx).coerceAtLeast(0f)
-            drawIntoCanvas { canvas ->
-                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    style = android.graphics.Paint.Style.STROKE
-                    strokeWidth = strokePx
-                    shader = sweepShader
-                    this.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
-                    if (blurPx > 0f) {
-                        maskFilter = android.graphics.BlurMaskFilter(
-                            blurPx,
-                            android.graphics.BlurMaskFilter.Blur.NORMAL,
-                        )
-                    }
-                }
-                canvas.nativeCanvas.drawRoundRect(
-                    bounds.left + insetPx,
-                    bounds.top + insetPx,
-                    bounds.right - insetPx,
-                    bounds.bottom - insetPx,
-                    radius,
-                    radius,
-                    paint,
-                )
-            }
-        }
-
-        // Subtle outer bloom: centered on the bar's edge so it radiates outward
-        // like the bar is the light source, swelling gently with the voice.
-        drawGlowRing(
-            strokePx = 4.dp.toPx() + 3.dp.toPx() * level,
-            blurPx = 6.dp.toPx() + 4.dp.toPx() * level,
-            alpha = 0.16f * breath + 0.16f * level,
-            insetPx = 0f,
-        )
-        // Thin crisp gradient border hugging the bar edge.
-        drawGlowRing(
-            strokePx = 1.5.dp.toPx(),
-            blurPx = 0f,
-            alpha = 0.9f,
-            insetPx = 0.75.dp.toPx(),
-        )
-    }
-}
-
 /**
- * Siri/sea-style voice wave: smooth continuous curves flowing through the
- * search field, their swell driven by the live microphone amplitude. Three
- * layered waves with different frequencies and directions give it the depth of
- * rolling water; all taper to zero at both ends so the wave breathes out of
- * the field's center.
+ * Voice wave: an organic range of rolling hills sitting flush on the bottom edge
+ * of the search pill while the mic is capturing. Three parallax layers (two
+ * receding grey ranges behind a [primary] hero range with a gradient sheen and a
+ * crisp ridgeline) drift horizontally for depth, and their height rides the live
+ * microphone [level] through a concave response so even a little speech makes the
+ * range swell dramatically. Colors come from the active theme (nothing
+ * hardcoded); drawing is clipped to the pill so the fill follows its rounded
+ * corners.
  */
 @Composable
 private fun VoiceWaveOverlay(
     bounds: Rect,
     level: Float,
+    appearProgress: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
     val transition = rememberInfiniteTransition(label = "voiceWave")
@@ -789,174 +725,138 @@ private fun VoiceWaveOverlay(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = LinearEasing),
+            animation = tween(durationMillis = 4200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "wavePhase",
     )
 
-    // All wave colors come from the active theme so the ribbon reads as part
-    // of the search bar on every brand/custom palette — nothing hardcoded.
     val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
+    // Mid range blends the grey toward the hero so the three layers read as one
+    // receding range rather than two unrelated colors.
+    val midColor = lerp(tertiary, primary, 0.45f)
 
     Canvas(modifier = modifier) {
         if (bounds.width <= 0f || bounds.height <= 0f) return@Canvas
 
-        // The bar's chrome (back arrow, mic, cursor) is hidden while listening,
-        // so the wave runs end to end: strands flatten to the centerline at the
-        // edges and touch the pill's inner border on both sides.
-        val startX = bounds.left + 3.dp.toPx()
-        val endX = bounds.right - 3.dp.toPx()
+        // Chrome (back arrow, mic, cursor) is hidden while listening, so the
+        // hills span the full width of the pill.
+        val startX = bounds.left
+        val endX = bounds.right
         val span = endX - startX
         if (span <= 0f) return@Canvas
 
-        val centerY = bounds.center.y
-        val maxAmp = bounds.height * 0.42f
-        // Lively idle swell; speech makes the sea rise further.
-        val energy = 0.35f + 0.65f * level
         val twoPi = 2f * Math.PI.toFloat()
-        val pi = Math.PI.toFloat()
+        val baseline = bounds.bottom
+        val ceiling = (baseline - bounds.top) * 0.96f
 
-        // Edge fade pins every curve to the baseline at both ends.
+        // Concave amplitude response: a small amount of voice already lifts the
+        // hills high, so quiet speech still reads as a big, fancy swell while
+        // silence keeps a calm low range.
+        val voice = kotlin.math.sqrt((level * 2.2f).coerceIn(0f, 1f))
+        val amp = 0.28f + 0.72f * voice
+        val appear = appearProgress.coerceIn(0f, 1f)
+
+        // Ramps height from 0 at the very edges up across the outer ~14% so the
+        // range meets the pill ends without a vertical wall.
         fun edgeFade(u: Float): Float =
-            kotlin.math.sin(u * pi).coerceAtLeast(0f).let { kotlin.math.sqrt(it) }
+            (kotlin.math.min(u, 1f - u) / 0.14f).coerceIn(0f, 1f)
 
-        // ONE shared envelope for every strand — this is what makes the wave
-        // read as a single woven ribbon instead of unrelated lines. The crest
-        // drifts slowly across the field for the rolling-sea silhouette. The
-        // wide sigma keeps the braid alive across most of the field instead of
-        // bunching in one small swell.
-        val crest = 0.5f + 0.20f * kotlin.math.sin(t * 0.21f * twoPi)
-        val sigma = 0.34f
-        fun envelopeAt(u: Float): Float {
-            val d = (u - crest) / sigma
-            return kotlin.math.exp(-0.5f * d * d) * edgeFade(u)
+        // Organic silhouette: three sine octaves that drift horizontally over
+        // time, squared to deepen the valleys into distinct rounded hills of
+        // varying height (rather than identical bumps). Integer time multipliers
+        // keep the drift seamless across the animation loop.
+        fun profile(u: Float, phase: Float, speed: Float): Float {
+            val a = kotlin.math.sin((u * 2.6f + t * speed + phase) * twoPi)
+            val b = 0.45f * kotlin.math.sin((u * 5.1f - t * (speed + 1f) + phase * 1.7f) * twoPi)
+            val c = 0.22f * kotlin.math.sin((u * 9.7f + t * (speed + 2f) + phase * 2.3f) * twoPi)
+            val ridge = ((a + b + c) / 1.67f) * 0.5f + 0.5f
+            return ridge * ridge
         }
 
-        fun yAt(u: Float, freq: Float, phase0: Float, amp: Float): Float =
-            centerY + kotlin.math.sin((u * freq + t) * twoPi + phase0 * twoPi) *
-                maxAmp * energy * amp * envelopeAt(u)
-
-        val samples = 84
-        fun strand(freq: Float, phase0: Float, amp: Float): Path {
-            val path = Path()
+        val samples = 140
+        // Closed fill path plus the open top polyline (for the ridgeline stroke).
+        fun ridge(phase: Float, speed: Float, scale: Float): Pair<Path, Path> {
+            val fill = Path()
+            val top = Path()
+            fill.moveTo(startX, baseline)
             for (s in 0..samples) {
                 val u = s / samples.toFloat()
                 val x = startX + u * span
-                val y = yAt(u, freq, phase0, amp)
-                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                val y = baseline - profile(u, phase, speed) * edgeFade(u) * ceiling * amp * scale
+                fill.lineTo(x, y)
+                if (s == 0) top.moveTo(x, y) else top.lineTo(x, y)
             }
-            return path
+            fill.lineTo(endX, baseline)
+            fill.close()
+            return fill to top
         }
 
-        // Closed shape between two strands — the ribbon's translucent body.
-        fun ribbonBody(
-            freqA: Float, phaseA: Float, ampA: Float,
-            freqB: Float, phaseB: Float, ampB: Float,
-        ): Path {
-            val path = Path()
-            for (s in 0..samples) {
-                val u = s / samples.toFloat()
-                val x = startX + u * span
-                val y = yAt(u, freqA, phaseA, ampA)
-                if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            for (s in samples downTo 0) {
-                val u = s / samples.toFloat()
-                val x = startX + u * span
-                path.lineTo(x, yAt(u, freqB, phaseB, ampB))
-            }
-            path.close()
-            return path
-        }
-
-        fun drawCrisp(path: Path, color: ComposeColor, widthPx: Float, alpha: Float) {
-            drawPath(
-                path = path,
-                color = color.copy(alpha = alpha),
-                style = Stroke(width = widthPx, cap = StrokeCap.Round),
+        // Clip to the pill (a stadium: corner radius = half its height) so the
+        // fill follows the rounded corners and nothing spills past them.
+        val pill = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    left = bounds.left,
+                    top = bounds.top,
+                    right = bounds.right,
+                    bottom = bounds.bottom,
+                    cornerRadius = CornerRadius(bounds.height / 2f),
+                ),
             )
         }
-
-        fun drawBlurred(path: Path, colorArgb: Int, widthPx: Float, blurPx: Float, alpha: Float) {
-            drawIntoCanvas { canvas ->
-                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    style = android.graphics.Paint.Style.STROKE
-                    strokeWidth = widthPx
-                    color = colorArgb
-                    this.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
-                    maskFilter = android.graphics.BlurMaskFilter(
-                        blurPx,
-                        android.graphics.BlurMaskFilter.Blur.NORMAL,
-                    )
-                }
-                canvas.nativeCanvas.drawPath(path.asAndroidPath(), paint)
+        // Slide the whole range up from below the pill as it appears (and back
+        // down on stop); the pill clip hides the offset part so it reads as the
+        // wave rising out of the bar. `appear` also fades every layer in/out.
+        clipPath(pill) {
+            translate(top = (1f - appear) * bounds.height) {
+                // Two receding grey ranges give parallax depth behind the hero.
+                drawPath(
+                    path = ridge(phase = 0.55f, speed = 1f, scale = 1f).first,
+                    color = tertiary,
+                    alpha = 0.26f * appear,
+                )
+                drawPath(
+                    path = ridge(phase = 0.28f, speed = 2f, scale = 0.9f).first,
+                    color = midColor,
+                    alpha = 0.34f * appear,
+                )
+                // Hero range: a soft vertical gradient sheen and a crisp ridgeline
+                // that brightens and thickens as the voice rises.
+                val (frontFill, frontTop) = ridge(phase = 0f, speed = 3f, scale = 0.94f)
+                drawPath(
+                    path = frontFill,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(primary.copy(alpha = 0.96f), primary.copy(alpha = 0.72f)),
+                        startY = bounds.top,
+                        endY = baseline,
+                    ),
+                    alpha = appear,
+                )
+                drawPath(
+                    path = frontTop,
+                    color = primary,
+                    alpha = (0.85f + 0.15f * voice) * appear,
+                    style = Stroke(width = 1.5.dp.toPx() + 0.6.dp.toPx() * voice, cap = StrokeCap.Round),
+                )
             }
         }
-
-        // Wash the pill's interior with the wave's own hue so background and
-        // wave read as one luminous unit: a faint full-surface tint plus a
-        // radial glow that tracks the crest and breathes with the voice.
-        val washInset = 2.dp.toPx()
-        val washRadius = (bounds.height - washInset * 2f) / 2f
-        drawRoundRect(
-            color = primary.copy(alpha = 0.06f),
-            topLeft = Offset(bounds.left + washInset, bounds.top + washInset),
-            size = Size(bounds.width - washInset * 2f, bounds.height - washInset * 2f),
-            cornerRadius = CornerRadius(washRadius),
-        )
-        drawRoundRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    primary.copy(alpha = 0.13f + 0.12f * level),
-                    primary.copy(alpha = 0f),
-                ),
-                center = Offset(startX + crest * span, centerY),
-                radius = span * 0.45f,
-            ),
-            topLeft = Offset(bounds.left + washInset, bounds.top + washInset),
-            size = Size(bounds.width - washInset * 2f, bounds.height - washInset * 2f),
-            cornerRadius = CornerRadius(washRadius),
-        )
-
-        // Two strand families a half-cycle apart cross each other repeatedly,
-        // braiding around the shared envelope like the reference art. Higher
-        // frequencies give several undulations across the field, not one bump.
-        // Only primary/tertiary are used — secondary is grey in several brands
-        // and muddied the braid.
-        val freqA = 2.3f
-        val freqB = 2.55f
-
-        // 1) Translucent body between the two hero strands gives the ribbon
-        //    real mass — without it the wave reads as bare lines.
-        drawPath(
-            path = ribbonBody(freqA, 0f, 1f, freqB, 0.5f, 0.84f),
-            color = primary.copy(alpha = 0.14f),
-        )
-        drawPath(
-            path = ribbonBody(freqA, 0.08f, 0.9f, freqB, 0.58f, 0.74f),
-            color = tertiary.copy(alpha = 0.10f),
-        )
-
-        // 2) Inner strands — tight phase offsets inside each family so the
-        //    braid looks dense and intentional.
-        drawCrisp(strand(freqA, 0.08f, 0.92f), tertiary, 1.4.dp.toPx(), 0.45f)
-        drawCrisp(strand(freqA, 0.16f, 0.82f), primary, 1.2.dp.toPx(), 0.35f)
-        drawCrisp(strand(freqB, 0.58f, 0.74f), primary, 1.3.dp.toPx(), 0.40f)
-        drawCrisp(strand(freqB, 0.66f, 0.64f), tertiary, 1.2.dp.toPx(), 0.32f)
-
-        // 3) Counter-hero: bright strand of the second family with a soft glow.
-        val counterHero = strand(freqB, 0.5f, 0.84f)
-        drawBlurred(counterHero, tertiary.toArgb(), 4.dp.toPx(), 6.dp.toPx(), 0.25f + 0.20f * level)
-        drawCrisp(counterHero, tertiary, 1.9.dp.toPx(), 0.85f)
-
-        // 4) Hero strand riding on top with a luminous underglow.
-        val hero = strand(freqA, 0f, 1f)
-        drawBlurred(hero, primary.toArgb(), 6.dp.toPx(), 8.dp.toPx(), 0.40f + 0.25f * level)
-        drawCrisp(hero, primary, 2.2.dp.toPx(), 1f)
     }
+}
+
+/**
+ * The Toolbar's navigation button (the magnifier on the SearchBar, the back
+ * arrow on the SearchView) is a direct [ImageButton] child, unlike menu items.
+ * Returns it so the listening transition can translate it down into the wave, or
+ * null if the navigation icon isn't present yet.
+ */
+private fun ViewGroup.firstImageButtonChild(): View? {
+    for (i in 0 until childCount) {
+        val child = getChildAt(i)
+        if (child is ImageButton) return child
+    }
+    return null
 }
 
 private const val COMPOSE_CONTENT_TAG = "app_top_search_bar_compose_content"
