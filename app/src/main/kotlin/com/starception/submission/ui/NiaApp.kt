@@ -19,6 +19,7 @@ package com.starception.submission.ui
 import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asComposeRenderEffect
@@ -91,9 +90,15 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -549,25 +554,19 @@ private fun NiaFloatingBottomBar(
         }
     }
 
-    // Circular voice-search button — same on-device Whisper flow as the
-    // search bar's mic, via the bus.
+    // Circular voice-assistant button beside the floating nav — the same
+    // on-device Whisper flow as the search bar's mic (via the bus), now with a
+    // live listening animation driven by the real capture state and mic level.
     val voiceButton = @Composable {
-        Surface(
+        val listening by com.starception.submission.ui.search.SearchPrefillBus.listening
+            .collectAsStateWithLifecycle()
+        val level by com.starception.submission.ui.search.SearchPrefillBus.voiceLevel
+            .collectAsStateWithLifecycle()
+        VoiceAssistantButton(
+            listening = listening,
+            level = level,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.onSurface,
-            shadowElevation = 8.dp,
-            modifier = Modifier.size(60.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = Icons.Outlined.GraphicEq,
-                    contentDescription = "Voice search",
-                    tint = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        }
+        )
     }
 
     if (vertical) {
@@ -600,6 +599,96 @@ private fun NiaFloatingBottomBar(
             pill(Modifier.weight(1f))
             Spacer(modifier = Modifier.width(10.dp))
             voiceButton()
+        }
+    }
+}
+
+/**
+ * Voice-assistant button: the circular button beside the floating nav. It idles
+ * as the five-bar graphic-eq mark; while [listening], those same five bars
+ * become a live equalizer — each bar rises and falls with the mic [level] (with
+ * a gentle shimmer even in silence so it reads as actively listening), and the
+ * button breathes subtly with your voice. Tapping toggles capture (start / stop)
+ * via the shared bus; this composable only reflects state.
+ */
+@Composable
+private fun VoiceAssistantButton(
+    listening: Boolean,
+    level: Float,
+    onClick: () -> Unit,
+) {
+    // Eased state 0 (idle) → 1 (listening); a light spring gives an organic
+    // wake-up / settle rather than a hard switch.
+    val progress by animateFloatAsState(
+        targetValue = if (listening) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+        label = "assistantProgress",
+    )
+    // Smoothed mic amplitude; folded with progress so it only drives the bars
+    // while actually listening (and never lingers after stop).
+    val amp by animateFloatAsState(
+        targetValue = (level * 14f).coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 400f),
+        label = "assistantAmp",
+    )
+    val ampActive = amp * progress
+
+    val container = MaterialTheme.colorScheme.onSurface
+    val barColor = MaterialTheme.colorScheme.surface
+
+    // Time source for the per-bar shimmer while listening.
+    val infinite = rememberInfiniteTransition(label = "assistant")
+    val t by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
+        label = "assistantBars",
+    )
+
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = container,
+        shadowElevation = 8.dp,
+        modifier = Modifier
+            .size(60.dp)
+            .graphicsLayer {
+                val s = 1f + 0.06f * ampActive
+                scaleX = s
+                scaleY = s
+            },
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.size(24.dp)) {
+                // Five bars echoing the graphic-eq icon. The resting silhouette
+                // (heights below) shows when idle; while listening each bar is
+                // driven by the mic level plus a small per-bar shimmer, so it
+                // visibly tracks the user's voice.
+                val rest = floatArrayOf(0.4f, 0.6f, 1f, 0.6f, 0.4f)
+                val bars = rest.size
+                val slot = size.width / bars
+                val barW = slot * 0.5f
+                val cy = size.height / 2f
+                val maxH = size.height
+                val twoPi = 2f * Math.PI.toFloat()
+                for (i in 0 until bars) {
+                    val wob = 0.5f + 0.5f * kotlin.math.sin((t + i * 0.16f) * twoPi)
+                    // Small idle shimmer while listening + a voice-driven leap.
+                    val drive = (ampActive + 0.12f * progress).coerceIn(0f, 1f)
+                    val live = ((0.2f + 0.8f * wob) * drive + 0.14f).coerceIn(0.12f, 1f)
+                    // Blend from the resting icon shape (idle) to the live bar.
+                    val frac = rest[i] * (1f - progress) + live * progress
+                    val h = (maxH * frac).coerceAtLeast(barW)
+                    val x = slot * i + slot / 2f
+                    drawLine(
+                        color = barColor,
+                        start = Offset(x, cy - h / 2f),
+                        end = Offset(x, cy + h / 2f),
+                        strokeWidth = barW,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
         }
     }
 }

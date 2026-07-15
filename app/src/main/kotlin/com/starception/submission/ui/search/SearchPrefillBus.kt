@@ -51,4 +51,22 @@ object SearchPrefillBus {
     fun setSearchOpen(open: Boolean) {
         _isSearchOpen.value = open
     }
+
+    // Live on-device voice-capture state, published by AppTopSearchBar (which
+    // owns the Whisper service): whether capture is active, and the current mic
+    // amplitude while it is. Ambient surfaces like the bottom voice-assistant
+    // button read these to animate in sync with the real listening session.
+    private val _listening = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val listening: kotlinx.coroutines.flow.StateFlow<Boolean> = _listening
+
+    fun setListening(value: Boolean) {
+        _listening.value = value
+    }
+
+    private val _voiceLevel = kotlinx.coroutines.flow.MutableStateFlow(0f)
+    val voiceLevel: kotlinx.coroutines.flow.StateFlow<Float> = _voiceLevel
+
+    fun setVoiceLevel(value: Float) {
+        _voiceLevel.value = value
+    }
 }

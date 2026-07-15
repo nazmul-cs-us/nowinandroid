@@ -183,6 +183,29 @@ fun AppTopSearchBar(
         ),
         label = "listenProgress",
     )
+    // Publish the live capture state + mic level to the shared bus so the bottom
+    // voice-assistant button animates in sync with the real listening session
+    // (it lives in NiaApp, outside this bar, and has no direct service handle).
+    LaunchedEffect(isListening) {
+        com.starception.submission.ui.search.SearchPrefillBus.setListening(isListening)
+    }
+    LaunchedEffect(whisperService) {
+        whisperService.voiceLevel.collect {
+            com.starception.submission.ui.search.SearchPrefillBus.setVoiceLevel(it)
+        }
+    }
+    // Safety reset: if this search bar leaves composition while search is open or
+    // a capture is live (e.g. tapping a result navigates to a new screen, so the
+    // SearchView never fires its HIDDEN transition), clear the shared flags. This
+    // stops `isSearchOpen`/`listening` getting stuck true and permanently hiding
+    // ambient surfaces such as the floating bottom navigation bar.
+    DisposableEffect(Unit) {
+        onDispose {
+            com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(false)
+            com.starception.submission.ui.search.SearchPrefillBus.setListening(false)
+            com.starception.submission.ui.search.SearchPrefillBus.setVoiceLevel(0f)
+        }
+    }
     // SearchBar's bounds inside the AndroidView, used to position the
     // voice wave overlay precisely around the pill.
     var searchBarBoundsPx by remember { mutableStateOf<Rect?>(null) }
