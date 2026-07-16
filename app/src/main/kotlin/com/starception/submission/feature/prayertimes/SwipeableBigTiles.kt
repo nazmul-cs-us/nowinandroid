@@ -1308,6 +1308,12 @@ fun SwipeableBigTiles(
         val tilt by rememberParallaxTilt()
         val parallaxFrontPx = with(density) { (if (isLandscape) 8.dp else 12.dp).toPx() }
         val parallaxBackPx = parallaxFrontPx * 0.3f
+        // Vertical (pitch) parallax gets a larger throw than horizontal so tilting
+        // the phone up/down gives a more pronounced, engaging 3D lift. (The stack
+        // rests neutral at any hold angle, so this only shows while actively
+        // tilting — no overlap at rest.)
+        val parallaxFrontPxY = with(density) { (if (isLandscape) 16.dp else 24.dp).toPx() }
+        val parallaxBackPxY = parallaxFrontPxY * 0.3f
 
         // Resting geometry: a RIGHT-TO-LEFT fan. The front card sits in place; each
         // card behind it steps to the LEFT only (no vertical offset) and tapers
@@ -1609,17 +1615,18 @@ fun SwipeableBigTiles(
                                     if (q < flightSplit) {
                                         val t = q / flightSplit
                                         translationX = tilt.x * parallaxFrontPx
-                                        translationY = -lift * t + tilt.y * parallaxFrontPx
+                                        translationY = -lift * t + tilt.y * parallaxFrontPxY
                                         val s = 1f - (1f - apexScale) * t
                                         scaleX = s; scaleY = s
                                         rotationX = apexTilt * t
                                     } else {
                                         val t = FastOutSlowInEasing.transform((q - flightSplit) / (1f - flightSplit))
                                         val par = lerp(parallaxFrontPx, parallaxBackPx, t)
+                                        val parY = lerp(parallaxFrontPxY, parallaxBackPxY, t)
                                         // Descend into the deepest fan slot (slot 3):
                                         // up-and-left, matching the resting fan.
                                         translationX = lerp(0f, -fanXPx * 3f, t) + tilt.x * par
-                                        translationY = lerp(-lift, -fanYPx * 3f, t) + tilt.y * par
+                                        translationY = lerp(-lift, -fanYPx * 3f, t) + tilt.y * parY
                                         val s = lerp(apexScale, 1f - scaleStep * 3f, t)
                                         scaleX = s; scaleY = s
                                         rotationX = apexTilt * (1f - t)
@@ -1632,8 +1639,9 @@ fun SwipeableBigTiles(
                                     val slot = (if (v >= 0f) position - promote(v) else position + promote(-v))
                                         .coerceIn(0f, 3f)
                                     val par = lerp(parallaxFrontPx, parallaxBackPx, slot / 3f)
+                                    val parY = lerp(parallaxFrontPxY, parallaxBackPxY, slot / 3f)
                                     translationX = -fanXPx * slot + tilt.x * par
-                                    translationY = -fanYPx * slot + tilt.y * par
+                                    translationY = -fanYPx * slot + tilt.y * parY
                                     val s = 1f - scaleStep * slot
                                     scaleX = s; scaleY = s
                                 }
