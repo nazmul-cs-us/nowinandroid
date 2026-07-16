@@ -1105,46 +1105,18 @@ fun DuaDetailScreen(
         }
     }
 
-    // Continuous playback: when a dua finishes on its own, auto-play the next dua in
-    // this chapter (Fortress-of-the-Muslim). Fires only on natural completion, so a
-    // pause stops the chain. Re-registered when the list changes; cleared on dispose so
-    // it never fires for another screen.
-    DisposableEffect(duasList) {
-        ChapterAudioController.onCompletion = {
-            val completedTitle = ChapterAudioController.currentTitle
-            val idx = if (completedTitle != null) {
-                duasList.indexOfFirst { it.title == completedTitle }
-            } else {
-                -1
-            }
-            val next = idx + 1
-            if (idx >= 0 && next < duasList.size) {
-                val nextDua = duasList[next]
-                scope.launch {
-                    val chTitle = nextDua.title.substringBefore(":").trim()
-                    val position = Regex("""Dua\s+(\d+)""").find(nextDua.title)
-                        ?.groupValues?.get(1)?.toIntOrNull()
-                    val nextUrl = withContext(Dispatchers.IO) {
-                        runCatching {
-                            val dao = DuaDatabase.getInstance(context).duaDao()
-                            val perDua = if (position != null) {
-                                dao.getDuaAudioByTitleAndPosition(chTitle, position)
-                            } else {
-                                null
-                            }
-                            perDua ?: dao.getChapterAudioByTitle(chTitle)
-                        }.getOrNull()
-                    }
-                    // Follow playback visually, then start the next dua.
-                    pagerState.animateScrollToPage(next)
-                    if (nextUrl != null) {
-                        ChapterAudioController.currentTitle = nextDua.title
-                        ChapterAudioController.toggle(nextUrl)
-                    }
-                }
+    // Follow app-level continuous playback visually: when the background auto-advance
+    // moves to the next dua (updating the controller's observable current title), animate
+    // the pager to that dua so an open screen stays in sync. Playback itself — and its
+    // background continuation — is owned by the app, not this screen.
+    LaunchedEffect(ChapterAudioController.currentTitle, duasList) {
+        val playingTitle = ChapterAudioController.currentTitle
+        if (playingTitle != null && duasList.isNotEmpty()) {
+            val idx = duasList.indexOfFirst { it.title == playingTitle }
+            if (idx >= 0 && idx != pagerState.currentPage) {
+                pagerState.animateScrollToPage(idx)
             }
         }
-        onDispose { ChapterAudioController.onCompletion = null }
     }
 
     // When duasList is empty but we have fallback content, show 1 (single dua from navigation params)

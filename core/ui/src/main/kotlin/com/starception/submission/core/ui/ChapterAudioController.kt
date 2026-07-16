@@ -32,8 +32,9 @@ object ChapterAudioController {
     var loadingUrl by mutableStateOf<String?>(null)
         private set
 
-    /** Title of the current track, set by the play button so the media bar can label it. */
-    var currentTitle: String? = null
+    /** Title of the current track, set by the play button so the media bar can label it.
+     *  Observable (mutableStateOf) so screens can follow app-level continuous playback. */
+    var currentTitle by mutableStateOf<String?>(null)
 
     private var mp: MediaPlayer? = null
 
