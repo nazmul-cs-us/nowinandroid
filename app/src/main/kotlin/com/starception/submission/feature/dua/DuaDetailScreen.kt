@@ -152,6 +152,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -173,6 +174,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.feature.surah.QuranFonts
@@ -1899,10 +1901,15 @@ fun DuaDetailScreen(
                                 val offset = lazyListState.firstVisibleItemScrollOffset
                                 val delta = (index * 1000 + offset) - (prevIndex * 1000 + prevOffset)
                                 if (kotlin.math.abs(delta) > 10) {
-                                    fabVisible = if (index == 0 && offset < 100) {
-                                        true // at top: always show
-                                    } else {
-                                        delta < 0 // scrolling up → show, down → hide
+                                    fabVisible = when {
+                                        // At the very top: always show.
+                                        index == 0 && offset < 100 -> true
+                                        // Header fully scrolled off: keep hidden (the FAB
+                                        // rides off with the banner; don't flash it back in
+                                        // on an upward flick deep in the list).
+                                        index > 0 -> false
+                                        // Within the header: scrolling up shows, down hides.
+                                        else -> delta < 0
                                     }
                                     prevIndex = index
                                     prevOffset = offset
@@ -1918,10 +1925,26 @@ fun DuaDetailScreen(
                                 ) + fadeOut(animationSpec = tween(durationMillis = 300)),
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    // Centered on the artwork/card boundary — measured to
-                                    // match the Hadith page's FAB (center exactly at the
-                                    // banner's bottom edge).
-                                    .offset(x = (-12).dp, y = headerHeight - 28.dp),
+                                    // Ride up 1:1 with the scroll like the Surah page's FAB
+                                    // (which lives inside the scrolling content): stay pinned
+                                    // to the banner's bottom edge and track how far the header
+                                    // (item 0) has scrolled up, so it moves with the page and
+                                    // then scrolls away — instead of just vanishing in place.
+                                    // Read in the layout phase (offset lambda) so scrolling
+                                    // never triggers recomposition.
+                                    .offset {
+                                        val scrolled = if (lazyListState.firstVisibleItemIndex == 0) {
+                                            lazyListState.firstVisibleItemScrollOffset
+                                        } else {
+                                            // Header fully scrolled off — carry the FAB off
+                                            // the top edge with it.
+                                            headerHeight.toPx().toInt()
+                                        }
+                                        IntOffset(
+                                            x = (-12).dp.toPx().roundToInt(),
+                                            y = (headerHeight.toPx() - 28.dp.toPx() - scrolled).roundToInt(),
+                                        )
+                                    },
                             ) {
                                 val isThisPlaying = ChapterAudioController.currentUrl == audioUrl &&
                                     ChapterAudioController.isPlaying
