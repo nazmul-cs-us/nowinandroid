@@ -164,6 +164,11 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     { pos, dur ->
                         com.starception.submission.media.GlobalMediaViewModel.onFortressProgressChanged?.invoke(pos, dur)
                     }
+                // Bridge the service's natural-completion signal to the controller so the
+                // Dua screen can auto-play the next dua in the chapter.
+                com.starception.submission.services.ChapterRecitationState.onCompletion = {
+                    com.starception.submission.core.ui.ChapterAudioController.onCompletion?.invoke()
+                }
 
                 Log.d("SubmissionApplication", "Background initialization completed")
             } catch (e: Exception) {

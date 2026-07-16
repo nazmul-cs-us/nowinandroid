@@ -56,6 +56,13 @@ object ChapterAudioController {
     var onProgressChanged: ((positionMs: Int, durationMs: Int) -> Unit)? = null
 
     /**
+     * Fired when the current recitation finishes on its own (natural end — NOT a pause or stop).
+     * The app bridges the [ChapterRecitationService] completion here; the Dua screen uses it to
+     * auto-play the next dua in the chapter.
+     */
+    var onCompletion: (() -> Unit)? = null
+
+    /**
      * Optional delegate, supplied by the app, that plays through a foreground MediaSession service
      * (ChapterRecitationService) so playback shows a system notification + lock-screen controls.
      * When set, toggle() delegates play/pause to it instead of using the in-app MediaPlayer.
@@ -171,6 +178,7 @@ object ChapterAudioController {
             isPlaying = false
             stopProgressTicker()
             onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
+            onCompletion?.invoke()
         }
         newPlayer.setOnErrorListener { _, _, _ ->
             loadingUrl = null; isPlaying = false; currentUrl = null

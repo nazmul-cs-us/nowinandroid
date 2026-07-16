@@ -87,6 +87,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1328,10 +1329,18 @@ fun PrayerTimesScreen(
                                     horizontalArrangement = Arrangement.Start,
                                     verticalAlignment = Alignment.Bottom
                                 ) {
-                                    // Time (hour:minute)
+                                    // Time (hour:minute). headlineMedium's default ~36sp
+                                    // line box PLUS the extra font padding overflows the
+                                    // shorter expanded tile and clips the time. Drop the
+                                    // font padding and use a snug (but glyph-safe) line box
+                                    // so it stays fully visible without taller tiles.
                                     Text(
                                         text = timeOnly,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontSize = 24.sp,
+                                            lineHeight = 30.sp,
+                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        ),
                                         color = baseColor,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -1915,7 +1924,10 @@ fun PrayerTimesScreen(
                 val tileHeight by animateDpAsState(
                     // Collapsed tiles are a touch shorter (was 140) so the whole
                     // collapsed dashboard fits one screen with the location card
-                    // clearing the floating nav bar — no scrolling needed.
+                    // clearing the floating nav bar — no scrolling needed. Expanded
+                    // stays 112 so "Show Less" and the location card still fit; the
+                    // prayer-time clip is fixed by dropping its font padding (below),
+                    // not by making these tiles taller.
                     targetValue = if (showAllPrayers) 112.dp else 136.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
