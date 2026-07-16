@@ -1913,7 +1913,10 @@ fun PrayerTimesScreen(
                 // row + Show Less button land just above the floating nav pill
                 // without the page having to scroll.
                 val tileHeight by animateDpAsState(
-                    targetValue = if (showAllPrayers) 112.dp else 140.dp,
+                    // Collapsed tiles are a touch shorter (was 140) so the whole
+                    // collapsed dashboard fits one screen with the location card
+                    // clearing the floating nav bar — no scrolling needed.
+                    targetValue = if (showAllPrayers) 112.dp else 136.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
