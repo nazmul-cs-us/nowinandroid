@@ -487,6 +487,9 @@ object GoogleSampleNotificationManager {
         // Look for NEXT prayer in the countdown text
         val nextPrayerShort = when {
             textToSearch.contains("Fajr", ignoreCase = true) -> "Fjr"
+            // Jummah (Friday) replaces Dhuhr — match it before/alongside Dhuhr so the chip
+            // shows "Jum" instead of falling through to the generic "Nxt".
+            textToSearch.contains("Jum", ignoreCase = true) -> "Jum"
             textToSearch.contains("Dhuhr", ignoreCase = true) -> "Dhr"
             textToSearch.contains("Asr", ignoreCase = true) -> "Asr"
             textToSearch.contains("Maghrib", ignoreCase = true) -> "Mgb"

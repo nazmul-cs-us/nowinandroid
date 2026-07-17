@@ -171,26 +171,26 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 // card — title without ": Dua ") is left alone, and a null next-audio (end of
                 // chapter) simply stops.
                 val autoAdvanceNextDua: () -> Unit = {
-                    val completedTitle = com.starception.submission.core.ui.ChapterAudioController.currentTitle
+                    val controller = com.starception.submission.core.ui.ChapterAudioController
+                    val completedTitle = controller.currentTitle
+                    Log.d("DuaAutoPlay", "onCompletion | completed='$completedTitle'")
+                    // Only per-dua/chapter recitations ("Chapter: Dua N") auto-advance.
                     if (completedTitle != null && completedTitle.contains(": Dua ")) {
+                        val completedChapter = completedTitle.substringBefore(":").trim()
                         delegateScope.launch {
-                            val chTitle = completedTitle.substringBefore(":").trim()
-                            val position = Regex("""Dua\s+(\d+)""").find(completedTitle)
-                                ?.groupValues?.getOrNull(1)?.toIntOrNull()
-                            if (position != null) {
-                                val nextPos = position + 1
-                                val nextAudio = runCatching {
-                                    com.starception.submission.core.duadatabase.DuaDatabase
-                                        .getInstance(appCtx).duaDao()
-                                        .getDuaAudioByTitleAndPosition(chTitle, nextPos)
-                                }.getOrNull()
-                                if (!nextAudio.isNullOrBlank()) {
-                                    kotlinx.coroutines.withContext(Dispatchers.Main) {
-                                        com.starception.submission.core.ui.ChapterAudioController
-                                            .currentTitle = "$chTitle: Dua $nextPos"
-                                        com.starception.submission.core.ui.ChapterAudioController
-                                            .toggle(nextAudio)
-                                    }
+                            // DB-derived: play the next fortress chapter's recitation. Works from
+                            // ANY entry point (topic/feed card or the detail screen) and continues
+                            // in the background; stops at the end of the book.
+                            val next = runCatching {
+                                com.starception.submission.core.duadatabase.DuaDatabase
+                                    .getInstance(appCtx).duaDao()
+                                    .getNextChapterAfter(completedChapter)
+                            }.getOrNull()
+                            Log.d("DuaAutoPlay", "completedChapter='$completedChapter' next='${next?.title}' audio=${next?.audioUrl}")
+                            if (next != null && next.audioUrl.isNotBlank()) {
+                                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                    controller.currentTitle = "${next.title}: Dua 1"
+                                    controller.toggle(next.audioUrl)
                                 }
                             }
                         }

@@ -3211,11 +3211,19 @@ class PrayerSettingsRepository @Inject constructor(
         )
     }
 
-    /** Whether the one-time first-run "grant Do Not Disturb access" prompt has been shown. */
-    fun hasShownDndPrompt(): Boolean = prefs.getBoolean(KEY_DND_PROMPT_SHOWN, false)
+    // "Silent During Prayer" is on by default but needs Do Not Disturb access to work. Ask for
+    // it once PER APP SESSION while it's still missing — not once-ever. (The old persisted flag
+    // meant anyone who dismissed the first prompt was never asked again, so silent mode silently
+    // never worked.) In-memory so it re-prompts on the next launch until access is granted;
+    // granting access makes the caller's `!dndGranted` guard stop it, and turning the feature
+    // off also stops it.
+    private var dndPromptShownThisSession = false
 
-    /** Mark the one-time DND-access prompt as shown so it never appears again. */
+    /** Whether the "grant Do Not Disturb access" prompt has been shown this app session. */
+    fun hasShownDndPrompt(): Boolean = dndPromptShownThisSession
+
+    /** Mark the DND-access prompt as shown for this session (re-asks next launch if still ungranted). */
     fun markDndPromptShown() {
-        prefs.edit().putBoolean(KEY_DND_PROMPT_SHOWN, true).apply()
+        dndPromptShownThisSession = true
     }
 }

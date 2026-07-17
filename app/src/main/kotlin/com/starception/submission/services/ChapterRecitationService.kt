@@ -153,6 +153,7 @@ class ChapterRecitationService : Service() {
             startProgressUpdates()
         }
         player.setOnCompletionListener {
+            Log.d("DuaAutoPlay", "service setOnCompletionListener fired | title=${ChapterRecitationState.title}")
             ChapterRecitationState.markStopped()
             stopProgressUpdates()
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)

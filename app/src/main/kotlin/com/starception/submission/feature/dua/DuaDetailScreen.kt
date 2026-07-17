@@ -1105,6 +1105,13 @@ fun DuaDetailScreen(
         }
     }
 
+    // Publish this list's ordered dua titles so the app-level continuous playback can keep
+    // advancing through the topic in the background (and even after leaving this screen).
+    LaunchedEffect(duasList) {
+        ChapterAudioController.playlistTitles = duasList.map { it.title }
+        android.util.Log.d("DuaAutoPlay", "playlist set | size=${duasList.size} first='${duasList.firstOrNull()?.title}'")
+    }
+
     // Follow app-level continuous playback visually: when the background auto-advance
     // moves to the next dua (updating the controller's observable current title), animate
     // the pager to that dua so an open screen stays in sync. Playback itself — and its

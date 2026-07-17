@@ -64,6 +64,14 @@ object ChapterAudioController {
     var onCompletion: (() -> Unit)? = null
 
     /**
+     * Ordered dua titles ("Chapter: Dua N") for the list currently being played, set by the
+     * Dua screen so the app-level auto-advance can continue through the topic in the
+     * background. Duas in one chapter share a single chapter-level recitation, so the advance
+     * skips to the next chapter's dua.
+     */
+    var playlistTitles: List<String> = emptyList()
+
+    /**
      * Optional delegate, supplied by the app, that plays through a foreground MediaSession service
      * (ChapterRecitationService) so playback shows a system notification + lock-screen controls.
      * When set, toggle() delegates play/pause to it instead of using the in-app MediaPlayer.

@@ -51,6 +51,20 @@ interface DuaDao {
     suspend fun getChapterAudioByTitle(title: String): String?
 
     /**
+     * The next chapter (by table order) after the one titled [title] that has a recitation —
+     * used to auto-advance continuous playback into the following chapter. Null past the end.
+     */
+    @Query(
+        """
+        SELECT title, audio_url AS audioUrl FROM chapters
+        WHERE id > (SELECT id FROM chapters WHERE title = :title LIMIT 1)
+          AND audio_url IS NOT NULL AND audio_url != ''
+        ORDER BY id ASC LIMIT 1
+        """
+    )
+    suspend fun getNextChapterAfter(title: String): NextChapterAudio?
+
+    /**
      * Per-DUA recitation audio URL, looked up by chapter title + dua position.
      * Falls back (in the caller) to the chapter audio when a dua has none.
      */
@@ -465,6 +479,14 @@ data class ChapterWithCount(
     val id: Int,
     val title: String,
     val duaCount: Int
+)
+
+/**
+ * Next chapter's title + recitation URL, for continuous playback auto-advance.
+ */
+data class NextChapterAudio(
+    val title: String,
+    val audioUrl: String,
 )
 
 /**
