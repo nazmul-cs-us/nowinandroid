@@ -2,9 +2,11 @@ package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -96,7 +98,7 @@ fun AiSuggestionsFab(
         initialValue = 1f,
         targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500),
+            animation = tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
@@ -105,8 +107,8 @@ fun AiSuggestionsFab(
     // Show FAB only when there are pending suggestions
     AnimatedVisibility(
         visible = hasPendingSuggestions,
-        enter = scaleIn() + fadeIn(),
-        exit = scaleOut() + fadeOut(),
+        enter = scaleIn(spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)) + fadeIn(tween(200)),
+        exit = scaleOut(tween(150)) + fadeOut(tween(150)),
         modifier = modifier
     ) {
         BadgedBox(

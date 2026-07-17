@@ -20,6 +20,12 @@ package com.starception.submission.feature.settings
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -188,7 +194,11 @@ private fun ColumnScope.SettingsPanel(
             onClick = { onChangeThemeBrand(ROYAL) },
         )
     }
-    AnimatedVisibility(visible = settings.brand == DEFAULT && supportDynamicColor) {
+    AnimatedVisibility(
+        visible = settings.brand == DEFAULT && supportDynamicColor,
+        enter = fadeIn(tween(300)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
+        exit = fadeOut(tween(200)) + shrinkVertically(tween(200, easing = FastOutSlowInEasing))
+    ) {
         Column {
             SettingsDialogSectionTitle(text = stringResource(string.feature_settings_dynamic_color_preference))
             Column(Modifier.selectableGroup()) {

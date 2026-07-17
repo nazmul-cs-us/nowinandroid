@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 import com.starception.submission.prayer.service.EnhancedLocationService
 import kotlinx.coroutines.launch
@@ -238,10 +239,7 @@ fun CompassProgressIndicator(
     
     val animatedCompassDegree by animateFloatAsState(
         targetValue = currentDegreeState.floatValue,
-        animationSpec = tween(
-            durationMillis = 300, // Slightly longer animation for smoother movement
-            easing = androidx.compose.animation.core.FastOutSlowInEasing // Smoother easing
-        ),
+        animationSpec = NiaMotion.spatialFast(),
         label = "compassRotation"
     )
     
@@ -335,7 +333,7 @@ fun CompassProgressIndicator(
                 angularDistance < 90f -> 0.30f
                 else              -> 0.15f
             },
-            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1),
             label = "glowAlpha"
         )
         val glowColor = if (isNearQibla) Color(0xFF10B981) else accuracyColor
@@ -399,17 +397,17 @@ fun CompassProgressIndicator(
         // Arc animations — declared here before canvas usage
         val arcAlpha by animateFloatAsState(
             targetValue = if (isNearQibla) 0f else 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
             label = "arcAlpha"
         )
         val arcScale by animateFloatAsState(
             targetValue = if (isNearQibla) 0.2f else 1f,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
             label = "arcScale"
         )
         val arcProgress by animateFloatAsState(
             targetValue = if (isNearQibla) 0.03f else 0.15f,
-            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
             label = "arcProgress"
         )
 
@@ -468,7 +466,7 @@ fun CompassProgressIndicator(
         )
         val kaabaGlow by animateFloatAsState(
             targetValue = if (isNearQibla) 1f else 0f,
-            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_4),
             label = "kaabaGlow"
         )
         // Subtle breathing effect for Kaaba when aligned

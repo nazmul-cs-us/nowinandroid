@@ -178,7 +178,7 @@ fun AppTopSearchBar(
     val listenProgress by animateFloatAsState(
         targetValue = if (isListening) 1f else 0f,
         animationSpec = spring(
-            dampingRatio = 0.72f,
+            dampingRatio = 0.7f,
             stiffness = Spring.StiffnessLow,
         ),
         label = "listenProgress",
@@ -662,7 +662,7 @@ fun AppTopSearchBar(
             targetValue = (whisperLevel * 15f).coerceIn(0f, 1f),
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 450f,
+                stiffness = 400f,
             ),
             label = "voiceLevel",
         )

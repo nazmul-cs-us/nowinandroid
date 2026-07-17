@@ -932,8 +932,13 @@ fun DuaDetailScreen(
     // to the whole-chapter recitation only if a dua has no per-dua audio.
     var chapterAudioUrl by remember(title) { mutableStateOf<String?>(null) }
     LaunchedEffect(title) {
-        val chTitle = title.substringBefore(":").trim()
-        val position = Regex("""Dua\s+(\d+)""").find(title)?.groupValues?.get(1)?.toIntOrNull()
+        // Chapter titles can contain colons — split on the ": Dua N" suffix instead.
+        val chTitle = if (title.contains(": Dua ")) {
+            title.substringBeforeLast(": Dua ").trim()
+        } else {
+            title.substringBefore(":").trim()
+        }
+        val position = title.substringAfterLast(": Dua ", "").trim().toIntOrNull()
         chapterAudioUrl = withContext(Dispatchers.IO) {
             runCatching {
                 val dao = DuaDatabase.getInstance(context).duaDao()
@@ -1210,11 +1215,7 @@ fun DuaDetailScreen(
 
                 val duaAnimatedProgress by animateFloatAsState(
                     targetValue = targetProgress,
-                    animationSpec = if (targetProgress == 0f) {
-                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
-                    } else {
-                        spring(stiffness = Spring.StiffnessHigh)
-                    },
+                    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessHigh),
                     label = "duaSwipeProgress",
                 )
 
@@ -1884,9 +1885,12 @@ fun DuaDetailScreen(
                         // to the whole-chapter recitation).
                         var pageAudioUrl by remember(dua.title) { mutableStateOf<String?>(null) }
                         LaunchedEffect(dua.title) {
-                            val chTitle = dua.title.substringBefore(":").trim()
-                            val position = Regex("""Dua\s+(\d+)""").find(dua.title)
-                                ?.groupValues?.get(1)?.toIntOrNull()
+                            val chTitle = if (dua.title.contains(": Dua ")) {
+                                dua.title.substringBeforeLast(": Dua ").trim()
+                            } else {
+                                dua.title.substringBefore(":").trim()
+                            }
+                            val position = dua.title.substringAfterLast(": Dua ", "").trim().toIntOrNull()
                             pageAudioUrl = withContext(Dispatchers.IO) {
                                 runCatching {
                                     val dao = DuaDatabase.getInstance(context).duaDao()
@@ -2134,8 +2138,8 @@ fun DuaDetailScreen(
 
                 AnimatedVisibility(
                     visible = expandedEllipsis != 0 && activeHiddenPages.isNotEmpty(),
-                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
+                    enter = expandVertically(expandFrom = Alignment.Bottom, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
                 ) {
                     Surface(
                         modifier = Modifier
@@ -2265,7 +2269,7 @@ fun DuaDetailScreen(
                                 // Animated scale for active
                                 val scale by animateFloatAsState(
                                     targetValue = if (isActive) 1.15f else 1f,
-                                    animationSpec = tween(durationMillis = 200),
+                                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
                                     label = "scale"
                                 )
                                 Surface(
@@ -2338,8 +2342,8 @@ fun DuaDetailScreen(
             // re-renders the actual Arabic as the font and size change.
             AnimatedVisibility(
                 visible = showFloatingToolbar,
-                enter = fadeIn(animationSpec = tween(160)),
-                exit = fadeOut(animationSpec = tween(160)),
+                enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
+                exit = fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)),
                 modifier = Modifier.zIndex(10f),
             ) {
                 // Tap-outside-to-dismiss layer with a light dim, so the sheet reads
@@ -2592,7 +2596,11 @@ fun DuaDetailScreen(
                             )
                         }
 
-                        AnimatedVisibility(visible = expandedSection == "font") {
+                        AnimatedVisibility(
+                            visible = expandedSection == "font",
+                            enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                            exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
+                        ) {
                             Column {
                                 availableFonts.forEach { font ->
                                     val fontSelected = selectedFont == font
@@ -2670,7 +2678,11 @@ fun DuaDetailScreen(
                             )
                         }
 
-                        AnimatedVisibility(visible = expandedSection == "language") {
+                        AnimatedVisibility(
+                            visible = expandedSection == "language",
+                            enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                            exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
+                        ) {
                             Column {
                                 availableTranslations.forEach { code ->
                                     val langSelected = selectedTranslation == code
@@ -2738,7 +2750,7 @@ fun DuaDetailScreen(
             val statusBarVisible = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() > 0.dp
             val toolbarAlpha by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (statusBarVisible) 0f else 1f,
-                animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 180, easing = FastOutSlowInEasing),
                 label = "toolbarAlpha"
             )
 
@@ -3234,7 +3246,7 @@ private fun CollapsibleDuaSection(
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
         label = "chevronRotation"
     )
 
@@ -3342,8 +3354,8 @@ private fun CollapsibleDuaSection(
                     // Expandable content
                     AnimatedVisibility(
                         visible = isExpanded,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                        exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
                     ) {
                         Box(
                             modifier = Modifier

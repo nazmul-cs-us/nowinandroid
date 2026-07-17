@@ -1,7 +1,12 @@
 package com.starception.submission.download
 
 import android.util.Log
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,7 +67,7 @@ fun MissingContentCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .animateContentSize(),
+            .animateContentSize(animationSpec = tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -95,7 +101,19 @@ fun MissingContentCard(
                 textAlign = TextAlign.Center,
             )
 
-            when (val state = downloadState) {
+            AnimatedContent(
+                targetState = downloadState,
+                transitionSpec = {
+                    NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit()
+                },
+                label = "download_state",
+            ) { state ->
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                when (state) {
                 is DownloadCardState.Idle -> {
                     val sizeText = if (categorySize > 0) {
                         " (${formatSize(categorySize)})"
@@ -181,6 +199,8 @@ fun MissingContentCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Retry")
                     }
+                }
+                }
                 }
             }
         }

@@ -1268,10 +1268,16 @@ fun PrayerTimesScreen(
                             }
                             Text(
                                 text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
+                                // The Arabic fonts carry very tall ascent/descent, so an
+                                // unconstrained line box here eats the 112dp expanded tile's
+                                // height budget and the time row below gets clipped. Pin the
+                                // line box like the time text does.
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontFamily = getSelectedArabicFontFamily(screenContext),
                                     fontSize = 16.sp,
-                                    letterSpacing = 0.4.sp
+                                    letterSpacing = 0.4.sp,
+                                    lineHeight = 22.sp,
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
                                 ),
                                 color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
                                     "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
@@ -1925,10 +1931,11 @@ fun PrayerTimesScreen(
                     // Collapsed tiles are a touch shorter (was 140) so the whole
                     // collapsed dashboard fits one screen with the location card
                     // clearing the floating nav bar — no scrolling needed. Expanded
-                    // stays 112 so "Show Less" and the location card still fit; the
-                    // prayer-time clip is fixed by dropping its font padding (below),
-                    // not by making these tiles taller.
-                    targetValue = if (showAllPrayers) 112.dp else 136.dp,
+                    // needs 118: at 112 the name row + Arabic line + 24sp time exceed
+                    // the inner budget and the time digits clip at the tile's bottom,
+                    // even with font padding stripped. Three rows still land above
+                    // the floating nav with ~20dp to spare.
+                    targetValue = if (showAllPrayers) 118.dp else 136.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
@@ -1950,18 +1957,11 @@ fun PrayerTimesScreen(
                 
                 val sunriseAnimProgress by animateFloatAsState(
                     targetValue = if (showAllPrayers) 1f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium,
-                        visibilityThreshold = 0.01f
-                    ).let { spec ->
-                        // Add stagger delay for sunrise card
-                        tween(
-                            durationMillis = (spec as? SpringSpec)?.let { 600 } ?: 400,
-                            delayMillis = 80,
-                            easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
-                        )
-                    },
+                    animationSpec = tween(
+                        durationMillis = 600,
+                        delayMillis = 80,
+                        easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+                    ),
                     label = "sunriseCardAnimation"
                 )
                 

@@ -1,6 +1,8 @@
 package com.starception.submission.feature.salah.datacollection
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -390,6 +392,7 @@ private fun PostureSegmentBox(
     val width = ((segment.endIndex - segment.startIndex + 1) * 2).dp.coerceAtLeast(20.dp)
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.05f else 1f,
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "segmentScale"
     )
     val hapticFeedback = LocalHapticFeedback.current

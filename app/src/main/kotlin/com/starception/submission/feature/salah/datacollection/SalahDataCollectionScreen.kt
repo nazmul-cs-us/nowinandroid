@@ -797,7 +797,7 @@ private fun GuidedRecordingCard(
                     } else 0f
                     val animatedProgress by animateFloatAsState(
                         targetValue = progress,
-                        animationSpec = tween(300),
+                        animationSpec = tween(300, easing = FastOutSlowInEasing),
                         label = "guided_progress"
                     )
 
@@ -807,7 +807,7 @@ private fun GuidedRecordingCard(
                         initialValue = 1f,
                         targetValue = 0.3f,
                         animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
+                            animation = tween(800, easing = FastOutSlowInEasing),
                             repeatMode = RepeatMode.Reverse
                         ),
                         label = "rec_dot"
@@ -1197,7 +1197,7 @@ private fun RecordingHero(
                     initialValue = 1f,
                     targetValue = 0.3f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(800, easing = LinearEasing),
+                        animation = tween(800, easing = FastOutSlowInEasing),
                         repeatMode = RepeatMode.Reverse
                     ),
                     label = "rec_alpha"
@@ -1494,6 +1494,7 @@ private fun PostureChip(
             isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
             else -> MaterialTheme.colorScheme.onSurface
         },
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "text"
     )
     val borderColor by animateColorAsState(

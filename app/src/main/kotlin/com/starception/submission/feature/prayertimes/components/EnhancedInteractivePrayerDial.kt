@@ -157,18 +157,18 @@ fun EnhancedInteractivePrayerDial(
     // Enhanced animations with elastic spring effects
     val dialScale by animateFloatAsState(
         targetValue = when {
-            isDragging -> 1.08f
+            isDragging -> 1.03f
             else -> 1f
         },
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessVeryLow
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "dialScale"
     )
 
     val knobScale by animateFloatAsState(
-        targetValue = if (isDragging) 1.25f else 1f,
+        targetValue = if (isDragging) 1.1f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -452,8 +452,8 @@ fun EnhancedInteractivePrayerDial(
                 // Adjustment indicator with animation
                 AnimatedVisibility(
                     visible = currentAdjustment != 0,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = expandVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(200, easing = LinearOutSlowInEasing)),
+                    exit = shrinkVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
                 ) {
                     Text(
                         text = formatAdjustment(currentAdjustment),

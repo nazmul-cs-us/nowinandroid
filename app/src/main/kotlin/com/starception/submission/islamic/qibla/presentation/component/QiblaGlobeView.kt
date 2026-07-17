@@ -124,10 +124,12 @@ fun QiblaGlobeView(
     var deviceHeading by remember { mutableFloatStateOf(0f) }
     var lastUpdatedHeading by remember { mutableFloatStateOf(0f) }  // Track last heading used for update
 
-    // Smooth animated heading - same animation as Smart Prediction tile's CompassProgressIndicator
     val animatedHeading by animateFloatAsState(
         targetValue = deviceHeading,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        animationSpec = spring(
+            dampingRatio = 0.75f,
+            stiffness = Spring.StiffnessMedium
+        ),
         label = "smoothBeamHeading"
     )
     var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
@@ -616,13 +618,13 @@ fun QiblaGlobeView(
                                                 val direction = if (targetState > initialState) -1 else 1
                                                 slideInVertically(
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
                                                         stiffness = Spring.StiffnessMedium
                                                     )
                                                 ) { height -> direction * height } + fadeIn() togetherWith
                                                 slideOutVertically(
                                                     animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
                                                         stiffness = Spring.StiffnessMedium
                                                     )
                                                 ) { height -> -direction * height } + fadeOut()

@@ -23,6 +23,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.feature.course.CourseScreen
 import com.starception.submission.feature.course.CourseDetailScreen
 import com.starception.submission.feature.course.CourseProgressTracker
@@ -68,7 +69,12 @@ fun NavGraphBuilder.courseScreen(
         }
     }
 
-    composable<CourseDetailRoute> { backStackEntry ->
+    composable<CourseDetailRoute>(
+        enterTransition = { NiaTransitions.detailEnter() },
+        exitTransition = { NiaTransitions.detailExit() },
+        popEnterTransition = { NiaTransitions.detailPopEnter() },
+        popExitTransition = { NiaTransitions.detailPopExit() },
+    ) { backStackEntry ->
         val context = LocalContext.current
         val route = backStackEntry.arguments?.let {
             CourseDetailRoute(it.getString("courseId") ?: "")

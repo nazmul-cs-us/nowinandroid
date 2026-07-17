@@ -21,6 +21,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.search.SearchNote
 import com.starception.submission.feature.search.SearchRoute
@@ -44,7 +45,12 @@ fun NavGraphBuilder.searchScreen(
 ) {
     // TODO: Handle back stack for each top-level destination. At the moment each top-level
     // destination may have own search screen's back stack.
-    composable<SearchRoute> { backStackEntry ->
+    composable<SearchRoute>(
+        enterTransition = { NiaTransitions.slideUpEnter() },
+        exitTransition = { NiaTransitions.fadeThroughExit() },
+        popEnterTransition = { NiaTransitions.fadeThroughEnter() },
+        popExitTransition = { NiaTransitions.slideDownExit() },
+    ) { backStackEntry ->
         val route = backStackEntry.toRoute<SearchRoute>()
         SearchRoute(
             onBackClick = onBackClick,

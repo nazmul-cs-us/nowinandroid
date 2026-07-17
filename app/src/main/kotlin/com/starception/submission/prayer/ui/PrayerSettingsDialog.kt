@@ -227,27 +227,11 @@ fun PrayerSettingsDialog(
                 )
             ) {
                 if (isLoading) {
-                    // Enhanced loading state with animation
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        val loadingRotation by rememberInfiniteTransition(label = "loading_rotation").animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(
-                                    durationMillis = 1000,
-                                    easing = LinearEasing
-                                )
-                            ),
-                            label = "loading_rotation"
-                        )
-                        
                         CircularProgressIndicator(
-                            modifier = Modifier.graphicsLayer {
-                                rotationZ = loadingRotation
-                            },
                             color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 3.dp
                         )

@@ -8,6 +8,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1780,12 +1782,16 @@ private fun HadithSectionCard(
     var expanded by remember { mutableStateOf(isExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "chevronRotation"
     )
 
     // Background color for the section
-    val sectionColor = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val sectionColor by animateColorAsState(
+        targetValue = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(150, easing = FastOutSlowInEasing),
+        label = "sectionColor"
+    )
     val sectionShape = RoundedCornerShape(12.dp)
 
     // Outer container - use Modifier.shadow with shape for proper rounded shadow
@@ -1829,6 +1835,14 @@ private fun HadithSectionCard(
             ) {
                 // Drag handle at top center - this is the only draggable area
                 if (showDragHandle) {
+                    val dragIconTint by animateColorAsState(
+                        targetValue = if (isDragging)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        animationSpec = tween(150, easing = FastOutSlowInEasing),
+                        label = "dragIconTint"
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1838,10 +1852,7 @@ private fun HadithSectionCard(
                         Icon(
                             imageVector = Icons.Default.DragHandle,
                             contentDescription = "Drag to reorder",
-                            tint = if (isDragging)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = dragIconTint,
                             modifier = dragHandleModifier.size(24.dp)
                         )
                     }
@@ -1899,8 +1910,16 @@ private fun HadithSectionCard(
                 // Expandable content with animation
                 androidx.compose.animation.AnimatedVisibility(
                     visible = expanded,
-                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                    enter = androidx.compose.animation.expandVertically(
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + androidx.compose.animation.fadeIn(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    ),
+                    exit = androidx.compose.animation.shrinkVertically(
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + androidx.compose.animation.fadeOut(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    )
                 ) {
                     Box(
                         modifier = Modifier
@@ -1964,12 +1983,16 @@ private fun HadithSectionCardWithContent(
     var expanded by remember { mutableStateOf(isExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "chevronRotation"
     )
 
     // Background color for the section
-    val sectionColor = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val sectionColor by animateColorAsState(
+        targetValue = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(150, easing = FastOutSlowInEasing),
+        label = "sectionColor"
+    )
     val sectionShape = RoundedCornerShape(12.dp)
 
     // Outer container - use Modifier.shadow with shape for proper rounded shadow
@@ -2013,6 +2036,14 @@ private fun HadithSectionCardWithContent(
             ) {
                 // Drag handle at top center - this is the only draggable area
                 if (showDragHandle) {
+                    val dragIconTint by animateColorAsState(
+                        targetValue = if (isDragging)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        animationSpec = tween(150, easing = FastOutSlowInEasing),
+                        label = "dragIconTint"
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2022,10 +2053,7 @@ private fun HadithSectionCardWithContent(
                         Icon(
                             imageVector = Icons.Default.DragHandle,
                             contentDescription = "Drag to reorder",
-                            tint = if (isDragging)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = dragIconTint,
                             modifier = dragHandleModifier.size(24.dp)
                         )
                     }
@@ -2072,8 +2100,16 @@ private fun HadithSectionCardWithContent(
                     // Expandable content with animation
                     androidx.compose.animation.AnimatedVisibility(
                         visible = expanded,
-                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                        enter = androidx.compose.animation.expandVertically(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + androidx.compose.animation.fadeIn(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing)
+                        ),
+                        exit = androidx.compose.animation.shrinkVertically(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + androidx.compose.animation.fadeOut(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing)
+                        )
                     ) {
                         Box(
                             modifier = Modifier

@@ -90,6 +90,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -424,7 +425,7 @@ private fun NiaFloatingBottomBar(
                 val bubbleAlpha by animateFloatAsState(
                     // Hidden when no top-level tab is selected (detail screens).
                     targetValue = if (selectedIndex >= 0) 1f else 0f,
-                    animationSpec = tween(200),
+                    animationSpec = tween(200, easing = FastOutSlowInEasing),
                     label = "navBubbleAlpha",
                 )
                 val bubbleColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -502,7 +503,7 @@ private fun NiaFloatingBottomBar(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        animationSpec = tween(250),
+                        animationSpec = tween(250, easing = FastOutSlowInEasing),
                         label = "navItemTint",
                     )
                     Column(

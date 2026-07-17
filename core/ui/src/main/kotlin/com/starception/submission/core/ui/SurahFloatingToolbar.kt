@@ -18,6 +18,7 @@
 package com.starception.submission.core.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -147,31 +148,45 @@ fun SurahFloatingToolbar(
             ),
             alignment = Alignment.BottomCenter
         ) {
-            // Background scrim
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        coroutineScope.launch {
-                            delay(100)
-                            onDismiss()
-                        }
-                    },
-                contentAlignment = Alignment.BottomCenter
+            // The if(visible) guard removes the Popup instantly on dismiss, so exit specs
+            // can't play; a transition state seeded false->true makes the ENTER animate
+            // on first composition (plain visible=true would appear with no animation).
+            val enterState = remember { MutableTransitionState(false) }.apply { targetState = true }
+            AnimatedVisibility(
+                visibleState = enterState,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(150))
             ) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(200)) + scaleIn(
+                // Background scrim
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            coroutineScope.launch {
+                                delay(100)
+                                onDismiss()
+                            }
+                        },
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    AnimatedVisibility(
+                    visibleState = enterState,
+                    enter = fadeIn(
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    ) + scaleIn(
                         spring(
                             dampingRatio = Spring.DampingRatioMediumBouncy,
                             stiffness = Spring.StiffnessLow
                         )
                     ),
-                    exit = fadeOut(tween(150)) + scaleOut()
+                    exit = fadeOut(tween(150)) + scaleOut(tween(150))
                 ) {
                     FloatingToolbarContent(
                         surahNumber = surahNumber,
@@ -179,6 +194,7 @@ fun SurahFloatingToolbar(
                         actions = actions,
                         onDismiss = onDismiss
                     )
+                }
                 }
             }
         }

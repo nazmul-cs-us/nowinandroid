@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import java.text.SimpleDateFormat
 import java.util.*
@@ -111,25 +112,35 @@ fun NoteDialog(
                                     modifier = Modifier.size(44.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = if (editingNote != null)
-                                                Icons.Outlined.EditNote
-                                            else
-                                                Icons.Outlined.NoteAlt,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        Crossfade(
+                                            targetState = editingNote != null,
+                                            animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4)
+                                        ) { isEditing ->
+                                            Icon(
+                                                imageVector = if (isEditing)
+                                                    Icons.Outlined.EditNote
+                                                else
+                                                    Icons.Outlined.NoteAlt,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
                                     }
                                 }
 
                                 Column {
-                                    Text(
-                                        text = if (editingNote != null) "Edit Note" else "Notes",
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Crossfade(
+                                        targetState = editingNote != null,
+                                        animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4)
+                                    ) { isEditing ->
+                                        Text(
+                                            text = if (isEditing) "Edit Note" else "Notes",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 }
                             }
 
@@ -209,8 +220,8 @@ fun NoteDialog(
                     // Expandable input section
                     AnimatedVisibility(
                         visible = isInputExpanded || existingNotes.isEmpty(),
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                        exit = shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeOut()
                     ) {
                         Column {
                             Spacer(modifier = Modifier.height(8.dp))
@@ -347,7 +358,7 @@ fun NoteDialog(
                             // Add button (when collapsed)
                             AnimatedVisibility(
                                 visible = !isInputExpanded,
-                                enter = scaleIn() + fadeIn(),
+                                enter = scaleIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
                                 exit = scaleOut() + fadeOut()
                             ) {
                                 FilledTonalIconButton(

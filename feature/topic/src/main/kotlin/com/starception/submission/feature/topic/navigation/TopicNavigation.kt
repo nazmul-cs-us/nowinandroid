@@ -23,6 +23,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.topic.TopicScreen
 import com.starception.submission.feature.topic.TopicViewModel
@@ -45,7 +46,12 @@ fun NavGraphBuilder.topicScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
-    composable<TopicRoute> { entry ->
+    composable<TopicRoute>(
+        enterTransition = { NiaTransitions.detailEnter() },
+        exitTransition = { NiaTransitions.detailExit() },
+        popEnterTransition = { NiaTransitions.detailPopEnter() },
+        popExitTransition = { NiaTransitions.detailPopExit() },
+    ) { entry ->
         val id = entry.toRoute<TopicRoute>().id
         TopicScreen(
             showBackButton = showBackButton,

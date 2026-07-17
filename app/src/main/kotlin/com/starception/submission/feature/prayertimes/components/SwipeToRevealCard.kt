@@ -105,9 +105,6 @@ fun SwipeToRevealCard(
     var revealedSide by remember { mutableStateOf<String?>(null) }
     val currentRevealedSide by rememberUpdatedState(revealedSide)
 
-    // Auto-collapse delay after button tap (milliseconds)
-    val autoCollapseDelayMs = 800L
-
     // Width of the revealed action buttons areas
     val adjustRevealedWidth = 120.dp  // Right side: +/- buttons
     val resetRevealedWidth = 80.dp    // Left side: Reset button
@@ -129,7 +126,7 @@ fun SwipeToRevealCard(
             // Peek left to show +/- buttons hint
             peekOffset.animateTo(
                 targetValue = -30f,
-                animationSpec = tween(durationMillis = 300)
+                animationSpec = tween(durationMillis = 300, easing = androidx.compose.animation.core.FastOutSlowInEasing)
             )
             delay(200)
             peekOffset.animateTo(
@@ -288,9 +285,9 @@ fun SwipeToRevealCard(
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onResetOffset()
                                 Log.d("SwipeToReveal", "🔄 Reset $prayerName to default")
-                                // Auto-collapse after reset
+                                // Brief pause so the reset is seen, then spring the panel closed
                                 coroutineScope.launch {
-                                    delay(autoCollapseDelayMs)
+                                    delay(400L)
                                     onRevealChange(false)
                                 }
                             }

@@ -333,13 +333,17 @@ fun InteractivePrayerDial(
     var isSwipingHorizontally by remember { mutableStateOf(false) }
     val swipeThreshold = 150f // How far to swipe to trigger action
 
-    // Animated swipe offset for smooth visual feedback
+    // Tracks the finger 1:1 while swiping; the spring only smooths the settle after release.
     val animatedSwipeOffset by animateFloatAsState(
         targetValue = swipeOffset,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
-        ),
+        animationSpec = if (isSwipingHorizontally) {
+            snap()
+        } else {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow
+            )
+        },
         label = "swipeOffset"
     )
 
@@ -353,7 +357,7 @@ fun InteractivePrayerDial(
         targetValue = if (isDragging) 1.05f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
+            stiffness = Spring.StiffnessMedium
         ),
         label = "dialScale"
     )

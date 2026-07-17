@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -113,6 +114,19 @@ fun GlobePopupScreen(
         label = "contentAlpha"
     )
 
+    // The whole card slides up into place. The GL globe is a SurfaceView, which can't be
+    // alpha-composited — position transforms move its punched hole, alpha would not — so
+    // the card animates position while the inner chrome fades via contentAlpha.
+    val cardSlide by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 1f,
+        animationSpec = if (isVisible) {
+            NiaMotion.spatialDefault()
+        } else {
+            NiaMotion.exitTween(NiaMotion.Duration.SHORT_4)
+        },
+        label = "cardSlide"
+    )
+
     // Distance to Kaaba (great-circle) for the bottom status pill
     val distanceKm = remember(userLatitude, userLongitude) {
         val lat1 = Math.toRadians(userLatitude)
@@ -149,7 +163,8 @@ fun GlobePopupScreen(
                     .align(Alignment.Center)
                     .padding(horizontal = 12.dp)
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f),
+                    .fillMaxHeight(0.7f)
+                    .graphicsLayer { translationY = cardSlide * 48.dp.toPx() },
                 shape = RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,

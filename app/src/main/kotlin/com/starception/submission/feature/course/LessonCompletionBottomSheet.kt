@@ -20,7 +20,11 @@ import android.Manifest
 import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -226,6 +230,10 @@ fun LessonCompletionBottomSheet(
                 ) {
                     AnimatedContent(
                         targetState = isRecording,
+                        transitionSpec = {
+                            fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
+                                fadeOut(tween(200, easing = FastOutSlowInEasing))
+                        },
                         label = "recording_state",
                     ) { recording ->
                         if (recording) {
@@ -370,7 +378,7 @@ private fun RecordingIndicator(
         initialValue = 1f,
         targetValue = 0.3f,
         animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = LinearEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "pulse_alpha",

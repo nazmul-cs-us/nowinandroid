@@ -21,6 +21,8 @@ import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -236,11 +238,13 @@ internal fun ForYouScreen(
         AnimatedVisibility(
             visible = showLoading,
             enter = slideInVertically(
+                animationSpec = tween(300, easing = FastOutSlowInEasing),
                 initialOffsetY = { fullHeight -> -fullHeight },
-            ) + fadeIn(),
+            ) + fadeIn(tween(300)),
             exit = slideOutVertically(
+                animationSpec = tween(200, easing = FastOutSlowInEasing),
                 targetOffsetY = { fullHeight -> -fullHeight },
-            ) + fadeOut(),
+            ) + fadeOut(tween(200)),
         ) {
             val loadingContentDescription = stringResource(id = R.string.feature_foryou_loading)
             Box(

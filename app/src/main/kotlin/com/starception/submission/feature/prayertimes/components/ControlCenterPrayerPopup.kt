@@ -106,6 +106,7 @@ import com.kyant.backdrop.highlight.HighlightStyle
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -232,26 +233,22 @@ fun ControlCenterPrayerPopup(
         }
     }
 
-    // Calculate rotations based on adjusted prayer time
-    val hourRotation by remember(adjustedPrayerTime) {
-        derivedStateOf {
-            // Hour dial: 12 hours = 360 degrees, so 30 degrees per hour + minute contribution
-            -((adjustedPrayerTime.hour % 12) * 30f + adjustedPrayerTime.minute * 0.5f)
-        }
-    }
-    val minuteRotation by remember(adjustedPrayerTime) {
-        derivedStateOf {
-            // Minute dial: 60 minutes = 360 degrees, so 6 degrees per minute
-            -(adjustedPrayerTime.minute * 6f)
-        }
-    }
+    // Hands are driven by continuous minutes-of-day (not the wrapped hour/minute values)
+    // so the spring can sweep them smoothly during drag without spinning backwards when
+    // a hand crosses 12/60. Visual angle is identical modulo 360°.
+    val adjustedMinutesOfDay = originalTime.hour * 60f + originalTime.minute + timeAdjustment
+    val hourRotation by animateFloatAsState(
+        targetValue = -(adjustedMinutesOfDay * 0.5f),
+        animationSpec = NiaMotion.spatialFast(),
+        label = "hourRotation",
+    )
+    val minuteRotation by animateFloatAsState(
+        targetValue = -(adjustedMinutesOfDay * 6f),
+        animationSpec = NiaMotion.spatialFast(),
+        label = "minuteRotation",
+    )
     // Second dial: static position based on adjusted prayer time seconds (no animation for performance)
-    val secondRotation by remember(adjustedPrayerTime) {
-        derivedStateOf {
-            // Second dial shows the seconds of the adjusted time
-            -(adjustedPrayerTime.second * 6f)
-        }
-    }
+    val secondRotation = -(adjustedPrayerTime.second * 6f)
 
     val dialScale by animateFloatAsState(
         targetValue = if (isDragging) 1.02f else 1f,
@@ -667,8 +664,8 @@ fun ControlCenterPrayerPopup(
                             ) + fadeIn(animationSpec = spring(stiffness = 300f)),
                             exit = slideOutVertically(
                                 targetOffsetY = { it },
-                                animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)
-                            ) + fadeOut(animationSpec = spring(stiffness = 400f))
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
+                            ) + fadeOut(animationSpec = spring(stiffness = 300f))
                         ) {
                             // Liquid Glass Bottom Tabs UI - starts in middle, user swipes to select
                             var selectedTabIndex by remember { mutableIntStateOf(-1) }
@@ -761,8 +758,8 @@ fun ControlCenterPrayerPopup(
                             ) + fadeIn(animationSpec = spring(stiffness = 300f)),
                             exit = slideOutVertically(
                                 targetOffsetY = { -it },
-                                animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)
-                            ) + fadeOut(animationSpec = spring(stiffness = 400f))
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
+                            ) + fadeOut(animationSpec = spring(stiffness = 300f))
                         ) {
                             Text(
                                 text = "Rotate dial to adjust time",

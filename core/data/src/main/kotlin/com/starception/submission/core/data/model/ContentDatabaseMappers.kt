@@ -21,6 +21,9 @@ import com.starception.submission.core.contentdatabase.TopicEntity as ContentTop
 import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.Topic
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 
 /**
  * Extension function to convert ContentDatabase TopicEntity to external Topic model
@@ -54,7 +57,12 @@ fun NewsResourceWithTopics.asExternalModel(topicsMap: Map<Int, Topic>): NewsReso
 }
 
 /**
- * Parse publish date string to Instant
+ * Parse publish date string to Instant.
+ *
+ * The news.db generators (NewsDbGenerator, DatabaseSyncHelper, scripts/generate_news_db.py)
+ * write local datetimes WITHOUT an offset ("2026-07-17T20:18:01"). Instant.parse requires
+ * one, so parse those as device-local time; DISTANT_PAST would otherwise leak to the UI
+ * as "Jan 1, 100001".
  */
 private fun parsePublishDate(dateString: String?): Instant {
     if (dateString.isNullOrBlank()) {
@@ -63,6 +71,10 @@ private fun parsePublishDate(dateString: String?): Instant {
     return try {
         Instant.parse(dateString)
     } catch (e: Exception) {
-        Instant.DISTANT_PAST
+        try {
+            LocalDateTime.parse(dateString).toInstant(TimeZone.currentSystemDefault())
+        } catch (e: Exception) {
+            Instant.DISTANT_PAST
+        }
     }
 }

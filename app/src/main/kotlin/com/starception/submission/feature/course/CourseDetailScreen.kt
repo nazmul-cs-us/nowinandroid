@@ -382,7 +382,7 @@ fun CourseDetailScreen(
 
     val toolbarAlpha by animateFloatAsState(
         targetValue = collapseProgress,
-        animationSpec = tween(150),
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
         label = "toolbarAlpha"
     )
 
@@ -1914,7 +1914,7 @@ private fun EnhancedModuleCard(
     var isExpanded by remember { mutableStateOf(moduleIndex == 0) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = tween(300),
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
         label = "rotation"
     )
 
@@ -2128,6 +2128,7 @@ private fun EnhancedLessonItem(
     val backgroundColor by animateColorAsState(
         targetValue = if (lesson.isCompleted) accentColor.copy(alpha = 0.05f)
         else Color.Transparent,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
         label = "bgColor"
     )
 

@@ -19,6 +19,7 @@ package com.starception.submission.ui.foryou2pane
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -52,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.ui.extractHadithInfo
 import com.starception.submission.core.ui.extractSurahNumber
@@ -327,6 +329,7 @@ private fun DetailPaneContent(
     AnimatedContent(
         targetState = newsResource.id,
         label = "DetailPaneAnimation",
+        transitionSpec = { NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit() },
     ) { _ ->
         when {
             // Surah detail

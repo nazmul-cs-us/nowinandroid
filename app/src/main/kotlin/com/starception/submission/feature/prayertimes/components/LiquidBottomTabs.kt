@@ -125,7 +125,7 @@ fun LiquidBottomTabs(
                     animationScope.launch {
                         offsetAnimation.animateTo(
                             0f,
-                            spring(1f, 300f, 0.5f)
+                            spring(1f, 800f, 0.1f)
                         )
                     }
                 },

@@ -232,9 +232,9 @@ fun QiblaCompass(
     
     val animatedCompassDegree by animateFloatAsState(
         targetValue = currentDegreeState.floatValue,
-        animationSpec = tween(
-            durationMillis = 300, // Slightly longer animation for smoother movement
-            easing = androidx.compose.animation.core.FastOutSlowInEasing // Smoother easing
+        animationSpec = spring(
+            dampingRatio = 0.8f,
+            stiffness = Spring.StiffnessMedium
         ),
         label = "compassRotation"
     )

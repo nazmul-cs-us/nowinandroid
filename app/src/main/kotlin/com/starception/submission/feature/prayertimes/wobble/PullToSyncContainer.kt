@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -62,6 +63,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import android.content.res.Configuration
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -222,9 +224,13 @@ fun PullToSyncContainer(
     // top inset without the subtitle being clipped on devices with tall
     // hole-punch cutouts.
     val mediaHoldFraction = 0.58f
-    val prayerAlertHoldFraction = refreshingHoldFraction
-    // When media AND a prayer alert are live, the strip stacks a chip above the
-    // MediaMiniBar — that needs more vertical room than either alone.
+    // Single-line status banners (silent window, prayer alert, Islamic event) only
+    // need one text line below the status-bar inset — the sync fraction (0.50)
+    // leaves a tall empty sage gap above the text, so they hold tighter.
+    val bannerHoldFraction = 0.42f
+    // When media AND a prayer alert (or silent-mode status) are live, the strip
+    // stacks a chip above the MediaMiniBar — that needs more vertical room than
+    // either alone.
     val stackedHoldFraction = 0.72f
     val isMushafActive = mushafState != null
     val refreshingOffset = remember { Animatable(0f) }
@@ -235,7 +241,7 @@ fun PullToSyncContainer(
             )
         } else if (mediaState.isVisible) {
             refreshingOffset.animateTo(
-                targetValue = if (isPrayerAlert) stackedHoldFraction else mediaHoldFraction,
+                targetValue = if (isPrayerAlert || isSilentMode) stackedHoldFraction else mediaHoldFraction,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessMediumLow,
@@ -243,7 +249,7 @@ fun PullToSyncContainer(
             )
         } else if (isPrayerAlert || isSilentMode || isIslamicEvent) {
             refreshingOffset.animateTo(
-                targetValue = prayerAlertHoldFraction,
+                targetValue = bannerHoldFraction,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessMediumLow,
@@ -262,7 +268,10 @@ fun PullToSyncContainer(
         } else {
             refreshingOffset.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(durationMillis = 600)
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
             )
         }
     }
@@ -379,11 +388,22 @@ fun PullToSyncContainer(
             )
         }
 
-        // Inner content: pushes down flat (like Fitbit)
+        // Inner content: pushes down flat (like Fitbit). Two displacement modes on
+        // purpose: persistent holds (media bar / alerts / syncing) use top PADDING so
+        // the page resizes and its bottom stays scroll-reachable while the strip is
+        // up; the transient finger-drag part TRANSLATES the sheet instead, so pulling
+        // slides the page rigidly rather than squeezing weight-based layouts — and the
+        // offset lambda runs in the placement phase, skipping per-frame relayout.
+        val holdOffsetY = (refreshingOffset.value * maxRevealDp).dp
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = contentOffsetY, start = horizontalMargin, end = horizontalMargin)
+                .padding(top = holdOffsetY, start = horizontalMargin, end = horizontalMargin)
+                .offset {
+                    val raw = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
+                    val dragBeyondHold = (raw - refreshingOffset.value).coerceAtLeast(0f)
+                    IntOffset(0, (dragBeyondHold * maxRevealDp).dp.roundToPx())
+                }
                 .clip(
                     RoundedCornerShape(
                         topStart = cornerRadius,
@@ -406,9 +426,9 @@ fun PullToSyncContainer(
                 // --- Media Mini-Bar fills the sage area ---
                 // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
                 // (via titleDragModifier) so playback button taps are not swallowed.
-                // If a prayer alert is also live (e.g. Maghrib while a Surah plays in
-                // driving mode), stack a compact chip on top so the user sees both
-                // events instead of media silently winning the if/else.
+                // If a prayer alert or silent-mode window is also live (e.g. Isha
+                // silence while a dua recitation plays), stack a compact chip on top
+                // so the user sees both instead of media silently winning the if/else.
                 Box(
                     modifier = Modifier
                         .zIndex(1f)
@@ -447,6 +467,26 @@ fun PullToSyncContainer(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = prayerAlertState.displayText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 13.sp,
+                                    color = indicatorColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        } else if (isSilentMode) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DoNotDisturbOn,
+                                    contentDescription = null,
+                                    tint = indicatorColor,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = silentModeState.displayText,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 13.sp,
                                     color = indicatorColor,
@@ -499,8 +539,9 @@ fun PullToSyncContainer(
                                     }
                                 },
                             )
-                        },
-                    contentAlignment = Alignment.Center,
+                        }
+                        .padding(bottom = 16.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -557,8 +598,9 @@ fun PullToSyncContainer(
                                     }
                                 },
                             )
-                        },
-                    contentAlignment = Alignment.Center,
+                        }
+                        .padding(bottom = 16.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -590,8 +632,9 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
-                    contentAlignment = Alignment.Center,
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(bottom = 16.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

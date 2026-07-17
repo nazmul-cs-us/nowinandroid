@@ -248,11 +248,13 @@ private fun SegmentedModeSelector(
                 val bgColor by animateColorAsState(
                     targetValue = if (isSelected) MaterialTheme.colorScheme.primary
                     else Color.Transparent,
+                    animationSpec = tween(200, easing = FastOutSlowInEasing),
                     label = "mode_bg"
                 )
                 val contentColor by animateColorAsState(
                     targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = tween(200, easing = FastOutSlowInEasing),
                     label = "mode_content"
                 )
 
@@ -305,11 +307,13 @@ private fun PostureFilterChip(
     val bgColor by animateColorAsState(
         targetValue = if (isSelected) postureColor.copy(alpha = 0.15f)
         else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "chip_bg"
     )
     val borderColor by animateColorAsState(
         targetValue = if (isSelected) postureColor.copy(alpha = 0.6f)
         else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "chip_border"
     )
 
@@ -437,7 +441,7 @@ fun PlaybackBar(
             } else 0f
             val animatedProgress by animateFloatAsState(
                 targetValue = progress,
-                animationSpec = tween(150),
+                animationSpec = tween(200, easing = FastOutSlowInEasing),
                 label = "progress"
             )
 

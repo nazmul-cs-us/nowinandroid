@@ -18,6 +18,7 @@ package com.starception.submission.ui.interests2pane
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -52,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.feature.interests.InterestsRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
@@ -223,7 +225,10 @@ internal fun InterestsListDetailScreen(
                             }
                         },
                 ) {
-                    AnimatedContent(topicRoute) { route ->
+                    AnimatedContent(
+                        targetState = topicRoute,
+                        transitionSpec = { NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit() },
+                    ) { route ->
                         when (route) {
                             is TopicRoute -> {
                                 TopicScreen(

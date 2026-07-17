@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.starception.submission.core.designsystem.animation.NiaMotion
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
@@ -152,9 +154,15 @@ fun PrayerBubblePopup(
         label = "popupScale"
     )
 
+    // Fade tracks the scale spring on the way in (~400ms settle) and finishes within
+    // the 200ms dismiss delay on the way out, so both movements read as one.
     val alpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        animationSpec = if (isVisible) {
+            NiaMotion.enterTween()
+        } else {
+            NiaMotion.exitTween(NiaMotion.Duration.SHORT_4)
+        },
         label = "popupAlpha"
     )
 
@@ -290,21 +298,14 @@ private fun IOSPrayerCard(
                 }
 
                 // Simple checkmark badge if prayed
-                if (isPrayed) {
-                    val badgeScale by animateFloatAsState(
-                        targetValue = 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "badgeScale"
-                    )
-
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isPrayed,
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                    enter = NiaTransitions.fabEnter(),
+                    exit = NiaTransitions.fabExit(),
+                ) {
                     Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(24.dp)
-                            .scale(badgeScale),
+                        modifier = Modifier.size(24.dp),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primary
                     ) {

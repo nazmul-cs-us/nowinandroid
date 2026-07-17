@@ -157,7 +157,7 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
     // Smooth animation for progress
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(1000, easing = EaseOutCubic)
+        animationSpec = tween(300, easing = FastOutSlowInEasing)
     )
     
     Canvas(modifier = Modifier.size(watchSize)) {
@@ -329,7 +329,7 @@ fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
     // Smooth animated rotation with Islamic aesthetic
     val animatedDirection by animateFloatAsState(
         targetValue = qiblaDirection,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 300f)
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 800f)
     )
     
     Canvas(modifier = Modifier.size(watchSize)) {

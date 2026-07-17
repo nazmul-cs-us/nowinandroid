@@ -113,6 +113,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
@@ -739,7 +740,9 @@ fun SurahDetailScreen(
             val totalItems = 1 + bismillahOffset + state.ayahs.size
             if (ayahIndex in 0 until totalItems) {
                 android.util.Log.d("QuranAlbumPlayer", "📜 Scrolling to Ayah $scrollToAyah at index $ayahIndex")
-                scrollState.animateScrollToItem(ayahIndex)
+                scrollState.animateScrollToItem(
+                    ayahIndex
+                )
             }
         }
     }
@@ -1106,10 +1109,14 @@ fun SurahDetailScreen(
 
         androidx.compose.animation.AnimatedVisibility(
             visible = showTopBar.value,
-            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
-                    androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +
-                    androidx.compose.animation.fadeOut(),
+            enter = androidx.compose.animation.slideInVertically(
+                animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
+                initialOffsetY = { -it }
+            ) + androidx.compose.animation.fadeIn(animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3)),
+            exit = androidx.compose.animation.slideOutVertically(
+                animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
+                targetOffsetY = { -it }
+            ) + androidx.compose.animation.fadeOut(animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3)),
         ) {
         // Always visible toolbar with collapsing effect based on scroll position
         AlbumPlayerTopBar(
@@ -1362,7 +1369,11 @@ fun SurahDetailScreen(
                         }
                         if (offset > 0f) {
                             // Below threshold: settle back into place smoothly.
-                            androidx.compose.animation.core.animate(offset, 0f) { value, _ ->
+                            androidx.compose.animation.core.animate(
+                                offset,
+                                0f,
+                                animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1)
+                            ) { value, _ ->
                                 sheetDragOffset = value
                             }
                             return available
@@ -2237,7 +2248,10 @@ private fun AlbumPlayerContent(
             // Item 0 = AlbumHeader+InfoCard, item 1 = MushafPagerView.
             // Small delay lets Compose finish layout before scrolling.
             kotlinx.coroutines.delay(80)
-            scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+            scrollState.animateScrollToItem(
+                index = 1,
+                scrollOffset = 0
+            )
         }
     }
 
@@ -2278,13 +2292,22 @@ private fun AlbumPlayerContent(
 
             when {
                 firstItem == 0 && offset > 0 -> {
-                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+                    scrollState.animateScrollToItem(
+                        index = 1,
+                        scrollOffset = 0
+                    )
                 }
                 firstItem >= 1 && offset > 0 -> {
-                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+                    scrollState.animateScrollToItem(
+                        index = 1,
+                        scrollOffset = 0
+                    )
                 }
                 firstItem >= 2 -> {
-                    scrollState.animateScrollToItem(index = 1, scrollOffset = 0)
+                    scrollState.animateScrollToItem(
+                        index = 1,
+                        scrollOffset = 0
+                    )
                 }
             }
         }

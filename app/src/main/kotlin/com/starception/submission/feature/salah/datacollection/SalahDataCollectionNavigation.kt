@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -25,7 +26,12 @@ fun NavGraphBuilder.salahDataCollectionScreen(
     onBackClick: () -> Unit,
     onNavigateToLiveRecording: () -> Unit = {}
 ) {
-    composable<SalahDataCollectionRoute> {
+    composable<SalahDataCollectionRoute>(
+        enterTransition = { NiaTransitions.detailEnter() },
+        exitTransition = { NiaTransitions.detailExit() },
+        popEnterTransition = { NiaTransitions.detailPopEnter() },
+        popExitTransition = { NiaTransitions.detailPopExit() },
+    ) {
         SalahDataCollectionScreen(
             onBackClick = onBackClick,
             onNavigateToLiveRecording = onNavigateToLiveRecording
@@ -37,7 +43,12 @@ fun NavGraphBuilder.salahLiveRecordingScreen(
     onNavigateToReview: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    composable<SalahLiveRecordingRoute> {
+    composable<SalahLiveRecordingRoute>(
+        enterTransition = { NiaTransitions.detailEnter() },
+        exitTransition = { NiaTransitions.detailExit() },
+        popEnterTransition = { NiaTransitions.detailPopEnter() },
+        popExitTransition = { NiaTransitions.detailPopExit() },
+    ) {
         LivePrayerRecordingScreen(
             onNavigateToReview = onNavigateToReview,
             onBack = onBackClick
@@ -48,7 +59,12 @@ fun NavGraphBuilder.salahLiveRecordingScreen(
 fun NavGraphBuilder.salahPrayerReviewScreen(
     onBackClick: () -> Unit
 ) {
-    composable<SalahPrayerReviewRoute> { backStackEntry ->
+    composable<SalahPrayerReviewRoute>(
+        enterTransition = { NiaTransitions.detailEnter() },
+        exitTransition = { NiaTransitions.detailExit() },
+        popEnterTransition = { NiaTransitions.detailPopEnter() },
+        popExitTransition = { NiaTransitions.detailPopExit() },
+    ) { backStackEntry ->
         val route = backStackEntry.toRoute<SalahPrayerReviewRoute>()
         PrayerReviewScreen(
             filePath = route.filePath,

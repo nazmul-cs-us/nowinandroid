@@ -1,9 +1,9 @@
 package com.starception.submission.download
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.designsystem.animation.NiaTransitions
 
 @Composable
 fun AssetDownloadScreen(
@@ -65,32 +66,42 @@ fun AssetDownloadScreen(
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
-    when (val state = screenState) {
-        is DownloadScreenState.Loading -> {
-            LoadingContent(modifier)
-        }
-        is DownloadScreenState.AllReady -> {
-            LaunchedEffect(Unit) {
-                onReady()
+    LaunchedEffect(screenState) {
+        if (screenState is DownloadScreenState.AllReady) onReady()
+    }
+
+    AnimatedContent(
+        targetState = screenState,
+        transitionSpec = {
+            NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit()
+        },
+        label = "screen_state",
+    ) { state ->
+        when (state) {
+            is DownloadScreenState.Loading -> {
+                LoadingContent(modifier)
             }
-        }
-        is DownloadScreenState.Error -> {
-            ErrorContent(
-                message = state.message,
-                modifier = modifier,
-            )
-        }
-        is DownloadScreenState.NeedsDownload -> {
-            DownloadContent(
-                state = state,
-                onDownloadRequired = viewModel::downloadRequired,
-                onDownloadCategory = viewModel::downloadCategory,
-                onDeleteCategory = viewModel::deleteCategory,
-                onSkip = {
-                    viewModel.skipOptionalDownloads()
-                },
-                modifier = modifier,
-            )
+            is DownloadScreenState.AllReady -> {
+                // onReady() fires from the LaunchedEffect above; nothing to draw here.
+            }
+            is DownloadScreenState.Error -> {
+                ErrorContent(
+                    message = state.message,
+                    modifier = modifier,
+                )
+            }
+            is DownloadScreenState.NeedsDownload -> {
+                DownloadContent(
+                    state = state,
+                    onDownloadRequired = viewModel::downloadRequired,
+                    onDownloadCategory = viewModel::downloadCategory,
+                    onDeleteCategory = viewModel::deleteCategory,
+                    onSkip = {
+                        viewModel.skipOptionalDownloads()
+                    },
+                    modifier = modifier,
+                )
+            }
         }
     }
 }
@@ -198,6 +209,7 @@ private fun DownloadContent(
                 item {
                     val animatedProgress by animateFloatAsState(
                         targetValue = state.overallProgress,
+                        animationSpec = tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
                         label = "overall_progress",
                     )
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -300,13 +312,15 @@ private fun DownloadContent(
                     }
                     if (isExpanded) {
                         items(cats, key = { it.categoryKey }) { cat ->
-                            CategoryCard(
-                                state = cat,
-                                onDownload = { onDownloadCategory(cat.categoryKey) },
-                                onDelete = if (cat.isComplete) {
-                                    { onDeleteCategory(cat.categoryKey) }
-                                } else null,
-                            )
+                            Box(modifier = Modifier.animateItem()) {
+                                CategoryCard(
+                                    state = cat,
+                                    onDownload = { onDownloadCategory(cat.categoryKey) },
+                                    onDelete = if (cat.isComplete) {
+                                        { onDeleteCategory(cat.categoryKey) }
+                                    } else null,
+                                )
+                            }
                         }
                     }
                 }
@@ -364,6 +378,7 @@ private fun CollapsibleGroupHeader(
 ) {
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = tween(250, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "chevron_rotation",
     )
     Row(

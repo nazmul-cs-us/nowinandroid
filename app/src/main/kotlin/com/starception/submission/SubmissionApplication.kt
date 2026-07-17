@@ -165,32 +165,59 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                         com.starception.submission.media.GlobalMediaViewModel.onFortressProgressChanged?.invoke(pos, dur)
                     }
                 // Fortress-of-the-Muslim continuous playback: when a per-dua recitation
-                // ("Chapter: Dua N") finishes on its own, resolve the NEXT dua straight from
-                // the DB and play it. Lives at the app level so it keeps going in the
-                // background even after the Dua screen is closed. Chapter-level playback (news
-                // card — title without ": Dua ") is left alone, and a null next-audio (end of
-                // chapter) simply stops.
+                // ("Chapter: Dua N") finishes on its own, play the next dua of the SAME
+                // chapter (every dua has its own clip), then fall through to the next
+                // chapter. Lives at the app level so it keeps going in the background
+                // even after the Dua screen is closed. Chapter-level playback (news
+                // card — title without ": Dua ") is left alone, and running past the
+                // end of the book simply stops.
                 val autoAdvanceNextDua: () -> Unit = {
                     val controller = com.starception.submission.core.ui.ChapterAudioController
                     val completedTitle = controller.currentTitle
                     Log.d("DuaAutoPlay", "onCompletion | completed='$completedTitle'")
                     // Only per-dua/chapter recitations ("Chapter: Dua N") auto-advance.
                     if (completedTitle != null && completedTitle.contains(": Dua ")) {
-                        val completedChapter = completedTitle.substringBefore(":").trim()
+                        // Chapter titles can themselves contain colons ("Invocation for
+                        // someone who says: \"...\""), so split on the ": Dua N" suffix.
+                        val completedChapter = completedTitle.substringBeforeLast(": Dua ").trim()
+                        val completedPosition = completedTitle.substringAfterLast(": Dua ").trim().toIntOrNull()
                         delegateScope.launch {
-                            // DB-derived: play the next fortress chapter's recitation. Works from
-                            // ANY entry point (topic/feed card or the detail screen) and continues
-                            // in the background; stops at the end of the book.
-                            val next = runCatching {
-                                com.starception.submission.core.duadatabase.DuaDatabase
-                                    .getInstance(appCtx).duaDao()
-                                    .getNextChapterAfter(completedChapter)
-                            }.getOrNull()
-                            Log.d("DuaAutoPlay", "completedChapter='$completedChapter' next='${next?.title}' audio=${next?.audioUrl}")
-                            if (next != null && next.audioUrl.isNotBlank()) {
+                            val dao = com.starception.submission.core.duadatabase.DuaDatabase
+                                .getInstance(appCtx).duaDao()
+                            // Next dua within the same chapter first.
+                            val nextInChapter = if (completedPosition != null) {
+                                runCatching {
+                                    dao.getDuaAudioByTitleAndPosition(completedChapter, completedPosition + 1)
+                                }.getOrNull()?.takeIf { it.isNotBlank() }
+                            } else {
+                                null
+                            }
+                            if (nextInChapter != null) {
+                                val nextTitle = "$completedChapter: Dua ${completedPosition!! + 1}"
+                                Log.d("DuaAutoPlay", "next in chapter -> '$nextTitle'")
                                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                                    controller.currentTitle = "${next.title}: Dua 1"
-                                    controller.toggle(next.audioUrl)
+                                    controller.currentTitle = nextTitle
+                                    controller.toggle(nextInChapter)
+                                }
+                                return@launch
+                            }
+                            // Chapter exhausted — move to the following chapter, preferring
+                            // its Dua 1 per-dua clip (matches what the page play buttons
+                            // resolve) over the whole-chapter recitation.
+                            val next = runCatching {
+                                dao.getNextChapterAfter(completedChapter)
+                            }.getOrNull()
+                            Log.d("DuaAutoPlay", "completedChapter='$completedChapter' nextChapter='${next?.title}'")
+                            if (next != null) {
+                                val firstDuaClip = runCatching {
+                                    dao.getDuaAudioByTitleAndPosition(next.title, 1)
+                                }.getOrNull()?.takeIf { it.isNotBlank() }
+                                val audio = firstDuaClip ?: next.audioUrl
+                                if (audio.isNotBlank()) {
+                                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                        controller.currentTitle = "${next.title}: Dua 1"
+                                        controller.toggle(audio)
+                                    }
                                 }
                             }
                         }
