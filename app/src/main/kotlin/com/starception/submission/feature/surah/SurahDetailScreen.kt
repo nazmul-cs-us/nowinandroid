@@ -26,6 +26,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -4514,6 +4515,29 @@ private const val MARKER_GAP_AFTER_EM = 0.55f
 private const val MARKER_INK_GAP_EM = 0.3f
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
+
+/** Inline-content tag for the invisible line filler appended to non-final page
+ *  slices. Android never justifies a paragraph's last line, so a sliced page's
+ *  bottom line collapses to natural width even though the full-text layout had
+ *  it justified. The filler is wider than any line, wraps alone onto a clipped
+ *  zero-ink line, and thereby keeps the real last content line justified. */
+private const val MUSHAF_LINE_FILLER_TAG = "mushafLineFiller"
+
+/** Filler width as a fraction of the page line width. It must NOT fit in any
+ *  line's leftover space (so it wraps, keeping the content line justified) but
+ *  MUST fit on a line of its own (an over-wide placeholder cannot wrap at all
+ *  and just runs off the edge of the last line — measured, not guessed). */
+private const val MUSHAF_LINE_FILLER_WIDTH_FRACTION = 0.98f
+
+private fun mushafLineFillerPlaceholder(maxWidthPx: Int, emPx: Float): androidx.compose.ui.text.Placeholder =
+    androidx.compose.ui.text.Placeholder(
+        androidx.compose.ui.unit.TextUnit(
+            (maxWidthPx / emPx) * MUSHAF_LINE_FILLER_WIDTH_FRACTION,
+            androidx.compose.ui.unit.TextUnitType.Em,
+        ),
+        androidx.compose.ui.unit.TextUnit(0.1f, androidx.compose.ui.unit.TextUnitType.Em),
+        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
+    )
 /** Drawn ornament width in em. */
 private const val MARKER_ORNAMENT_WIDTH_EM = MARKER_HEIGHT_EM * MARKER_ORNAMENT_FILL * MARKER_ASPECT
 /** Total slot width reserved in the text flow. */
@@ -4569,7 +4593,15 @@ private fun computeInkMarkerGeometries(
         style = style,
         constraints = androidx.compose.ui.unit.Constraints(maxWidth = maxWidthPx),
         placeholders = markerAnnotations.map {
-            AnnotatedString.Range(ornamentPlaceholder, it.start, it.end)
+            AnnotatedString.Range(
+                if (it.item == MUSHAF_LINE_FILLER_TAG) {
+                    mushafLineFillerPlaceholder(maxWidthPx, emPx)
+                } else {
+                    ornamentPlaceholder
+                },
+                it.start,
+                it.end,
+            )
         },
         density = density,
     )
@@ -4600,17 +4632,24 @@ private fun computeInkMarkerGeometries(
     layout.placeholderRects.forEachIndexed { i, rect ->
         if (rect == null) return@forEachIndexed
         val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
+        if (annotation.item == MUSHAF_LINE_FILLER_TAG) return@forEachIndexed
         val digits = pageText.text.substring(annotation.start, annotation.end)
         val h = rect.height * MARKER_ORNAMENT_FILL
         val w = h * MARKER_ASPECT
 
         val markerLine = layout.getLineForOffset(annotation.start)
-        // Scan only the medallion's own vertical span: ink outside it (high
-        // maddas, superscript alefs, strokes of other lines) cannot collide
-        // with the ornament and must not bias the midpoint.
+        // Scan only the CENTRAL span of the ornament. The medallion is a
+        // circle, so ink at its extreme top/bottom rows can only touch the
+        // sparse outer flourish — while those rows are exactly where glyphs
+        // of NEIGHBOURING lines overshoot their boxes (marker 52 of Al-A'raf:
+        // the hamza+damma stack of the line below poked 6px into the band's
+        // bottom edge mid-gap and split the true gap in two). Trimming to the
+        // solid ring's collision zone excludes both maddas above and
+        // next-line stack tips below without missing real tails, which sweep
+        // through the middle.
         val ornTop = rect.top + (rect.height - h) / 2f
-        val bandTop = ((ornTop - 0.05f * emPx) * scale).toInt()
-        val bandBottom = ((ornTop + h + 0.05f * emPx) * scale).toInt()
+        val bandTop = ((ornTop + 0.12f * h) * scale).toInt()
+        val bandBottom = ((ornTop + 0.88f * h) * scale).toInt()
         var nextCharIdx = annotation.end
         while (nextCharIdx < pageText.length &&
             (pageText.text[nextCharIdx].isWhitespace() ||
@@ -4625,42 +4664,96 @@ private fun computeInkMarkerGeometries(
         val slotCenter = (rect.left + rect.right) / 2f
         val window = 2f * emPx
 
-        val rightScanFrom = if (nextOnSameLine) slotCenter else lineLeft
-        var rightInk = rect.right
-        run {
-            var x = (rightScanFrom * scale).toInt()
-            val maxX = ((rect.right + window) * scale).toInt()
+        val centerX: Float
+        if (nextOnSameLine) {
+            // Both neighbours share this line. Naive edge scans fail when a deep
+            // tail sweeps across the slot (both scans land inside the SAME glyph
+            // run — marker 43 of Al-Muddaththir measured a 2px "gap"). Instead,
+            // find the LARGEST ink-free run of columns in the window and center
+            // the medallion in it: that is the true white gap between the two
+            // words regardless of how far any tail intrudes.
+            //
+            // The window MUST reach into both words' ink or the gap gets cut at
+            // the window edge and the midpoint biases toward it (markers 49/52 of
+            // Al-A'raf sat left-of-center on justify-stretched lines). The next
+            // word's layout position bounds the left side exactly.
+            val nextWordX = layout.getHorizontalPosition(nextCharIdx, usePrimaryDirection = true)
+            val winLPx = minOf(rect.left - window, nextWordX - 1.5f * emPx).coerceAtLeast(lineLeft)
+            val winL = (winLPx * scale).toInt().coerceAtLeast(0)
+            val winR = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
+            // Among all ink-free runs, pick the one that OVERLAPS THE SLOT most
+            // (ties broken by width) — the slot is where layout reserved space
+            // between the two words, so that run IS the inter-word gap. Picking
+            // the globally widest run instead can select white space beyond the
+            // NEXT word (marker 52 of Al-A'raf landed on top of it that way).
+            val slotL = (rect.left * scale).toInt()
+            val slotR = (rect.right * scale).toInt()
+            var bestGapL = -1
+            var bestGapR = -1
+            var bestOverlap = -1
+            var bestWidth = -1
+            var runStart = -1
+            var x = winL
+            val runLog = StringBuilder()
+            while (x <= winR + 1) {
+                val ink = x <= winR && columnHasInk(x, bandTop, bandBottom)
+                if (!ink && runStart < 0) runStart = x
+                if ((ink || x == winR + 1) && runStart >= 0) {
+                    val runEnd = x
+                    val overlap = (minOf(runEnd, slotR) - maxOf(runStart, slotL)).coerceAtLeast(0)
+                    val width = runEnd - runStart
+                    runLog.append("[${(runStart / scale).toInt()}..${(runEnd / scale).toInt()}]ov=${(overlap / scale).toInt()} ")
+                    if (overlap > bestOverlap || (overlap == bestOverlap && width > bestWidth)) {
+                        bestOverlap = overlap
+                        bestWidth = width
+                        bestGapL = runStart
+                        bestGapR = runEnd
+                    }
+                    runStart = -1
+                }
+                x++
+            }
+            android.util.Log.d(
+                "MushafInk",
+                "RUNS d=$digits win=[${(winL / scale).toInt()}..${(winR / scale).toInt()}] " +
+                    "slot=[${(slotL / scale).toInt()}..${(slotR / scale).toInt()}] " +
+                    "band=[$bandTop..$bandBottom] runs= $runLog",
+            )
+            if (digits == "52") {
+                try {
+                    val f = java.io.File("/data/user/0/com.starception.submission.demo.debug/files/mushaf_ink_debug.png")
+                    java.io.FileOutputStream(f).use { out ->
+                        bitmap.asAndroidBitmap()
+                            .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    android.util.Log.d("MushafInk", "DUMPED bitmap to ${f.absolutePath} scale=$scale")
+                } catch (t: Throwable) {
+                    android.util.Log.e("MushafInk", "dump failed", t)
+                }
+            }
+            centerX = if (bestGapL >= 0) {
+                ((bestGapL + bestGapR) / 2f) / scale
+            } else {
+                slotCenter // window solid with ink — degenerate; keep the slot center
+            }
+        } else {
+            // Line-end marker: hug the verse at the measured ink edge. Scanning
+            // from the line's empty left region cannot start inside a glyph.
+            var rightInk = rect.right
+            var x = (lineLeft * scale).toInt().coerceAtLeast(0)
+            val maxX = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
             while (x <= maxX) {
                 if (columnHasInk(x, bandTop, bandBottom)) { rightInk = x / scale; break }
                 x++
             }
-        }
-        val leftInk: Float? = if (nextOnSameLine) {
-            var found: Float? = null
-            var x = ((minOf(slotCenter, rightInk) - 2f) * scale).toInt()
-            val minX = ((rect.left - window) * scale).toInt()
-            while (x >= minX) {
-                if (columnHasInk(x, bandTop, bandBottom)) { found = x / scale; break }
-                x--
-            }
-            found ?: rect.left
-        } else {
-            null
-        }
-
-        val centerX = if (leftInk != null) {
-            (leftInk + rightInk) / 2f
-        } else {
-            maxOf(
+            centerX = maxOf(
                 rightInk - MARKER_INK_GAP_EM * emPx - w / 2f,
                 lineLeft + w / 2f,
             )
         }
         android.util.Log.d(
             "MushafInk",
-            "MEASURED d=$digits rect=[${rect.left},${rect.right}] line=$markerLine " +
-                "lineLeft=$lineLeft lineRight=${layout.getLineRight(markerLine)} " +
-                "nextSame=$nextOnSameLine rightInk=$rightInk leftInk=$leftInk centerX=$centerX",
+            "MEASURED d=$digits rect=[${rect.left},${rect.right}] line=$markerLine centerX=$centerX nextSame=$nextOnSameLine",
         )
         result.add(
             MarkerGeometry(
@@ -5330,7 +5423,17 @@ private fun MushafPagerView(
                         fullLayout.getLineEnd(endLine, visibleEnd = true)
                     }
 
-                    val pageString = masterString.subSequence(startCharIndex, endCharIndex)
+                    val rawSlice = masterString.subSequence(startCharIndex, endCharIndex)
+                    // Non-final pages: append the invisible over-wide filler so the
+                    // slice's bottom content line stays justified (it was justified
+                    // in the full layout; see MUSHAF_LINE_FILLER_TAG).
+                    val pageString = if (endCharIndex < masterString.length) {
+                        androidx.compose.ui.text.AnnotatedString.Builder(rawSlice).apply {
+                            appendInlineContent(MUSHAF_LINE_FILLER_TAG, "\u200B")
+                        }.toAnnotatedString()
+                    } else {
+                        rawSlice
+                    }
 
                     val pageAyahRanges = ayahCharRanges.mapNotNull { (ayahNum, range) ->
                         val overlapStart = maxOf(range.first, startCharIndex)
@@ -5399,6 +5502,17 @@ private fun MushafPagerView(
                 }
             }
 
+            // Render-side inline map including the dynamically-sized line filler —
+            // must match the widths the paginator and geometry pass used.
+            val pagerEmPxForFiller = with(density) { committedFontSize.sp.toPx() }
+            val pageInlineContent = remember(markerInlineContent, availableWidthPx, committedFontSize) {
+                markerInlineContent + (
+                    MUSHAF_LINE_FILLER_TAG to androidx.compose.foundation.text.InlineTextContent(
+                        mushafLineFillerPlaceholder(availableWidthPx.toInt(), pagerEmPxForFiller),
+                    ) { _ -> }
+                    )
+            }
+
             // Ink-accurate marker geometry per page, prefetched for the pages the
             // reader can reach next so page turns never show markers moving.
             val inkGeomCache = remember(paginatedPages) {
@@ -5459,7 +5573,7 @@ private fun MushafPagerView(
                 MushafPageWithFrame(
                     pageText = page.text,
                     pageNumber = page.pageNumber,
-                    inlineContent = markerInlineContent,
+                    inlineContent = pageInlineContent,
                     inkGeometries = inkGeomCache[pageIndex],
                     arabicFont = arabicFont,
                     arabicFontSize = committedFontSize,
