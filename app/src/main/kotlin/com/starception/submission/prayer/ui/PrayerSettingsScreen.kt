@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.prayer.model.*
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 /**
  * Prayer settings configuration screen
@@ -181,7 +182,7 @@ private fun PrayerSettingsContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = FloatingNavClearance),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Top bar for dialog mode with Material 3 styling

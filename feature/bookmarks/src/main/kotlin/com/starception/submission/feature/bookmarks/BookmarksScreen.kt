@@ -76,6 +76,7 @@ import com.starception.submission.core.ui.TrackScreenViewEvent
 import com.starception.submission.core.ui.TrackScrollJank
 import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
 import com.starception.submission.core.ui.newsFeed
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun BookmarksRoute(
@@ -216,7 +217,7 @@ private fun BookmarksGrid(
                 onNewsClick = onNewsClick,
             )
             item(span = StaggeredGridItemSpan.FullLine) {
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
+                Spacer(Modifier.height(FloatingNavClearance))
             }
         }
         val itemsAvailable = when (feedState) {

@@ -95,30 +95,33 @@ Location: `training/salah_model/`
 | `feature_engineering.py` | Feature extraction from raw sensor windows |
 | `data_augmentation.py` | Data augmentation strategies |
 | `export_tflite.py` | Convert Keras model to TFLite |
+| `dataset_report.py` | Dataset + training quality report (`output/dataset_report.json`, deployed to app assets as `last_training_report.json`) |
 | `data/salah_training_data/*.jsonl` | Collected training data |
 
 ### Feature Engineering (`feature_engineering.py`)
-Extracts **30 statistical features** from each 100ms sensor window:
+Extracts **30 statistical features** from each 100ms sensor window. The exact
+index layout below matches both `extract_window_features()` (Python) and
+`SalahFeatureExtractor.kt` (on-device) — they must stay in lockstep:
 
-**Accelerometer features (15):**
-- Mean X, Y, Z (3)
-- Std X, Y, Z (3)
-- Magnitude mean, std (2)
-- Pitch, Roll (2)
-- Energy (sum of squares) (1)
-- Min, Max magnitude (2)
-- Range (max - min) (1)
-- Zero crossing rate (1)
+| Index | Feature |
+|-------|---------|
+| 0–2   | accel_mean_x, accel_mean_y, accel_mean_z |
+| 3–5   | accel_std_x, accel_std_y, accel_std_z |
+| 6–7   | accel_mag_mean, accel_mag_var |
+| 8–10  | gyro_mean_x, gyro_mean_y, gyro_mean_z |
+| 11–13 | gyro_std_x, gyro_std_y, gyro_std_z |
+| 14–15 | gyro_mag_mean, gyro_mag_var |
+| 16–17 | pitch (precomputed), pitch_var |
+| 18–19 | roll (precomputed), roll_var |
+| 20–21 | accel_mag_min, accel_mag_max |
+| 22–23 | gyro_mag_min, gyro_mag_max |
+| 24–25 | pitch_range, roll_range (max − min across window) |
+| 26–27 | accel_magnitude, gyro_magnitude (precomputed by Android) |
+| 28–29 | accel_energy, gyro_energy (mean of sum of squares) |
 
-**Gyroscope features (15):**
-- Mean X, Y, Z (3)
-- Std X, Y, Z (3)
-- Magnitude mean, std (2)
-- Angular velocity (2)
-- Energy (1)
-- Min, Max magnitude (2)
-- Range (1)
-- Zero crossing rate (1)
+> Note: features 24–25 are **ranges**, not angle values. The rotation
+> augmentation must not overwrite them (this was a real bug, fixed in
+> `data_augmentation.py` — ranges are invariant under a fixed rotation).
 
 ### Sequence Creation
 - Groups consecutive windows into sequences of **20 windows** (2 seconds of data)

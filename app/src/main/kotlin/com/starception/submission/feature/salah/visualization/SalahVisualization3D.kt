@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.ModelInstance
+import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController
@@ -73,6 +74,18 @@ class SalahVisualization3D(
     private var axisY = "roll"
     private var axisZ = "am"
     private var pointSize = 3f
+    private var stateTime = 0f
+
+    // Diagnostics overlays
+    private var flaggedIndices: Set<Int> = emptySet()
+    private var showDisagreements = false
+    private var showEllipsoids = false
+
+    // PCA projection: x,y,z triplets parallel to dataPoints (FEATURE_PCA mode)
+    private var pcaPositions: FloatArray? = null
+
+    // Original dataPoints index for each entry of filteredPoints
+    private var filteredIndices: IntArray = IntArray(0)
 
     // 3D Models
     private var phoneModel: Model? = null
@@ -112,6 +125,13 @@ class SalahVisualization3D(
     private var scatterPointModel: Model? = null
     private val scatterInstances: MutableList<ModelInstance> = mutableListOf()
 
+    // Flagged (model-vs-label disagreement) points — rendered with a pulse
+    private val flaggedInstances: MutableList<Pair<ModelInstance, Vector3>> = mutableListOf()
+
+    // Per-class 1-sigma spread ellipsoids
+    private var ellipsoidModel: Model? = null
+    private val ellipsoidInstances: MutableList<ModelInstance> = mutableListOf()
+
     // Temporary vectors for calculations
     private val tmpVec3 = Vector3()
     private val tmpMatrix = Matrix4()
@@ -127,6 +147,31 @@ class SalahVisualization3D(
         // instead of changing field-of-view, which feels unresponsive on mobile
         cameraController = object : CameraInputController(camera) {
             private val zoomDir = Vector3()
+            private var downX = 0f
+            private var downY = 0f
+            private var downTime = 0L
+
+            override fun touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
+                if (pointer == 0) {
+                    downX = screenX.toFloat()
+                    downY = screenY.toFloat()
+                    downTime = System.currentTimeMillis()
+                }
+                return super.touchDown(screenX, screenY, pointer, button)
+            }
+
+            override fun touchUp(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
+                val handled = super.touchUp(screenX, screenY, pointer, button)
+                if (pointer == 0) {
+                    val dx = screenX - downX
+                    val dy = screenY - downY
+                    val quick = System.currentTimeMillis() - downTime < 350
+                    val still = dx * dx + dy * dy < 24f * 24f
+                    if (quick && still) pickPointAt(screenX.toFloat(), screenY.toFloat())
+                }
+                return handled
+            }
+
             override fun pinchZoom(amount: Float): Boolean {
                 // Dolly zoom: move camera along view direction toward/away from target
                 val delta = zoomDir.set(camera.direction).nor().scl(amount * translateUnits)
@@ -157,6 +202,7 @@ class SalahVisualization3D(
         buildGroundPlane()
         buildHighlightModel()
         buildScatterPointModel()
+        buildEllipsoidModel()
         buildHumanoid()
 
         isReady = true
@@ -164,6 +210,7 @@ class SalahVisualization3D(
 
     override fun render() {
         val delta = Gdx.graphics.deltaTime
+        stateTime += delta
 
         // Update camera
         cameraController.update()
@@ -182,7 +229,7 @@ class SalahVisualization3D(
 
         // Render based on mode
         when (currentMode) {
-            VisualizationMode.SCATTER -> renderScatter()
+            VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> renderScatter()
             VisualizationMode.PHONE_MODEL -> renderPhone()
             VisualizationMode.GRAVITY_VECTOR -> renderGravity()
         }
@@ -205,6 +252,7 @@ class SalahVisualization3D(
         groundModel?.dispose()
         highlightModel?.dispose()
         scatterPointModel?.dispose()
+        ellipsoidModel?.dispose()
         gravityArrowModels.forEach { it.dispose() }
         headModel?.dispose()
         torsoModel?.dispose()
@@ -253,7 +301,7 @@ class SalahVisualization3D(
 
             when (mode) {
                 VisualizationMode.GRAVITY_VECTOR -> buildGravityVectors()
-                VisualizationMode.SCATTER -> rebuildScatterInstances()
+                VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> rebuildScatterInstances()
                 VisualizationMode.PHONE_MODEL -> Unit
             }
             resetCameraForMode()
@@ -327,6 +375,92 @@ class SalahVisualization3D(
         }
     }
 
+    /** Flagged sample indices (model-vs-label disagreement runs) from batch analysis. */
+    fun setDisagreements(indices: Set<Int>) {
+        safePostRunnable {
+            flaggedIndices = indices
+            if (isScatterLike()) rebuildScatterInstances()
+        }
+    }
+
+    fun setShowDisagreements(show: Boolean) {
+        safePostRunnable {
+            showDisagreements = show
+            if (isScatterLike()) rebuildScatterInstances()
+        }
+    }
+
+    fun setShowEllipsoids(show: Boolean) {
+        safePostRunnable {
+            showEllipsoids = show
+            if (isScatterLike()) rebuildScatterInstances()
+        }
+    }
+
+    /** x,y,z triplets parallel to the sample list, from FeatureSpacePCA. */
+    fun setPcaPositions(positions: FloatArray?) {
+        safePostRunnable {
+            pcaPositions = positions
+            if (currentMode == VisualizationMode.FEATURE_PCA) {
+                rebuildScatterInstances()
+                resetCameraForMode()
+            }
+        }
+    }
+
+    private fun isScatterLike() =
+        currentMode == VisualizationMode.SCATTER || currentMode == VisualizationMode.FEATURE_PCA
+
+    /**
+     * World-space position of a sample: PCA projection in FEATURE_PCA mode
+     * (falling back to axis mapping until the projection arrives), else the
+     * user-selected axis mapping.
+     */
+    private fun samplePosition(originalIndex: Int, sample: SalahDataSample, out: Vector3): Vector3 {
+        val pca = pcaPositions
+        return if (currentMode == VisualizationMode.FEATURE_PCA && pca != null &&
+            originalIndex * 3 + 2 < pca.size
+        ) {
+            out.set(pca[originalIndex * 3], pca[originalIndex * 3 + 1], pca[originalIndex * 3 + 2])
+        } else {
+            out.set(
+                sample.getAxisValue(axisX),
+                sample.getAxisValue(axisY),
+                sample.getAxisValue(axisZ),
+            )
+        }
+    }
+
+    /** Ray-pick the nearest visible point and jump playback to it. */
+    private fun pickPointAt(screenX: Float, screenY: Float) {
+        if (!isScatterLike() || filteredPoints.isEmpty()) return
+        val ray = camera.getPickRay(screenX, screenY)
+        val pos = Vector3()
+        val toPoint = Vector3()
+        val threshold = max(0.9f, pointSize * 0.25f)
+        var bestIndex = -1
+        var bestPerp = Float.MAX_VALUE
+
+        filteredPoints.forEachIndexed { fi, sample ->
+            samplePosition(filteredIndices[fi], sample, pos)
+            toPoint.set(pos).sub(ray.origin)
+            val along = toPoint.dot(ray.direction)
+            if (along <= 0f) return@forEachIndexed // behind the camera
+            // Perpendicular distance from the point to the ray
+            val perp = tmpVec3.set(ray.direction).scl(along).add(ray.origin).dst(pos)
+            if (perp < threshold && perp < bestPerp) {
+                bestPerp = perp
+                bestIndex = filteredIndices[fi]
+            }
+        }
+
+        if (bestIndex >= 0) {
+            playbackIndex = bestIndex
+            isPlaying = false
+            updatePlaybackCallback()
+        }
+    }
+
     // ============================================
     // Private rendering methods
     // ============================================
@@ -338,14 +472,30 @@ class SalahVisualization3D(
             modelBatch.render(instance, environment)
         }
 
+        // Flagged disagreement points pulse so they are findable at a glance
+        if (flaggedInstances.isNotEmpty()) {
+            val pulse = 1f + 0.35f * sin(stateTime * 5f)
+            val scale = pointSize * 0.15f * 1.4f * pulse
+            for ((instance, position) in flaggedInstances) {
+                instance.transform.setToTranslation(position)
+                instance.transform.scale(scale, scale, scale)
+                modelBatch.render(instance, environment)
+            }
+        }
+
+        // Per-class spread ellipsoids (translucent; ModelBatch sorts blended last)
+        if (showEllipsoids) {
+            for (instance in ellipsoidInstances) {
+                modelBatch.render(instance, environment)
+            }
+        }
+
         // Render highlight for current playback position
         if (playbackIndex in dataPoints.indices) {
             val sample = dataPoints[playbackIndex]
             highlightInstance?.let { instance ->
-                val x = sample.getAxisValue(axisX)
-                val y = sample.getAxisValue(axisY)
-                val z = sample.getAxisValue(axisZ)
-                instance.transform.setToTranslation(x, y, z)
+                samplePosition(playbackIndex, sample, tmpVec3)
+                instance.transform.setToTranslation(tmpVec3)
                 instance.transform.scale(pointSize * 0.3f, pointSize * 0.3f, pointSize * 0.3f)
                 modelBatch.render(instance, environment)
             }
@@ -525,7 +675,7 @@ class SalahVisualization3D(
                 camera.position.set(10f, 6f, 12f)
                 camera.lookAt(0f, 3.5f, 0f)
             }
-            VisualizationMode.SCATTER -> fitCameraToScatterData()
+            VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> fitCameraToScatterData()
             VisualizationMode.GRAVITY_VECTOR -> fitCameraToGravityData()
         }
         camera.up.set(Vector3.Y)
@@ -543,9 +693,15 @@ class SalahVisualization3D(
             return
         }
 
-        val xs = points.map { it.getAxisValue(axisX) }
-        val ys = points.map { it.getAxisValue(axisY) }
-        val zs = points.map { it.getAxisValue(axisZ) }
+        val pos = Vector3()
+        val positions = points.mapIndexed { fi, sample ->
+            val original = if (filteredPoints.isNotEmpty()) filteredIndices[fi] else fi
+            samplePosition(original, sample, pos)
+            Triple(pos.x, pos.y, pos.z)
+        }
+        val xs = positions.map { it.first }
+        val ys = positions.map { it.second }
+        val zs = positions.map { it.third }
 
         val centerX = (xs.minOrNull()!! + xs.maxOrNull()!!) / 2f
         val centerY = (ys.minOrNull()!! + ys.maxOrNull()!!) / 2f
@@ -575,13 +731,24 @@ class SalahVisualization3D(
     private fun cameraPositionTarget(): Vector3 {
         return when (currentMode) {
             VisualizationMode.PHONE_MODEL -> Vector3(0f, 3.5f, 0f)
-            VisualizationMode.SCATTER -> {
+            VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> {
                 val points = filteredPoints.ifEmpty { dataPoints }
-                if (points.isEmpty()) Vector3.Zero.cpy() else Vector3(
-                    (points.minOf { it.getAxisValue(axisX) } + points.maxOf { it.getAxisValue(axisX) }) / 2f,
-                    (points.minOf { it.getAxisValue(axisY) } + points.maxOf { it.getAxisValue(axisY) }) / 2f,
-                    (points.minOf { it.getAxisValue(axisZ) } + points.maxOf { it.getAxisValue(axisZ) }) / 2f
-                )
+                if (points.isEmpty()) {
+                    Vector3.Zero.cpy()
+                } else {
+                    val pos = Vector3()
+                    var minX = Float.MAX_VALUE; var maxX = -Float.MAX_VALUE
+                    var minY = Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+                    var minZ = Float.MAX_VALUE; var maxZ = -Float.MAX_VALUE
+                    points.forEachIndexed { fi, sample ->
+                        val original = if (filteredPoints.isNotEmpty()) filteredIndices[fi] else fi
+                        samplePosition(original, sample, pos)
+                        minX = min(minX, pos.x); maxX = max(maxX, pos.x)
+                        minY = min(minY, pos.y); maxY = max(maxY, pos.y)
+                        minZ = min(minZ, pos.z); maxZ = max(maxZ, pos.z)
+                    }
+                    Vector3((minX + maxX) / 2f, (minY + maxY) / 2f, (minZ + maxZ) / 2f)
+                }
             }
             VisualizationMode.GRAVITY_VECTOR -> Vector3.Zero.cpy()
         }
@@ -676,6 +843,67 @@ class SalahVisualization3D(
         ).sphere(1f, 1f, 1f, 8, 8)
 
         scatterPointModel = modelBuilder.end()
+    }
+
+    private fun buildEllipsoidModel() {
+        val modelBuilder = ModelBuilder()
+        modelBuilder.begin()
+        // Unit sphere, scaled per class to its 1-sigma spread; translucent material
+        val material = Material(
+            ColorAttribute.createDiffuse(Color.WHITE),
+            BlendingAttribute(true, 0.22f),
+        )
+        modelBuilder.part(
+            "ellipsoid",
+            GL20.GL_TRIANGLES,
+            (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong(),
+            material
+        ).sphere(2f, 2f, 2f, 20, 20) // diameter 2 => unit radius
+        ellipsoidModel = modelBuilder.end()
+    }
+
+    /**
+     * Per-class centroid + axis-aligned 1-sigma ellipsoids over the CURRENT positions
+     * (axis mapping or PCA). Overlapping ellipsoids = classes the model will confuse.
+     */
+    private fun rebuildEllipsoids() {
+        ellipsoidInstances.clear()
+        val model = ellipsoidModel ?: return
+        if (filteredPoints.isEmpty()) return
+
+        val byPosture = mutableMapOf<SalahPosture, MutableList<Vector3>>()
+        val pos = Vector3()
+        filteredPoints.forEachIndexed { fi, sample ->
+            samplePosition(filteredIndices[fi], sample, pos)
+            byPosture.getOrPut(sample.posture) { mutableListOf() }.add(pos.cpy())
+        }
+
+        for ((posture, positions) in byPosture) {
+            if (positions.size < 5) continue
+            var mx = 0f; var my = 0f; var mz = 0f
+            for (v in positions) { mx += v.x; my += v.y; mz += v.z }
+            val n = positions.size
+            mx /= n; my /= n; mz /= n
+            var vx = 0f; var vy = 0f; var vz = 0f
+            for (v in positions) {
+                vx += (v.x - mx) * (v.x - mx)
+                vy += (v.y - my) * (v.y - my)
+                vz += (v.z - mz) * (v.z - mz)
+            }
+            val sx = max(0.4f, sqrt(vx / n))
+            val sy = max(0.4f, sqrt(vy / n))
+            val sz = max(0.4f, sqrt(vz / n))
+
+            val instance = ModelInstance(model)
+            instance.transform.setToTranslation(mx, my, mz)
+            instance.transform.scale(sx, sy, sz)
+            val color = getPostureColor(posture)
+            instance.materials.first().set(
+                ColorAttribute.createDiffuse(Color(color.r, color.g, color.b, 0.22f)),
+                BlendingAttribute(true, 0.22f),
+            )
+            ellipsoidInstances.add(instance)
+        }
     }
 
     // ============================================
@@ -1088,25 +1316,34 @@ class SalahVisualization3D(
 
     private fun rebuildScatterInstances() {
         scatterInstances.clear()
+        flaggedInstances.clear()
 
         val scale = pointSize * 0.15f
+        val pos = Vector3()
 
-        for (sample in filteredPoints) {
-            val x = sample.getAxisValue(axisX)
-            val y = sample.getAxisValue(axisY)
-            val z = sample.getAxisValue(axisZ)
+        filteredPoints.forEachIndexed { fi, sample ->
+            val originalIndex = filteredIndices[fi]
+            samplePosition(originalIndex, sample, pos)
 
+            val isFlagged = showDisagreements && originalIndex in flaggedIndices
             val instance = ModelInstance(scatterPointModel)
-            instance.transform.setToTranslation(x, y, z)
-            instance.transform.scale(scale, scale, scale)
-
-            // Set color based on posture
-            val postureColor = getPostureColor(sample.posture)
             val material = instance.materials.first()
-            material.set(ColorAttribute.createDiffuse(postureColor))
 
-            scatterInstances.add(instance)
+            if (isFlagged) {
+                // Red + emissive so it pops against the class colors; transform is
+                // set every frame by the pulse in renderScatter.
+                material.set(ColorAttribute.createDiffuse(Color(1f, 0.25f, 0.25f, 1f)))
+                material.set(ColorAttribute.createEmissive(Color(0.5f, 0.05f, 0.05f, 1f)))
+                flaggedInstances.add(instance to pos.cpy())
+            } else {
+                instance.transform.setToTranslation(pos)
+                instance.transform.scale(scale, scale, scale)
+                material.set(ColorAttribute.createDiffuse(getPostureColor(sample.posture)))
+                scatterInstances.add(instance)
+            }
         }
+
+        rebuildEllipsoids()
     }
 
     private fun getPostureColor(posture: SalahPosture): Color {
@@ -1123,6 +1360,15 @@ class SalahVisualization3D(
     }
 
     private fun applyFilter() {
-        filteredPoints = dataPoints.filter { it.posture in visiblePostures }
+        val points = mutableListOf<SalahDataSample>()
+        val indices = mutableListOf<Int>()
+        dataPoints.forEachIndexed { index, sample ->
+            if (sample.posture in visiblePostures) {
+                points.add(sample)
+                indices.add(index)
+            }
+        }
+        filteredPoints = points
+        filteredIndices = indices.toIntArray()
     }
 }

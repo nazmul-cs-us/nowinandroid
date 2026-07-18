@@ -22,6 +22,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -223,11 +225,22 @@ fun PullToSyncContainer(
     // title + subtitle (e.g. "البقرة / Al-Baqarah") clear the safeDrawing
     // top inset without the subtitle being clipped on devices with tall
     // hole-punch cutouts.
+    val maxRevealDpForBanners =
+        if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 130f else 220f
     val mediaHoldFraction = 0.58f
-    // Single-line status banners (silent window, prayer alert, Islamic event) only
-    // need one text line below the status-bar inset — the sync fraction (0.50)
-    // leaves a tall empty sage gap above the text, so they hold tighter.
-    val bannerHoldFraction = 0.42f
+    // Single-line status banners (silent window, prayer alert, Islamic event):
+    // the strip must fit the REAL status-bar inset plus the REAL text line at
+    // the user's font scale plus margins — a fixed fraction under-sizes on tall
+    // insets / large font scales and the text gets clipped ("squeezed").
+    val bannerDensity = LocalDensity.current
+    val bannerTopInsetDp = with(bannerDensity) {
+        WindowInsets.safeDrawing.getTop(this).toDp()
+    }
+    val bannerLineDp = with(bannerDensity) { 20.sp.toDp() } // labelMedium line height, font-scale aware
+    val bannerHoldFraction = (
+        (bannerTopInsetDp + bannerLineDp + 34.dp) /* breathing above + 16dp bottom margin */
+            .value / maxRevealDpForBanners
+        ).coerceIn(0.32f, 0.62f)
     // When media AND a prayer alert (or silent-mode status) are live, the strip
     // stacks a chip above the MediaMiniBar — that needs more vertical room than
     // either alone.
@@ -312,7 +325,7 @@ fun PullToSyncContainer(
     // portrait-sized reveal eats too much vertical space and squeezes the page
     // content. Use a smaller reveal in landscape (the strip only needs a single line).
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val maxRevealDp = if (isLandscape) 130f else 220f
+    val maxRevealDp = maxRevealDpForBanners
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
@@ -399,6 +412,11 @@ fun PullToSyncContainer(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = holdOffsetY, start = horizontalMargin, end = horizontalMargin)
+                // The sheet is now below the window top by holdOffsetY, so tell children
+                // that much top inset is already spent — otherwise every screen's
+                // statusBarsPadding/TopAppBar inset stacks onto the strip and leaves a
+                // dead zone under the sheet's top edge.
+                .consumeWindowInsets(PaddingValues(top = holdOffsetY))
                 .offset {
                     val raw = (dragDistanceAnimated / maxDragDistance).coerceIn(0f, 1f)
                     val dragBeyondHold = (raw - refreshingOffset.value).coerceAtLeast(0f)

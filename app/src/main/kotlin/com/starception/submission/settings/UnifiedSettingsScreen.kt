@@ -79,6 +79,7 @@ import com.starception.submission.settings.components.TtsSettingsSection
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.VoiceSettingsSection
 import androidx.compose.material.icons.outlined.Storage
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,6 +104,31 @@ fun UnifiedSettingsScreen(
     val totalDownloadedSize by viewModel.totalDownloadedSize.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
+
+    // Accordion sections in list order (hero card is item 0). Used to scroll a
+    // newly expanded section to the top so its content is visible immediately —
+    // without this, expanding a lower section opens entirely below the fold.
+    val sectionIds = remember(contentCategories.isNotEmpty()) {
+        buildList {
+            add("appearance"); add("prayer"); add("notifications"); add("traveldua")
+            add("voice"); add("tts"); add("salah")
+            if (contentCategories.isNotEmpty()) add("content")
+            add("about"); add("developer")
+        }
+    }
+    var skipInitialExpandScroll by remember { mutableStateOf(true) }
+    LaunchedEffect(expandedSections) {
+        if (skipInitialExpandScroll) {
+            skipInitialExpandScroll = false
+            return@LaunchedEffect
+        }
+        val id = expandedSections.firstOrNull() ?: return@LaunchedEffect
+        val index = sectionIds.indexOf(id)
+        if (index >= 0) {
+            kotlinx.coroutines.delay(120) // let the expand animation begin first
+            listState.animateScrollToItem(index + 1)
+        }
+    }
     val density = LocalDensity.current
     val headerHeight = 156.dp
     val headerHeightPx = with(density) { headerHeight.toPx() }
@@ -210,7 +236,9 @@ fun UnifiedSettingsScreen(
                 LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                // Bottom padding clears the floating nav pill so the last section's
+                // header and content are fully reachable.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {

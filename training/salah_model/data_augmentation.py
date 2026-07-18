@@ -58,8 +58,10 @@ def augment_rotation(X: np.ndarray, max_angle_deg: float = 15.0) -> np.ndarray:
             ax, ay, az = X_aug[i, t, 0], X_aug[i, t, 1], X_aug[i, t, 2]
             X_aug[i, t, 16] = np.degrees(np.arctan2(ay, az))  # pitch
             X_aug[i, t, 18] = np.degrees(np.arctan2(ax, az))  # roll
-            X_aug[i, t, 24] = X_aug[i, t, 16]  # pitch copy
-            X_aug[i, t, 25] = X_aug[i, t, 18]  # roll copy
+            # Features 24-25 are pitch_range/roll_range (max - min across the
+            # window), NOT pitch/roll values — a fixed rotation shifts angles but
+            # leaves their within-window spread essentially unchanged, so the
+            # ranges are intentionally left untouched.
 
     return X_aug
 

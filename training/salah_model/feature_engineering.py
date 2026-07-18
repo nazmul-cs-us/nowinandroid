@@ -48,6 +48,9 @@ def load_jsonl_files(data_dir: str) -> List[dict]:
                     # Skip non-classification postures
                     posture = sample.get("posture", "")
                     if posture in POSTURE_TO_INDEX:
+                        # Tag provenance for the dataset report (underscore key
+                        # so it can't collide with recorded sensor fields).
+                        sample["_source_file"] = filepath.name
                         samples.append(sample)
                         line_count += 1
                 except json.JSONDecodeError:

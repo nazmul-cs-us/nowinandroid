@@ -197,6 +197,7 @@ import java.time.format.DateTimeFormatter
 import java.time.Duration
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
@@ -1683,7 +1684,8 @@ fun PrayerTimesScreen(
                         modifier = Modifier
                             .weight(0.5f)
                             .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = FloatingNavClearance),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // No instruction banner in landscape to save space
@@ -1931,11 +1933,11 @@ fun PrayerTimesScreen(
                     // Collapsed tiles are a touch shorter (was 140) so the whole
                     // collapsed dashboard fits one screen with the location card
                     // clearing the floating nav bar — no scrolling needed. Expanded
-                    // needs 118: at 112 the name row + Arabic line + 24sp time exceed
-                    // the inner budget and the time digits clip at the tile's bottom,
-                    // even with font padding stripped. Three rows still land above
-                    // the floating nav with ~20dp to spare.
-                    targetValue = if (showAllPrayers) 118.dp else 136.dp,
+                    // The visible card needs ~110dp inside its 2dp vertical margins:
+                    // any less and the name row + Arabic line + 24sp time clip the
+                    // digits, any more and the third row pushes "Show Less" into the
+                    // floating nav pill. 114 outer − 4 margin = 110 card.
+                    targetValue = if (showAllPrayers) 114.dp else 134.dp,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessLow,
@@ -2039,7 +2041,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2081,7 +2083,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2131,7 +2133,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2173,7 +2175,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2259,7 +2261,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                                     .graphicsLayer {
                                         // Material 3 expressive card entrance with bounce and scale
                                         translationY = (1f - fajrAnimProgress) * 24f
@@ -2308,7 +2310,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
                                     .graphicsLayer {
                                         // Material 3 expressive card entrance with staggered timing
                                         translationY = (1f - sunriseAnimProgress) * 32f
@@ -2461,6 +2463,7 @@ fun PrayerTimesScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(FloatingNavClearance))
             }
             } // End of portrait layout else block
         }

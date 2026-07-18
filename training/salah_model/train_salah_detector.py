@@ -27,6 +27,7 @@ from feature_engineering import (
     POSTURE_LABELS, NUM_CLASSES, SEQUENCE_LENGTH, FEATURES_PER_WINDOW
 )
 from data_augmentation import augment_dataset, balance_classes
+from dataset_report import build_report, write_report
 
 
 def _choose_split_counts(n_groups: int, test_ratio: float = 0.15, val_ratio: float = 0.15) -> tuple[int, int]:
@@ -193,6 +194,9 @@ def train(args):
         print("Grouped split produced an empty partition. Collect more sessions per posture.")
         return
 
+    # Snapshot the real (pre-balancing/augmentation) split for the dataset report.
+    y_train_raw = y_train.copy()
+
     # Balance classes
     X_train, y_train = balance_classes(X_train, y_train, strategy="oversample")
 
@@ -278,6 +282,9 @@ def train(args):
     y_val_pred = model.predict(X_val, verbose=0).argmax(axis=1)
     print("\nValidation Classification Report:")
     print(classification_report(y_val, y_val_pred, target_names=POSTURE_LABELS))
+    val_report_dict = classification_report(
+        y_val, y_val_pred, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
+    )
 
     print("\nValidation Confusion Matrix:")
     cm_val = confusion_matrix(y_val, y_val_pred)
@@ -295,6 +302,9 @@ def train(args):
     y_test_pred = model.predict(X_test, verbose=0).argmax(axis=1)
     print("\nTest Classification Report:")
     print(classification_report(y_test, y_test_pred, target_names=POSTURE_LABELS))
+    test_report_dict = classification_report(
+        y_test, y_test_pred, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
+    )
 
     print("\nTest Confusion Matrix:")
     cm_test = confusion_matrix(y_test, y_test_pred)
@@ -316,6 +326,22 @@ def train(args):
     hist_dict = {k: [float(v) for v in vals] for k, vals in history.history.items()}
     with open(output_dir / "training_history.json", 'w') as f:
         json.dump(hist_dict, f, indent=2)
+
+    # Dataset + training quality report (consumed by export_tflite --deploy)
+    report = build_report(
+        samples=samples,
+        y_train=y_train_raw,
+        y_val=y_val,
+        y_test=y_test,
+        val_accuracy=val_acc,
+        test_accuracy=test_acc,
+        cm_val=cm_val,
+        cm_test=cm_test,
+        val_report=val_report_dict,
+        test_report=test_report_dict,
+        model_version=norm_params["model_version"],
+    )
+    write_report(report, output_dir)
 
     # Save model
     model.save(str(output_dir / "salah_detector.keras"))

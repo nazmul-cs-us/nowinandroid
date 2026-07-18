@@ -26,7 +26,14 @@ fun Visualization3DView(
     samples: List<SalahDataSample>,
     state: VisualizationState,
     onStateChange: (VisualizationState) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Preferred sink for high-frequency playback ticks. Unlike [onStateChange]
+     * (which rebuilds from the composition-time state snapshot and can clobber
+     * concurrent async updates like predictions/PCA), this merges into the
+     * LATEST state at the owner. Falls back to [onStateChange] when null.
+     */
+    onPlaybackTick: ((index: Int, posture: SalahPosture?, pitch: Float, roll: Float, accelMag: Float, gyroMag: Float, playing: Boolean) -> Unit)? = null
 ) {
     var visualizationRef by remember { mutableStateOf<SalahVisualization3D?>(null) }
     var fragmentRef by remember { mutableStateOf<LibGDXFragment?>(null) }
@@ -34,6 +41,7 @@ fun Visualization3DView(
     // Keep latest references for the factory callback (avoids stale closure)
     val currentState by rememberUpdatedState(state)
     val currentOnStateChange by rememberUpdatedState(onStateChange)
+    val currentOnPlaybackTick by rememberUpdatedState(onPlaybackTick)
 
     val context = LocalContext.current
 
@@ -90,6 +98,32 @@ fun Visualization3DView(
         viz.setPointSize(state.pointSize)
     }
 
+    // Diagnostics overlays
+    LaunchedEffect(state.flaggedIndices, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setDisagreements(state.flaggedIndices)
+    }
+
+    LaunchedEffect(state.showDisagreements, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setShowDisagreements(state.showDisagreements)
+    }
+
+    LaunchedEffect(state.showEllipsoids, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setShowEllipsoids(state.showEllipsoids)
+    }
+
+    // PCA projection for FEATURE_PCA mode
+    LaunchedEffect(state.pcaPositions, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setPcaPositions(state.pcaPositions)
+    }
+
     // Reset camera / auto-fit request
     LaunchedEffect(state.cameraResetToken, visualizationRef) {
         val viz = visualizationRef ?: return@LaunchedEffect
@@ -134,15 +168,20 @@ fun Visualization3DView(
             // Callback for LibGDX to update Compose state during playback.
             // Uses rememberUpdatedState refs to avoid stale closure over initial state.
             val onPlaybackUpdate = { index: Int, posture: SalahPosture?, pitch: Float, roll: Float, accelMag: Float, gyroMag: Float, playing: Boolean ->
-                currentOnStateChange(currentState.copy(
-                    playbackIndex = index,
-                    currentPosture = posture,
-                    currentPitch = pitch,
-                    currentRoll = roll,
-                    currentAccelMag = accelMag,
-                    currentGyroMag = gyroMag,
-                    isPlaying = playing
-                ))
+                val tick = currentOnPlaybackTick
+                if (tick != null) {
+                    tick(index, posture, pitch, roll, accelMag, gyroMag, playing)
+                } else {
+                    currentOnStateChange(currentState.copy(
+                        playbackIndex = index,
+                        currentPosture = posture,
+                        currentPitch = pitch,
+                        currentRoll = roll,
+                        currentAccelMag = accelMag,
+                        currentGyroMag = gyroMag,
+                        isPlaying = playing
+                    ))
+                }
             }
 
             // Create LibGDX ApplicationListener

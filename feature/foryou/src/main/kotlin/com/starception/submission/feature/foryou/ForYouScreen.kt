@@ -110,6 +110,7 @@ import com.starception.submission.core.ui.TrackScrollJank
 import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
 import com.starception.submission.core.ui.launchCustomChromeTab
 import com.starception.submission.core.ui.newsFeed
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun ForYouScreen(
@@ -228,7 +229,9 @@ internal fun ForYouScreen(
                     // Add space for the content to clear the "offline" snackbar.
                     // TODO: Check that the Scaffold handles this correctly in NiaApp
                     // if (isOffline) Spacer(modifier = Modifier.height(48.dp))
-                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
+                    // Clear the floating nav pill, which overlays content (the
+                    // safeDrawing inset alone only covers the gesture bar).
+                    Spacer(Modifier.height(FloatingNavClearance))
                 }
             }
         }

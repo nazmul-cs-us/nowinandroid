@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
@@ -84,6 +86,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -107,12 +110,14 @@ import com.starception.submission.feature.salah.visualization.PlaybackBar
 import com.starception.submission.feature.salah.visualization.Visualization3DView
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import java.text.SimpleDateFormat
 import kotlin.math.abs
 import java.util.Date
 import java.util.Locale
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -124,6 +129,8 @@ fun SalahDataCollectionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val vizState by viewModel.vizState.collectAsState()
     val allSamples by viewModel.allSamples.collectAsState()
+    val fileQuality by viewModel.fileQuality.collectAsState()
+    val deployedModel by viewModel.deployedModel.collectAsState()
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var showDeleteFileDialog by remember { mutableStateOf<String?>(null) }
     var showVisualization by remember { mutableStateOf(false) }
@@ -198,7 +205,7 @@ fun SalahDataCollectionScreen(
                 // Left: Controls + Postures
                 LazyColumn(
                     modifier = Modifier.weight(0.5f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = FloatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Live prayer recording button (always visible when not recording)
@@ -207,6 +214,8 @@ fun SalahDataCollectionScreen(
                     }
                     // Guided recording card
                     item { GuidedRecordingCard(uiState, viewModel) }
+                    item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
+                    item { deployedModel?.let { DeployedModelCard(it) } }
                     item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
@@ -224,14 +233,16 @@ fun SalahDataCollectionScreen(
                                 showVisualization = it
                                 if (it) viewModel.loadAllSamples()
                             },
-                            onVizStateChange = { viewModel.updateVizState(it) }
+                            onVizStateChange = { viewModel.updateVizState(it) },
+                            onAnalyzePredictions = { viewModel.analyzeVizPredictions() },
+                            onPlaybackTick = viewModel::onVizPlaybackTick
                         )
                     }
                 }
                 // Right: Files + Stats
                 LazyColumn(
                     modifier = Modifier.weight(0.5f),
-                    contentPadding = PaddingValues(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                    contentPadding = PaddingValues(start = 8.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { SessionStats(uiState) }
@@ -240,7 +251,9 @@ fun SalahDataCollectionScreen(
                     items(uiState.dataFiles, key = { it.name }) { file ->
                         SwipeToDismissFileItem(
                             file = file,
-                            onDelete = { showDeleteFileDialog = file.name }
+                            onDelete = { showDeleteFileDialog = file.name },
+                            quality = fileQuality[file.name],
+                            onAnalyze = { viewModel.analyzeFileQuality(file) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -251,7 +264,7 @@ fun SalahDataCollectionScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Live prayer recording button (always visible when not recording)
@@ -260,6 +273,8 @@ fun SalahDataCollectionScreen(
                 }
                 // Guided recording card
                 item { GuidedRecordingCard(uiState, viewModel) }
+                    item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
+                    item { deployedModel?.let { DeployedModelCard(it) } }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
@@ -282,7 +297,9 @@ fun SalahDataCollectionScreen(
                             showVisualization = it
                             if (it) viewModel.loadAllSamples()
                         },
-                        onVizStateChange = { viewModel.updateVizState(it) }
+                        onVizStateChange = { viewModel.updateVizState(it) },
+                        onAnalyzePredictions = { viewModel.analyzeVizPredictions() },
+                        onPlaybackTick = viewModel::onVizPlaybackTick
                     )
                 }
                 item { SensorPreview(uiState) }
@@ -290,7 +307,9 @@ fun SalahDataCollectionScreen(
                 items(uiState.dataFiles, key = { it.name }) { file ->
                     SwipeToDismissFileItem(
                         file = file,
-                        onDelete = { showDeleteFileDialog = file.name }
+                        onDelete = { showDeleteFileDialog = file.name },
+                        quality = fileQuality[file.name],
+                        onAnalyze = { viewModel.analyzeFileQuality(file) }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -994,12 +1013,150 @@ private fun GuidedRecordingCard(
 }
 
 // ═══════════════════════════════════════════════════════
+// NEXT-UP GUIDANCE + DEPLOYED MODEL QUALITY
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Tells the collector exactly what to record next: the classification posture
+ * furthest from the per-class target. Tapping pre-selects it in the recorder.
+ */
+@Composable
+private fun NextUpCard(
+    uiState: SalahDataCollectionUiState,
+    onSelectPosture: (SalahPosture) -> Unit
+) {
+    val target = 500
+    val ranked = SalahPosture.classificationLabels
+        .map { it to (uiState.globalPostureCounts[it.name] ?: 0) }
+        .sortedBy { it.second }
+    val (nextPosture, nextCount) = ranked.first()
+    if (nextCount >= target) return // dataset complete — nothing to push
+
+    val totalCollected = ranked.sumOf { it.second.coerceAtMost(target) }
+    val overallPct = (totalCollected * 100) / (target * ranked.size)
+    val weakest = ranked.take(3).filter { it.second < target }
+
+    Card(
+        onClick = { onSelectPosture(nextPosture) },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
+        ),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.TrackChanges,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Next up: ${nextPosture.displayName}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "$nextCount / $target",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Text(
+                text = buildString {
+                    append("Dataset $overallPct% of target")
+                    if (weakest.size > 1) {
+                        append(" · thin: ")
+                        append(weakest.joinToString(", ") { it.first.displayName })
+                    }
+                    append(" · tap to select")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
+/**
+ * Quality of the model currently shipped in assets — from the training pipeline's
+ * dataset_report.json. Absent until the first `export_tflite.py --deploy` run.
+ */
+@Composable
+private fun DeployedModelCard(info: DeployedModelInfo) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Memory,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Deployed model v${info.modelVersion}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "test ${(info.testAccuracy * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                text = buildString {
+                    append("val ${(info.valAccuracy * 100).toInt()}%")
+                    if (info.weakestClasses.isNotEmpty()) {
+                        append(" · weakest: ")
+                        append(
+                            info.weakestClasses.joinToString(", ") { (name, f1) ->
+                                "$name ${(f1 * 100).toInt()}%"
+                            }
+                        )
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════
 // QUICK GUIDE
 // ═══════════════════════════════════════════════════════
 
 @Composable
 private fun QuickGuide() {
+    // Collapsed by default: the steps matter on first use, then become scroll noise.
+    var expanded by remember { mutableStateOf(false) }
     Card(
+        onClick = { expanded = !expanded },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         ),
@@ -1032,7 +1189,35 @@ private fun QuickGuide() {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                val chevron by animateFloatAsState(
+                    targetValue = if (expanded) 180f else 0f,
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4),
+                    label = "guideChevron"
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = chevron }
+                )
             }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = expanded,
+                enter = androidx.compose.animation.expandVertically(
+                    animationSpec = NiaMotion.spatialDefault()
+                ) + androidx.compose.animation.fadeIn(
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4)
+                ),
+                exit = androidx.compose.animation.shrinkVertically(
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1)
+                ) + androidx.compose.animation.fadeOut(
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_3)
+                ),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(modifier = Modifier.height(12.dp))
             // Gradient divider
             Box(
@@ -1095,6 +1280,8 @@ private fun QuickGuide() {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                }
+            }
                 }
             }
         }
@@ -2228,10 +2415,63 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Model-agreement badge for a recording: green >= 85%, amber >= 70%, red below.
+ * Untested files show a tappable "check" chip that runs the analysis.
+ */
+@Composable
+private fun FileQualityBadge(quality: FileQuality?, onAnalyze: () -> Unit) {
+    when {
+        quality == null -> Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier.clickable(onClick = onAnalyze)
+        ) {
+            Text(
+                text = "check",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+
+        quality.isAnalyzing -> CircularProgressIndicator(
+            modifier = Modifier.size(12.dp),
+            strokeWidth = 1.5.dp
+        )
+
+        else -> {
+            val pct = (quality.agreement * 100).toInt()
+            val color = when {
+                pct >= 85 -> Color(0xFF2E7D32)
+                pct >= 70 -> Color(0xFFF9A825)
+                else -> MaterialTheme.colorScheme.error
+            }
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = color.copy(alpha = 0.15f),
+                modifier = Modifier.clickable(onClick = onAnalyze)
+            ) {
+                Text(
+                    text = if (quality.flaggedCount > 0) "$pct% \u00b7 ${quality.flaggedCount}!" else "$pct%",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SwipeToDismissFileItem(
     file: DataFileInfo,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    quality: FileQuality? = null,
+    onAnalyze: () -> Unit = {}
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -2276,13 +2516,18 @@ private fun SwipeToDismissFileItem(
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true
     ) {
-        DataFileItem(file = file, onDelete = onDelete)
+        DataFileItem(file = file, onDelete = onDelete, quality = quality, onAnalyze = onAnalyze)
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DataFileItem(file: DataFileInfo, onDelete: () -> Unit) {
+private fun DataFileItem(
+    file: DataFileInfo,
+    onDelete: () -> Unit,
+    quality: FileQuality? = null,
+    onAnalyze: () -> Unit = {}
+) {
     // Map posture names to short display names
     val postureDisplayNames = mapOf(
         "QIYAM" to "Qiyam",
@@ -2371,6 +2616,8 @@ private fun DataFileItem(file: DataFileInfo, onDelete: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    FileQualityBadge(quality = quality, onAnalyze = onAnalyze)
                 }
 
                 // Posture tags
@@ -2426,7 +2673,9 @@ private fun Visualization3DCard(
     vizState: VisualizationState,
     showVisualization: Boolean,
     onToggleVisualization: (Boolean) -> Unit,
-    onVizStateChange: (VisualizationState) -> Unit
+    onVizStateChange: (VisualizationState) -> Unit,
+    onAnalyzePredictions: () -> Unit = {},
+    onPlaybackTick: ((Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit)? = null
 ) {
     val shadowElevation by animateFloatAsState(
         targetValue = if (showVisualization) 5f else 2f,
@@ -2610,6 +2859,7 @@ private fun Visualization3DCard(
                                 samples = allSamples,
                                 state = vizState,
                                 onStateChange = onVizStateChange,
+                                onPlaybackTick = onPlaybackTick,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -2633,7 +2883,8 @@ private fun Visualization3DCard(
                         VisualizationControls(
                             state = vizState,
                             onStateChange = onVizStateChange,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            onAnalyzePredictions = onAnalyzePredictions
                         )
                     }
                 }

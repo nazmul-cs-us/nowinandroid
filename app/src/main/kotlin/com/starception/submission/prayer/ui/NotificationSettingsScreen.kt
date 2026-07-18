@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 /**
  * Clean list-based notification settings screen
@@ -186,7 +187,7 @@ fun NotificationSettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(FloatingNavClearance))
                 }
             }
         }

@@ -36,6 +36,8 @@ import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.PaddingValues
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 /**
  * Islamic Salah (Prayer) Dashboard Screen
@@ -235,7 +237,8 @@ private fun SalahContent(
     } else {
         // PORTRAIT LAYOUT: Original vertical layout
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = FloatingNavClearance)
         ) {
             // Next prayer card with Qibla compass
             item {

@@ -6,7 +6,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetManifest
+import com.starception.submission.feature.salah.visualization.VisualizationMode
 import com.starception.submission.feature.salah.visualization.VisualizationState
+import com.starception.submission.feature.salah.visualization.VizPrediction
+import com.starception.submission.ml.FeatureSpacePCA
+import com.starception.submission.ml.SalahBatchInference
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import com.starception.submission.sensor.SalahDataCollectionService
@@ -73,6 +77,22 @@ data class DataFileInfo(
     val totalSamples: Int = 0
 )
 
+/** Quality summary of the model currently deployed in assets (from training). */
+data class DeployedModelInfo(
+    val modelVersion: Int,
+    val valAccuracy: Float,
+    val testAccuracy: Float,
+    /** The 2 classes with the lowest test F1 — where more/better data helps most. */
+    val weakestClasses: List<Pair<String, Float>>,
+)
+
+/** Cached model-vs-label result for one recording file. */
+data class FileQuality(
+    val agreement: Float,
+    val flaggedCount: Int,
+    val isAnalyzing: Boolean = false,
+)
+
 /**
  * Posture sequence for guided recording.
  * Each pair is (posture, isTransition).
@@ -111,6 +131,21 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     private val _allSamples = MutableStateFlow<List<SalahDataSample>>(emptyList())
     val allSamples: StateFlow<List<SalahDataSample>> = _allSamples.asStateFlow()
 
+    // Per-file model-vs-label quality, keyed by file name. Backed by a
+    // SharedPreferences cache keyed on name+mtime so results survive restarts
+    // and invalidate automatically when a file is relabeled.
+    private val _fileQuality = MutableStateFlow<Map<String, FileQuality>>(emptyMap())
+    val fileQuality: StateFlow<Map<String, FileQuality>> = _fileQuality.asStateFlow()
+
+    private val qualityPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("salah_file_quality", 0)
+    }
+
+    // Quality report of the deployed model, if training ever shipped one
+    // (export_tflite.py --deploy copies it into assets as last_training_report.json).
+    private val _deployedModel = MutableStateFlow<DeployedModelInfo?>(null)
+    val deployedModel: StateFlow<DeployedModelInfo?> = _deployedModel.asStateFlow()
+
     private var countdownJob: Job? = null
     private var guidedJob: Job? = null
 
@@ -141,6 +176,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     }
 
     init {
+        loadDeployedModelReport()
         // Set up callbacks
         collectionService.onSampleRecorded = { sample ->
             _uiState.update { state ->
@@ -292,6 +328,27 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         refreshFileList()
     }
 
+    private fun loadDeployedModelReport() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _deployedModel.value = runCatching {
+                val json = getApplication<Application>().assets
+                    .open("last_training_report.json").bufferedReader().readText()
+                val root = JSONObject(json)
+                val metrics = root.getJSONObject("metrics")
+                val f1 = metrics.getJSONObject("per_class_f1_test")
+                val perClass = buildList {
+                    f1.keys().forEach { key -> add(key to f1.getDouble(key).toFloat()) }
+                }.sortedBy { it.second }
+                DeployedModelInfo(
+                    modelVersion = root.optInt("model_version", 1),
+                    valAccuracy = metrics.optDouble("val_accuracy", 0.0).toFloat(),
+                    testAccuracy = metrics.optDouble("test_accuracy", 0.0).toFloat(),
+                    weakestClasses = perClass.take(2),
+                )
+            }.getOrNull() // asset absent until the first training run deploys it
+        }
+    }
+
     fun setPosture(posture: SalahPosture) {
         collectionService.currentPosture = posture
         _uiState.update { state ->
@@ -329,6 +386,16 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 globalTotalSamples = globalTotal
             )
         }
+        // Restore cached quality results for the listed files (mtime-keyed).
+        val cached = mutableMapOf<String, FileQuality>()
+        for (file in files) {
+            val raw = qualityPrefs.getString("${'$'}{file.name}:${'$'}{file.lastModified}", null) ?: continue
+            val parts = raw.split(",")
+            val agreement = parts.getOrNull(0)?.toFloatOrNull() ?: continue
+            val flagged = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            cached[file.name] = FileQuality(agreement, flagged)
+        }
+        _fileQuality.value = cached
     }
 
     // ═══════════════════════════════════════════════════════
@@ -531,12 +598,127 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
             val sorted = samples.sortedBy { it.timestamp }
             _allSamples.value = sorted
-            _vizState.update { it.copy(totalSamples = sorted.size) }
+            // Data changed — previous model analysis and PCA projection are stale.
+            _vizState.update {
+                it.copy(
+                    totalSamples = sorted.size,
+                    predictions = null,
+                    flaggedIndices = emptySet(),
+                    pcaPositions = null,
+                    pcaVariance = null,
+                )
+            }
+        }
+    }
+
+    /** Analyze one recording file against the deployed model; cache by name+mtime. */
+    fun analyzeFileQuality(file: DataFileInfo) {
+        if (_fileQuality.value[file.name]?.isAnalyzing == true) return
+        _fileQuality.update { it + (file.name to FileQuality(0f, 0, isAnalyzing = true)) }
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val path = java.io.File(collectionService.getDataDirectory(), file.name).absolutePath
+                val result = SalahBatchInference(getApplication()).use { it.analyzeFile(path) }
+                val quality = FileQuality(result.overallAgreement, result.flaggedSegments.size)
+                qualityPrefs.edit()
+                    .putString(
+                        "${'$'}{file.name}:${'$'}{file.lastModified}",
+                        "${'$'}{quality.agreement},${'$'}{quality.flaggedCount}",
+                    )
+                    .apply()
+                _fileQuality.update { it + (file.name to quality) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e("SalahDataVM", "File quality analysis failed for ${'$'}{file.name}", e)
+                _fileQuality.update { it - file.name }
+            }
+        }
+    }
+
+    /**
+     * Playback ticks arrive up to 50x/s from the GL thread's callback; merging into
+     * the latest state here (instead of copying the composition snapshot) keeps them
+     * from clobbering concurrent async updates (predictions, PCA, flags).
+     */
+    fun onVizPlaybackTick(
+        index: Int,
+        posture: SalahPosture?,
+        pitch: Float,
+        roll: Float,
+        accelMag: Float,
+        gyroMag: Float,
+        playing: Boolean,
+    ) {
+        _vizState.update {
+            it.copy(
+                playbackIndex = index,
+                currentPosture = posture,
+                currentPitch = pitch,
+                currentRoll = roll,
+                currentAccelMag = accelMag,
+                currentGyroMag = gyroMag,
+                isPlaying = playing,
+            )
         }
     }
 
     fun updateVizState(state: VisualizationState) {
+        val previous = _vizState.value
         _vizState.value = state
+        // Entering the PCA view computes the projection on first use.
+        if (state.mode == VisualizationMode.FEATURE_PCA && previous.mode != state.mode) {
+            computePcaProjection()
+        }
+    }
+
+    /** Run the deployed model over the loaded dataset for disagreement highlighting. */
+    fun analyzeVizPredictions() {
+        val samples = _allSamples.value
+        if (samples.isEmpty() || _vizState.value.isAnalyzingPredictions) return
+        _vizState.update { it.copy(isAnalyzingPredictions = true) }
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val result = SalahBatchInference(getApplication()).use { it.analyzeSamples(samples) }
+                val flagged = buildSet {
+                    result.flaggedSegments.forEach { f -> addAll(f.startIndex..f.endIndex) }
+                }
+                _vizState.update {
+                    it.copy(
+                        isAnalyzingPredictions = false,
+                        predictions = result.predictions.map { p -> VizPrediction(p.predicted, p.confidence) },
+                        flaggedIndices = flagged,
+                        showDisagreements = true,
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("SalahDataVM", "Viz model analysis failed", e)
+                _vizState.update { it.copy(isAnalyzingPredictions = false) }
+            }
+        }
+    }
+
+    fun computePcaProjection() {
+        val samples = _allSamples.value
+        val current = _vizState.value
+        if (samples.size < 2 || current.isComputingPca || current.pcaPositions != null) return
+        _vizState.update { it.copy(isComputingPca = true) }
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val result = FeatureSpacePCA.project(samples)
+                _vizState.update {
+                    it.copy(
+                        isComputingPca = false,
+                        pcaPositions = result.positions,
+                        pcaVariance = result.varianceExplained,
+                    )
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("SalahDataVM", "PCA projection failed", e)
+                _vizState.update { it.copy(isComputingPca = false) }
+            }
+        }
     }
 
     override fun onCleared() {

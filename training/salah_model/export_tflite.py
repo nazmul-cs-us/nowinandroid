@@ -187,6 +187,13 @@ def main():
             if norm_src.exists():
                 shutil.copy2(norm_src, android_assets / "salah_norm_params.json")
                 print(f"Deployed norm params to: {android_assets / 'salah_norm_params.json'}")
+
+            # And the training quality report, so the app can show how good
+            # the deployed model actually is.
+            report_src = model_dir / "dataset_report.json"
+            if report_src.exists():
+                shutil.copy2(report_src, android_assets / "last_training_report.json")
+                print(f"Deployed training report to: {android_assets / 'last_training_report.json'}")
         else:
             print(f"\nAndroid assets directory not found: {android_assets}")
             print("Copy the .tflite file manually to app/src/main/assets/")

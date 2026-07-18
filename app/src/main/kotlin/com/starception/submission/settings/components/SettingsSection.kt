@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -170,17 +171,15 @@ fun SettingsSection(
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeIn(),
+                    animationSpec = NiaMotion.spatialDefault()
+                ) + fadeIn(
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4)
+                ),
                 exit = shrinkVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                ) + fadeOut()
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1)
+                ) + fadeOut(
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_3)
+                )
             ) {
                 Column {
                     // Modern divider with gradient

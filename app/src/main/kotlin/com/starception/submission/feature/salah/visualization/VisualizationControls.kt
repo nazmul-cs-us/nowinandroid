@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -38,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -73,7 +75,8 @@ import com.starception.submission.ml.SalahPosture
 fun VisualizationControls(
     state: VisualizationState,
     onStateChange: (VisualizationState) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAnalyzePredictions: () -> Unit = {}
 ) {
     Column(
         modifier = modifier,
@@ -85,6 +88,50 @@ fun VisualizationControls(
             currentMode = state.mode,
             onModeSelected = { onStateChange(state.copy(mode = it)) }
         )
+
+        // ── Model Diagnostics ──────────────────────────
+        if (state.mode == VisualizationMode.SCATTER || state.mode == VisualizationMode.FEATURE_PCA) {
+            SectionHeader("Diagnostics")
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (state.predictions == null) {
+                    FilterChip(
+                        selected = false,
+                        enabled = !state.isAnalyzingPredictions,
+                        onClick = onAnalyzePredictions,
+                        label = {
+                            Text(if (state.isAnalyzingPredictions) "Analyzing…" else "Run model analysis")
+                        }
+                    )
+                } else {
+                    FilterChip(
+                        selected = state.showDisagreements,
+                        onClick = { onStateChange(state.copy(showDisagreements = !state.showDisagreements)) },
+                        label = { Text("Disagreements (${state.flaggedIndices.size})") }
+                    )
+                }
+                FilterChip(
+                    selected = state.showEllipsoids,
+                    onClick = { onStateChange(state.copy(showEllipsoids = !state.showEllipsoids)) },
+                    label = { Text("Class spread") }
+                )
+            }
+            if (state.mode == VisualizationMode.FEATURE_PCA) {
+                Text(
+                    text = when {
+                        state.isComputingPca -> "Projecting 30-D features…"
+                        state.pcaVariance != null ->
+                            "PCA view · ${(state.pcaVariance * 100).toInt()}% of variance in 3 axes"
+                        else -> "PCA projection not computed yet"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         // ── Posture Filters ────────────────────────────
         Row(
@@ -229,7 +276,8 @@ private fun SegmentedModeSelector(
     val modes = listOf(
         Triple(VisualizationMode.SCATTER, "Scatter", Icons.Default.Grain),
         Triple(VisualizationMode.PHONE_MODEL, "Phone", Icons.Default.PhoneAndroid),
-        Triple(VisualizationMode.GRAVITY_VECTOR, "Gravity", Icons.Default.Public)
+        Triple(VisualizationMode.GRAVITY_VECTOR, "Gravity", Icons.Default.Public),
+        Triple(VisualizationMode.FEATURE_PCA, "PCA", Icons.Default.BubbleChart)
     )
 
     Surface(
@@ -546,6 +594,51 @@ fun CurrentSampleCard(state: VisualizationState) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+
+            // Model prediction vs label at the current playback window — red when
+            // they disagree, so scrubbing a flagged run shows instantly whether the
+            // label or the model is wrong.
+            val prediction = state.predictions?.getOrNull(state.playbackIndex)
+            if (prediction != null && state.currentPosture != null) {
+                val predicted = prediction.predicted
+                val agrees = predicted == state.currentPosture
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (agrees) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        }
+                    ) {
+                        Text(
+                            text = when {
+                                predicted == null -> "Model: —"
+                                else -> "Model: ${predicted.displayName} ${(prediction.confidence * 100).toInt()}%"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            color = if (agrees) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            }
+                        )
+                    }
+                    if (!agrees && predicted != null) {
+                        Text(
+                            text = "≠ label",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

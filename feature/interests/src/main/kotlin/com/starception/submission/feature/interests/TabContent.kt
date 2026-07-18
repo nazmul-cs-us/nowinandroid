@@ -48,6 +48,8 @@ import com.starception.submission.core.model.data.FollowableTopic
 import com.starception.submission.core.ui.InterestsItem
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import androidx.compose.foundation.layout.height
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun TopicsTabContent(
@@ -137,7 +139,7 @@ fun TopicsTabContent(
 
             if (withBottomSpacer) {
                 item {
-                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
+                    Spacer(Modifier.height(FloatingNavClearance))
                 }
             }
         }

@@ -1,11 +1,14 @@
 package com.starception.submission.feature.salah.datacollection
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.ml.SalahBatchInference
 import com.starception.submission.ml.SalahPosture
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,12 +38,19 @@ data class PrayerReviewState(
     val isSaving: Boolean = false,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
-    val filePath: String = ""
+    val filePath: String = "",
+    // Model-vs-label quality analysis (null until run; cleared when labels change)
+    val isAnalyzing: Boolean = false,
+    val analysisProgress: Int = 0,
+    val analysis: SalahBatchInference.BatchResult? = null,
+    /** timeline segment index -> number of flagged (high-confidence disagreement) windows */
+    val flaggedPerSegment: Map<Int, Int> = emptyMap(),
 )
 
 @HiltViewModel
 class PrayerReviewViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     companion object {
@@ -51,6 +61,7 @@ class PrayerReviewViewModel @Inject constructor(
     val state: StateFlow<PrayerReviewState> = _state.asStateFlow()
 
     private var rawLines = mutableListOf<String>()
+    private var autoAnalyzedPath: String? = null
 
     fun loadFile(filePath: String) {
         _state.value = _state.value.copy(filePath = filePath, isLoading = true)
@@ -106,12 +117,79 @@ class PrayerReviewViewModel @Inject constructor(
                         postureCounts = counts,
                         isLoading = false
                     )
+
+                    // Instant quality check: recordings open this screen right after
+                    // saving, so auto-run the model-vs-label analysis for anything
+                    // big enough to classify but small enough to be quick.
+                    if (rawLines.size in 20..6000 && autoAnalyzedPath != filePath) {
+                        autoAnalyzedPath = filePath
+                        analyzeQuality()
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error loading file", e)
                     _state.value = _state.value.copy(isLoading = false)
                 }
             }
         }
+    }
+
+    /**
+     * Run the current on-device model over the whole file and compare against labels.
+     * Results drive the quality card and the warning badges on timeline segments.
+     */
+    fun analyzeQuality() {
+        if (_state.value.isAnalyzing) return
+        val filePath = _state.value.filePath
+        if (filePath.isEmpty()) return
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isAnalyzing = true, analysisProgress = 0)
+            try {
+                val result = withContext(Dispatchers.Default) {
+                    SalahBatchInference(appContext).use { batch ->
+                        batch.analyzeFile(filePath) { processed ->
+                            _state.value = _state.value.copy(analysisProgress = processed)
+                        }
+                    }
+                }
+                _state.value = _state.value.copy(
+                    isAnalyzing = false,
+                    analysis = result,
+                    flaggedPerSegment = mapFlagsToSegments(result, _state.value.segments),
+                )
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e(TAG, "Quality analysis failed", e)
+                _state.value = _state.value.copy(isAnalyzing = false)
+            }
+        }
+    }
+
+    /** Select the timeline segment containing [windowIndex] (from a flagged-segment tap). */
+    fun selectSegmentAtWindow(windowIndex: Int) {
+        val idx = _state.value.segments.indexOfFirst {
+            windowIndex in it.startIndex..it.endIndex
+        }
+        if (idx >= 0) {
+            _state.value = _state.value.copy(selectedSegmentIndex = idx)
+        }
+    }
+
+    private fun mapFlagsToSegments(
+        result: SalahBatchInference.BatchResult,
+        segments: List<PostureSegment>,
+    ): Map<Int, Int> {
+        val perSegment = mutableMapOf<Int, Int>()
+        for (flag in result.flaggedSegments) {
+            segments.forEachIndexed { segIndex, seg ->
+                val overlap = minOf(flag.endIndex, seg.endIndex) -
+                    maxOf(flag.startIndex, seg.startIndex) + 1
+                if (overlap > 0) {
+                    perSegment[segIndex] = (perSegment[segIndex] ?: 0) + overlap
+                }
+            }
+        }
+        return perSegment
     }
 
     fun selectSegment(index: Int) {
@@ -137,7 +215,10 @@ class PrayerReviewViewModel @Inject constructor(
         _state.value = _state.value.copy(
             segments = segments,
             postureCounts = counts,
-            selectedSegmentIndex = null
+            selectedSegmentIndex = null,
+            // Labels changed — the previous model-vs-label comparison is stale.
+            analysis = null,
+            flaggedPerSegment = emptyMap(),
         )
     }
 
