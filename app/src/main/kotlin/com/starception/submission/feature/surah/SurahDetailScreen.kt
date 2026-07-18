@@ -26,7 +26,6 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -4694,7 +4693,6 @@ private fun computeInkMarkerGeometries(
             var bestWidth = -1
             var runStart = -1
             var x = winL
-            val runLog = StringBuilder()
             while (x <= winR + 1) {
                 val ink = x <= winR && columnHasInk(x, bandTop, bandBottom)
                 if (!ink && runStart < 0) runStart = x
@@ -4702,7 +4700,6 @@ private fun computeInkMarkerGeometries(
                     val runEnd = x
                     val overlap = (minOf(runEnd, slotR) - maxOf(runStart, slotL)).coerceAtLeast(0)
                     val width = runEnd - runStart
-                    runLog.append("[${(runStart / scale).toInt()}..${(runEnd / scale).toInt()}]ov=${(overlap / scale).toInt()} ")
                     if (overlap > bestOverlap || (overlap == bestOverlap && width > bestWidth)) {
                         bestOverlap = overlap
                         bestWidth = width
@@ -4712,24 +4709,6 @@ private fun computeInkMarkerGeometries(
                     runStart = -1
                 }
                 x++
-            }
-            android.util.Log.d(
-                "MushafInk",
-                "RUNS d=$digits win=[${(winL / scale).toInt()}..${(winR / scale).toInt()}] " +
-                    "slot=[${(slotL / scale).toInt()}..${(slotR / scale).toInt()}] " +
-                    "band=[$bandTop..$bandBottom] runs= $runLog",
-            )
-            if (digits == "52") {
-                try {
-                    val f = java.io.File("/data/user/0/com.starception.submission.demo.debug/files/mushaf_ink_debug.png")
-                    java.io.FileOutputStream(f).use { out ->
-                        bitmap.asAndroidBitmap()
-                            .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                    }
-                    android.util.Log.d("MushafInk", "DUMPED bitmap to ${f.absolutePath} scale=$scale")
-                } catch (t: Throwable) {
-                    android.util.Log.e("MushafInk", "dump failed", t)
-                }
             }
             centerX = if (bestGapL >= 0) {
                 ((bestGapL + bestGapR) / 2f) / scale
@@ -4751,10 +4730,6 @@ private fun computeInkMarkerGeometries(
                 lineLeft + w / 2f,
             )
         }
-        android.util.Log.d(
-            "MushafInk",
-            "MEASURED d=$digits rect=[${rect.left},${rect.right}] line=$markerLine centerX=$centerX nextSame=$nextOnSameLine",
-        )
         result.add(
             MarkerGeometry(
                 digits = digits,
@@ -4912,18 +4887,6 @@ private fun MushafPageWithFrame(
             Text(
                 text = renderedText,
                 inlineContent = inlineContent,
-                onTextLayout = { tl ->
-                    tl.placeholderRects.forEachIndexed { i, r ->
-                        if (r != null) {
-                            android.util.Log.d(
-                                "MushafInk",
-                                "DISPLAYED p$pageNumber #$i rect=[${r.left},${r.right}] " +
-                                    "line=${tl.getLineForOffset(tl.layoutInput.text.length.coerceAtMost(1))} " +
-                                    "lineCount=${tl.lineCount} width=${tl.size.width}",
-                            )
-                        }
-                    }
-                },
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,

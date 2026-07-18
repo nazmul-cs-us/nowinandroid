@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ContextThemeWrapper
@@ -136,6 +137,15 @@ fun AppTopSearchBar(
     val accentColor = MaterialTheme.colorScheme.primary.toArgb()
     val titleColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    // Popular-chip colors must come from the Compose scheme too: the XML shape's
+    // ?attr/colorSurfaceContainerHighest resolves against the inflated DayNight
+    // View theme, which follows SYSTEM dark mode — not the in-app Dark pref.
+    val chipBackground = MaterialTheme.colorScheme.surfaceContainerHighest.toArgb()
+    val chipStroke = MaterialTheme.colorScheme.outlineVariant.toArgb()
+    // Expanded SearchView input pill (the toolbar's shaped background). Its
+    // style color resolves from the DayNight View theme once at inflation, so
+    // without a repaint it stays black after a dark→light flip until restart.
+    val expandedPillColor = MaterialTheme.colorScheme.surfaceContainerHigh.toArgb()
     val topInsetPx = with(LocalDensity.current) { topInset.roundToPx() }
     val currentContent by rememberUpdatedState(content)
     val viewModel = hiltViewModel<TopBarSearchViewModel>()
@@ -550,6 +560,12 @@ fun AppTopSearchBar(
 
             appBar.setPadding(0, topInsetPx, 0, 0)
 
+            // Re-apply the pill tint on every update pass, not just at factory
+            // time: the in-app Dark pref recomposes Compose without re-inflating
+            // this View, so a factory-only tint goes stale on theme flips (and on
+            // cold start, where the pref loads after first inflation).
+            searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
+
             // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
             // and the toolbar container — those become visible when expanded.
             // Do NOT call searchView.setBackgroundColor: SearchView itself is sized
@@ -560,7 +576,20 @@ fun AppTopSearchBar(
             root.findViewById<View?>(
                 MaterialR.id.open_search_view_toolbar_container
             )?.setBackgroundColor(searchViewBg)
+            // The expanded input pill is the toolbar's OWN MaterialShapeDrawable
+            // (expressive AppBarWithSearch style) — tint it so the stadium shape
+            // survives while the fill follows the Compose scheme.
+            searchView.toolbar.backgroundTintList = ColorStateList.valueOf(expandedPillColor)
+            root.findViewById<View?>(
+                MaterialR.id.open_search_view_divider
+            )?.setBackgroundColor(chipStroke)
             searchView.getEditText().setTextColor(titleColor)
+            // Hint + clear (✕) button otherwise keep their DayNight (system)
+            // colors — unreadable when the app-level Dark pref disagrees.
+            searchView.getEditText().setHintTextColor(subtitleColor)
+            searchView.findViewById<ImageButton?>(
+                MaterialR.id.open_search_view_clear_button
+            )?.setColorFilter(titleColor)
 
             renderSuggestions(
                 container = suggestionContainer,
@@ -575,6 +604,8 @@ fun AppTopSearchBar(
                 accentColor = accentColor,
                 titleColor = titleColor,
                 subtitleColor = subtitleColor,
+                chipBackground = chipBackground,
+                chipStroke = chipStroke,
                 onVerseClick = { surah, ayah ->
                     searchView.hide()
                     currentOnVerseClick(surah, ayah)
@@ -909,6 +940,8 @@ private fun renderSuggestions(
     accentColor: Int,
     titleColor: Int,
     subtitleColor: Int,
+    chipBackground: Int,
+    chipStroke: Int,
     onVerseClick: (Int, Int) -> Unit,
     onRecentClick: (String) -> Unit,
     onPopularClick: (PopularSuggestion) -> Unit,
@@ -967,6 +1000,16 @@ private fun renderSuggestions(
         append(ftsTopics.joinToString("|") { it.topic.id })
         append("##")
         append(ftsNews.joinToString("|") { it.id })
+        append("##")
+        // Palette in the key so an in-app theme flip (same data, new colors)
+        // still repaints rows that would otherwise be skipped as unchanged.
+        append(accentColor)
+        append(':')
+        append(titleColor)
+        append(':')
+        append(subtitleColor)
+        append(':')
+        append(chipBackground)
     }
     if (container.getTag(SUGGESTION_STATE_TAG.hashCode()) == stateKey) return
     container.setTag(SUGGESTION_STATE_TAG.hashCode(), stateKey)
@@ -1108,7 +1151,7 @@ private fun renderSuggestions(
         )
         addPopularChipsRow(
             container, inflater, popularSuggestions,
-            accentColor, titleColor, onPopularClick,
+            titleColor, chipBackground, chipStroke, onPopularClick,
         )
     }
 
@@ -1520,8 +1563,9 @@ private fun addPopularChipsRow(
     parent: ViewGroup,
     inflater: LayoutInflater,
     suggestions: List<PopularSuggestion>,
-    accentColor: Int,
     titleColor: Int,
+    chipBackground: Int,
+    chipStroke: Int,
     onClick: (PopularSuggestion) -> Unit,
 ) {
     val ctx = parent.context
@@ -1550,9 +1594,14 @@ private fun addPopularChipsRow(
             typeface = appTypeface
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(dp(ctx, 14), dp(ctx, 8), dp(ctx, 14), dp(ctx, 8))
-            background = ContextCompat.getDrawable(
-                ctx, R.drawable.app_search_chip_background,
-            )
+            // Built in code from the Compose palette — the XML shape's ?attr
+            // colors resolve against the DayNight View theme (system dark),
+            // which disagrees with the in-app Dark pref.
+            background = GradientDrawable().apply {
+                cornerRadius = dp(ctx, 20).toFloat()
+                setColor(chipBackground)
+                setStroke(dp(ctx, 1), chipStroke)
+            }
             isClickable = true
             isFocusable = true
             // Use the surface ripple from the parent theme so the chip feels
