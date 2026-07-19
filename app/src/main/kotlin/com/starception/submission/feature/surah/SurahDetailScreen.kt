@@ -10,11 +10,16 @@ import androidx.compose.animation.*
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -83,7 +88,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -135,6 +142,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import javax.inject.Inject
@@ -1827,33 +1835,277 @@ fun SurahDetailScreen(
         // header is scrolled off-screen, the chevron sticks to the top of the
         // viewport. Hints that swiping up reveals more (surah info / full
         // Mushaf).
-        // Floating chevron. When the album header is visible, anchor it just
-        // above the header's bottom edge (where the ayah view begins). Once
-        // the user scrolls past the header (Mushaf fullscreen), reposition it
-        // at the bottom of the screen, just above the Mushaf page number.
-        // Hidden while the reading-settings sheet is open so it doesn't float
-        // over the sheet.
+        // Swipe hints. Header visible: bouncing up-chevron at the header's
+        // bottom edge (swipe up → Mushaf). Fullscreen Mushaf: a transient
+        // "Swipe down" pill drops in from the top for a few seconds, and the
+        // first entry also plays a scroll "peek" that physically reveals the
+        // header's edge and settles back — demonstrating the gesture itself.
+        // Nothing is anchored at the bottom: the page text runs to the nav
+        // inset, so a bottom hint would overlap the last line or the system
+        // gesture bar. Hidden while the reading-settings sheet is open.
+        val peekDistancePx = with(LocalDensity.current) { 40.dp.toPx() }
+        // How many times the labelled pill has been shown this visit — after
+        // the second showing the hint starts life already collapsed to the
+        // grabber so re-entries stop nagging.
+        var swipeDownHintShows by remember { mutableStateOf(0) }
+        LaunchedEffect(scrollState) {
+            // One peek per screen visit, on the first entry into fullscreen
+            // Mushaf. Deliberately NOT keyed on the fullscreen flag: the peek
+            // itself makes the header visible mid-animation, and a keyed
+            // effect would be cancelled right there, leaving the page stuck
+            // half-scrolled.
+            snapshotFlow {
+                scrollState.layoutInfo.visibleItemsInfo.none { it.index == 0 }
+            }.first { it }
+            delay(600)
+            if (!scrollState.isScrollInProgress) {
+                scrollState.animateScrollBy(
+                    -peekDistancePx,
+                    NiaMotion.emphasizedTween(NiaMotion.Duration.MEDIUM_4),
+                )
+                delay(80)
+                scrollState.animateScrollBy(
+                    peekDistancePx,
+                    NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_2),
+                )
+            }
+        }
         if (uiState is SurahDetailUiState.Success && !showFloatingToolbar) {
             val item0BottomPx = scrollState.layoutInfo.visibleItemsInfo
                 .firstOrNull { it.index == 0 }
                 ?.let { it.offset + it.size }
-            if (item0BottomPx != null) {
-                val anchorOffsetDp = with(LocalDensity.current) { item0BottomPx.toDp() }
-                    .coerceAtLeast(0.dp)
-                SwipeUpToMushafHint(
+            val headerVisible = item0BottomPx != null
+
+            // One continuous hint object with three states. Fullscreen
+            // Mushaf: a labelled "Swipe down" pill that collapses into the
+            // 32x4dp grabber. When the user scrolls down and the header
+            // appears, the SAME object rides the header boundary and the
+            // up-chevron morphs OUT of the pill (container fades away, bare
+            // chevron fades in) — not a separate hint popping in elsewhere.
+            var hintExpanded by remember { mutableStateOf(false) }
+            LaunchedEffect(headerVisible) {
+                if (headerVisible) {
+                    hintExpanded = false
+                } else if (swipeDownHintShows < 2) {
+                    hintExpanded = true
+                    // Count a "showing" only after the pill has survived on
+                    // screen for 1.5s — scroll bounces and the peek animation
+                    // flip fullscreen on/off within milliseconds, and each
+                    // flip would otherwise burn one of the two allowed
+                    // showings unseen.
+                    delay(1500)
+                    swipeDownHintShows++
+                    delay(2000)
+                    hintExpanded = false
+                }
+            }
+            // Touching the Quran text collapses the pill straight into the
+            // grabber — the reader has started interacting, the hint's job
+            // is done. Observed on the Initial pass without consuming, so
+            // page turns, long-presses and scrolls behave exactly as before.
+            if (hintExpanded) {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = anchorOffsetDp - 28.dp)
-                        .zIndex(10f),
+                        .matchParentSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.changes.any { it.pressed }) {
+                                        hintExpanded = false
+                                        break
+                                    }
+                                }
+                            }
+                        },
                 )
+            }
+            val isLabel = hintExpanded && !headerVisible
+            val hintShape = RoundedCornerShape(percent = 50)
+            val hintContainerColor by animateColorAsState(
+                // Only the labelled pill has a container; the grabber and the
+                // chevron are the SAME drawn stroke (see bend canvas below),
+                // so the surface behind them stays transparent and the shape
+                // itself carries the transform.
+                targetValue = if (isLabel) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = NiaMotion.effectsSlow(),
+                label = "mushafHintColor",
+            )
+            val hintBorderColor by animateColorAsState(
+                targetValue = if (isLabel) {
+                    MaterialTheme.colorScheme.outlineVariant
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = NiaMotion.effectsSlow(),
+                label = "mushafHintBorder",
+            )
+            val hintElevation by animateDpAsState(
+                targetValue = if (isLabel) 8.dp else 0.dp,
+                animationSpec = NiaMotion.effectsSlow(),
+                label = "mushafHintElevation",
+            )
+            // One continuously-animated vertical position: docked 6dp into
+            // the page's top strip in fullscreen, riding the header boundary
+            // while the header is visible. A spring chases the target so the
+            // flip between the two anchors never teleports — the same object
+            // visibly travels while it folds/unfolds.
+            val hintTargetOffset = if (headerVisible) {
+                (with(LocalDensity.current) { item0BottomPx!!.toDp() } - 22.dp)
+                    .coerceAtLeast(6.dp)
             } else {
-                SwipeUpToMushafHint(
-                    pointDown = true,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 30.dp)
-                        .zIndex(10f),
-                )
+                6.dp
+            }
+            val hintOffsetY by animateDpAsState(
+                targetValue = hintTargetOffset,
+                animationSpec = NiaMotion.spatialDefault(),
+                label = "mushafHintOffset",
+            )
+            val positionModifier = Modifier.offset(y = hintOffsetY)
+            // Fold fraction: 0 = flat grabber bar, 1 = up-chevron. Drives the
+            // stroke geometry below AND the whole-object bounce/pulse. Hoisted
+            // to the Surface level because Surface clips its content to the
+            // stadium shape — bouncing the canvas INSIDE the surface sheared
+            // the chevron's top off on every upward bounce.
+            val bend by animateFloatAsState(
+                targetValue = if (headerVisible) 1f else 0f,
+                animationSpec = NiaMotion.spatialDefault(),
+                label = "mushafHintBend",
+            )
+            val handleTransition = rememberInfiniteTransition(label = "mushafHandleHint")
+            val bounceDp by handleTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = -8f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(700, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "mushafHandleBounce",
+            )
+            val pulse by handleTransition.animateFloat(
+                initialValue = 0.45f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(700, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "mushafHandlePulse",
+            )
+            Surface(
+                shape = hintShape,
+                color = hintContainerColor,
+                border = BorderStroke(1.dp, hintBorderColor),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .then(positionModifier)
+                    .zIndex(10f)
+                    .graphicsLayer {
+                        // Bounce + pulse the WHOLE object (only once folded
+                        // into the chevron) so the Surface's shape clip moves
+                        // with the stroke instead of shearing it off.
+                        translationY = bounceDp.dp.toPx() * bend
+                        val pulseGate = ((bend - 0.85f) / 0.15f).coerceIn(0f, 1f)
+                        alpha = 1f - (1f - pulse) * pulseGate
+                    }
+                    .shadow(
+                        elevation = hintElevation,
+                        shape = hintShape,
+                        clip = false,
+                        // Primary-tinted shadow — the default black-at-low-
+                        // alpha shadow disappears on this cream palette.
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                    ),
+            ) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = isLabel,
+                    transitionSpec = {
+                        (fadeIn(NiaMotion.effectsDefault()) togetherWith fadeOut(NiaMotion.effectsDefault()))
+                            .using(
+                                SizeTransform(clip = false) { _, _ ->
+                                    NiaMotion.spatialDefault()
+                                },
+                            )
+                    },
+                    label = "mushafHintMorph",
+                ) { label ->
+                    if (label) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) {
+                            // The chevron dips gently — same motion language
+                            // as the bent-chevron handle on the header boundary.
+                            val chevronTransition = rememberInfiniteTransition(label = "pillChevron")
+                            val chevronDip by chevronTransition.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 3f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(700, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse,
+                                ),
+                                label = "pillChevronDip",
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .graphicsLayer { translationY = chevronDip.dp.toPx() },
+                            )
+                            Text(
+                                text = "Swipe down for surah info",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    } else {
+                        // Grabber ↔ chevron as ONE drawn stroke: a horizontal
+                        // 32dp bar whose midpoint lifts as the header comes
+                        // into view, folding the pill into a ^ (and unfolding
+                        // back into the flat pill on the way up) — a real
+                        // geometric transform, not a crossfade. Fold fraction,
+                        // bounce and pulse are hoisted to the Surface level
+                        // (see graphicsLayer above) so the shape clip can't
+                        // shear the bouncing chevron.
+                        // Same theme color in both shapes — the flat grabber
+                        // bar and the folded chevron are one object, so they
+                        // share the brand primary rather than swapping to a
+                        // neutral gray when flattened.
+                        val strokeColor = MaterialTheme.colorScheme.primary
+                        Canvas(
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .size(width = 36.dp, height = 20.dp),
+                        ) {
+                            val cx = size.width / 2f
+                            val halfWidth = lerp(16.dp.toPx(), 11.dp.toPx(), bend)
+                            val peak = 9.dp.toPx() * bend
+                            val baseY = size.height / 2f + peak / 2f
+                            val stroke = lerp(4.dp.toPx(), 3.5.dp.toPx(), bend)
+                            val path = Path().apply {
+                                moveTo(cx - halfWidth, baseY)
+                                lineTo(cx, baseY - peak)
+                                lineTo(cx + halfWidth, baseY)
+                            }
+                            drawPath(
+                                path = path,
+                                color = strokeColor,
+                                style = Stroke(
+                                    width = stroke,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round,
+                                ),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -4751,7 +5003,6 @@ private fun computeInkMarkerGeometries(
 @Composable
 private fun MushafPageWithFrame(
     pageText: AnnotatedString,
-    pageNumber: Int,
     arabicFont: String,
     arabicFontSize: Float,
     showBismillah: Boolean,
@@ -4796,10 +5047,12 @@ private fun MushafPageWithFrame(
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
     val horizontalPadding = 12.dp
-    val topPadding = 4.dp
+    // 16dp strip at the top hosts the morphing pull-down hint drawn by the
+    // screen overlay (pill ↔ grabber); MUST match the paginator's topPadding
+    // so measured pages fit exactly.
+    val topPadding = 16.dp
     val bottomPadding = 16.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
-    val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
 
     // The ayah ornaments are painted BEHIND the text at the exact placeholder
     // rects the layout produced, so overhanging swashes render on top of the
@@ -4865,7 +5118,7 @@ private fun MushafPageWithFrame(
                         start = horizontalPadding,
                         end = horizontalPadding,
                         top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding + pageFooterHeightDp
+                        bottom = bottomPadding
                     )
             ) {
                 val geoms = inkGeometries ?: return@Canvas
@@ -4913,7 +5166,7 @@ private fun MushafPageWithFrame(
                         start = horizontalPadding,
                         end = horizontalPadding,
                         top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding + pageFooterHeightDp
+                        bottom = bottomPadding
                     )
                     .pointerInput(ayahRanges) {
                         detectTapGestures(
@@ -4934,7 +5187,7 @@ private fun MushafPageWithFrame(
                         start = horizontalPadding,
                         end = horizontalPadding,
                         top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding + pageFooterHeightDp
+                        bottom = bottomPadding
                     )
             ) {
                 val geoms = inkGeometries ?: return@Canvas
@@ -4954,20 +5207,6 @@ private fun MushafPageWithFrame(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = bottomPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = pageNumber.toString(),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                    fontFamily = ubuntuInspiredFontFamily,
-                    color = onSurfaceColor.copy(alpha = 0.7f)
-                )
-            }
         }
     }
 }
@@ -5041,10 +5280,12 @@ private fun MushafPagerView(
     }
     val lineSpacingMultiplier = 1.45f
     val horizontalPadding = 12.dp
-    val topPadding = 4.dp
+    // 16dp strip at the top hosts the morphing pull-down hint drawn by the
+    // screen overlay (pill ↔ grabber); MUST match MushafPageWithFrame's
+    // topPadding so rendered pages fit exactly.
+    val topPadding = 16.dp
     val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
-    val pageFooterHeightDp = 28.dp // tall enough to clear the page-number footer (~22dp) so the last line isn't crowded
 
     // End-of-ayah marker: the user's ornamental frame drawable with the ayah
     // number centered inside, tinted in the theme color. Drawn as inline
@@ -5299,10 +5540,10 @@ private fun MushafPagerView(
         ) {
             val availableWidthPx = with(density) { (maxWidth - horizontalPadding * 2).toPx() }
             val fullPageHeightPx = with(density) {
-                (maxHeight - topPadding - bottomPadding - pageFooterHeightDp).toPx()
+                (maxHeight - topPadding - bottomPadding).toPx()
             }
             val firstPageHeightPx = if (showBismillah) {
-                with(density) { (maxHeight - topPadding - bottomPadding - pageFooterHeightDp - bismillahHeightDp).toPx() }
+                with(density) { (maxHeight - topPadding - bottomPadding - bismillahHeightDp).toPx() }
             } else {
                 fullPageHeightPx
             }
@@ -5535,7 +5776,6 @@ private fun MushafPagerView(
                 val page = paginatedPages[pageIndex]
                 MushafPageWithFrame(
                     pageText = page.text,
-                    pageNumber = page.pageNumber,
                     inlineContent = pageInlineContent,
                     inkGeometries = inkGeomCache[pageIndex],
                     arabicFont = arabicFont,
@@ -6963,52 +7203,6 @@ fun TafseerDialog(
 }
 
 
-/**
- * Small animated upward chevron shown at the top of the ayah list when not in
- * Mushaf mode. Bounces gently upward in an infinite loop to hint that swiping
- * up switches to the Mushaf view.
- */
-@Composable
-private fun SwipeUpToMushafHint(modifier: Modifier = Modifier, pointDown: Boolean = false) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "swipeUpHint")
-    val bouncePeak = if (pointDown) 8f else -8f
-    val bounceDp by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = bouncePeak,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "swipeUpHintBounce",
-    )
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "swipeUpHintAlpha",
-    )
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            imageVector = if (pointDown) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-            contentDescription = "Swipe up for Mushaf view",
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .size(28.dp)
-                .graphicsLayer {
-                    translationY = bounceDp.dp.toPx()
-                    this.alpha = alpha
-                },
-        )
-    }
-}
 
 
 /**
