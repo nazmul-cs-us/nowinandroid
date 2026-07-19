@@ -152,12 +152,31 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     val hasDuaSuffix = title.contains(": Dua ")
                     val chapter = if (hasDuaSuffix) title.substringBeforeLast(": Dua ").trim() else title.trim()
                     val duaNumber = if (hasDuaSuffix) title.substringAfterLast(": Dua ").trim() else null
+                    // Reference BOOK names only (e.g. "Al-Bukhari and Muslim") —
+                    // hadith numbers are deliberately not spoken.
+                    val referenceBooks = if (duaNumber?.toIntOrNull() != null) {
+                        runCatching {
+                            com.starception.submission.core.duadatabase.DuaDatabase
+                                .getInstance(appCtx).duaDao()
+                                .getDuaReferenceBooksByTitleAndPosition(chapter, duaNumber.toInt())
+                        }.getOrNull().orEmpty()
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .distinct()
+                            .take(2)
+                    } else {
+                        emptyList()
+                    }
                     val announcement = buildString {
                         if (!chapter.equals(lastAnnouncedChapter, ignoreCase = true)) {
                             append(chapter)
                             if (duaNumber != null) append(". ")
                         }
                         if (duaNumber != null) append("Dua $duaNumber")
+                        if (referenceBooks.isNotEmpty()) {
+                            append(". From ")
+                            append(referenceBooks.joinToString(" and "))
+                        }
                     }.trim()
                     if (announcement.isEmpty()) return@announce
                     lastAnnouncedChapter = chapter
