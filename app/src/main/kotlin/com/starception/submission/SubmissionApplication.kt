@@ -62,6 +62,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
     @Inject
     lateinit var audioDownloadHelper: com.starception.submission.download.AudioDownloadHelper
 
+    @Inject
+    lateinit var fortressTtsService: com.starception.submission.voice.SherpaOnnxTtsService
+
     override fun onCreate() {
         Log.d("SubmissionApplication", "Application onCreate started")
         super.onCreate()
@@ -135,6 +138,40 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 // resolves the CDN/local source here, then hands the final source to the service.
                 val appCtx = applicationContext
                 val delegateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+                // Spoken announcements for Fortress playback, via the on-device TTS:
+                // the chapter (topic) name is announced whenever playback crosses into
+                // a different chapter, and the dua number before every clip. Lives in
+                // the play delegate so ONE hook covers both a user tapping play and
+                // the app-level auto-advance. Speaks nothing (fast no-op) when the TTS
+                // engine isn't downloaded; a timeout guards against the announcement
+                // ever stalling playback.
+                var lastAnnouncedChapter: String? = null
+                val announceFortressTrack: suspend (String) -> Unit = announce@{ title ->
+                    if (title.isBlank()) return@announce
+                    val hasDuaSuffix = title.contains(": Dua ")
+                    val chapter = if (hasDuaSuffix) title.substringBeforeLast(": Dua ").trim() else title.trim()
+                    val duaNumber = if (hasDuaSuffix) title.substringAfterLast(": Dua ").trim() else null
+                    val announcement = buildString {
+                        if (!chapter.equals(lastAnnouncedChapter, ignoreCase = true)) {
+                            append(chapter)
+                            if (duaNumber != null) append(". ")
+                        }
+                        if (duaNumber != null) append("Dua $duaNumber")
+                    }.trim()
+                    if (announcement.isEmpty()) return@announce
+                    lastAnnouncedChapter = chapter
+                    try {
+                        kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                            val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+                            val started = fortressTtsService.speak(announcement) { done.complete(Unit) }
+                            if (started) done.await() // speak() invokes onComplete itself on failure
+                        }
+                    } catch (e: Exception) {
+                        Log.w("DuaAutoPlay", "TTS announcement failed, playing audio directly", e)
+                    }
+                }
+
                 com.starception.submission.core.ui.ChapterAudioController.playbackDelegate =
                     object : com.starception.submission.core.ui.ChapterAudioController.PlaybackDelegate {
                         override fun play(url: String, title: String) {
@@ -142,8 +179,21 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                                 val source = runCatching {
                                     audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
                                 }.getOrNull() ?: url
+                                // Announce after the (possibly slow) download resolve so
+                                // the spoken title leads straight into the audio.
+                                announceFortressTrack(title)
+                                // Mirror the mini-bar: include the Interests topic name on
+                                // the notification's subtitle line when the Dua screen set it.
+                                val notifTopic = com.starception.submission.core.ui
+                                    .ChapterAudioController.currentTopic
+                                    ?.trim()?.takeIf { it.isNotEmpty() }
+                                val notifSubtitle = if (notifTopic != null) {
+                                    "Fortress of the Muslim · $notifTopic"
+                                } else {
+                                    "Fortress of the Muslim"
+                                }
                                 com.starception.submission.services.ChapterRecitationService.play(
-                                    appCtx, source, title, "Fortress of the Muslim",
+                                    appCtx, source, title, notifSubtitle,
                                 )
                             }
                         }

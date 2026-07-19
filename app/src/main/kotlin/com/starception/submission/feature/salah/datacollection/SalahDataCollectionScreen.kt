@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -54,6 +55,8 @@ import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -208,20 +211,22 @@ fun SalahDataCollectionScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = FloatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Live prayer recording button (always visible when not recording)
-                    if (!uiState.isRecording && !uiState.isCountingDown) {
-                        item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
-                    }
-                    // Guided recording card
-                    item { GuidedRecordingCard(uiState, viewModel) }
+                    // Same workflow order as portrait: needs → baseline →
+                    // posture → record → alternative modes.
                     item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
                     item { deployedModel?.let { DeployedModelCard(it) } }
+                    item { PostureSelector(uiState, viewModel) }
                     item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
                         item { CaptureQualityCard(uiState) }
                     }
-                    item { PostureSelector(uiState, viewModel) }
+                    // Guided recording card
+                    item { GuidedRecordingCard(uiState, viewModel) }
+                    // Live prayer recording (always visible when not recording)
+                    if (!uiState.isRecording && !uiState.isCountingDown) {
+                        item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
+                    }
                     item { TrainingProgress(uiState) }
                     // 3D Visualization Card
                     item {
@@ -267,24 +272,27 @@ fun SalahDataCollectionScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Live prayer recording button (always visible when not recording)
-                if (!uiState.isRecording && !uiState.isCountingDown) {
-                    item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
-                }
-                // Guided recording card
-                item { GuidedRecordingCard(uiState, viewModel) }
-                    item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
-                    item { deployedModel?.let { DeployedModelCard(it) } }
+                // Workflow order: what the dataset needs next → deployed model
+                // baseline → pick a posture → record it. The alternative modes
+                // (guided / live) follow as secondary entry points.
+                item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
+                item { deployedModel?.let { DeployedModelCard(it) } }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
                 }
+                item { PostureSelector(uiState, viewModel) }
                 item { RecordingHero(uiState, viewModel) }
                 // Capture quality feedback during recording
                 if (uiState.isRecording && uiState.lastSample != null) {
                     item { CaptureQualityCard(uiState) }
                 }
-                item { PostureSelector(uiState, viewModel) }
+                // Guided recording card
+                item { GuidedRecordingCard(uiState, viewModel) }
+                // Live prayer recording (always visible when not recording)
+                if (!uiState.isRecording && !uiState.isCountingDown) {
+                    item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
+                }
                 item { SessionStats(uiState) }
                 item { TrainingProgress(uiState) }
                 // 3D Visualization Card
@@ -422,7 +430,7 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
@@ -448,46 +456,45 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            )
-                        )
-                    ),
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.PlayArrow,
+                    imageVector = Icons.Default.SelfImprovement,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Record Live Prayer",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Pray normally with phone in pocket. ML detects postures automatically.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )
             }
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -515,11 +522,14 @@ private fun GuidedRecordingCard(
         return
     }
 
+    // IDLE reads as a normal surface card like every other section; only the
+    // active guided-session states keep a soft primary wash so a running
+    // session stays visually distinct.
     val cardColor = when (guidedState) {
-        GuidedRecordingState.IDLE -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-        GuidedRecordingState.WELCOME, GuidedRecordingState.COUNTDOWN -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+        GuidedRecordingState.IDLE -> MaterialTheme.colorScheme.surface
+        GuidedRecordingState.WELCOME, GuidedRecordingState.COUNTDOWN -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         GuidedRecordingState.RECORDING_POSTURE -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        GuidedRecordingState.POSTURE_TRANSITION -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        GuidedRecordingState.POSTURE_TRANSITION -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
         GuidedRecordingState.COMPLETED -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
         GuidedRecordingState.CANCELLED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
     }
@@ -532,8 +542,8 @@ private fun GuidedRecordingCard(
             .shadow(
                 elevation = if (guidedState != GuidedRecordingState.IDLE) 6.dp else 3.dp,
                 shape = RoundedCornerShape(20.dp),
-                ambientColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             )
             .animateContentSize(tween(300))
     ) {
@@ -553,26 +563,19 @@ private fun GuidedRecordingCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(13.dp))
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.tertiaryContainer,
-                                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-                                        )
-                                    )
-                                ),
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.PlayArrow,
+                                imageVector = Icons.Default.RecordVoiceOver,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(26.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Guided Recording",
@@ -612,7 +615,7 @@ private fun GuidedRecordingCard(
                                         viewModel.setGuidedDuration(duration)
                                     },
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.tertiary
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceContainerHighest,
                                 shadowElevation = if (isSelected) 2.dp else 0.dp
                             ) {
@@ -620,7 +623,7 @@ private fun GuidedRecordingCard(
                                     text = "${duration}s",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onTertiary
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
                                 )
@@ -647,7 +650,7 @@ private fun GuidedRecordingCard(
                                     Icon(
                                         imageVector = Icons.Default.Download,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Text(
@@ -689,7 +692,7 @@ private fun GuidedRecordingCard(
                                             viewModel.downloadTtsEngine()
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.tertiary
+                                            containerColor = MaterialTheme.colorScheme.primary
                                         ),
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.fillMaxWidth()
@@ -715,7 +718,7 @@ private fun GuidedRecordingCard(
                         },
                         enabled = uiState.isTtsAvailable,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiary
+                            containerColor = MaterialTheme.colorScheme.primary
                         ),
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
@@ -743,14 +746,14 @@ private fun GuidedRecordingCard(
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary.copy(alpha = pulseAlpha),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha),
                         modifier = Modifier.size(48.dp)
                     )
                     Text(
                         text = "Get Ready",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = uiState.guidedMessage,
@@ -783,21 +786,21 @@ private fun GuidedRecordingCard(
                             .size(80.dp)
                             .scale(countdownScale)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = if (uiState.countdownSeconds > 0) "${uiState.countdownSeconds}" else "Go!",
                             style = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.tertiary
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     Text(
                         text = "Put phone in pocket!",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.tertiary
+                        color = MaterialTheme.colorScheme.primary
                     )
                     OutlinedButton(
                         onClick = { viewModel.cancelGuidedRecording() },
@@ -935,7 +938,7 @@ private fun GuidedRecordingCard(
                         text = uiState.guidedMessage,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = transAlpha),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = transAlpha),
                         textAlign = TextAlign.Center
                     )
 
@@ -1039,39 +1042,75 @@ private fun NextUpCard(
     Card(
         onClick = { onSelectPosture(nextPosture) },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.TrackChanges,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Next up: ${nextPosture.displayName}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "$nextCount / $target",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.TrackChanges,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Record next: ${nextPosture.displayName}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Tap to select this posture",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = "$nextCount / $target",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
+            LinearProgressIndicator(
+                progress = { overallPct / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
             Text(
                 text = buildString {
                     append("Dataset $overallPct% of target")
@@ -1079,10 +1118,9 @@ private fun NextUpCard(
                         append(" · thin: ")
                         append(weakest.joinToString(", ") { it.first.displayName })
                     }
-                    append(" · tap to select")
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -1158,13 +1196,13 @@ private fun QuickGuide() {
     Card(
         onClick = { expanded = !expanded },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 2.dp,
+                elevation = 4.dp,
                 shape = RoundedCornerShape(20.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
@@ -1173,21 +1211,29 @@ private fun QuickGuide() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "How to Collect Data",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 val chevron by animateFloatAsState(
@@ -1306,7 +1352,7 @@ private fun RecordingHero(
     Card(
         colors = CardDefaults.cardColors(
             containerColor = when {
-                uiState.isCountingDown -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                uiState.isCountingDown -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 uiState.isRecording -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
                 else -> MaterialTheme.colorScheme.surface
             }
@@ -1346,14 +1392,14 @@ private fun RecordingHero(
                         .size(100.dp)
                         .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "${uiState.countdownSeconds}",
                         style = MaterialTheme.typography.displayLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.tertiary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1361,7 +1407,7 @@ private fun RecordingHero(
                     text = "Put phone in pocket now!",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1500,13 +1546,13 @@ private fun RecordingHero(
             } else if (uiState.trimmedSamples > 0) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     modifier = Modifier.padding(top = 10.dp)
                 ) {
                     Text(
                         text = "Trimmed ${uiState.trimmedSamples} samples (phone-grab noise)",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                     )
                 }
@@ -1674,6 +1720,7 @@ private fun PostureChip(
     onClick: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
+    val isComplete = globalCount >= POSTURE_TARGET_WINDOWS
 
     val textColor by animateColorAsState(
         targetValue = when {
@@ -1697,10 +1744,19 @@ private fun PostureChip(
         label = "shadowElevation"
     )
 
+    // Each tile doubles as a dataset gauge: the bar fills toward the
+    // 500-window target so the grid reads as a per-class dashboard while
+    // you collect. Completed classes get a check badge.
+    val datasetProgress by animateFloatAsState(
+        targetValue = globalCount.coerceAtMost(POSTURE_TARGET_WINDOWS) / POSTURE_TARGET_WINDOWS.toFloat(),
+        animationSpec = NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_1),
+        label = "postureDatasetProgress"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
+            .height(84.dp)
             .shadow(
                 elevation = shadowElevation.dp,
                 shape = RoundedCornerShape(16.dp),
@@ -1711,7 +1767,7 @@ private fun PostureChip(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
+                .height(84.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
                 .clickable(
@@ -1761,7 +1817,7 @@ private fun PostureChip(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -1783,25 +1839,62 @@ private fun PostureChip(
                     fontSize = 13.sp
                 )
             }
-            // Show counts
-            val countText = when {
-                isRecording && sessionCount > 0 -> "+$sessionCount"
-                globalCount > 0 -> "$globalCount"
-                else -> null
-            }
-            countText?.let {
+            Spacer(modifier = Modifier.height(5.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { datasetProgress },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = if (isSelected && isRecording) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    trackColor = textColor.copy(alpha = 0.15f),
+                )
                 Text(
-                    text = it,
+                    // Live "+N" while this posture is being recorded; the
+                    // stored dataset count otherwise.
+                    text = if (isRecording && sessionCount > 0) "+$sessionCount" else "$globalCount",
                     style = MaterialTheme.typography.labelSmall,
-                    color = textColor.copy(alpha = 0.5f),
+                    color = textColor.copy(alpha = 0.6f),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp
+                    fontSize = 9.sp,
+                    maxLines = 1
                 )
             }
         }
         }
+        if (isComplete) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Target reached",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+        }
     }
 }
+
+/** Dataset target per posture class, in 100ms windows — matches the training
+ *  pipeline's expectation and the progress card at the top of the screen. */
+private const val POSTURE_TARGET_WINDOWS = 500
 
 // ═══════════════════════════════════════════════════════
 // SESSION STATS

@@ -1,5 +1,10 @@
 # Salah ML Posture Detection System
 
+> **Working the collect→train→deploy loop?** Use
+> [`SALAH_TRAINING_PLAYBOOK.md`](SALAH_TRAINING_PLAYBOOK.md) — it has the
+> verified step-by-step commands (some command examples below are outdated).
+> This guide remains the architecture deep-dive.
+
 Complete guide for the on-device machine learning system that detects Islamic prayer (salah) postures using phone sensors.
 
 ## System Overview

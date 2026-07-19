@@ -36,6 +36,11 @@ object ChapterAudioController {
      *  Observable (mutableStateOf) so screens can follow app-level continuous playback. */
     var currentTitle by mutableStateOf<String?>(null)
 
+    /** Interests-topic name of the current track (e.g. "Quranic Duas"), set by the Dua
+     *  screen alongside [currentTitle] so the media bar's subtitle can show which topic
+     *  the playing dua belongs to. Null when unknown (news-card chapter playback). */
+    var currentTopic by mutableStateOf<String?>(null)
+
     private var mp: MediaPlayer? = null
 
     /**

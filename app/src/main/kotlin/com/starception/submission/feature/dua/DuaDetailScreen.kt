@@ -1977,6 +1977,9 @@ fun DuaDetailScreen(
                                 FloatingActionButton(
                                     onClick = {
                                         ChapterAudioController.currentTitle = dua.title
+                                        // Feed the media bar's subtitle the Interests topic
+                                        // this dua belongs to (first chip on the page).
+                                        ChapterAudioController.currentTopic = topics.firstOrNull()?.name
                                         ChapterAudioController.toggle(audioUrl)
                                     },
                                     containerColor = MaterialTheme.colorScheme.primary,
@@ -2990,6 +2993,7 @@ fun DuaDetailScreen(
                             val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
                             IconButton(onClick = {
                                 ChapterAudioController.currentTitle = title
+                                ChapterAudioController.currentTopic = topics.firstOrNull()?.name
                                 ChapterAudioController.toggle(audioUrl)
                             }) {
                                 if (isThisLoading) {

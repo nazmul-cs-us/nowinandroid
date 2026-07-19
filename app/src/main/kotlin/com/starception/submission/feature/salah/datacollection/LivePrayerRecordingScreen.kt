@@ -54,7 +54,10 @@ fun LivePrayerRecordingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                // Clear the app's floating bottom navigation — without this
+                // the bottom-anchored Start/Stop buttons hide behind the pill.
+                .padding(bottom = com.starception.submission.core.designsystem.theme.FloatingNavClearance),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -109,8 +112,6 @@ private fun PreRecordingContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -203,7 +204,7 @@ private fun PreRecordingContent(
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                containerColor = MaterialTheme.colorScheme.surface
             )
         ) {
             Column(
@@ -244,7 +245,8 @@ private fun PreRecordingContent(
                 }
                 Text(
                     text = "The app will automatically detect and count your prayer postures using on-device ML. You can review and correct any mistakes after recording.",
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

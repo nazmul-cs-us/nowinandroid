@@ -319,6 +319,17 @@ class GlobalMediaViewModel(
      */
     private fun onFortressPlaybackStarted(title: String) {
         activeSource = MediaSource.Fortress(title = title)
+        // Surface the Interests topic of the playing dua ("Quranic Duas",
+        // "Hadith", …) on the subtitle line — set by the Dua screen's play
+        // buttons. NOT the chapter name: the title line already carries the
+        // chapter, so repeating it read as a bug.
+        val topicName = com.starception.submission.core.ui.ChapterAudioController.currentTopic
+            ?.trim()?.takeIf { it.isNotEmpty() }
+        val subtitle = if (topicName != null) {
+            "Fortress of the Muslim · $topicName"
+        } else {
+            "Fortress of the Muslim"
+        }
         _controllerState.update { current ->
             // Preserve position/duration if this is just a resume of the same track.
             val keepProgress = current.playback.source is MediaSource.Fortress &&
@@ -329,7 +340,7 @@ class GlobalMediaViewModel(
                 playback = current.playback.copy(
                     isPlaying = true,
                     title = title,
-                    subtitle = "Fortress of the Muslim",
+                    subtitle = subtitle,
                     currentPosition = if (keepProgress) current.playback.currentPosition else 0,
                     duration = if (keepProgress) current.playback.duration else 0,
                     source = activeSource,
