@@ -295,10 +295,43 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                         // someone who says: \"...\""), so split on the ": Dua N" suffix.
                         val completedChapter = completedTitle.substringBeforeLast(": Dua ").trim()
                         val completedPosition = completedTitle.substringAfterLast(": Dua ").trim().toIntOrNull()
+                        // Topic playlist set by the Dua screen. When the user is listening
+                        // inside a topic-filtered list ("Forgiveness & Repentance", ...),
+                        // the next track must be the next dua of that TOPIC — the book-order
+                        // neighbor chapter usually belongs to a different topic entirely.
+                        val playlist = controller.playlistTitles
+                        val playlistIndex = playlist.indexOf(completedTitle)
                         delegateScope.launch {
                             val dao = com.starception.submission.core.duadatabase.DuaDatabase
                                 .getInstance(appCtx).duaDao()
-                            // Next dua within the same chapter first.
+                            if (playlistIndex >= 0) {
+                                // Walk forward through the topic playlist to the first entry
+                                // whose audio resolves (per-dua clip, else chapter recitation).
+                                for (i in playlistIndex + 1 until playlist.size) {
+                                    val nextTitle = playlist[i]
+                                    if (!nextTitle.contains(": Dua ")) continue
+                                    val nextChapter = nextTitle.substringBeforeLast(": Dua ").trim()
+                                    val nextPosition = nextTitle.substringAfterLast(": Dua ").trim().toIntOrNull() ?: continue
+                                    val audio = runCatching {
+                                        dao.getDuaAudioByTitleAndPosition(nextChapter, nextPosition)
+                                    }.getOrNull()?.takeIf { it.isNotBlank() }
+                                        ?: runCatching {
+                                            dao.getChapterAudioByTitle(nextChapter)
+                                        }.getOrNull()?.takeIf { it.isNotBlank() }
+                                    if (audio != null) {
+                                        Log.d("DuaAutoPlay", "next in topic playlist -> '$nextTitle'")
+                                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                            controller.currentTitle = nextTitle
+                                            controller.toggle(audio)
+                                        }
+                                        return@launch
+                                    }
+                                }
+                                Log.d("DuaAutoPlay", "topic playlist finished — stopping")
+                                return@launch
+                            }
+                            // No topic playlist (news-card chapter playback): fall through to
+                            // book order. Next dua within the same chapter first.
                             val nextInChapter = if (completedPosition != null) {
                                 runCatching {
                                     dao.getDuaAudioByTitleAndPosition(completedChapter, completedPosition + 1)
