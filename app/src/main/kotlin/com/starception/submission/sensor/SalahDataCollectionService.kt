@@ -8,6 +8,7 @@ import android.hardware.SensorManager
 import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.PowerManager
 import android.util.Log
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
@@ -67,6 +68,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     private var liveAutoStopHandler: Handler? = null
     private var liveAutoStopRunnable: Runnable? = null
 
+    // Keeps the CPU (and thus non-wakeup sensor delivery) alive while the phone
+    // is in the user's pocket with the screen off during a recording session.
+    private var wakeLock: PowerManager.WakeLock? = null
+
     // Accumulation buffers for current window (with timestamps for synchronization)
     private val accelXBuffer = mutableListOf<Float>()
     private val accelYBuffer = mutableListOf<Float>()
@@ -93,6 +98,31 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     var onSampleRecorded: ((SalahDataSample) -> Unit)? = null
     var onStatsUpdated: ((Map<SalahPosture, Int>, Int) -> Unit)? = null
     var onLivePostureDetected: ((SalahPosture, Float) -> Unit)? = null
+
+    // Invoked on the main thread with the recorded file path when live mode
+    // auto-stops at MAX_PRAYER_DURATION_MS, so the UI can leave the recording state.
+    var onLiveAutoStopped: ((String?) -> Unit)? = null
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "starception:SalahDataCollection"
+        ).apply {
+            // Safety timeout slightly past the max session length
+            acquire(MAX_PRAYER_DURATION_MS + 60_000L)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing wake lock: ${e.message}")
+        }
+        wakeLock = null
+    }
 
     /**
      * Start recording sensor data for a new session.
@@ -124,6 +154,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         Log.i(TAG, "   Session: $sessionId")
         Log.i(TAG, "   Output: ${outputFile?.absolutePath}")
 
+        acquireWakeLock()
+
         // Start sensor thread
         sensorThread = HandlerThread("SalahSensorThread").apply { start() }
         sensorHandler = Handler(sensorThread!!.looper)
@@ -151,6 +183,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         isRecording = false
         sensorManager.unregisterListener(this)
+        releaseWakeLock()
 
         sensorThread?.quitSafely()
         sensorThread = null
@@ -463,6 +496,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         Log.i(TAG, "   Output: ${outputFile?.absolutePath}")
         Log.i(TAG, "   Auto-stop: 30 minutes")
 
+        acquireWakeLock()
+
         // Start sensor thread
         sensorThread = HandlerThread("SalahSensorThread").apply { start() }
         sensorHandler = Handler(sensorThread!!.looper)
@@ -483,7 +518,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         liveAutoStopHandler = Handler(android.os.Looper.getMainLooper())
         liveAutoStopRunnable = Runnable {
             Log.i(TAG, "Live recording auto-stop (30 minutes reached)")
-            stopLivePrayerRecording()
+            val filePath = stopLivePrayerRecording()
+            onLiveAutoStopped?.invoke(filePath)
         }
         liveAutoStopHandler?.postDelayed(liveAutoStopRunnable!!, MAX_PRAYER_DURATION_MS)
     }
@@ -506,6 +542,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         isRecording = false
         isLiveMode = false
         sensorManager.unregisterListener(this)
+        releaseWakeLock()
 
         sensorThread?.quitSafely()
         sensorThread = null

@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -61,32 +62,34 @@ class LivePrayerRecordingViewModel @Inject constructor(
         collectionService.onSampleRecorded = { sample ->
             try {
                 val engine = detectionEngine
-                if (engine != null) {
-                    val result = engine.addSampleAndClassify(sample)
-                    if (result != null) {
-                        _state.value = _state.value.copy(
+                val result = engine?.addSampleAndClassify(sample)
+                if (result != null) {
+                    // Feed to sequence validator for rak'ah counting
+                    sequenceValidator.processDetection(result.posture, result.confidence, System.currentTimeMillis())
+                    _state.update {
+                        it.copy(
                             detectedPosture = result.posture,
                             detectedConfidence = result.confidence,
-                            sampleCount = _state.value.sampleCount + 1
-                        )
-                        // Feed to sequence validator for rak'ah counting
-                        sequenceValidator.processDetection(result.posture, result.confidence, System.currentTimeMillis())
-                        _state.value = _state.value.copy(
+                            sampleCount = it.sampleCount + 1,
                             rakahCount = sequenceValidator.completedRakahs
-                        )
-                    } else {
-                        _state.value = _state.value.copy(
-                            sampleCount = _state.value.sampleCount + 1
                         )
                     }
                 } else {
-                    _state.value = _state.value.copy(
-                        sampleCount = _state.value.sampleCount + 1
-                    )
+                    _state.update { it.copy(sampleCount = it.sampleCount + 1) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in real-time ML prediction", e)
             }
+        }
+
+        // Keep UI state in sync when the service auto-stops at the 30-minute limit;
+        // without this the screen stays in "recording" and the review step is lost.
+        collectionService.onLiveAutoStopped = { filePath ->
+            Log.i(TAG, "Live recording auto-stopped, saved to: $filePath")
+            timerJob?.cancel()
+            _state.update { it.copy(isRecording = false, recordedFilePath = filePath) }
+            detectionEngine?.close()
+            detectionEngine = null
         }
 
         collectionService.startLivePrayerRecording()
@@ -97,9 +100,7 @@ class LivePrayerRecordingViewModel @Inject constructor(
         timerJob = viewModelScope.launch {
             while (_state.value.isRecording) {
                 delay(1000)
-                _state.value = _state.value.copy(
-                    elapsedSeconds = _state.value.elapsedSeconds + 1
-                )
+                _state.update { it.copy(elapsedSeconds = it.elapsedSeconds + 1) }
             }
         }
     }
@@ -111,10 +112,7 @@ class LivePrayerRecordingViewModel @Inject constructor(
         timerJob?.cancel()
 
         val filePath = collectionService.stopLivePrayerRecording()
-        _state.value = _state.value.copy(
-            isRecording = false,
-            recordedFilePath = filePath
-        )
+        _state.update { it.copy(isRecording = false, recordedFilePath = filePath) }
 
         detectionEngine?.close()
         detectionEngine = null
