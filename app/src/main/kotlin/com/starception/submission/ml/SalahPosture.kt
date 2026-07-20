@@ -12,7 +12,7 @@ enum class SalahPosture(val displayName: String, val arabicName: String) {
     SUJUD("Prostration", "سجود"),
     JALSA("Sitting", "جلسة"),
     TASHAHHUD("Final Sitting", "تشهد"),
-    QIYAM_RISING("Rising Up", "قيام");
+    QIYAM_RISING("Rising Up", "اعتدال");
 
     companion object {
         val classificationLabels = listOf(QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)

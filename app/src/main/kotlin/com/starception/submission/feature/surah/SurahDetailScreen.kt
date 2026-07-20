@@ -71,6 +71,7 @@ import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.window.Dialog
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -3218,7 +3219,7 @@ private fun AlbumPlayerContent(
                 title = { Text("Delete Note?") },
                 text = { Text("This note will be permanently removed.") },
                 confirmButton = {
-                    Button(
+                    NiaOutlinedButton(
                         onClick = {
                             showDeleteNoteConfirmation?.let { note ->
                                 scope.launch {
@@ -3232,9 +3233,6 @@ private fun AlbumPlayerContent(
                             }
                             showDeleteNoteConfirmation = null
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
                     ) {
                         Text("Delete")
                     }
@@ -3390,13 +3388,12 @@ private fun BottomSheetNotesContent(
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
-            FilledTonalButton(
+            NiaOutlinedButton(
                 onClick = {
                     keyboardController?.hide()
                     onSaveNote()
                 },
                 enabled = noteText.isNotBlank(),
-                shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(
                     imageVector = if (editingNote != null) Icons.Default.Check else Icons.Default.Add,

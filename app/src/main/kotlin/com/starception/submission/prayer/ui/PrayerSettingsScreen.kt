@@ -38,6 +38,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.prayer.model.*
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
@@ -1002,15 +1003,12 @@ private fun RestoreAutoSettingsButton(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
-            OutlinedButton(
+
+            NiaOutlinedButton(
                 onClick = onRestoreClick,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.secondary
-                )
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,

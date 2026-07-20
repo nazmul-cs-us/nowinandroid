@@ -94,19 +94,56 @@ data class FileQuality(
 )
 
 /**
- * Posture sequence for guided recording.
- * Each pair is (posture, isTransition).
- * Transition postures use a fixed 8s duration; static postures use user-selected duration.
+ * One step of the guided recording sequence.
+ * Transition steps use a fixed 8s duration; static postures use user-selected duration.
  */
-val GUIDED_POSTURE_SEQUENCE: List<Pair<SalahPosture, Boolean>> = listOf(
-    SalahPosture.QIYAM to false,
-    SalahPosture.RUKU to false,
-    SalahPosture.GOING_TO_SUJUD to true,
-    SalahPosture.SUJUD to false,
-    SalahPosture.JALSA to false,
-    SalahPosture.SUJUD to false,           // Second sujud
-    SalahPosture.QIYAM_RISING to true,
-    SalahPosture.TASHAHHUD to false
+data class GuidedStep(
+    val posture: SalahPosture,
+    val isTransition: Boolean,
+    val instruction: String,
+)
+
+/**
+ * Posture sequence for guided recording, mirroring one real rak'ah that ends like the
+ * final rak'ah of a prayer (same ideal order the SalahSequenceValidator enforces):
+ * QIYAM → RUKU → QIYAM_RISING (i'tidal) → GOING_TO_SUJUD → SUJUD → JALSA → SUJUD → TASHAHHUD.
+ * After ruku the worshipper always straightens back up to standing before descending to
+ * sujud, and the tashahhud sitting follows the second sujud directly — so the recorded
+ * transitions match the ones the model will see in real prayers.
+ */
+val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
+    GuidedStep(
+        SalahPosture.QIYAM, isTransition = false,
+        instruction = "Stand upright as in prayer, hands folded. Hold this position.",
+    ),
+    GuidedStep(
+        SalahPosture.RUKU, isTransition = false,
+        instruction = "Bow into ruku with your hands on your knees. Hold this position.",
+    ),
+    GuidedStep(
+        SalahPosture.QIYAM_RISING, isTransition = true,
+        instruction = "Rise slowly from ruku back to standing, and remain standing.",
+    ),
+    GuidedStep(
+        SalahPosture.GOING_TO_SUJUD, isTransition = true,
+        instruction = "Go down slowly into prostration.",
+    ),
+    GuidedStep(
+        SalahPosture.SUJUD, isTransition = false,
+        instruction = "Stay in prostration. Hold this position.",
+    ),
+    GuidedStep(
+        SalahPosture.JALSA, isTransition = false,
+        instruction = "Sit up between the two prostrations. Hold this position.",
+    ),
+    GuidedStep(
+        SalahPosture.SUJUD, isTransition = false,
+        instruction = "Go down into the second prostration. Hold this position.",
+    ),
+    GuidedStep(
+        SalahPosture.TASHAHHUD, isTransition = false,
+        instruction = "Sit up from prostration for the tashahhud. Hold this position.",
+    ),
 )
 
 private const val TRANSITION_DURATION = 8 // seconds for transition postures
@@ -449,9 +486,9 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             _uiState.update { it.copy(countdownSeconds = 0) }
 
             // 4. Loop through posture sequence
-            for ((index, entry) in GUIDED_POSTURE_SEQUENCE.withIndex()) {
-                val (posture, isTransition) = entry
-                val postureDuration = if (isTransition) TRANSITION_DURATION else duration
+            for ((index, step) in GUIDED_POSTURE_SEQUENCE.withIndex()) {
+                val posture = step.posture
+                val postureDuration = if (step.isTransition) TRANSITION_DURATION else duration
 
                 // Set posture label on collection service
                 collectionService.currentPosture = posture
@@ -470,12 +507,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 }
 
                 // Speak posture instruction
-                val instruction = if (isTransition) {
-                    "Now perform ${posture.displayName}."
-                } else {
-                    "Now perform ${posture.displayName}. Hold this position."
-                }
-                speakAndWait(instruction)
+                speakAndWait(step.instruction)
 
                 // Count down the posture duration
                 for (remaining in postureDuration downTo 1) {
@@ -492,7 +524,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
                 // Transition announcement (if not the last posture)
                 if (index < GUIDED_POSTURE_SEQUENCE.size - 1) {
-                    val nextPosture = GUIDED_POSTURE_SEQUENCE[index + 1].first
+                    val nextPosture = GUIDED_POSTURE_SEQUENCE[index + 1].posture
                     _uiState.update {
                         it.copy(
                             guidedState = GuidedRecordingState.POSTURE_TRANSITION,

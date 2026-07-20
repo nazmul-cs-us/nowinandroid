@@ -32,6 +32,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -39,8 +40,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.foundation.BorderStroke
 import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithRepository
@@ -1987,23 +1988,12 @@ private fun CoursePrimaryActionButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    Button(
+    NiaOutlinedButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp),
-        shape = RoundedCornerShape(50),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
-            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            disabledContentColor = Color.White.copy(alpha = 0.7f),
-        ),
         enabled = enabled,
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 8.dp,
-        ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
     ) {
         Icon(
@@ -2443,22 +2433,11 @@ private fun CourseBigTile(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Continue button - Material 3 Expressive style with category accent color
-                Button(
+                NiaOutlinedButton(
                     onClick = onContinue,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                    shape = RoundedCornerShape(50), // Full pill shape
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = accentColor,
-                        contentColor = Color.White,
-                        disabledContainerColor = accentColor.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.7f),
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp,
-                    ),
                     enabled = !isCompleted,
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 ) {

@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 
 /**
  * Dialog showing the Tajweed color legend with all rules and their meanings.
@@ -89,11 +90,8 @@ fun TajweedLegendDialog(
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        Button(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
+                        NiaOutlinedButton(
+                            onClick = onDismiss
                         ) {
                             Text("Got it!")
                         }

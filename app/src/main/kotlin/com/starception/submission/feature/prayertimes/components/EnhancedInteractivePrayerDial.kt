@@ -19,7 +19,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -482,7 +486,7 @@ fun EnhancedInteractivePrayerDial(
             ) {
                 // Preset adjustment buttons
                 listOf(-15, -5, 0, +5, +15).forEach { preset ->
-                    FilledTonalButton(
+                    NiaOutlinedButton(
                         onClick = {
                             // Undo button (preset == 0) should restore the original offset (baseAdjustment)
                             val newAdjustment = if (preset == 0) baseAdjustment else baseAdjustment + preset
@@ -501,13 +505,6 @@ fun EnhancedInteractivePrayerDial(
                             }
                         },
                         modifier = Modifier.size(48.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = when {
-                                preset == 0 -> MaterialTheme.colorScheme.secondaryContainer // Undo uses secondary color
-                                preset > 0 -> MaterialTheme.colorScheme.primaryContainer
-                                else -> MaterialTheme.colorScheme.tertiaryContainer
-                            }
-                        ),
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         if (preset == 0) {

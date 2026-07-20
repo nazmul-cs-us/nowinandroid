@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
@@ -629,9 +630,8 @@ private fun SalahTrainingSection(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        androidx.compose.material3.FilledTonalButton(
+        NiaOutlinedButton(
             onClick = onNavigateToDataCollection,
-            shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)

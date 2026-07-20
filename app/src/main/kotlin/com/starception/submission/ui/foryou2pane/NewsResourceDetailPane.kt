@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.ui.BookmarkButton
@@ -182,7 +182,7 @@ fun NewsResourceDetailPane(
 
             // Open in browser button (if URL exists)
             if (userNewsResource.url.isNotBlank()) {
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         launchCustomChromeTab(
                             context = context,
@@ -190,7 +190,7 @@ fun NewsResourceDetailPane(
                             toolbarColor = backgroundColor,
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = stringResource(R.string.feature_foryou_open_in_browser))
                 }

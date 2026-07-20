@@ -153,15 +153,38 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     val chapter = if (hasDuaSuffix) title.substringBeforeLast(": Dua ").trim() else title.trim()
                     val duaNumber = if (hasDuaSuffix) title.substringAfterLast(": Dua ").trim() else null
                     // Reference BOOK names only (e.g. "Al-Bukhari and Muslim") —
-                    // hadith numbers are deliberately not spoken.
+                    // hadith numbers are deliberately not spoken. The database's
+                    // collection_name column is empty, so match the prose
+                    // reference strings against the canonical collections and
+                    // speak the first two mentioned (the primary citation leads
+                    // the string; later mentions are usually grading notes).
                     val referenceBooks = if (duaNumber?.toIntOrNull() != null) {
-                        runCatching {
+                        val refText = runCatching {
                             com.starception.submission.core.duadatabase.DuaDatabase
                                 .getInstance(appCtx).duaDao()
-                                .getDuaReferenceBooksByTitleAndPosition(chapter, duaNumber.toInt())
-                        }.getOrNull().orEmpty()
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() }
+                                .getDuaReferenceStringsByTitleAndPosition(chapter, duaNumber.toInt())
+                        }.getOrNull().orEmpty().joinToString(" ")
+                        // (match pattern in text) -> spoken form; Tirmithi/Tirmidhi
+                        // spellings collapse to one spoken name.
+                        val knownBooks = listOf(
+                            "Al-Bukhari" to "Al-Bukhari",
+                            "Muslim" to "Muslim",
+                            "Abu Dawud" to "Abu Dawud",
+                            "At-Tirmithi" to "At-Tirmidhi",
+                            "At-Tirmidhi" to "At-Tirmidhi",
+                            "An-Nasa'i" to "An-Nasa'i",
+                            "Ibn Majah" to "Ibn Majah",
+                            "Ahmad" to "Ahmad",
+                            "Malik" to "Malik",
+                            "Ad-Darimi" to "Ad-Darimi",
+                            "Al-Hakim" to "Al-Hakim",
+                        )
+                        knownBooks.mapNotNull { (pattern, spoken) ->
+                            val idx = refText.indexOf(pattern, ignoreCase = true)
+                            if (idx >= 0) idx to spoken else null
+                        }
+                            .sortedBy { it.first }
+                            .map { it.second }
                             .distinct()
                             .take(2)
                     } else {

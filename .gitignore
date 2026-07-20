@@ -92,3 +92,8 @@ audio/
 # Python cache
 __pycache__/
 *.pyc
+
+# Python virtual environments
+.venv/
+.venv-*/
+venv/

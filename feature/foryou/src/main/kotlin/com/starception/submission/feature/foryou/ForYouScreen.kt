@@ -66,7 +66,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,6 +94,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.core.designsystem.component.DynamicAsyncImage
 import com.starception.submission.core.designsystem.component.NiaButton
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaOverlayLoadingWheel
 import com.starception.submission.core.designsystem.component.scrollbar.DecorativeScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
@@ -331,7 +331,9 @@ private fun EmptyFeedContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onBrowseTopicsClick) {
+        NiaOutlinedButton(
+            onClick = onBrowseTopicsClick
+        ) {
             Text("Browse topics")
         }
     }

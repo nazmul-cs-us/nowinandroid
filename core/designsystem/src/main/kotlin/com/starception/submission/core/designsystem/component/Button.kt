@@ -16,14 +16,17 @@
 
 package com.starception.submission.core.designsystem.component
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +34,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.NiaTheme
 
 /**
- * Now in Android filled button with generic content slot. Wraps Material 3 [Button].
+ * Now in Android button with generic content slot. Wraps Material 3 [OutlinedButton],
+ * styled per the Material Components `Widget.Material3.Button.OutlinedButton` spec
+ * (transparent container, 1dp `colorOutline` stroke).
  *
  * @param onClick Will be called when the user clicks the button.
  * @param modifier Modifier to be applied to the button.
@@ -55,13 +63,10 @@ fun NiaButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
-    Button(
+    NiaOutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.onBackground,
-        ),
         contentPadding = contentPadding,
         content = content,
     )
@@ -121,13 +126,26 @@ fun NiaOutlinedButton(
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    // Shape morph on press, per MaterialButton's cornerSpringForce: full pill at rest,
+    // cornerSmall (8dp) while pressed, animated with the fast-spatial spring.
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isPressed) {
+            NiaButtonDefaults.PressedCornerRadius
+        } else {
+            NiaButtonDefaults.CornerRadius
+        },
+        animationSpec = NiaMotion.spatialFast(),
+        label = "buttonCornerMorph",
+    )
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ),
+        shape = RoundedCornerShape(cornerRadius),
+        interactionSource = interactionSource,
+        colors = ButtonDefaults.outlinedButtonColors(),
         border = BorderStroke(
             width = NiaButtonDefaults.OutlinedButtonBorderWidth,
             color = if (enabled) {
@@ -310,4 +328,9 @@ object NiaButtonDefaults {
     // TODO: File bug
     // OutlinedButton default border width isn't exposed via ButtonDefaults
     val OutlinedButtonBorderWidth = 1.dp
+
+    // Corner.Full on the spec 40dp container; morphs to cornerSmall while pressed
+    // (m3_comp_button_small_pressed_container_shape).
+    val CornerRadius = 20.dp
+    val PressedCornerRadius = 8.dp
 }

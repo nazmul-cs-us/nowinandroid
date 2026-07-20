@@ -22,13 +22,12 @@ The system uses accelerometer and gyroscope data from a phone placed in the user
 |---------|--------|-------------|
 | QIYAM | قيام | Standing upright |
 | RUKU | ركوع | Bowing (back ~90 degrees) |
-| GOING_TO_SUJUD | سجود | Transitioning down to prostration |
+| GOING_TO_SUJUD | هوي | Transitioning down to prostration |
 | SUJUD | سجود | Prostration (face on ground) |
 | JALSA | جلسة | Sitting between prostrations |
 | TASHAHHUD | تشهد | Final sitting position |
-| QIYAM_RISING | قيام | Rising back to standing |
+| QIYAM_RISING | اعتدال | Rising back to standing (i'tidal after ruku) |
 
-Additional non-ML postures: `TRANSITION` (catch-all), `NOT_PRAYING` (idle state).
 
 ---
 

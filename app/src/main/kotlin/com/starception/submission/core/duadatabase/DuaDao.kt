@@ -76,19 +76,20 @@ interface DuaDao {
     suspend fun getDuaAudioByTitleAndPosition(title: String, position: Int): String?
 
     /**
-     * Hadith-collection (book) names referencing a dua, looked up by chapter
-     * title + dua position. Book names only — the spoken announcement before
-     * playback deliberately omits hadith numbers. Deduped by the caller.
+     * Raw hadith reference strings for a dua, looked up by chapter title +
+     * dua position. NOTE: collection_name is empty across the shipped v2
+     * database, so callers parse book names out of these prose strings
+     * (e.g. "Al-Bukhari, cf. Al-Asqalani, Fathul-Bari 11/113; Muslim 4/2083").
      */
     @Query("""
-        SELECT hr.collection_name FROM hadith_references hr
+        SELECT hr.reference_str FROM hadith_references hr
         JOIN invocations i ON i.id = hr.invocation_id
         JOIN chapters c ON c.id = i.chapter_id
         WHERE c.title = :title AND i.position = :position
-          AND hr.collection_name IS NOT NULL AND hr.collection_name != ''
+          AND hr.reference_str IS NOT NULL AND hr.reference_str != ''
         ORDER BY hr.id ASC
     """)
-    suspend fun getDuaReferenceBooksByTitleAndPosition(title: String, position: Int): List<String>
+    suspend fun getDuaReferenceStringsByTitleAndPosition(title: String, position: Int): List<String>
 
     /**
      * Get all chapters with dua count

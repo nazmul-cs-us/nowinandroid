@@ -38,8 +38,6 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Traffic
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.config.TravelDuaSettings
 
 /**
@@ -229,7 +228,7 @@ fun TravelDuaSection(
                 Spacer(modifier = Modifier.height(2.dp))
 
                 // Play/Pause button with animated content
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (isPlaying) {
@@ -240,18 +239,7 @@ fun TravelDuaSection(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPlaying)
-                            MaterialTheme.colorScheme.error
-                        else
-                            MaterialTheme.colorScheme.primary,
-                        contentColor = if (isPlaying)
-                            MaterialTheme.colorScheme.onError
-                        else
-                            MaterialTheme.colorScheme.onPrimary
-                    )
+                        .height(48.dp)
                 ) {
                     AnimatedContent(
                         targetState = isPlaying,

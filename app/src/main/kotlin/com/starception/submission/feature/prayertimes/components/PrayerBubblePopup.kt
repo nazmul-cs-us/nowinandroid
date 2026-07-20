@@ -32,7 +32,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.designsystem.animation.NiaMotion
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.animation.NiaTransitions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -400,23 +407,13 @@ private fun IOSPrayerCard(
                     )
                 }
             } else {
-                // Filled button for mark action - disabled if prayer time hasn't arrived
-                Button(
+                // Outlined button for mark action - disabled if prayer time hasn't arrived
+                NiaOutlinedButton(
                     onClick = { onTogglePrayer(true) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = !isUpcoming, // Disable if prayer time is still upcoming
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp,
-                        pressedElevation = 0.dp
-                    )
+                    enabled = !isUpcoming // Disable if prayer time is still upcoming
                 ) {
                     Text(
                         text = if (isUpcoming) "Prayer Time Not Yet" else "Mark as Prayed",

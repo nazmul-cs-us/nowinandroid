@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.File
 
@@ -253,21 +254,14 @@ private fun PreRecordingContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Button(
+        NiaOutlinedButton(
             onClick = {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onStartRecording()
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .shadow(
-                    elevation = 4.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                .height(56.dp),
         ) {
             Text(
                 text = "Start Prayer Recording",
@@ -499,24 +493,14 @@ private fun RecordingContent(
         Spacer(modifier = Modifier.weight(1f))
 
         // Stop button
-        Button(
+        NiaOutlinedButton(
             onClick = {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onStopRecording()
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .shadow(
-                    elevation = 4.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    ambientColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
-                    spotColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error
-            )
+                .height(56.dp),
         ) {
             Text(
                 text = "Stop Recording",
@@ -718,21 +702,14 @@ private fun PostRecordingContent(
         Spacer(modifier = Modifier.weight(1f))
 
         // Review button
-        Button(
+        NiaOutlinedButton(
             onClick = {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onNavigateToReview(filePath)
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .shadow(
-                    elevation = 4.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                .height(56.dp),
         ) {
             Text(
                 text = "Review & Label",
@@ -741,18 +718,14 @@ private fun PostRecordingContent(
         }
 
         // Discard button
-        OutlinedButton(
+        NiaOutlinedButton(
             onClick = {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onDiscard()
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error
-            )
+                .height(56.dp)
         ) {
             Text(
                 text = "Discard Recording",

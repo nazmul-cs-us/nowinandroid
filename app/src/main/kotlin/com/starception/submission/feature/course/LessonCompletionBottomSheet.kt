@@ -55,16 +55,13 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -294,7 +291,7 @@ fun LessonCompletionBottomSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Not Yet button
-                OutlinedButton(
+                NiaOutlinedButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -302,13 +299,12 @@ fun LessonCompletionBottomSheet(
                         }
                     },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Text("Not Yet")
                 }
 
                 // Completed button
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -316,10 +312,6 @@ fun LessonCompletionBottomSheet(
                         }
                     },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CheckCircle,
@@ -343,7 +335,7 @@ private fun RecordButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        FilledTonalButton(
+        NiaOutlinedButton(
             onClick = {
                 if (hasPermission) {
                     onStartRecording()
@@ -352,7 +344,6 @@ private fun RecordButton(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
         ) {
             Text("Add Voice Note")
         }
@@ -424,20 +415,15 @@ private fun RecordingIndicator(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Cancel button
-            OutlinedButton(
+            NiaOutlinedButton(
                 onClick = onCancel,
-                shape = RoundedCornerShape(14.dp),
             ) {
                 Text("Cancel")
             }
 
             // Stop button
-            Button(
+            NiaOutlinedButton(
                 onClick = onStop,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
             ) {
                 Text("Stop Recording")
             }
@@ -480,17 +466,15 @@ private fun RecordingPlayback(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Play/Stop button
-            FilledTonalButton(
+            NiaOutlinedButton(
                 onClick = if (isPlaying) onStop else onPlay,
-                shape = RoundedCornerShape(14.dp),
             ) {
                 Text(if (isPlaying) "Stop Playback" else "Play Recording")
             }
 
             // Delete button
-            OutlinedButton(
+            NiaOutlinedButton(
                 onClick = onDelete,
-                shape = RoundedCornerShape(14.dp),
             ) {
                 Text("Remove")
             }
@@ -763,7 +747,7 @@ fun LessonCompletionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Button(
+                    NiaOutlinedButton(
                         onClick = {
                             Log.d("CompletionDialog_TRACE", "✅ Completed clicked")
                             onComplete(hasRecording)
@@ -771,10 +755,6 @@ fun LessonCompletionDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
                     ) {
                         Text(
                             text = "Mark Complete",
@@ -783,7 +763,7 @@ fun LessonCompletionDialog(
                         )
                     }
 
-                    FilledTonalButton(
+                    NiaOutlinedButton(
                         onClick = {
                             Log.d("CompletionDialog_TRACE", "❌ Not Yet clicked")
                             onDismiss()
@@ -791,7 +771,6 @@ fun LessonCompletionDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(46.dp),
-                        shape = RoundedCornerShape(16.dp),
                     ) {
                         Text(
                             text = "Not Now",

@@ -3,6 +3,7 @@ package com.starception.submission.feature.surah
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,7 @@ import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 import java.text.SimpleDateFormat
 import java.util.*
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 
 /**
  * Material 3 Expressive Note Dialog for Quran Ayahs
@@ -279,7 +281,7 @@ fun NoteDialog(
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
 
-                                        FilledTonalButton(
+                                        NiaOutlinedButton(
                                             onClick = {
                                                 if (noteText.isNotBlank()) {
                                                     if (editingNote != null) {
@@ -298,7 +300,6 @@ fun NoteDialog(
                                                 }
                                             },
                                             enabled = noteText.isNotBlank(),
-                                            shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Icon(
                                                 imageVector = if (editingNote != null) Icons.Default.Check else Icons.Default.Add,
@@ -445,7 +446,7 @@ fun NoteDialog(
                 )
             },
             confirmButton = {
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         showDeleteConfirmation?.let { onDeleteNote(it) }
                         if (editingNote?.id == showDeleteConfirmation?.id) {
@@ -454,9 +455,6 @@ fun NoteDialog(
                         }
                         showDeleteConfirmation = null
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
                 ) {
                     Text("Delete")
                 }
@@ -631,9 +629,8 @@ private fun EmptyNotesState(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        FilledTonalButton(
+        NiaOutlinedButton(
             onClick = onAddClick,
-            shape = RoundedCornerShape(16.dp),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
         ) {
             Icon(

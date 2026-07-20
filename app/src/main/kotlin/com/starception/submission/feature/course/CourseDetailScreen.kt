@@ -89,9 +89,8 @@ import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.SignalCellularAlt
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.WorkspacePremium
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -100,7 +99,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -1445,9 +1443,8 @@ private fun CertificateProgressCard(
             }
 
             if (progressPercent >= 100) {
-                OutlinedButton(
+                NiaOutlinedButton(
                     onClick = { /* Download certificate */ },
-                    shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
@@ -2511,20 +2508,12 @@ private fun EnhancedBottomBar(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Full-width Continue button
-                Button(
+                NiaOutlinedButton(
                     onClick = onContinue,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     enabled = progressPercent < 100f,
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp,
-                    ),
                 ) {
                     Icon(
                         imageVector = if (progressPercent >= 100f) Icons.Filled.CheckCircle else Icons.Default.PlayArrow,
@@ -2562,18 +2551,9 @@ private fun EnhancedBottomBar(
                     )
                 }
 
-                Button(
+                NiaOutlinedButton(
                     onClick = onEnroll,
                     modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp,
-                    ),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 ) {
                     Icon(

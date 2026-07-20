@@ -32,6 +32,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.HighLatitudeAdjustment
@@ -543,7 +544,7 @@ private fun RestoreButton(
     countryName: String,
     onClick: () -> Unit
 ) {
-    androidx.compose.material3.OutlinedButton(
+    NiaOutlinedButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {

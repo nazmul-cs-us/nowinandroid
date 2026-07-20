@@ -59,8 +59,6 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -70,7 +68,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -114,6 +111,7 @@ import com.starception.submission.feature.salah.visualization.Visualization3DVie
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.core.designsystem.animation.NiaMotion
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import java.text.SimpleDateFormat
@@ -346,14 +344,11 @@ fun SalahDataCollectionScreen(
                 )
             },
             confirmButton = {
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         viewModel.deleteAllData()
                         showDeleteAllDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
+                    }
                 ) {
                     Text("Delete All")
                 }
@@ -399,14 +394,11 @@ fun SalahDataCollectionScreen(
                 }
             },
             confirmButton = {
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         viewModel.deleteFile(fileName)
                         showDeleteFileDialog = null
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
+                    }
                 ) {
                     Text("Delete")
                 }
@@ -686,15 +678,11 @@ private fun GuidedRecordingCard(
                                         )
                                     }
                                     // Download button
-                                    Button(
+                                    NiaOutlinedButton(
                                         onClick = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.downloadTtsEngine()
                                         },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary
-                                        ),
-                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -711,16 +699,12 @@ private fun GuidedRecordingCard(
                     }
 
                     // Start button
-                    Button(
+                    NiaOutlinedButton(
                         onClick = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             viewModel.startGuidedRecording()
                         },
                         enabled = uiState.isTtsAvailable,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
@@ -761,9 +745,8 @@ private fun GuidedRecordingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
-                    OutlinedButton(
-                        onClick = { viewModel.cancelGuidedRecording() },
-                        shape = RoundedCornerShape(12.dp)
+                    NiaOutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() }
                     ) {
                         Text("Cancel")
                     }
@@ -802,9 +785,8 @@ private fun GuidedRecordingCard(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    OutlinedButton(
-                        onClick = { viewModel.cancelGuidedRecording() },
-                        shape = RoundedCornerShape(12.dp)
+                    NiaOutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() }
                     ) {
                         Text("Cancel")
                     }
@@ -911,9 +893,8 @@ private fun GuidedRecordingCard(
                     }
 
                     // Cancel button
-                    OutlinedButton(
+                    NiaOutlinedButton(
                         onClick = { viewModel.cancelGuidedRecording() },
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -942,9 +923,8 @@ private fun GuidedRecordingCard(
                         textAlign = TextAlign.Center
                     )
 
-                    OutlinedButton(
-                        onClick = { viewModel.cancelGuidedRecording() },
-                        shape = RoundedCornerShape(12.dp)
+                    NiaOutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() }
                     ) {
                         Text("Cancel")
                     }
@@ -977,12 +957,8 @@ private fun GuidedRecordingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
-                    Button(
+                    NiaOutlinedButton(
                         onClick = { viewModel.resetGuidedState() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Done", fontWeight = FontWeight.Bold)
@@ -1003,9 +979,8 @@ private fun GuidedRecordingCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    OutlinedButton(
-                        onClick = { viewModel.resetGuidedState() },
-                        shape = RoundedCornerShape(12.dp)
+                    NiaOutlinedButton(
+                        onClick = { viewModel.resetGuidedState() }
                     ) {
                         Text("Dismiss")
                     }
@@ -1411,9 +1386,8 @@ private fun RecordingHero(
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(
+                NiaOutlinedButton(
                     onClick = { viewModel.cancelCountdown() },
-                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -1503,12 +1477,8 @@ private fun RecordingHero(
 
             // Record / Stop Button
             if (uiState.isRecording) {
-                Button(
+                NiaOutlinedButton(
                     onClick = { viewModel.stopRecording() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
-                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -1518,12 +1488,8 @@ private fun RecordingHero(
                     Text("Stop Recording", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
             } else {
-                Button(
+                NiaOutlinedButton(
                     onClick = { viewModel.startRecording() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)

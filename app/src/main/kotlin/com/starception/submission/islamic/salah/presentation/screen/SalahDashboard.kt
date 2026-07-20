@@ -38,6 +38,7 @@ import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.PaddingValues
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 
 /**
  * Islamic Salah (Prayer) Dashboard Screen
@@ -579,11 +580,8 @@ private fun SalahErrorState(
                 textAlign = TextAlign.Center
             )
             
-            Button(
-                onClick = onRetryClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+            NiaOutlinedButton(
+                onClick = onRetryClick
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,

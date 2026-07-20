@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.ml.SalahPosture
 import java.io.File
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
@@ -204,27 +205,20 @@ fun PrayerReviewScreen(
 
                 // Save button
                 val saveHapticFeedback = LocalHapticFeedback.current
-                Button(
+                NiaOutlinedButton(
                     onClick = {
                         saveHapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.saveLabels()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                            ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        .height(56.dp),
                     enabled = !state.isSaving
                 ) {
                     if (state.isSaving) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.primary
                         )
                     } else {
                         Text(
@@ -236,7 +230,7 @@ fun PrayerReviewScreen(
 
                 // Discard button
                 val discardHapticFeedback = LocalHapticFeedback.current
-                OutlinedButton(
+                NiaOutlinedButton(
                     onClick = {
                         discardHapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.discardRecording()
@@ -244,11 +238,7 @@ fun PrayerReviewScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+                        .height(56.dp)
                 ) {
                     Text(
                         text = "Discard Recording",
@@ -538,7 +528,10 @@ private fun DataQualityCard(
                 }
 
                 analysis == null -> {
-                    FilledTonalButton(onClick = onAnalyze, modifier = Modifier.fillMaxWidth()) {
+                    NiaOutlinedButton(
+                        onClick = onAnalyze,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Analyze data quality")
                     }
                 }
