@@ -418,9 +418,8 @@ fun RefreshIndicator(
                     }
                     
                     Spacer(modifier = Modifier.width(16.dp))
-                    
-                    // Enhanced text - temporarily hidden
-                    /*Column(
+
+                    Column(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Text(
@@ -438,7 +437,8 @@ fun RefreshIndicator(
                             } else {
                                 MaterialTheme.colorScheme.onSurface
                             }
-                        
+                        )
+
                         if (isRefreshing) {
                             Text(
                                 text = "Accessing your location & calculating fresh prayer times...",
@@ -452,7 +452,7 @@ fun RefreshIndicator(
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                             )
                         }
-                    }*/
+                    }
                 }
                 
                 // Professional progress bar
