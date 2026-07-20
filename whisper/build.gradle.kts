@@ -52,9 +52,13 @@ dependencies {
     // Use api() so WhisperContext and other classes are transitively visible to consumers
     api(files("libs/whisper-cpp.aar"))
 
-    // LiteRT (successor to TFLite) for Whisper inference (legacy) - 16KB page aligned
-    implementation("com.google.ai.edge.litert:litert:1.2.0")
-    implementation("com.google.ai.edge.litert:litert-support:1.2.0")
+    // LiteRT (successor to TFLite) for Whisper inference (legacy).
+    // 1.2.0's libtensorflowlite_jni.so was 16KB-page-aligned on arm64-v8a but NOT on
+    // x86_64 (still 4KB) — Play Store's 16KB check covers both 64-bit ABIs. 1.4.0 is
+    // the first release with x86_64 fixed too; pinned to 1.4.2 (latest 1.x patch,
+    // same org.tensorflow.lite-compatible API surface as 1.2.0).
+    implementation("com.google.ai.edge.litert:litert:1.4.2")
+    implementation("com.google.ai.edge.litert:litert-support:1.4.2")
 
     // JTransforms for fast FFT calculations (legacy)
     implementation("com.github.wendykierp:JTransforms:3.1")

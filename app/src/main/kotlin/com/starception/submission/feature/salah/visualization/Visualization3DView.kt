@@ -105,6 +105,15 @@ fun Visualization3DView(
         viz.setDisagreements(state.flaggedIndices)
     }
 
+    // Model predictions, parallel to `samples` — drives dual humanoid
+    // playback (ground-truth vs prediction) in PHONE_MODEL mode once
+    // "Analyze predictions" has run. Null clears back to a single figure.
+    LaunchedEffect(state.predictions, visualizationRef) {
+        val viz = visualizationRef ?: return@LaunchedEffect
+        awaitReady(viz)
+        viz.setPredictions(state.predictions)
+    }
+
     LaunchedEffect(state.showDisagreements, visualizationRef) {
         val viz = visualizationRef ?: return@LaunchedEffect
         awaitReady(viz)

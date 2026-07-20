@@ -221,6 +221,28 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                                 val source = runCatching {
                                     audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
                                 }.getOrNull() ?: url
+                                // Resolve the Interests topic for THIS track from the news DB —
+                                // fortress news titles are exactly "Chapter: Dua N", matching the
+                                // playback title — so the subtitle shows the topic on every entry
+                                // path (news card, auto-advance to the next chapter), not just
+                                // when the Dua screen set it. Always assign, so the topic follows
+                                // chapter changes instead of going stale.
+                                val resolvedTopic = runCatching {
+                                    val newsDao = com.starception.submission.core.contentdatabase
+                                        .NewsDatabase.getInstance(appCtx).newsDao()
+                                    newsDao.getNewsIdByExactTitle(title.trim())?.let { newsId ->
+                                        newsDao.getTopicIdsForNews(newsId).takeIf { it.isNotEmpty() }
+                                            ?.let { topicIds ->
+                                                com.starception.submission.core.contentdatabase
+                                                    .TopicsDatabase.getInstance(appCtx).topicsDao()
+                                                    .getTopicsByIds(topicIds).firstOrNull()?.name
+                                            }
+                                    }
+                                }.getOrNull()
+                                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                    com.starception.submission.core.ui
+                                        .ChapterAudioController.currentTopic = resolvedTopic
+                                }
                                 // Announce after the (possibly slow) download resolve so
                                 // the spoken title leads straight into the audio.
                                 announceFortressTrack(title)

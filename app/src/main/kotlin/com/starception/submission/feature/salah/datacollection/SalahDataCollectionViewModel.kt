@@ -74,7 +74,10 @@ data class DataFileInfo(
     val sizeKb: Long,
     val lastModified: Long,
     val postureCounts: Map<String, Int> = emptyMap(),
-    val totalSamples: Int = 0
+    val totalSamples: Int = 0,
+    /** A live-prayer recording not yet reviewed — excluded from the dataset's
+     *  aggregate posture counts until reviewed (see SalahDataCollectionService.getGlobalPostureCounts). */
+    val isPendingReview: Boolean = false
 )
 
 /** Quality summary of the model currently deployed in assets (from training). */
@@ -411,7 +414,8 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 sizeKb = file.length() / 1024,
                 lastModified = file.lastModified(),
                 postureCounts = counts,
-                totalSamples = counts.values.sum()
+                totalSamples = counts.values.sum(),
+                isPendingReview = file.name.startsWith(SalahDataCollectionService.LIVE_FILE_PREFIX)
             )
         }
         val (globalCounts, globalTotal) = collectionService.getGlobalPostureCounts()
@@ -642,6 +646,10 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
         }
     }
+
+    /** Absolute path for a recording file name, for navigating to Review & Label. */
+    fun filePathFor(fileName: String): String =
+        java.io.File(collectionService.getDataDirectory(), fileName).absolutePath
 
     /** Analyze one recording file against the deployed model; cache by name+mtime. */
     fun analyzeFileQuality(file: DataFileInfo) {

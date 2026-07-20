@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.ml.SalahBatchInference
 import com.starception.submission.ml.SalahPosture
+import com.starception.submission.sensor.SalahDataCollectionService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -249,8 +250,26 @@ class PrayerReviewViewModel @Inject constructor(
                         }
                     }
 
-                    Log.i(TAG, "Labels saved to ${file.absolutePath}")
-                    _state.value = _state.value.copy(isSaving = false, isSaved = true)
+                    // Reviewed live recordings graduate into the same aggregate pool as
+                    // manually-collected data (see SalahDataCollectionService.getGlobalPostureCounts,
+                    // which excludes salah_live_* files from dataset totals until this happens).
+                    var savedPath = file.absolutePath
+                    if (file.name.startsWith(SalahDataCollectionService.LIVE_FILE_PREFIX)) {
+                        val renamed = File(
+                            file.parentFile,
+                            SalahDataCollectionService.REVIEWED_FILE_PREFIX +
+                                file.name.removePrefix(SalahDataCollectionService.LIVE_FILE_PREFIX)
+                        )
+                        if (file.renameTo(renamed)) {
+                            savedPath = renamed.absolutePath
+                            Log.i(TAG, "Reviewed live recording renamed to ${renamed.name} — now counted in dataset totals")
+                        } else {
+                            Log.w(TAG, "Failed to rename reviewed file ${file.name}; it will remain excluded from dataset totals")
+                        }
+                    }
+
+                    Log.i(TAG, "Labels saved to $savedPath")
+                    _state.value = _state.value.copy(isSaving = false, isSaved = true, filePath = savedPath)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error saving labels", e)
                     _state.value = _state.value.copy(isSaving = false)
