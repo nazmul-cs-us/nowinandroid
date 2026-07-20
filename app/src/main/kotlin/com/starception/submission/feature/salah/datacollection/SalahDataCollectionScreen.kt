@@ -50,7 +50,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
@@ -58,6 +57,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Card
@@ -125,6 +125,7 @@ import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 fun SalahDataCollectionScreen(
     onBackClick: () -> Unit,
     onNavigateToLiveRecording: () -> Unit = {},
+    onNavigateToReview: (String) -> Unit = {},
     viewModel: SalahDataCollectionViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -256,7 +257,8 @@ fun SalahDataCollectionScreen(
                             file = file,
                             onDelete = { showDeleteFileDialog = file.name },
                             quality = fileQuality[file.name],
-                            onAnalyze = { viewModel.analyzeFileQuality(file) }
+                            onAnalyze = { viewModel.analyzeFileQuality(file) },
+                            onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -315,7 +317,8 @@ fun SalahDataCollectionScreen(
                         file = file,
                         onDelete = { showDeleteFileDialog = file.name },
                         quality = fileQuality[file.name],
-                        onAnalyze = { viewModel.analyzeFileQuality(file) }
+                        onAnalyze = { viewModel.analyzeFileQuality(file) },
+                        onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -482,7 +485,7 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
                 )
             }
             Icon(
-                imageVector = Icons.Default.PlayArrow,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
@@ -592,113 +595,107 @@ private fun GuidedRecordingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // Connected segmented control: one track, the selected
+                    // segment slides as a filled primary pill.
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        listOf(10, 15, 20, 30).forEach { duration ->
-                            val isSelected = uiState.guidedSelectedDuration == duration
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.setGuidedDuration(duration)
-                                    },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                shadowElevation = if (isSelected) 2.dp else 0.dp
-                            ) {
-                                Text(
-                                    text = "${duration}s",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                        Row(modifier = Modifier.padding(4.dp)) {
+                            listOf(10, 15, 20, 30).forEach { duration ->
+                                val isSelected = uiState.guidedSelectedDuration == duration
+                                val segColor by animateColorAsState(
+                                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                                    else Color.Transparent,
+                                    animationSpec = tween(200, easing = FastOutSlowInEasing),
+                                    label = "segColor"
                                 )
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(segColor)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = ripple(bounded = true),
+                                            onClick = {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                viewModel.setGuidedDuration(duration)
+                                            }
+                                        )
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${duration}s",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // TTS Engine Download Section
+                    // TTS Engine Download Section — flat editorial rows, no
+                    // nested box; the tonal button carries the action.
                     if (!uiState.isTtsAvailable) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
-                            modifier = Modifier.fillMaxWidth()
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Text(
+                                text = "Voice-guided recording needs the Kokoro TTS engine (~175 MB, one-time download).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 16.sp
+                            )
+
+                            if (uiState.isTtsDownloading) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Download,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp
                                     )
                                     Text(
-                                        text = "Voice engine required",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Text(
-                                    text = "Download the Kokoro TTS engine to enable voice-guided recording.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
-                                    lineHeight = 16.sp
-                                )
-
-                                if (uiState.isTtsDownloading) {
-                                    // Download in progress - progress shown via pull-down indicator
-                                    Text(
-                                        text = "Downloading... pull down to see progress",
+                                        text = "Downloading… pull down to see progress",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                } else {
-                                    // Download error
-                                    uiState.ttsDownloadError?.let { error ->
-                                        Text(
-                                            text = error,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                    // Download button
-                                    NiaOutlinedButton(
-                                        onClick = {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            viewModel.downloadTtsEngine()
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (uiState.ttsDownloadError != null) "Retry Download (~175 MB)" else "Download TTS Engine (~175 MB)",
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
+                                }
+                            } else {
+                                uiState.ttsDownloadError?.let { error ->
+                                    Text(
+                                        text = error,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                NiaOutlinedButton(
+                                    onClick = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        viewModel.downloadTtsEngine()
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (uiState.ttsDownloadError != null) "Retry Download (~175 MB)" else "Download Voice Engine",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
                                 }
                             }
                         }
                     }
 
-                    // Start button
+                    // Start button — app-wide outlined style.
                     NiaOutlinedButton(
                         onClick = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1017,86 +1014,87 @@ private fun NextUpCard(
     Card(
         onClick = { onSelectPosture(nextPosture) },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         ),
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(20.dp),
-                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-            )
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.TrackChanges,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "RECORD NEXT",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Record next: ${nextPosture.displayName}",
-                        style = MaterialTheme.typography.titleSmall,
+                        text = nextPosture.displayName,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = "Tap to select this posture",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (nextPosture.arabicName.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = nextPosture.arabicName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "$nextCount of $target windows · tap to select",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (weakest.size > 1) {
                     Text(
-                        text = "$nextCount / $target",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        text = "Also thin: " + weakest.drop(1).joinToString(", ") { it.first.displayName },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )
                 }
             }
-            LinearProgressIndicator(
-                progress = { overallPct / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            Spacer(modifier = Modifier.width(16.dp))
+            // Dataset completion ring — overall progress toward target across all classes.
+            val animatedPct by animateFloatAsState(
+                targetValue = overallPct / 100f,
+                animationSpec = NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_1),
+                label = "datasetRing"
             )
-            Text(
-                text = buildString {
-                    append("Dataset $overallPct% of target")
-                    if (weakest.size > 1) {
-                        append(" · thin: ")
-                        append(weakest.joinToString(", ") { it.first.displayName })
-                    }
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp)) {
+                CircularProgressIndicator(
+                    progress = { animatedPct },
+                    modifier = Modifier.size(84.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    strokeWidth = 7.dp,
+                    strokeCap = StrokeCap.Round
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$overallPct%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "dataset",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -1475,10 +1473,14 @@ private fun RecordingHero(
                 }
             }
 
-            // Record / Stop Button
+            // Record / Stop Button — app-wide outlined style.
+            val heroHaptics = LocalHapticFeedback.current
             if (uiState.isRecording) {
                 NiaOutlinedButton(
-                    onClick = { viewModel.stopRecording() },
+                    onClick = {
+                        heroHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.stopRecording()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -1489,7 +1491,10 @@ private fun RecordingHero(
                 }
             } else {
                 NiaOutlinedButton(
-                    onClick = { viewModel.startRecording() },
+                    onClick = {
+                        heroHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.startRecording()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -1589,18 +1594,12 @@ private fun PostureSelector(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = uiState.currentPosture.displayName,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                    )
-                }
+                Text(
+                    text = uiState.currentPosture.displayName,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -1697,16 +1696,8 @@ private fun PostureChip(
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "text"
     )
-    val borderColor by animateColorAsState(
-        targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-        },
-        label = "border"
-    )
-
     val shadowElevation by animateFloatAsState(
-        targetValue = if (isSelected) 4f else 0f,
+        targetValue = if (isSelected) 3f else 0f,
         label = "shadowElevation"
     )
 
@@ -1725,7 +1716,7 @@ private fun PostureChip(
             .height(84.dp)
             .shadow(
                 elevation = shadowElevation.dp,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             )
@@ -1734,8 +1725,7 @@ private fun PostureChip(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(84.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(18.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(
@@ -1747,7 +1737,7 @@ private fun PostureChip(
                         onClick()
                     }
                 ),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(18.dp),
             color = Color.Transparent
         ) {
             // Background with gradient for selected+recording
@@ -2004,20 +1994,15 @@ private fun SessionStats(uiState: SalahDataCollectionUiState) {
 
 @Composable
 private fun StatPill(label: String, value: String, color: Color) {
+    // Numbers-first, borderless: the value is the visual anchor, the label a
+    // quiet caption underneath.
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = color.copy(alpha = 0.1f)
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -2128,20 +2113,13 @@ private fun SensorPreview(uiState: SalahDataCollectionUiState) {
 @Composable
 private fun SensorValue(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
@@ -2218,18 +2196,12 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = "${uiState.globalTotalSamples} total",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
+                        Text(
+                            text = "${uiState.globalTotalSamples} total",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                         Surface(
                             modifier = Modifier.size(28.dp),
                             shape = CircleShape,
@@ -2437,17 +2409,11 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
             )
         }
         if (uiState.totalDataSizeKb > 0) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest
-            ) {
-                Text(
-                    text = "${uiState.dataFiles.size} files \u00B7 ${uiState.totalDataSizeKb} KB",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
+            Text(
+                text = "${uiState.dataFiles.size} files \u00B7 ${uiState.totalDataSizeKb} KB",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
     if (uiState.dataFiles.isEmpty()) {
@@ -2460,15 +2426,32 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
                 .fillMaxWidth()
                 .padding(top = 8.dp)
         ) {
-            Text(
-                text = "No recordings yet.\nSelect a posture and start recording.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
-            )
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = "No recordings yet",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Select a posture above and start recording.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -2530,7 +2513,8 @@ private fun SwipeToDismissFileItem(
     file: DataFileInfo,
     onDelete: () -> Unit,
     quality: FileQuality? = null,
-    onAnalyze: () -> Unit = {}
+    onAnalyze: () -> Unit = {},
+    onReview: () -> Unit = {}
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -2575,7 +2559,7 @@ private fun SwipeToDismissFileItem(
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true
     ) {
-        DataFileItem(file = file, onDelete = onDelete, quality = quality, onAnalyze = onAnalyze)
+        DataFileItem(file = file, onDelete = onDelete, quality = quality, onAnalyze = onAnalyze, onReview = onReview)
     }
 }
 
@@ -2585,7 +2569,8 @@ private fun DataFileItem(
     file: DataFileInfo,
     onDelete: () -> Unit,
     quality: FileQuality? = null,
-    onAnalyze: () -> Unit = {}
+    onAnalyze: () -> Unit = {},
+    onReview: () -> Unit = {}
 ) {
     // Map posture names to short display names
     val postureDisplayNames = mapOf(
@@ -2677,6 +2662,35 @@ private fun DataFileItem(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     FileQualityBadge(quality = quality, onAnalyze = onAnalyze)
+                }
+
+                // Live recordings are labeled from the model's own real-time detection,
+                // not a human-confirmed ground truth, so they're excluded from the
+                // dataset's posture-count totals until reviewed (see
+                // SalahDataCollectionService.getGlobalPostureCounts). Surface that here
+                // with a direct path to fix it.
+                if (file.isPendingReview) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Live · needs review",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Review →",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = false),
+                                onClick = onReview
+                            )
+                        )
+                    }
                 }
 
                 // Posture tags
@@ -2805,26 +2819,13 @@ private fun Visualization3DCard(
                         }
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (showVisualization) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
-                    }
-                ) {
-                    Text(
-                        text = if (showVisualization) "Hide" else "Show",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (showVisualization) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                    )
-                }
+                Text(
+                    text = if (showVisualization) "Hide" else "Show",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 7.dp)
+                )
             }
 
             // Visualization content

@@ -449,7 +449,10 @@ fun NiaNavHost(
         // Salah data collection screen (developer tool)
         salahDataCollectionScreen(
             onBackClick = navController::popBackStack,
-            onNavigateToLiveRecording = navController::navigateToSalahLiveRecording
+            onNavigateToLiveRecording = navController::navigateToSalahLiveRecording,
+            onNavigateToReview = { filePath ->
+                navController.navigateToSalahPrayerReview(filePath)
+            }
         )
         // Live prayer recording screen
         salahLiveRecordingScreen(

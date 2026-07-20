@@ -44,6 +44,11 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         private const val WINDOW_SIZE = 5 // 5 samples per 100ms window at 50Hz
         private const val DATA_DIR_NAME = "salah_training_data"
         private const val MAX_PRAYER_DURATION_MS = 30 * 60 * 1000L // 30 minutes
+
+        /** Filename prefix for live-prayer recordings pending review (see [getGlobalPostureCounts]). */
+        const val LIVE_FILE_PREFIX = "salah_live_"
+        /** Filename prefix live recordings are renamed to once reviewed (indistinguishable from manual recordings). */
+        const val REVIEWED_FILE_PREFIX = "salah_data_"
     }
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -484,7 +489,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         // Create output file with "live" prefix
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        outputFile = File(dataDir, "salah_live_${timestamp}_$sessionId.jsonl")
+        outputFile = File(dataDir, "$LIVE_FILE_PREFIX${timestamp}_$sessionId.jsonl")
         writer = BufferedWriter(FileWriter(outputFile, true))
 
         // Initialize sensor timestamp reference
@@ -658,12 +663,19 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     /**
      * Scan all JSONL files and return aggregate posture counts across all collected data.
      * Returns a map of posture name to count, plus the total count.
+     *
+     * Excludes unreviewed live-prayer recordings (`salah_live_*.jsonl`): their labels are
+     * the on-device model's own real-time (debounced) predictions, not a human-confirmed
+     * ground truth, so counting them here — and thus toward "Training Progress" — before
+     * they've been through Review & Label would let the model's own mistakes quietly bias
+     * its own training data. Once reviewed, [PrayerReviewViewModel] renames the file to the
+     * `salah_data_` prefix, which drops it into this aggregate like any other recording.
      */
     fun getGlobalPostureCounts(): Pair<Map<String, Int>, Int> {
         val counts = mutableMapOf<String, Int>()
         var total = 0
 
-        for (file in listDataFiles()) {
+        for (file in listDataFiles().filter { !it.name.startsWith(LIVE_FILE_PREFIX) }) {
             try {
                 file.bufferedReader().useLines { lines ->
                     lines.forEach { line ->

@@ -194,6 +194,9 @@ interface NewsDao {
     @Query("SELECT topic_id FROM news_topics WHERE news_id = :newsId")
     suspend fun getTopicIdsForNews(newsId: Int): List<Int>
 
+    @Query("SELECT id FROM news_resources WHERE title = :title LIMIT 1")
+    suspend fun getNewsIdByExactTitle(title: String): Int?
+
     // ============= Write Operations =============
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

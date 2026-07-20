@@ -35,8 +35,8 @@ androidxWork = "2.9.0"
 androidxCar = "1.7.0"
 media3 = "1.5.1"
 material = "1.14.0"
-litert = "1.2.0"
-litertSupport = "1.2.0"
+litert = "1.4.2"
+litertSupport = "1.4.2"
 constraintlayout = "2.2.0"
 coil = "2.7.0"
 dependencyGuard = "0.5.0"
@@ -70,6 +70,7 @@ truth = "1.4.4"
 turbine = "1.2.0"
 reorderable = "2.4.3"
 libgdx = "1.13.1"
+gdxGltf = "2.2.1"
 skydovesColorpicker = "1.1.4"
 
 [bundles]
@@ -182,6 +183,7 @@ reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.r
 libgdx-core = { group = "com.badlogicgames.gdx", name = "gdx", version.ref = "libgdx" }
 libgdx-backend-android = { group = "com.badlogicgames.gdx", name = "gdx-backend-android", version.ref = "libgdx" }
 libgdx-platform = { group = "com.badlogicgames.gdx", name = "gdx-platform", version.ref = "libgdx" }
+libgdx-gltf = { group = "com.github.mgsx-dev.gdx-gltf", name = "gltf", version.ref = "gdxGltf" }
 
 # Dependencies of the included build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }

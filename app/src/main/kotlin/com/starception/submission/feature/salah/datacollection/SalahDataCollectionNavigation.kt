@@ -24,7 +24,8 @@ fun NavController.navigateToSalahPrayerReview(filePath: String) = navigate(Salah
 
 fun NavGraphBuilder.salahDataCollectionScreen(
     onBackClick: () -> Unit,
-    onNavigateToLiveRecording: () -> Unit = {}
+    onNavigateToLiveRecording: () -> Unit = {},
+    onNavigateToReview: (String) -> Unit = {}
 ) {
     composable<SalahDataCollectionRoute>(
         enterTransition = { NiaTransitions.detailEnter() },
@@ -34,7 +35,8 @@ fun NavGraphBuilder.salahDataCollectionScreen(
     ) {
         SalahDataCollectionScreen(
             onBackClick = onBackClick,
-            onNavigateToLiveRecording = onNavigateToLiveRecording
+            onNavigateToLiveRecording = onNavigateToLiveRecording,
+            onNavigateToReview = onNavigateToReview
         )
     }
 }

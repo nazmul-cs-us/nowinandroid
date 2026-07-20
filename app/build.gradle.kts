@@ -139,6 +139,8 @@ dependencies {
     // LibGDX for 3D sensor data visualization
     implementation(libs.libgdx.core)
     implementation(libs.libgdx.backend.android)
+    // glTF 2.0 loading (rigged humanoid with skeletal animation clips)
+    implementation(libs.libgdx.gltf)
     "natives"(variantOf(libs.libgdx.platform) { classifier("natives-arm64-v8a") })
     "natives"(variantOf(libs.libgdx.platform) { classifier("natives-armeabi-v7a") })
     "natives"(variantOf(libs.libgdx.platform) { classifier("natives-x86") })
@@ -203,6 +205,14 @@ dependencies {
     // Kotlin 2.2.21 compiler can read. 1.10.0+ require Kotlin 2.3+/2.4 (whole-project
     // toolchain bump). 1.9.0 still ships the atmosphere/day-night layer.
     implementation("earth.worldwind:worldwind:1.9.0")
+    // WorldWind -> geopackage-android:6.7.4 transitively pulls mil.nga:sqlite-android:3450200,
+    // whose bundled libsqliteX.so predates 16 KB page-size support (4 KB-aligned LOAD
+    // segments — the ONLY non-16KB-aligned native lib in this app, per manual ELF
+    // inspection). geopackage-android 6.7.5 (same geopackage-core:6.6.7, otherwise
+    // identical) bumps to sqlite-android:3500400, which ships a 16KB-aligned build.
+    // Force just the leaf artifact up two patch versions rather than the whole
+    // geopackage-android jump, since that's the only thing actually broken.
+    implementation("mil.nga:sqlite-android:3500400")
 
     // AndroidLiquidGlass library for glassmorphism effects
     implementation("io.github.kyant0:backdrop:1.0.0")

@@ -64,8 +64,20 @@ class LivePrayerRecordingViewModel @Inject constructor(
                 val engine = detectionEngine
                 val result = engine?.addSampleAndClassify(sample)
                 if (result != null) {
-                    // Feed to sequence validator for rak'ah counting
-                    sequenceValidator.processDetection(result.posture, result.confidence, System.currentTimeMillis())
+                    // Feed to sequence validator for rak'ah counting AND to label the
+                    // NEXT recorded window with the debounced posture — without this,
+                    // every sample in a live recording keeps the service's fixed
+                    // startup default (QIYAM) forever, so the saved file mislabels
+                    // everything except however long the person happened to stand.
+                    // confirmedPosture is the validator's last accepted stable posture
+                    // (filtered for noise/invalid transitions), not the raw per-window
+                    // guess, so a single noisy window can't flip the label. The
+                    // one-window (~100ms) lag between detection and the write it
+                    // labels is negligible against how long a posture is held.
+                    val validation = sequenceValidator.processDetection(
+                        result.posture, result.confidence, System.currentTimeMillis()
+                    )
+                    validation.confirmedPosture?.let { collectionService.currentPosture = it }
                     _state.update {
                         it.copy(
                             detectedPosture = result.posture,

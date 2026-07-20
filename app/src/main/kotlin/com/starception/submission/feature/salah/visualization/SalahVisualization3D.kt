@@ -22,6 +22,11 @@ import com.badlogic.gdx.math.Vector3
 import kotlin.math.max
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
+import net.mgsx.gltf.loaders.glb.GLBLoader
+import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
+import net.mgsx.gltf.scene3d.scene.Scene
+import net.mgsx.gltf.scene3d.scene.SceneAsset
+import net.mgsx.gltf.scene3d.scene.SceneManager
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
@@ -43,6 +48,12 @@ import kotlin.math.sqrt
  * - Dynamic axis mapping
  * - Real-time updates via callback
  */
+/** World-space X separation between the TRUTH and PRED humanoids in dual playback. */
+private const val HUMANOID_PAIR_OFFSET = 4.5f
+
+/** Optional rigged glTF asset path — see [SalahVisualization3D.tryLoadGltfHumanoid]. */
+private const val GLTF_HUMANOID_PATH = "models/salah_humanoid.glb"
+
 class SalahVisualization3D(
     private val onPlaybackUpdate: (Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit
 ) : ApplicationAdapter() {
@@ -93,25 +104,51 @@ class SalahVisualization3D(
     private var groundModel: Model? = null
     private var groundInstance: ModelInstance? = null
 
-    // Humanoid body parts (pill-shaped)
-    private var headModel: Model? = null
-    private var headInstance: ModelInstance? = null
-    private var torsoModel: Model? = null
-    private var torsoInstance: ModelInstance? = null
-    private var upperArmModel: Model? = null
-    private var leftUpperArmInstance: ModelInstance? = null
-    private var rightUpperArmInstance: ModelInstance? = null
-    private var forearmModel: Model? = null
-    private var leftForearmInstance: ModelInstance? = null
-    private var rightForearmInstance: ModelInstance? = null
-    private var upperLegModel: Model? = null
-    private var leftUpperLegInstance: ModelInstance? = null
-    private var rightUpperLegInstance: ModelInstance? = null
-    private var lowerLegModel: Model? = null
-    private var leftLowerLegInstance: ModelInstance? = null
-    private var rightLowerLegInstance: ModelInstance? = null
-    private var prayerMatModel: Model? = null
-    private var prayerMatInstance: ModelInstance? = null
+    // Humanoid rig (procedural capsule figure) — built TWICE. TRUTH plays back
+    // the recorded posture label; PRED plays back the model's prediction for
+    // the same window. Side by side, the two figures visibly diverge exactly
+    // when the model disagrees with the label — that divergence, plus a
+    // confidence-based tint on PRED, is the whole point of this view for R&D.
+    // Each rig owns its own Model/Material objects (never shared with the
+    // other rig) so tinting one never bleeds into the other.
+    private class HumanoidRig(
+        val head: ModelInstance,
+        val torso: ModelInstance,
+        val leftUpperArm: ModelInstance,
+        val rightUpperArm: ModelInstance,
+        val leftForearm: ModelInstance,
+        val rightForearm: ModelInstance,
+        val leftUpperLeg: ModelInstance,
+        val rightUpperLeg: ModelInstance,
+        val leftLowerLeg: ModelInstance,
+        val rightLowerLeg: ModelInstance,
+        val mat: ModelInstance,
+        /** All Models owned by this rig, for disposal. */
+        val models: List<Model>,
+        /** The actual (post-construction) cloth materials used by this rig's
+         *  torso + upper arms — tint these, not the pre-construction locals,
+         *  since ModelInstance may copy materials internally. */
+        val clothMaterials: List<Material>,
+        val matMaterial: Material,
+    )
+    private var truthRig: HumanoidRig? = null
+    private var predRig: HumanoidRig? = null
+
+    // Per-window model predictions (parallel to dataPoints); enables the
+    // dual ground-truth vs prediction humanoid playback in PHONE_MODEL mode.
+    // Null (default, before "Analyze predictions" runs) → single centered
+    // TRUTH figure only, matching the original single-humanoid behavior.
+    private var predictions: List<VizPrediction>? = null
+
+    // Optional rigged glTF humanoid (mgsx-dev gdx-gltf). Loaded eagerly if
+    // present at GLTF_HUMANOID_PATH but NOT YET wired into rendering — no
+    // rigged asset ships with the app today, so this is forward scaffolding.
+    // Wiring it into renderPhone()/renderRig() is the next step once a real
+    // salah_humanoid.glb (with per-posture animation clips) is added.
+    private var gltfAsset: SceneAsset? = null
+    private var sceneManager: SceneManager? = null
+    private var truthScene: Scene? = null
+    private var predScene: Scene? = null
 
     // Gravity vectors
     private var gravityArrowModels: MutableList<Model> = mutableListOf()
@@ -204,6 +241,7 @@ class SalahVisualization3D(
         buildScatterPointModel()
         buildEllipsoidModel()
         buildHumanoid()
+        tryLoadGltfHumanoid()
 
         isReady = true
     }
@@ -254,13 +292,41 @@ class SalahVisualization3D(
         scatterPointModel?.dispose()
         ellipsoidModel?.dispose()
         gravityArrowModels.forEach { it.dispose() }
-        headModel?.dispose()
-        torsoModel?.dispose()
-        upperArmModel?.dispose()
-        forearmModel?.dispose()
-        upperLegModel?.dispose()
-        lowerLegModel?.dispose()
-        prayerMatModel?.dispose()
+        truthRig?.models?.forEach { it.dispose() }
+        predRig?.models?.forEach { it.dispose() }
+        sceneManager?.dispose()
+        gltfAsset?.dispose()
+    }
+
+    /**
+     * Load an optional rigged glTF humanoid from assets. When present, the
+     * PHONE_MODEL mode renders it (with skeletal animation clips named after
+     * [SalahPosture] enum values, e.g. "QIYAM", "RUKU") instead of the
+     * procedural capsule rig. Any failure falls back silently to the rig.
+     */
+    private fun tryLoadGltfHumanoid() {
+        try {
+            val file = Gdx.files.internal(GLTF_HUMANOID_PATH)
+            if (!file.exists()) return
+            val asset = GLBLoader().load(file)
+            val sm = SceneManager()
+            sm.setCamera(camera)
+            sm.environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.6f, 0.6f, 0.6f, 1f))
+            sm.environment.add(DirectionalLightEx().apply { set(0.9f, 0.9f, 0.95f, -1f, -0.8f, -0.2f) })
+            truthScene = Scene(asset.scene).also { sm.addScene(it) }
+            predScene = Scene(asset.scene).also { sm.addScene(it) }
+            gltfAsset = asset
+            sceneManager = sm
+            Gdx.app?.log("SalahViz3D", "glTF humanoid loaded from $GLTF_HUMANOID_PATH")
+        } catch (e: Exception) {
+            Gdx.app?.log("SalahViz3D", "glTF humanoid unavailable, using procedural rig: ${e.message}")
+            sceneManager?.dispose()
+            gltfAsset?.dispose()
+            gltfAsset = null
+            sceneManager = null
+            truthScene = null
+            predScene = null
+        }
     }
 
     // ============================================
@@ -398,6 +464,13 @@ class SalahVisualization3D(
     }
 
     /** x,y,z triplets parallel to the sample list, from FeatureSpacePCA. */
+    /** Per-window model predictions, parallel to the sample list (or null to clear). */
+    fun setPredictions(preds: List<VizPrediction>?) {
+        safePostRunnable {
+            predictions = preds
+        }
+    }
+
     fun setPcaPositions(positions: FloatArray?) {
         safePostRunnable {
             pcaPositions = positions
@@ -505,26 +578,70 @@ class SalahVisualization3D(
 
     private fun renderPhone() {
         if (playbackIndex !in dataPoints.indices) return
-
+        val truth = truthRig ?: return
         val sample = dataPoints[playbackIndex]
 
-        // Pose humanoid based on current posture
-        poseHumanoid(sample.posture)
+        // Dual playback only once predictions have been analyzed (state.predictions
+        // != null); otherwise a single centered TRUTH figure, matching the
+        // original single-humanoid behavior.
+        val pred = predRig
+        val predictionList = predictions
+        val dual = predictionList != null && pred != null
 
-        // Render humanoid and prayer mat
+        if (dual) {
+            poseHumanoid(truth, sample.posture, -HUMANOID_PAIR_OFFSET)
+            val prediction = predictionList!!.getOrNull(playbackIndex)
+            val predPosture = prediction?.predicted ?: sample.posture
+            poseHumanoid(pred!!, predPosture, HUMANOID_PAIR_OFFSET)
+            tintPredictionRig(pred, prediction, agrees = predPosture == sample.posture)
+        } else {
+            poseHumanoid(truth, sample.posture, 0f)
+        }
+
         modelBatch.begin(camera)
-        prayerMatInstance?.let { modelBatch.render(it, environment) }
-        headInstance?.let { modelBatch.render(it, environment) }
-        torsoInstance?.let { modelBatch.render(it, environment) }
-        leftUpperArmInstance?.let { modelBatch.render(it, environment) }
-        rightUpperArmInstance?.let { modelBatch.render(it, environment) }
-        leftForearmInstance?.let { modelBatch.render(it, environment) }
-        rightForearmInstance?.let { modelBatch.render(it, environment) }
-        leftUpperLegInstance?.let { modelBatch.render(it, environment) }
-        rightUpperLegInstance?.let { modelBatch.render(it, environment) }
-        leftLowerLegInstance?.let { modelBatch.render(it, environment) }
-        rightLowerLegInstance?.let { modelBatch.render(it, environment) }
+        renderRig(truth)
+        if (dual) renderRig(pred!!)
         modelBatch.end()
+    }
+
+    private fun renderRig(rig: HumanoidRig) {
+        modelBatch.render(rig.mat, environment)
+        modelBatch.render(rig.head, environment)
+        modelBatch.render(rig.torso, environment)
+        modelBatch.render(rig.leftUpperArm, environment)
+        modelBatch.render(rig.rightUpperArm, environment)
+        modelBatch.render(rig.leftForearm, environment)
+        modelBatch.render(rig.rightForearm, environment)
+        modelBatch.render(rig.leftUpperLeg, environment)
+        modelBatch.render(rig.rightUpperLeg, environment)
+        modelBatch.render(rig.leftLowerLeg, environment)
+        modelBatch.render(rig.rightLowerLeg, environment)
+    }
+
+    /**
+     * Confidence-based tint of the PREDICTION figure: greener as the model
+     * agrees with the label more confidently; redder as it disagrees more
+     * confidently (a low-confidence wrong guess still reads amber, not full
+     * alarm red — it's genuinely more ambiguous, not necessarily "worse").
+     * Also tints the mat under the figure so the divergence reads even
+     * glancing at the scene, without needing to look at the body color.
+     */
+    private fun tintPredictionRig(rig: HumanoidRig, prediction: VizPrediction?, agrees: Boolean) {
+        val white = Color(0.95f, 0.95f, 0.95f, 1f)
+        val clothTarget = when {
+            prediction?.predicted == null -> Color(0.75f, 0.75f, 0.75f, 1f)
+            agrees -> white.cpy().lerp(Color(0.2f, 0.78f, 0.35f, 1f), prediction.confidence.coerceIn(0f, 1f))
+            else -> white.cpy().lerp(Color(0.85f, 0.18f, 0.18f, 1f), (0.45f + 0.55f * prediction.confidence).coerceIn(0f, 1f))
+        }
+        rig.clothMaterials.forEach { mat ->
+            (mat.get(ColorAttribute.Diffuse) as? ColorAttribute)?.color?.set(clothTarget)
+        }
+        val matTarget = when {
+            prediction?.predicted == null -> Color(0.18f, 0.55f, 0.34f, 1f)
+            agrees -> Color(0.15f, 0.5f, 0.2f, 1f)
+            else -> Color(0.55f, 0.15f, 0.15f, 1f)
+        }
+        (rig.matMaterial.get(ColorAttribute.Diffuse) as? ColorAttribute)?.color?.set(matTarget)
     }
 
     private fun renderGravity() {
@@ -672,7 +789,10 @@ class SalahVisualization3D(
     private fun resetCameraForMode() {
         when (currentMode) {
             VisualizationMode.PHONE_MODEL -> {
-                camera.position.set(10f, 6f, 12f)
+                // Wide enough to frame both TRUTH and PRED figures when dual
+                // playback is active (±HUMANOID_PAIR_OFFSET); single-figure
+                // mode just has extra headroom, which reads fine.
+                camera.position.set(15f, 7f, 17f)
                 camera.lookAt(0f, 3.5f, 0f)
             }
             VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> fitCameraToScatterData()
@@ -918,6 +1038,16 @@ class SalahVisualization3D(
      * each part as a single cylinder — the visual effect is close enough.
      */
     private fun buildHumanoid() {
+        truthRig = buildHumanoidRig()
+        predRig = buildHumanoidRig()
+    }
+
+    /**
+     * Builds one full capsule-figure rig with its own Model/Material objects
+     * so it can be posed and tinted completely independently of any other
+     * rig (see [tintPredictionRig]).
+     */
+    private fun buildHumanoidRig(): HumanoidRig {
         val mb = ModelBuilder()
         val attrs = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
 
@@ -943,47 +1073,47 @@ class SalahVisualization3D(
         mb.begin()
         mb.part("head", GL20.GL_TRIANGLES, attrs, skinMat)
             .sphere(1f, 1f, 1f, 12, 12)
-        headModel = mb.end()
-        headInstance = ModelInstance(headModel)
+        val headModel = mb.end()
+        val head = ModelInstance(headModel)
 
         // Torso — tall cylinder (clothing color)
         mb.begin()
         mb.part("torso", GL20.GL_TRIANGLES, attrs, clothMat)
             .capsule(0.6f, 3f, 12)
-        torsoModel = mb.end()
-        torsoInstance = ModelInstance(torsoModel)
+        val torsoModel = mb.end()
+        val torso = ModelInstance(torsoModel)
 
         // Upper arm — cylinder
         mb.begin()
         mb.part("upper_arm", GL20.GL_TRIANGLES, attrs, clothMat)
             .capsule(0.22f, 1.6f, 8)
-        upperArmModel = mb.end()
-        leftUpperArmInstance = ModelInstance(upperArmModel)
-        rightUpperArmInstance = ModelInstance(upperArmModel)
+        val upperArmModel = mb.end()
+        val leftUpperArm = ModelInstance(upperArmModel)
+        val rightUpperArm = ModelInstance(upperArmModel)
 
         // Forearm — cylinder (skin)
         mb.begin()
         mb.part("forearm", GL20.GL_TRIANGLES, attrs, skinMat)
             .capsule(0.18f, 1.4f, 8)
-        forearmModel = mb.end()
-        leftForearmInstance = ModelInstance(forearmModel)
-        rightForearmInstance = ModelInstance(forearmModel)
+        val forearmModel = mb.end()
+        val leftForearm = ModelInstance(forearmModel)
+        val rightForearm = ModelInstance(forearmModel)
 
         // Upper leg — cylinder (pants)
         mb.begin()
         mb.part("upper_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
             .capsule(0.28f, 2f, 8)
-        upperLegModel = mb.end()
-        leftUpperLegInstance = ModelInstance(upperLegModel)
-        rightUpperLegInstance = ModelInstance(upperLegModel)
+        val upperLegModel = mb.end()
+        val leftUpperLeg = ModelInstance(upperLegModel)
+        val rightUpperLeg = ModelInstance(upperLegModel)
 
         // Lower leg — cylinder (pants)
         mb.begin()
         mb.part("lower_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
             .capsule(0.22f, 1.8f, 8)
-        lowerLegModel = mb.end()
-        leftLowerLegInstance = ModelInstance(lowerLegModel)
-        rightLowerLegInstance = ModelInstance(lowerLegModel)
+        val lowerLegModel = mb.end()
+        val leftLowerLeg = ModelInstance(lowerLegModel)
+        val rightLowerLeg = ModelInstance(lowerLegModel)
 
         // Prayer mat — flat box (green)
         mb.begin()
@@ -993,13 +1123,40 @@ class SalahVisualization3D(
         )
         mb.part("prayer_mat", GL20.GL_TRIANGLES, attrs, matMaterial)
             .box(3f, 0.05f, 6f)
-        prayerMatModel = mb.end()
-        prayerMatInstance = ModelInstance(prayerMatModel)
-        prayerMatInstance?.transform?.setToTranslation(0f, -0.025f, 0f)
+        val matModel = mb.end()
+        val mat = ModelInstance(matModel).apply { transform.setToTranslation(0f, -0.025f, 0f) }
+
+        // Read back the ACTUAL materials each instance renders with (ModelInstance
+        // may copy them internally) so runtime tinting always hits what's on screen.
+        val clothMaterials = listOfNotNull(
+            torso.materials.firstOrNull(),
+            leftUpperArm.materials.firstOrNull(),
+            rightUpperArm.materials.firstOrNull()
+        ).distinct()
+        val matMaterialActual = mat.materials.firstOrNull() ?: matMaterial
+
+        return HumanoidRig(
+            head = head,
+            torso = torso,
+            leftUpperArm = leftUpperArm,
+            rightUpperArm = rightUpperArm,
+            leftForearm = leftForearm,
+            rightForearm = rightForearm,
+            leftUpperLeg = leftUpperLeg,
+            rightUpperLeg = rightUpperLeg,
+            leftLowerLeg = leftLowerLeg,
+            rightLowerLeg = rightLowerLeg,
+            mat = mat,
+            models = listOf(headModel, torsoModel, upperArmModel, forearmModel, upperLegModel, lowerLegModel, matModel),
+            clothMaterials = clothMaterials,
+            matMaterial = matMaterialActual
+        )
     }
 
     /**
-     * Position all humanoid body parts based on the current salah posture.
+     * Position all humanoid body parts of [rig] based on the current salah
+     * posture, offset laterally by [xOffset] (0 = centered; ±[HUMANOID_PAIR_OFFSET]
+     * for side-by-side dual playback).
      *
      * Coordinate system: Y is up, X is right, Z is toward viewer.
      * The figure faces the -Z direction (toward Qibla).
@@ -1011,20 +1168,21 @@ class SalahVisualization3D(
      *   Knee:             y = hipY - upperLegLength
      *   Foot:             y = kneeY - lowerLegLength
      */
-    private fun poseHumanoid(posture: SalahPosture) {
+    private fun poseHumanoid(rig: HumanoidRig, posture: SalahPosture, xOffset: Float) {
         when (posture) {
-            SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> poseStanding()
-            SalahPosture.RUKU -> poseRuku()
-            SalahPosture.GOING_TO_SUJUD -> poseGoingToSujud()
-            SalahPosture.SUJUD -> poseSujud()
-            SalahPosture.JALSA -> poseJalsa()
-            SalahPosture.TASHAHHUD -> poseTashahhud()
-            else -> poseStanding()
+            SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> poseStanding(rig, xOffset)
+            SalahPosture.RUKU -> poseRuku(rig, xOffset)
+            SalahPosture.GOING_TO_SUJUD -> poseGoingToSujud(rig, xOffset)
+            SalahPosture.SUJUD -> poseSujud(rig, xOffset)
+            SalahPosture.JALSA -> poseJalsa(rig, xOffset)
+            SalahPosture.TASHAHHUD -> poseTashahhud(rig, xOffset)
+            else -> poseStanding(rig, xOffset)
         }
+        rig.mat.transform.setToTranslation(xOffset, -0.025f, 0f)
     }
 
     /** Standing upright — Qiyam position, arms at sides */
-    private fun poseStanding() {
+    private fun poseStanding(rig: HumanoidRig, xOffset: Float) {
         // Build upward from ground (y=0 = feet level)
         // Lower leg capsule h=1.8 → center at 0.9
         // Upper leg capsule h=2.0 → center at 0.9+1.8/2+2.0/2 = 0.9+0.9+1.0 = 2.8
@@ -1037,31 +1195,31 @@ class SalahVisualization3D(
         val torsoY = hipY + 1.5f           // center of torso (5.3)
         val headY = torsoY + 2f            // center of head (7.3)
 
-        torsoInstance?.transform?.setToTranslation(0f, torsoY, 0f)
-        headInstance?.transform?.setToTranslation(0f, headY, 0f)
+        rig.torso.transform.setToTranslation(xOffset, torsoY, 0f)
+        rig.head.transform.setToTranslation(xOffset, headY, 0f)
 
         // Arms hanging at sides
-        leftUpperArmInstance?.transform?.idt()
-        leftUpperArmInstance?.transform?.setToTranslation(-0.9f, torsoY + 0.7f, 0f)
+        rig.leftUpperArm.transform.idt()
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.9f, torsoY + 0.7f, 0f)
 
-        rightUpperArmInstance?.transform?.idt()
-        rightUpperArmInstance?.transform?.setToTranslation(0.9f, torsoY + 0.7f, 0f)
+        rig.rightUpperArm.transform.idt()
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.9f, torsoY + 0.7f, 0f)
 
-        leftForearmInstance?.transform?.idt()
-        leftForearmInstance?.transform?.setToTranslation(-0.9f, torsoY - 0.6f, 0f)
+        rig.leftForearm.transform.idt()
+        rig.leftForearm.transform.setToTranslation(xOffset - 0.9f, torsoY - 0.6f, 0f)
 
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.9f, torsoY - 0.6f, 0f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.9f, torsoY - 0.6f, 0f)
 
         // Legs
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, upperLegY, 0f)
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, upperLegY, 0f)
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, lowerLegY, 0f)
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, lowerLegY, 0f)
+        rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, upperLegY, 0f)
+        rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, upperLegY, 0f)
+        rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, lowerLegY, 0f)
+        rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, lowerLegY, 0f)
     }
 
     /** Bowing — Ruku position: torso bent ~90 degrees forward, hands on knees */
-    private fun poseRuku() {
+    private fun poseRuku(rig: HumanoidRig, xOffset: Float) {
         // Same leg geometry as standing — feet at ground
         val groundY = 0f
         val lowerLegY = groundY + 0.9f
@@ -1069,182 +1227,182 @@ class SalahVisualization3D(
         val hipY = groundY + 3.8f
 
         // Torso: tilted forward 90 degrees from hip
-        torsoInstance?.transform?.idt()
-        torsoInstance?.transform?.setToTranslation(0f, hipY + 0.3f, -0.8f)
-        torsoInstance?.transform?.rotate(Vector3.X, 90f)
+        rig.torso.transform.idt()
+        rig.torso.transform.setToTranslation(xOffset, hipY + 0.3f, -0.8f)
+        rig.torso.transform.rotate(Vector3.X, 90f)
 
         // Head: in front of torso (bent forward)
-        headInstance?.transform?.setToTranslation(0f, hipY + 0.3f, -2.8f)
+        rig.head.transform.setToTranslation(xOffset, hipY + 0.3f, -2.8f)
 
         // Arms reaching down to knees
-        leftUpperArmInstance?.transform?.idt()
-        leftUpperArmInstance?.transform?.setToTranslation(-0.5f, hipY - 0.2f, -1f)
-        leftUpperArmInstance?.transform?.rotate(Vector3.X, 45f)
+        rig.leftUpperArm.transform.idt()
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.5f, hipY - 0.2f, -1f)
+        rig.leftUpperArm.transform.rotate(Vector3.X, 45f)
 
-        rightUpperArmInstance?.transform?.idt()
-        rightUpperArmInstance?.transform?.setToTranslation(0.5f, hipY - 0.2f, -1f)
-        rightUpperArmInstance?.transform?.rotate(Vector3.X, 45f)
+        rig.rightUpperArm.transform.idt()
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.5f, hipY - 0.2f, -1f)
+        rig.rightUpperArm.transform.rotate(Vector3.X, 45f)
 
-        leftForearmInstance?.transform?.idt()
-        leftForearmInstance?.transform?.setToTranslation(-0.5f, hipY - 0.8f, -0.6f)
+        rig.leftForearm.transform.idt()
+        rig.leftForearm.transform.setToTranslation(xOffset - 0.5f, hipY - 0.8f, -0.6f)
 
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.5f, hipY - 0.8f, -0.6f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.5f, hipY - 0.8f, -0.6f)
 
         // Legs: straight, feet on ground
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, upperLegY, 0f)
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, upperLegY, 0f)
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, lowerLegY, 0f)
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, lowerLegY, 0f)
+        rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, upperLegY, 0f)
+        rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, upperLegY, 0f)
+        rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, lowerLegY, 0f)
+        rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, lowerLegY, 0f)
     }
 
     /** Transitioning down — partway between standing and prostration */
-    private fun poseGoingToSujud() {
+    private fun poseGoingToSujud(rig: HumanoidRig, xOffset: Float) {
         // Hip is lowering — person bending knees to go down
         val groundY = 0f
         val hipY = 2.5f  // partway between standing (3.8) and kneeling (1.2)
 
         // Torso tilted forward ~45 degrees, descending
-        torsoInstance?.transform?.idt()
-        torsoInstance?.transform?.setToTranslation(0f, hipY + 0.5f, -0.5f)
-        torsoInstance?.transform?.rotate(Vector3.X, 45f)
+        rig.torso.transform.idt()
+        rig.torso.transform.setToTranslation(xOffset, hipY + 0.5f, -0.5f)
+        rig.torso.transform.rotate(Vector3.X, 45f)
 
-        headInstance?.transform?.setToTranslation(0f, hipY + 1f, -1.8f)
+        rig.head.transform.setToTranslation(xOffset, hipY + 1f, -1.8f)
 
         // Arms reaching forward
-        leftUpperArmInstance?.transform?.idt()
-        leftUpperArmInstance?.transform?.setToTranslation(-0.7f, hipY, -1f)
-        leftUpperArmInstance?.transform?.rotate(Vector3.X, 60f)
+        rig.leftUpperArm.transform.idt()
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.7f, hipY, -1f)
+        rig.leftUpperArm.transform.rotate(Vector3.X, 60f)
 
-        rightUpperArmInstance?.transform?.idt()
-        rightUpperArmInstance?.transform?.setToTranslation(0.7f, hipY, -1f)
-        rightUpperArmInstance?.transform?.rotate(Vector3.X, 60f)
+        rig.rightUpperArm.transform.idt()
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.7f, hipY, -1f)
+        rig.rightUpperArm.transform.rotate(Vector3.X, 60f)
 
-        leftForearmInstance?.transform?.idt()
-        leftForearmInstance?.transform?.setToTranslation(-0.7f, hipY - 0.5f, -1.5f)
-        leftForearmInstance?.transform?.rotate(Vector3.X, 70f)
+        rig.leftForearm.transform.idt()
+        rig.leftForearm.transform.setToTranslation(xOffset - 0.7f, hipY - 0.5f, -1.5f)
+        rig.leftForearm.transform.rotate(Vector3.X, 70f)
 
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.7f, hipY - 0.5f, -1.5f)
-        rightForearmInstance?.transform?.rotate(Vector3.X, 70f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.7f, hipY - 0.5f, -1.5f)
+        rig.rightForearm.transform.rotate(Vector3.X, 70f)
 
         // Legs bending — knees going forward, feet on ground
-        leftUpperLegInstance?.transform?.idt()
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, hipY - 0.8f, 0.5f)
-        leftUpperLegInstance?.transform?.rotate(Vector3.X, -40f)
+        rig.leftUpperLeg.transform.idt()
+        rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, hipY - 0.8f, 0.5f)
+        rig.leftUpperLeg.transform.rotate(Vector3.X, -40f)
 
-        rightUpperLegInstance?.transform?.idt()
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, hipY - 0.8f, 0.5f)
-        rightUpperLegInstance?.transform?.rotate(Vector3.X, -40f)
+        rig.rightUpperLeg.transform.idt()
+        rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, hipY - 0.8f, 0.5f)
+        rig.rightUpperLeg.transform.rotate(Vector3.X, -40f)
 
-        leftLowerLegInstance?.transform?.idt()
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.5f, 1.0f)
-        leftLowerLegInstance?.transform?.rotate(Vector3.X, -70f)
+        rig.leftLowerLeg.transform.idt()
+        rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, groundY + 0.5f, 1.0f)
+        rig.leftLowerLeg.transform.rotate(Vector3.X, -70f)
 
-        rightLowerLegInstance?.transform?.idt()
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.5f, 1.0f)
-        rightLowerLegInstance?.transform?.rotate(Vector3.X, -70f)
+        rig.rightLowerLeg.transform.idt()
+        rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.5f, 1.0f)
+        rig.rightLowerLeg.transform.rotate(Vector3.X, -70f)
     }
 
     /** Prostration — Sujud: face on ground, back arched, knees on ground */
-    private fun poseSujud() {
+    private fun poseSujud(rig: HumanoidRig, xOffset: Float) {
         val groundY = 0f
 
         // Torso: heavily tilted forward, close to ground
-        torsoInstance?.transform?.idt()
-        torsoInstance?.transform?.setToTranslation(0f, groundY + 0.8f, -0.5f)
-        torsoInstance?.transform?.rotate(Vector3.X, 120f)
+        rig.torso.transform.idt()
+        rig.torso.transform.setToTranslation(xOffset, groundY + 0.8f, -0.5f)
+        rig.torso.transform.rotate(Vector3.X, 120f)
 
         // Head: touching the ground
-        headInstance?.transform?.setToTranslation(0f, groundY + 0.3f, -2.5f)
+        rig.head.transform.setToTranslation(xOffset, groundY + 0.3f, -2.5f)
 
         // Arms: on ground, palms down beside head
-        leftUpperArmInstance?.transform?.idt()
-        leftUpperArmInstance?.transform?.setToTranslation(-0.7f, groundY + 0.4f, -1.5f)
-        leftUpperArmInstance?.transform?.rotate(Vector3.X, 90f)
+        rig.leftUpperArm.transform.idt()
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.7f, groundY + 0.4f, -1.5f)
+        rig.leftUpperArm.transform.rotate(Vector3.X, 90f)
 
-        rightUpperArmInstance?.transform?.idt()
-        rightUpperArmInstance?.transform?.setToTranslation(0.7f, groundY + 0.4f, -1.5f)
-        rightUpperArmInstance?.transform?.rotate(Vector3.X, 90f)
+        rig.rightUpperArm.transform.idt()
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.7f, groundY + 0.4f, -1.5f)
+        rig.rightUpperArm.transform.rotate(Vector3.X, 90f)
 
-        leftForearmInstance?.transform?.idt()
-        leftForearmInstance?.transform?.setToTranslation(-0.7f, groundY + 0.2f, -2.3f)
+        rig.leftForearm.transform.idt()
+        rig.leftForearm.transform.setToTranslation(xOffset - 0.7f, groundY + 0.2f, -2.3f)
 
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.7f, groundY + 0.2f, -2.3f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.7f, groundY + 0.2f, -2.3f)
 
         // Legs: knees on ground, lower legs folded back
-        leftUpperLegInstance?.transform?.idt()
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.6f, 1f)
-        leftUpperLegInstance?.transform?.rotate(Vector3.X, -60f)
+        rig.leftUpperLeg.transform.idt()
+        rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, groundY + 0.6f, 1f)
+        rig.leftUpperLeg.transform.rotate(Vector3.X, -60f)
 
-        rightUpperLegInstance?.transform?.idt()
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.6f, 1f)
-        rightUpperLegInstance?.transform?.rotate(Vector3.X, -60f)
+        rig.rightUpperLeg.transform.idt()
+        rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.6f, 1f)
+        rig.rightUpperLeg.transform.rotate(Vector3.X, -60f)
 
-        leftLowerLegInstance?.transform?.idt()
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.15f, 2f)
-        leftLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.leftLowerLeg.transform.idt()
+        rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, groundY + 0.15f, 2f)
+        rig.leftLowerLeg.transform.rotate(Vector3.X, -90f)
 
-        rightLowerLegInstance?.transform?.idt()
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.15f, 2f)
-        rightLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.rightLowerLeg.transform.idt()
+        rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.15f, 2f)
+        rig.rightLowerLeg.transform.rotate(Vector3.X, -90f)
     }
 
     /** Sitting between prostrations — Jalsa: kneeling upright */
-    private fun poseJalsa() {
+    private fun poseJalsa(rig: HumanoidRig, xOffset: Float) {
         val groundY = 0f
         val seatY = groundY + 1.2f
 
         // Torso: upright but lower (sitting)
-        torsoInstance?.transform?.idt()
-        torsoInstance?.transform?.setToTranslation(0f, seatY + 1f, 0f)
+        rig.torso.transform.idt()
+        rig.torso.transform.setToTranslation(xOffset, seatY + 1f, 0f)
 
         // Head: on top
-        headInstance?.transform?.setToTranslation(0f, seatY + 2.5f, 0f)
+        rig.head.transform.setToTranslation(xOffset, seatY + 2.5f, 0f)
 
         // Arms: resting on thighs
-        leftUpperArmInstance?.transform?.idt()
-        leftUpperArmInstance?.transform?.setToTranslation(-0.8f, seatY + 1.2f, 0f)
+        rig.leftUpperArm.transform.idt()
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.8f, seatY + 1.2f, 0f)
 
-        rightUpperArmInstance?.transform?.idt()
-        rightUpperArmInstance?.transform?.setToTranslation(0.8f, seatY + 1.2f, 0f)
+        rig.rightUpperArm.transform.idt()
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.8f, seatY + 1.2f, 0f)
 
-        leftForearmInstance?.transform?.idt()
-        leftForearmInstance?.transform?.setToTranslation(-0.6f, seatY + 0.2f, -0.4f)
-        leftForearmInstance?.transform?.rotate(Vector3.X, 30f)
+        rig.leftForearm.transform.idt()
+        rig.leftForearm.transform.setToTranslation(xOffset - 0.6f, seatY + 0.2f, -0.4f)
+        rig.leftForearm.transform.rotate(Vector3.X, 30f)
 
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.6f, seatY + 0.2f, -0.4f)
-        rightForearmInstance?.transform?.rotate(Vector3.X, 30f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.6f, seatY + 0.2f, -0.4f)
+        rig.rightForearm.transform.rotate(Vector3.X, 30f)
 
         // Legs folded underneath
-        leftUpperLegInstance?.transform?.idt()
-        leftUpperLegInstance?.transform?.setToTranslation(-0.4f, seatY - 0.3f, 0.3f)
-        leftUpperLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.leftUpperLeg.transform.idt()
+        rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, seatY - 0.3f, 0.3f)
+        rig.leftUpperLeg.transform.rotate(Vector3.X, -90f)
 
-        rightUpperLegInstance?.transform?.idt()
-        rightUpperLegInstance?.transform?.setToTranslation(0.4f, seatY - 0.3f, 0.3f)
-        rightUpperLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.rightUpperLeg.transform.idt()
+        rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, seatY - 0.3f, 0.3f)
+        rig.rightUpperLeg.transform.rotate(Vector3.X, -90f)
 
-        leftLowerLegInstance?.transform?.idt()
-        leftLowerLegInstance?.transform?.setToTranslation(-0.4f, groundY + 0.15f, 1.3f)
-        leftLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.leftLowerLeg.transform.idt()
+        rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, groundY + 0.15f, 1.3f)
+        rig.leftLowerLeg.transform.rotate(Vector3.X, -90f)
 
-        rightLowerLegInstance?.transform?.idt()
-        rightLowerLegInstance?.transform?.setToTranslation(0.4f, groundY + 0.15f, 1.3f)
-        rightLowerLegInstance?.transform?.rotate(Vector3.X, -90f)
+        rig.rightLowerLeg.transform.idt()
+        rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.15f, 1.3f)
+        rig.rightLowerLeg.transform.rotate(Vector3.X, -90f)
     }
 
     /** Final sitting — Tashahhud: similar to Jalsa but right index finger extended */
-    private fun poseTashahhud() {
+    private fun poseTashahhud(rig: HumanoidRig, xOffset: Float) {
         // Tashahhud is very similar to Jalsa posture
-        poseJalsa()
+        poseJalsa(rig, xOffset)
 
         // Right forearm slightly angled forward (pointing finger)
-        rightForearmInstance?.transform?.idt()
-        rightForearmInstance?.transform?.setToTranslation(0.5f, 1.4f, -0.8f)
-        rightForearmInstance?.transform?.rotate(Vector3.X, 40f)
+        rig.rightForearm.transform.idt()
+        rig.rightForearm.transform.setToTranslation(xOffset + 0.5f, 1.4f, -0.8f)
+        rig.rightForearm.transform.rotate(Vector3.X, 40f)
     }
 
     private fun buildGravityVectors() {
