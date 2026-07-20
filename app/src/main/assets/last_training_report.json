@@ -1,0 +1,232 @@
+{
+  "timestamp": "2026-07-20T15:26:49Z",
+  "model_version": 2,
+  "dataset": {
+    "total_windows": 2383,
+    "windows_per_class": {
+      "QIYAM": 595,
+      "RUKU": 201,
+      "GOING_TO_SUJUD": 77,
+      "SUJUD": 448,
+      "JALSA": 196,
+      "TASHAHHUD": 567,
+      "QIYAM_RISING": 299
+    },
+    "class_balance_ratio": 0.129,
+    "files": {
+      "salah_live_20260720_181503_1d6b7f63.jsonl": {
+        "windows": 2383,
+        "duration_seconds": 238.3,
+        "per_posture": {
+          "QIYAM": 595,
+          "RUKU": 201,
+          "QIYAM_RISING": 299,
+          "GOING_TO_SUJUD": 77,
+          "SUJUD": 448,
+          "JALSA": 196,
+          "TASHAHHUD": 567
+        }
+      }
+    },
+    "outlier_files": [],
+    "sequences": {
+      "train": {
+        "QIYAM": 43,
+        "RUKU": 20,
+        "GOING_TO_SUJUD": 1,
+        "SUJUD": 69,
+        "JALSA": 14,
+        "TASHAHHUD": 63,
+        "QIYAM_RISING": 43
+      },
+      "val": {
+        "QIYAM": 51,
+        "RUKU": 15,
+        "GOING_TO_SUJUD": 0,
+        "SUJUD": 24,
+        "JALSA": 16,
+        "TASHAHHUD": 0,
+        "QIYAM_RISING": 8
+      },
+      "test": {
+        "QIYAM": 81,
+        "RUKU": 8,
+        "GOING_TO_SUJUD": 2,
+        "SUJUD": 8,
+        "JALSA": 12,
+        "TASHAHHUD": 114,
+        "QIYAM_RISING": 6
+      }
+    }
+  },
+  "metrics": {
+    "val_accuracy": 0.7193,
+    "test_accuracy": 0.3636,
+    "per_class_f1_val": {
+      "QIYAM": 0.8667,
+      "RUKU": 0.8571,
+      "GOING_TO_SUJUD": 0.0,
+      "SUJUD": 0.76,
+      "JALSA": 0.1176,
+      "TASHAHHUD": 0.0,
+      "QIYAM_RISING": 0.7619
+    },
+    "per_class_f1_test": {
+      "QIYAM": 0.7538,
+      "RUKU": 0.5714,
+      "GOING_TO_SUJUD": 1.0,
+      "SUJUD": 0.7273,
+      "JALSA": 0.1752,
+      "TASHAHHUD": 0.0,
+      "QIYAM_RISING": 0.3704
+    },
+    "confusion_matrix_val": [
+      [
+        39,
+        0,
+        0,
+        7,
+        0,
+        0,
+        5
+      ],
+      [
+        0,
+        15,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        5,
+        0,
+        19,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        1,
+        15,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8
+      ]
+    ],
+    "confusion_matrix_test": [
+      [
+        49,
+        11,
+        0,
+        6,
+        0,
+        0,
+        15
+      ],
+      [
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        12,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        113,
+        0,
+        1
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        5
+      ]
+    ],
+    "confusion_labels": [
+      "QIYAM",
+      "RUKU",
+      "GOING_TO_SUJUD",
+      "SUJUD",
+      "JALSA",
+      "TASHAHHUD",
+      "QIYAM_RISING"
+    ]
+  },
+  "quality_flags": {
+    "class_balance_ratio": 0.129,
+    "low_sequence_classes": [
+      "RUKU",
+      "GOING_TO_SUJUD",
+      "JALSA"
+    ],
+    "outlier_files": []
+  }
+}

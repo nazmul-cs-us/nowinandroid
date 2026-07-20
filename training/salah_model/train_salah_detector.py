@@ -29,6 +29,10 @@ from feature_engineering import (
 from data_augmentation import augment_dataset, balance_classes
 from dataset_report import build_report, write_report
 
+# Small splits can miss rare classes entirely; passing explicit labels keeps
+# report/confusion-matrix shapes fixed at 7 classes either way.
+ALL_CLASS_IDS = list(range(NUM_CLASSES))
+
 
 def _choose_split_counts(n_groups: int, test_ratio: float = 0.15, val_ratio: float = 0.15) -> tuple[int, int]:
     if n_groups <= 1:
@@ -281,13 +285,13 @@ def train(args):
 
     y_val_pred = model.predict(X_val, verbose=0).argmax(axis=1)
     print("\nValidation Classification Report:")
-    print(classification_report(y_val, y_val_pred, target_names=POSTURE_LABELS))
+    print(classification_report(y_val, y_val_pred, labels=ALL_CLASS_IDS, target_names=POSTURE_LABELS, zero_division=0))
     val_report_dict = classification_report(
-        y_val, y_val_pred, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
+        y_val, y_val_pred, labels=ALL_CLASS_IDS, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
     )
 
     print("\nValidation Confusion Matrix:")
-    cm_val = confusion_matrix(y_val, y_val_pred)
+    cm_val = confusion_matrix(y_val, y_val_pred, labels=ALL_CLASS_IDS)
     print(cm_val)
 
     # Test set evaluation (held-out data)
@@ -301,13 +305,13 @@ def train(args):
 
     y_test_pred = model.predict(X_test, verbose=0).argmax(axis=1)
     print("\nTest Classification Report:")
-    print(classification_report(y_test, y_test_pred, target_names=POSTURE_LABELS))
+    print(classification_report(y_test, y_test_pred, labels=ALL_CLASS_IDS, target_names=POSTURE_LABELS, zero_division=0))
     test_report_dict = classification_report(
-        y_test, y_test_pred, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
+        y_test, y_test_pred, labels=ALL_CLASS_IDS, target_names=POSTURE_LABELS, output_dict=True, zero_division=0
     )
 
     print("\nTest Confusion Matrix:")
-    cm_test = confusion_matrix(y_test, y_test_pred)
+    cm_test = confusion_matrix(y_test, y_test_pred, labels=ALL_CLASS_IDS)
     print(cm_test)
 
     # Save normalization parameters

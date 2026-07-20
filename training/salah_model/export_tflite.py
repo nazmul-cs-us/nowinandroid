@@ -38,8 +38,16 @@ def export_tflite(
     print(f"Loading model from {model_path}...")
     model = keras.models.load_model(model_path)
 
-    # Convert to TFLite
-    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    # Convert via a concrete function: from_keras_model on a re-loaded Keras 3
+    # model loses batch-norm variable values ("missing attribute 'value'" /
+    # "Failed to infer result type(s)" in the MLIR converter).
+    input_shape = list(model.inputs[0].shape)
+    input_shape[0] = 1
+    run_model = tf.function(lambda x: model(x))
+    concrete_func = run_model.get_concrete_function(
+        tf.TensorSpec(input_shape, tf.float32)
+    )
+    converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete_func], run_model)
 
     if quantize:
         print("Applying int8 quantization...")

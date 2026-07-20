@@ -119,6 +119,11 @@ object ActivityTracker {
     private var textToSpeech: TextToSpeech? = null
     private var isTtsInitialized = false
 
+    // Prayer detection announcement state
+    private var wasPrayerConfirmed = false
+    private var lastPrayerAnnouncementTime = 0L
+    private const val PRAYER_ANNOUNCEMENT_COOLDOWN_MS = 60_000L
+
     // Voice completion for hands-free lesson completion
     private var whisperVoiceService: WhisperVoiceService? = null
     private var sherpaOnnxTtsService: SherpaOnnxTtsService? = null
@@ -339,10 +344,15 @@ object ActivityTracker {
                         rakahCount: Int
                     ) {
                         // Update activity display with current posture and rak'ah count
-                        if (prayerState == com.starception.submission.ml.SalahSequenceValidator.PrayerState.CONFIRMED) {
+                        val confirmed = prayerState == com.starception.submission.ml.SalahSequenceValidator.PrayerState.CONFIRMED
+                        if (confirmed) {
                             val rakahText = if (rakahCount > 0) " - Rak'ah $rakahCount" else ""
                             _currentActivity.value = "Praying (${posture.displayName})$rakahText"
+                            if (!wasPrayerConfirmed) {
+                                announcePrayerDetected()
+                            }
                         }
+                        wasPrayerConfirmed = confirmed
                     }
                 }
             )
@@ -699,6 +709,55 @@ object ActivityTracker {
                 playVibration()
                 Log.d("ActivityTracker", "📳 Activity change: Vibrate only (app in foreground)")
             }
+        }
+    }
+
+    /**
+     * Announce via TTS when prayer is first confirmed by the sequence validator.
+     *
+     * Unlike activity-change beeps, this is NOT suppressed in the background or when
+     * the Smart Activity tile is out of focus — the phone is in the user's pocket
+     * while praying, so background is exactly when this announcement matters.
+     * A cooldown guards against repeat announcements if the validator oscillates
+     * in and out of CONFIRMED during the same prayer.
+     */
+    private fun announcePrayerDetected() {
+        val ctx = context ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastPrayerAnnouncementTime < PRAYER_ANNOUNCEMENT_COOLDOWN_MS) {
+            Log.d("ActivityTracker", "🕌 Prayer detected again within cooldown - skipping announcement")
+            return
+        }
+        lastPrayerAnnouncementTime = now
+
+        when (_notificationMode.value) {
+            NotificationMode.MUTE -> {
+                Log.d("ActivityTracker", "🕌 Prayer detected - announcement muted")
+            }
+            NotificationMode.VIBRATE -> {
+                Log.d("ActivityTracker", "🕌 Prayer detected - vibrate only")
+                playVibration()
+            }
+            NotificationMode.SPEAKER -> {
+                Log.i("ActivityTracker", "🕌 Prayer detected - announcing via TTS")
+                speakPrayerAnnouncement(ctx)
+            }
+        }
+    }
+
+    private fun speakPrayerAnnouncement(ctx: Context) {
+        val text = "Praying"
+        if (textToSpeech == null) {
+            textToSpeech = TextToSpeech(ctx) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    textToSpeech?.language = Locale.US
+                    textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "prayer_detected")
+                } else {
+                    Log.e("ActivityTracker", "🕌 TTS init failed for prayer announcement")
+                }
+            }
+        } else {
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "prayer_detected")
         }
     }
 
