@@ -107,6 +107,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.starception.submission.feature.salah.visualization.CurrentSampleCard
 import com.starception.submission.feature.salah.visualization.DataQualitySummary
 import com.starception.submission.feature.salah.visualization.PlaybackBar
+import com.starception.submission.feature.salah.visualization.Visualization3DTeardown
 import com.starception.submission.feature.salah.visualization.Visualization3DView
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
@@ -234,6 +235,10 @@ fun SalahDataCollectionScreen(
                             vizState = vizState,
                             showVisualization = showVisualization,
                             onToggleVisualization = {
+                                // Hiding removes the GL AndroidView from composition; LibGDX must
+                                // be torn down BEFORE its surface detaches, or its pause handshake
+                                // deadlocks and kills the whole process.
+                                if (!it) Visualization3DTeardown.disposeActive()
                                 showVisualization = it
                                 if (it) viewModel.loadAllSamples()
                             },
@@ -302,6 +307,8 @@ fun SalahDataCollectionScreen(
                         vizState = vizState,
                         showVisualization = showVisualization,
                         onToggleVisualization = {
+                            // Same pre-detach teardown as the landscape call site above.
+                            if (!it) Visualization3DTeardown.disposeActive()
                             showVisualization = it
                             if (it) viewModel.loadAllSamples()
                         },

@@ -10,10 +10,68 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration
+import com.badlogic.gdx.backends.android.AndroidGraphics
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import kotlinx.coroutines.delay
+
+/**
+ * Tears down the LibGDX [fragment] in the order LibGDX requires, so it does NOT deadlock-kill
+ * the whole process.
+ *
+ * The hazard: LibGDX's AndroidGraphics.pause() (fired by the fragment's onPause during removal)
+ * posts a `queueEvent` to the GLSurfaceView's GL thread and blocks up to 4s waiting for it to be
+ * acknowledged; if it isn't, LibGDX calls Process.killProcess() ("waiting for pause synchronization
+ * took too long; assuming deadlock and killing"). During a Compose navigation pop, the container
+ * view — and with it the GLSurfaceView — is detached FIRST, which stops the GL thread, so the
+ * queued event never runs and the handshake deadlocks.
+ *
+ * Two defenses, in order:
+ *  1. Revive the GLSurfaceView's render thread (onResumeGLSurfaceView) so a queued pause event can
+ *     still be processed even if a detach already began.
+ *  2. Remove the fragment SYNCHRONOUSLY (commitNow) so the full onPause -> onDestroyView -> dispose
+ *     runs here, while we still control the ordering, rather than being scheduled for after detach.
+ *
+ * Idempotent: safe to call from both the DisposableEffect (which runs while the view is still
+ * attached — the important one) and AndroidView.onRelease (fallback).
+ */
+/**
+ * Hook for tearing down the live 3D view BEFORE its composable is removed on paths Compose
+ * gives us no early signal for (the card's Hide toggle). The screen calls [disposeActive]
+ * in the toggle's click handler — while the GL surface is still attached — then flips the
+ * visibility state. At most one 3D view exists at a time (LibGDX is process-global), so a
+ * single slot suffices.
+ */
+object Visualization3DTeardown {
+    internal var activeTeardown: (() -> Unit)? = null
+
+    /** Synchronously tear down the live GL fragment, if any. Safe no-op otherwise. */
+    fun disposeActive() {
+        activeTeardown?.invoke()
+    }
+}
+
+private fun tearDownGlFragment(activity: FragmentActivity?, fragment: LibGDXFragment?) {
+    if (fragment == null) return
+    val fm = activity?.supportFragmentManager ?: return
+    if (fm.isDestroyed) return
+    try {
+        (fragment.graphics as? AndroidGraphics)?.onResumeGLSurfaceView()
+    } catch (_: Exception) {
+    }
+    try {
+        fm.beginTransaction().remove(fragment).commitNowAllowingStateLoss()
+    } catch (_: Exception) {
+        try {
+            fm.beginTransaction().remove(fragment).commitAllowingStateLoss()
+        } catch (_: Exception) {
+        }
+    }
+}
 
 /**
  * Jetpack Compose wrapper for LibGDX SalahVisualization3D renderer.
@@ -37,6 +95,9 @@ fun Visualization3DView(
 ) {
     var visualizationRef by remember { mutableStateOf<SalahVisualization3D?>(null) }
     var fragmentRef by remember { mutableStateOf<LibGDXFragment?>(null) }
+    // Captured at factory time so teardown never depends on fragment.activity, which is
+    // usually already null during a navigation pop (leaving the GL thread orphaned).
+    var hostActivityRef by remember { mutableStateOf<FragmentActivity?>(null) }
 
     // Keep latest references for the factory callback (avoids stale closure)
     val currentState by rememberUpdatedState(state)
@@ -149,6 +210,56 @@ fun Visualization3DView(
         }
     }
 
+    // Tear the LibGDX fragment down on the destination's ON_STOP — NOT on Compose disposal.
+    //
+    // LibGDX's onPause() runs graphics.pause() (a blocking GL-thread handshake) and only THEN
+    // onPauseGLSurfaceView(); so onPause() is safe ONLY while the GLSurfaceView is still attached.
+    // On a navigation pop, Compose detaches the surface during composition disposal, so anything
+    // in onDispose / AndroidView.onRelease runs too late — pause() can't reach the (already
+    // stopped) GL thread, waits 4s, and LibGDX Process.killProcess()es the app. ON_STOP fires
+    // BEFORE that disposal, while the surface is attached, so the removal's onPause completes
+    // cleanly.
+    //
+    // Only tear down when the host Activity is still running (a genuine nav-pop). If the whole app
+    // is just backgrounded, the Activity's own lifecycle pauses the fragment normally (surface
+    // stays attached, no deadlock) and the viz survives to the foreground — so we skip.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val teardownNow: () -> Unit = {
+            tearDownGlFragment(hostActivityRef, fragmentRef)
+            visualizationRef = null
+            fragmentRef = null
+            hostActivityRef = null
+        }
+        // Hide-toggle path: the screen calls Visualization3DTeardown.disposeActive() from the
+        // toggle's click handler, BEFORE flipping the state that removes this composable —
+        // the last moment the GL surface is guaranteed attached on that path.
+        Visualization3DTeardown.activeTeardown = teardownNow
+        val observer = LifecycleEventObserver { _, event ->
+            // Navigation path (back OR forward): the destination's ON_STOP fires before the
+            // outgoing composition is disposed, i.e. while the GL surface is still attached.
+            // The host-activity check separates a real navigation (activity still STARTED →
+            // tear down now) from app backgrounding (activity stopping too → leave the
+            // fragment alone; the FragmentManager pauses it safely with the surface attached,
+            // and it resumes when the app returns to the foreground).
+            if (event == Lifecycle.Event.ON_STOP &&
+                hostActivityRef?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true
+            ) {
+                teardownNow()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (Visualization3DTeardown.activeTeardown === teardownNow) {
+                Visualization3DTeardown.activeTeardown = null
+            }
+            // Last-resort fallback; a no-op whenever one of the pre-detach paths above already
+            // ran (refs are null by then).
+            teardownNow()
+        }
+    }
+
     AndroidView(
         factory = { ctx ->
             // Custom FrameLayout that prevents LazyColumn from stealing touch events.
@@ -208,6 +319,7 @@ fun Visualization3DView(
             // Get FragmentActivity from context
             val fragmentActivity = ctx as? FragmentActivity
                 ?: throw IllegalStateException("Visualization3DView requires FragmentActivity context.")
+            hostActivityRef = fragmentActivity
 
             // Create named fragment (avoids "must be public static class" crash)
             val fragment = LibGDXFragment.newInstance(visualization, config)
@@ -234,15 +346,12 @@ fun Visualization3DView(
             container.requestLayout()
         },
         onRelease = {
+            // Fallback only — the DisposableEffect above is the real teardown (it runs while the
+            // view is still attached). Idempotent: no-ops if already torn down.
+            tearDownGlFragment(hostActivityRef, fragmentRef)
             visualizationRef = null
-            // Remove fragment when view is released
-            fragmentRef?.let { frag ->
-                try {
-                    val fm = (frag.activity as? FragmentActivity)?.supportFragmentManager
-                    fm?.beginTransaction()?.remove(frag)?.commitAllowingStateLoss()
-                } catch (_: Exception) {}
-            }
             fragmentRef = null
+            hostActivityRef = null
         }
     )
 }

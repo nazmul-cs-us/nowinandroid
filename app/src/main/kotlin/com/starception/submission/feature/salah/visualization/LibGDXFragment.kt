@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration
 import com.badlogic.gdx.backends.android.AndroidFragmentApplication
 
@@ -52,14 +51,15 @@ class LibGDXFragment : AndroidFragmentApplication() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val viz = visualization
         val cfg = config ?: AndroidApplicationConfiguration()
 
-        if (viz == null) {
-            // Fragment was recreated by Android without our pending refs — return empty view.
-            // This only happens during Activity recreation; Compose will re-create the view.
-            return FrameLayout(requireContext())
-        }
+        // When Android recreates this fragment from saved state (config change / process
+        // restore), our pending renderer ref is gone, so `visualization` is null. We must
+        // STILL initialize a GL app here: AndroidFragmentApplication.onResume() unconditionally
+        // dereferences its AndroidInput, and if initializeForView() was never called that input
+        // is null -> NPE crash the moment the fragment is resumed. A no-op renderer keeps the GL
+        // app valid until Compose disposes this leftover fragment and creates a fresh one.
+        val viz = visualization ?: SalahVisualization3D { _, _, _, _, _, _, _ -> }
 
         val view = initializeForView(viz, cfg)
 

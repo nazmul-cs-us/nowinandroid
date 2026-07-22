@@ -640,7 +640,13 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     cursor.close()
                     db.close()
 
-                    duas.sortedBy { it.duaNumber }
+                    // Sort by news-resource id, NOT duaNumber. For Fortress duas duaNumber is the
+                    // position WITHIN a chapter (parsed from "{Chapter}: Dua N"), so sorting a
+                    // multi-chapter list by it interleaves chapters ([every ch's Dua 1, every ch's
+                    // Dua 2, …]) — which made auto-advance hop between chapters mid-way. News ids
+                    // are assigned in (chapter, position) order by NewsDbGenerator, so id order is
+                    // the correct reading order that keeps each chapter's duas contiguous.
+                    duas.sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }
                 }
 
                 android.util.Log.d("DuaDetailViewModel", "✅ Loaded ${sortedDuas.size} duas for topic")
@@ -730,7 +736,10 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     cursor.close()
                     db.close()
 
-                    duas.sortedBy { it.duaNumber }
+                    // Sort by news-resource id (chapter→position order), not duaNumber — see the
+                    // note in loadDuasByTopic. duaNumber is a per-chapter position, so sorting the
+                    // whole book by it interleaves chapters and scrambles auto-advance order.
+                    duas.sortedBy { it.id.toIntOrNull() ?: Int.MAX_VALUE }
                 }
 
                 // Emit immediately with basic data - UI can show content now
