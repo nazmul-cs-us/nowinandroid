@@ -587,7 +587,7 @@ private fun GuidedRecordingCard(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "TTS walks you through each posture automatically",
+                                text = "Voice cues separate movement from held postures",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 16.sp
@@ -645,6 +645,13 @@ private fun GuidedRecordingCard(
                             }
                         }
                     }
+
+                    Text(
+                        text = "Before starting: turn up media volume and secure the phone in one trouser pocket. Keep the same placement for the full session; vary placement between sessions. Record at least 3 complete sessions for train, validation, and test splits.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp,
+                    )
 
                     // TTS Engine Download Section — flat editorial rows, no
                     // nested box; the tonal button carries the action.
@@ -784,7 +791,7 @@ private fun GuidedRecordingCard(
                         )
                     }
                     Text(
-                        text = "Put phone in pocket!",
+                        text = "Keep the phone secured in your pocket",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
@@ -881,7 +888,7 @@ private fun GuidedRecordingCard(
                     // Posture name
                     if (posture != null) {
                         Text(
-                            text = posture.displayName,
+                            text = uiState.guidedMessage.ifBlank { posture.displayName },
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -971,11 +978,19 @@ private fun GuidedRecordingCard(
 
                 GuidedRecordingState.CANCELLED -> {
                     Text(
-                        text = "Recording Cancelled",
+                        text = "Guided Recording Stopped",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.error
                     )
+                    if (uiState.guidedMessage.isNotBlank()) {
+                        Text(
+                            text = uiState.guidedMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                     if (uiState.totalSamples > 0) {
                         Text(
                             text = "${uiState.totalSamples} samples saved before cancellation",
@@ -1134,16 +1149,24 @@ private fun DeployedModelCard(info: DeployedModelInfo) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Deployed model v${info.modelVersion}",
+                    text = "Model v${info.modelVersion}",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "test ${(info.testAccuracy * 100).toInt()}%",
+                    text = if (info.isDeploymentReady) {
+                        "ready · test ${(info.testAccuracy * 100).toInt()}%"
+                    } else {
+                        "experimental · test ${(info.testAccuracy * 100).toInt()}%"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = if (info.isDeploymentReady) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
                 )
             }
             Text(
@@ -1596,7 +1619,7 @@ private fun PostureSelector(
                         )
                     }
                     Text(
-                        text = "Select Posture",
+                        text = "Select to Record",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -1609,82 +1632,118 @@ private fun PostureSelector(
                 )
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = postureRecordingGuidance(uiState.currentPosture),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                )
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Prayer postures in 3-column grid (all visible at once)
-        val prayerPostures = listOf(
-            SalahPosture.QIYAM,
-            SalahPosture.RUKU,
-            SalahPosture.GOING_TO_SUJUD,
-            SalahPosture.SUJUD,
-            SalahPosture.JALSA,
-            SalahPosture.TASHAHHUD,
-            SalahPosture.QIYAM_RISING
-        )
+            Text(
+                text = "STILL POSITIONS",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.2.sp,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Row 1: first 3
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-            prayerPostures.take(3).forEach { posture ->
-                Box(modifier = Modifier.weight(1f)) {
-                    PostureChip(
-                        posture = posture,
-                        isSelected = uiState.currentPosture == posture,
-                        isRecording = uiState.isRecording,
-                        sessionCount = uiState.postureCounts[posture] ?: 0,
-                        globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
-                        onClick = { viewModel.setPosture(posture) }
-                    )
+            val staticPostures = listOf(
+                SalahPosture.QIYAM,
+                SalahPosture.RUKU,
+                SalahPosture.SUJUD,
+                SalahPosture.JALSA,
+                SalahPosture.TASHAHHUD,
+            )
+            staticPostures.chunked(3).forEachIndexed { rowIndex, rowPostures ->
+                if (rowIndex > 0) Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowPostures.forEach { posture ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            PostureChip(
+                                posture = posture,
+                                isSelected = uiState.currentPosture == posture,
+                                isRecording = uiState.isRecording,
+                                sessionCount = uiState.postureCounts[posture] ?: 0,
+                                globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
+                                onClick = { viewModel.setPosture(posture) },
+                            )
+                        }
+                    }
+                    repeat(3 - rowPostures.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            // Row 2: next 3
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "MOVEMENTS · RECORD ONLY THE ARROW",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-            prayerPostures.drop(3).take(3).forEach { posture ->
-                Box(modifier = Modifier.weight(1f)) {
-                    PostureChip(
-                        posture = posture,
-                        isSelected = uiState.currentPosture == posture,
-                        isRecording = uiState.isRecording,
-                        sessionCount = uiState.postureCounts[posture] ?: 0,
-                        globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
-                        onClick = { viewModel.setPosture(posture) }
-                    )
+                listOf(
+                    SalahPosture.QIYAM_RISING to "Ruku\n→ Standing",
+                    SalahPosture.GOING_TO_SUJUD to "Standing or Sitting\n→ Sujud",
+                ).forEach { (posture, label) ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        PostureChip(
+                            posture = posture,
+                            label = label,
+                            isSelected = uiState.currentPosture == posture,
+                            isRecording = uiState.isRecording,
+                            sessionCount = uiState.postureCounts[posture] ?: 0,
+                            globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
+                            onClick = { viewModel.setPosture(posture) },
+                        )
+                    }
                 }
-            }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            // Row 3: last posture
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-            prayerPostures.drop(6).forEach { posture ->
-                Box(modifier = Modifier.weight(1f)) {
-                    PostureChip(
-                        posture = posture,
-                        isSelected = uiState.currentPosture == posture,
-                        isRecording = uiState.isRecording,
-                        sessionCount = uiState.postureCounts[posture] ?: 0,
-                        globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
-                        onClick = { viewModel.setPosture(posture) }
-                    )
-                }
-            }
             }
         }
     }
 }
 
+private fun postureRecordingGuidance(posture: SalahPosture): String = when (posture) {
+    SalahPosture.QIYAM ->
+        "Static posture: stand upright with your hands folded and remain still."
+    SalahPosture.RUKU ->
+        "Static posture: hold ruku with your hands on your knees and remain still."
+    SalahPosture.QIYAM_RISING ->
+        "Record only RUKU → STANDING. Begin already in ruku and stop fully upright. Do not continue toward sujud."
+    SalahPosture.GOING_TO_SUJUD ->
+        "Record only STANDING OR SITTING → SUJUD. Begin already upright or already seated. Do not include rising from ruku; record that movement separately."
+    SalahPosture.SUJUD ->
+        "Static posture: hold the prostration position and remain still."
+    SalahPosture.JALSA ->
+        "Static posture: sit upright between the two prostrations and remain still."
+    SalahPosture.TASHAHHUD ->
+        "Static posture: hold the final seated tashahhud position and remain still."
+}
+
 @Composable
 private fun PostureChip(
     posture: SalahPosture,
+    label: String = posture.displayName,
     isSelected: Boolean,
     isRecording: Boolean,
     sessionCount: Int,
@@ -1785,13 +1844,14 @@ private fun PostureChip(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = posture.displayName,
+                text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = textColor,
                 textAlign = TextAlign.Center,
-                maxLines = 1,
-                fontSize = 12.sp
+                maxLines = 2,
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
             )
             if (posture.arabicName.isNotEmpty()) {
                 Text(
@@ -2282,11 +2342,11 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                 val postureDisplayNames = mapOf(
                     "QIYAM" to "Qiyam",
                     "RUKU" to "Ruku",
-                    "GOING_TO_SUJUD" to "Going Down",
+                    "GOING_TO_SUJUD" to "Lowering to Sujud",
                     "SUJUD" to "Sujud",
                     "JALSA" to "Jalsa",
                     "TASHAHHUD" to "Tashahhud",
-                    "QIYAM_RISING" to "Rising Up"
+                    "QIYAM_RISING" to "Ruku to Standing"
                 )
 
                 postureOrder.forEach { posture ->
@@ -2345,7 +2405,8 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                     }
                 }
 
-                // Training readiness
+                // Per-class window coverage. The desktop inspector separately verifies
+                // that there are enough independent segments for leakage-safe splits.
                 val minCollected = postureOrder.minOf { uiState.globalPostureCounts[it] ?: 0 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
@@ -2365,7 +2426,7 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                     ) {
                         Text(
                             text = if (minCollected >= target) {
-                                "Ready for training!"
+                                "Window target reached"
                             } else {
                                 "Need ${target - minCollected}+ more per posture (target: $target)"
                             },
@@ -2583,11 +2644,11 @@ private fun DataFileItem(
     val postureDisplayNames = mapOf(
         "QIYAM" to "Qiyam",
         "RUKU" to "Ruku",
-        "GOING_TO_SUJUD" to "Going Down",
+        "GOING_TO_SUJUD" to "Lowering to Sujud",
         "SUJUD" to "Sujud",
         "JALSA" to "Jalsa",
         "TASHAHHUD" to "Tashahhud",
-        "QIYAM_RISING" to "Rising"
+        "QIYAM_RISING" to "Ruku to Standing"
     )
 
     Card(
@@ -2671,32 +2732,31 @@ private fun DataFileItem(
                     FileQualityBadge(quality = quality, onAnalyze = onAnalyze)
                 }
 
-                // Live recordings are labeled from the model's own real-time detection,
-                // not a human-confirmed ground truth, so they're excluded from the
-                // dataset's posture-count totals until reviewed (see
-                // SalahDataCollectionService.getGlobalPostureCounts). Surface that here
-                // with a direct path to fix it.
-                if (file.isPendingReview) {
+                // Surface any reason this file is excluded from training. Live and
+                // legacy files have a direct review path; malformed/empty files do not.
+                file.trainingIssue?.let { trainingIssue ->
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Live · needs review",
+                            text = trainingIssue,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Medium
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Review →",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = false),
-                                onClick = onReview
+                        if (file.isPendingReview) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Review →",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(bounded = false),
+                                    onClick = onReview
+                                )
                             )
-                        )
+                        }
                     }
                 }
 

@@ -47,8 +47,19 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         /** Filename prefix for live-prayer recordings pending review (see [getGlobalPostureCounts]). */
         const val LIVE_FILE_PREFIX = "salah_live_"
-        /** Filename prefix live recordings are renamed to once reviewed (indistinguishable from manual recordings). */
-        const val REVIEWED_FILE_PREFIX = "salah_data_"
+        /** Filename prefix for guided recordings with instruction-derived labels. */
+        const val GUIDED_FILE_PREFIX = "salah_guided_"
+        /** Filename prefix for live recordings after explicit human review. */
+        const val REVIEWED_FILE_PREFIX = "salah_reviewed_"
+
+        const val MANUAL_FILE_PREFIX = "salah_data_"
+        private const val DATA_SCHEMA_VERSION = 2
+    }
+
+    enum class CollectionMode(val jsonValue: String, val filePrefix: String) {
+        MANUAL("manual", MANUAL_FILE_PREFIX),
+        GUIDED("guided", GUIDED_FILE_PREFIX),
+        LIVE("live", LIVE_FILE_PREFIX),
     }
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -67,7 +78,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     var sessionId: String = ""
         private set
     private var isRecording = false
+    @Volatile
+    private var isSampleCaptureEnabled = false
     private var isLiveMode: Boolean = false
+    private var collectionMode: CollectionMode = CollectionMode.MANUAL
 
     // Live mode auto-stop timer
     private var liveAutoStopHandler: Handler? = null
@@ -132,7 +146,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     /**
      * Start recording sensor data for a new session.
      */
-    fun startRecording() {
+    fun startRecording(
+        captureImmediately: Boolean = true,
+        mode: CollectionMode = CollectionMode.MANUAL,
+    ) {
         if (isRecording) {
             Log.w(TAG, "Already recording")
             return
@@ -141,6 +158,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         sessionId = UUID.randomUUID().toString().take(8)
         totalSamplesWritten = 0
         postureCounts.clear()
+        clearSensorBuffers()
+        isSampleCaptureEnabled = captureImmediately
+        isLiveMode = false
+        collectionMode = mode
 
         // Create output directory
         val dataDir = getDataDirectory()
@@ -148,7 +169,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         // Create output file
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        outputFile = File(dataDir, "salah_data_${timestamp}_$sessionId.jsonl")
+        outputFile = File(dataDir, "${mode.filePrefix}${timestamp}_$sessionId.jsonl")
         writer = BufferedWriter(FileWriter(outputFile, true))
 
         // Initialize sensor timestamp reference for converting to wall clock
@@ -179,6 +200,26 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     }
 
     /**
+     * Pause writing sensor windows without ending the current file/session.
+     *
+     * Guided recording uses this while instructions are spoken and while the user moves
+     * through an unmodelled boundary. Clearing partial windows prevents samples on opposite
+     * sides of a label change from being combined into one training window.
+     */
+    fun pauseSampleCapture() {
+        isSampleCaptureEnabled = false
+        clearSensorBuffers()
+    }
+
+    /** Resume the current session with a clean window boundary and an explicit label. */
+    fun resumeSampleCapture(posture: SalahPosture) {
+        isSampleCaptureEnabled = false
+        clearSensorBuffers()
+        currentPosture = posture
+        isSampleCaptureEnabled = true
+    }
+
+    /**
      * Stop recording and finalize the output file.
      * @param trimLastMs If > 0, discard samples from the last N milliseconds
      *                   (to remove noise from pulling phone out of pocket).
@@ -187,6 +228,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         if (!isRecording) return
 
         isRecording = false
+        isSampleCaptureEnabled = false
         sensorManager.unregisterListener(this)
         releaseWakeLock()
 
@@ -196,6 +238,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         // Flush remaining buffer
         flushWindow()
+        clearSensorBuffers()
 
         // Close writer
         try {
@@ -287,11 +330,12 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     fun isRecording(): Boolean = isRecording
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (!isRecording) return
+        if (!isRecording || !isSampleCaptureEnabled) return
 
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
                 synchronized(accelXBuffer) {
+                    if (!isRecording || !isSampleCaptureEnabled) return
                     accelXBuffer.add(event.values[0])
                     accelYBuffer.add(event.values[1])
                     accelZBuffer.add(event.values[2])
@@ -300,6 +344,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             }
             Sensor.TYPE_GYROSCOPE -> {
                 synchronized(gyroXBuffer) {
+                    if (!isRecording || !isSampleCaptureEnabled) return
                     gyroXBuffer.add(event.values[0])
                     gyroYBuffer.add(event.values[1])
                     gyroZBuffer.add(event.values[2])
@@ -320,6 +365,21 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun clearSensorBuffers() {
+        synchronized(accelXBuffer) {
+            synchronized(gyroXBuffer) {
+                accelXBuffer.clear()
+                accelYBuffer.clear()
+                accelZBuffer.clear()
+                accelTimestamps.clear()
+                gyroXBuffer.clear()
+                gyroYBuffer.clear()
+                gyroZBuffer.clear()
+                gyroTimestamps.clear()
+            }
+        }
+    }
 
     /**
      * Flush accumulated sensor data into a labeled sample and write to file.
@@ -390,6 +450,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                 val accelWindowTs = accelTimestamps.take(WINDOW_SIZE)
                 val gyroWindowTs = gyroTimestamps.take(WINDOW_SIZE)
                 windowTimestampNs = (accelWindowTs[WINDOW_SIZE / 2] + gyroWindowTs[WINDOW_SIZE / 2]) / 2
+                // Capture the label while holding the same locks used by pause/resume.
+                // This prevents an already-extracted old window from receiving the next
+                // guided segment's label during a boundary race.
+                posture = currentPosture
 
                 // Remove consumed samples (keep overflow for next window)
                 repeat(WINDOW_SIZE) {
@@ -405,7 +469,6 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             }
         }
 
-        posture = currentPosture
         // Record sample with current posture label
 
         // Convert sensor timestamp (nanoseconds since boot) to wall clock milliseconds
@@ -446,7 +509,22 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         // Write to JSONL file
         try {
             writer?.apply {
-                write(sample.toJson().toString())
+                val json = sample.toJson().apply {
+                    put("schema_version", DATA_SCHEMA_VERSION)
+                    put("collection_mode", collectionMode.jsonValue)
+                    put(
+                        "label_source",
+                        when (collectionMode) {
+                            CollectionMode.MANUAL -> "manual_user"
+                            CollectionMode.GUIDED -> "guided_instruction"
+                            CollectionMode.LIVE -> "model_prediction"
+                        },
+                    )
+                    if (collectionMode == CollectionMode.LIVE) {
+                        put("human_reviewed", false)
+                    }
+                }
+                write(json.toString())
                 newLine()
             }
             totalSamplesWritten++
@@ -480,7 +558,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         sessionId = UUID.randomUUID().toString().take(8)
         totalSamplesWritten = 0
         postureCounts.clear()
+        clearSensorBuffers()
+        isSampleCaptureEnabled = true
         isLiveMode = true
+        collectionMode = CollectionMode.LIVE
         currentPosture = SalahPosture.QIYAM // Default posture for live mode
 
         // Create output directory
@@ -545,6 +626,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         liveAutoStopRunnable = null
 
         isRecording = false
+        isSampleCaptureEnabled = false
         isLiveMode = false
         sensorManager.unregisterListener(this)
         releaseWakeLock()
@@ -555,6 +637,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         // Flush remaining buffer
         flushWindow()
+        clearSensorBuffers()
 
         // Close writer
         try {
@@ -653,6 +736,32 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         return counts
     }
 
+    /** Return why a file is excluded from training, or null when provenance is valid. */
+    fun getFileTrainingIssue(fileName: String): String? {
+        val file = File(getDataDirectory(), fileName)
+        if (!file.exists() || file.length() == 0L) return "Empty · excluded"
+        if (file.name.startsWith(LIVE_FILE_PREFIX)) return "Live · needs review"
+
+        try {
+            file.bufferedReader().useLines { lines ->
+                lines.filter { it.isNotBlank() }.forEach { line ->
+                    val json = JSONObject(line)
+                    when (json.optString("collection_mode", "")) {
+                        CollectionMode.MANUAL.jsonValue,
+                        CollectionMode.GUIDED.jsonValue -> Unit
+                        CollectionMode.LIVE.jsonValue -> if (!json.optBoolean("human_reviewed", false)) {
+                            return "Live · needs review"
+                        }
+                        else -> return "Legacy labels · confirm review"
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            return "Invalid data · excluded"
+        }
+        return null
+    }
+
     /**
      * Get current session stats.
      */
@@ -664,12 +773,9 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
      * Scan all JSONL files and return aggregate posture counts across all collected data.
      * Returns a map of posture name to count, plus the total count.
      *
-     * Excludes unreviewed live-prayer recordings (`salah_live_*.jsonl`): their labels are
-     * the on-device model's own real-time (debounced) predictions, not a human-confirmed
-     * ground truth, so counting them here — and thus toward "Training Progress" — before
-     * they've been through Review & Label would let the model's own mistakes quietly bias
-     * its own training data. Once reviewed, [PrayerReviewViewModel] renames the file to the
-     * `salah_data_` prefix, which drops it into this aggregate like any other recording.
+     * Counts only rows with explicit provenance. Unreviewed live-prayer recordings and
+     * legacy rows without `collection_mode` are excluded so the progress UI mirrors the
+     * fail-closed Python training loader.
      */
     fun getGlobalPostureCounts(): Pair<Map<String, Int>, Int> {
         val counts = mutableMapOf<String, Int>()
@@ -681,8 +787,14 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                     lines.forEach { line ->
                         if (line.isBlank()) return@forEach
                         try {
-                            val posture = JSONObject(line).optString("posture", "")
-                            if (posture.isNotEmpty()) {
+                            val json = JSONObject(line)
+                            val posture = json.optString("posture", "")
+                            val mode = json.optString("collection_mode", "")
+                            val isEligible = mode == CollectionMode.MANUAL.jsonValue ||
+                                mode == CollectionMode.GUIDED.jsonValue ||
+                                (mode == CollectionMode.LIVE.jsonValue &&
+                                    json.optBoolean("human_reviewed", false))
+                            if (isEligible && posture.isNotEmpty()) {
                                 counts[posture] = (counts[posture] ?: 0) + 1
                                 total++
                             }

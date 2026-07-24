@@ -47,6 +47,24 @@ Location: `app/src/main/kotlin/com/starception/submission/feature/salah/datacoll
 4. Tap "Stop Recording" when done
 5. Last 3 seconds are auto-trimmed (removes phone-grab noise)
 
+### Guided Recording Contract
+- The countdown and spoken preparation are not written to the dataset.
+- Static capture begins after the user has moved into position and settled.
+- `QIYAM_RISING` and both `GOING_TO_SUJUD` movements use focused 4-second
+  captures, starting on the spoken "move now" cue.
+- Every label segment is at least 20 windows (2 seconds), so it can produce a
+  model input sequence.
+- One guided file contributes usable training sequences, but at least three
+  complete guided sessions are required to give every class an independent
+  train, validation, and test session.
+- Pending `salah_live_*` files are skipped by the Python loader until the
+  in-app review marks every row `human_reviewed` and renames them to
+  `salah_reviewed_*`.
+- New rows include `collection_mode` and `label_source`, preventing renamed
+  model predictions from silently entering training as ground truth.
+- Legacy rows without `collection_mode` fail closed. Open the file in the app
+  and use **Confirm Review & Save** to migrate it, or leave it excluded.
+
 ### Sensor Service
 Location: `app/src/main/kotlin/com/starception/submission/sensor/SalahDataCollectionService.kt`
 
@@ -131,6 +149,10 @@ index layout below matches both `extract_window_features()` (Python) and
 - Groups consecutive windows into sequences of **20 windows** (2 seconds of data)
 - Input tensor shape: `[batch, 20, 30]`
 - Sequences grouped by session and posture for proper temporal ordering
+- Whole sessions—not individual segments—are assigned to train, validation,
+  or test, so one recording can never leak into multiple partitions
+- For a population model, also collect multiple participants; session isolation
+  alone does not make two recordings from the same person independent by person
 
 ### Normalization
 - **Z-score standardization**: `(x - mean) / std` per feature
@@ -180,14 +202,14 @@ python3 train_salah_detector.py \
 
 ### Evaluation Safety
 - Sequences are highly overlapping, so random sequence-level train/test splits can leak near-duplicate windows across partitions.
-- The training pipeline should split by contiguous posture group/session before augmentation and normalization.
+- The training pipeline splits by whole recording session before augmentation and normalization.
 - Expect validation/test accuracy to drop after this fix; that lower number is more trustworthy and closer to production behavior.
 
 ### Training Results
-- Final training accuracy: ~93.5%
-- Final validation accuracy: ~97-100%
-- Early stopping at epoch ~21
-- Model size: **177 KB** (TFLite)
+Treat `output/dataset_report.json` as the result for each run; do not rely on
+historical headline numbers. Deployment is blocked unless evaluation is
+session-isolated, test accuracy is at least 80%, every class reaches at least
+60% test F1, and every class has at least 10 held-out test sequences.
 
 ### TFLite Export (`export_tflite.py`)
 ```bash

@@ -55,8 +55,6 @@ class SalahDetectionEngine(context: Context) : Closeable {
         // Increased from 0.3 to 0.6 so new detections carry more weight than history
         private const val EMA_ALPHA = 0.6f
 
-        // Minimum windows before first inference (half of sequence length for faster start)
-        private const val MIN_WINDOWS_FOR_INFERENCE = 10
     }
 
     data class ClassificationResult(
@@ -90,19 +88,35 @@ class SalahDetectionEngine(context: Context) : Closeable {
         sequenceLength = params.getInt("sequence_length")
         featuresPerWindow = params.getInt("features_per_window")
 
-        // Model version validation: prevent crashes from mismatched model/feature vectors
+        // Treat the model, normalization parameters, and Kotlin feature extractor as
+        // one versioned artifact. A warning is unsafe here: a mismatched order or shape
+        // can still produce plausible-looking but meaningless classifications.
         val modelVersion = params.optInt("model_version", 1)
-        if (featuresPerWindow != EXPECTED_FEATURES) {
-            Log.w(TAG, "Feature count mismatch: model expects $featuresPerWindow, code expects $EXPECTED_FEATURES")
+        require(modelVersion == MODEL_VERSION) {
+            "Model version $modelVersion does not match code version $MODEL_VERSION"
         }
-        if (modelVersion < MODEL_VERSION) {
-            Log.w(TAG, "Model version $modelVersion is older than code version $MODEL_VERSION - retrain recommended")
+        require(sequenceLength > 0) { "sequence_length must be positive" }
+        require(featuresPerWindow == EXPECTED_FEATURES) {
+            "Model expects $featuresPerWindow features; code extracts $EXPECTED_FEATURES"
+        }
+        require(meanArray.length() == featuresPerWindow && stdArray.length() == featuresPerWindow) {
+            "Normalization arrays must each contain $featuresPerWindow values"
+        }
+        val modelLabels = params.getJSONArray("posture_labels").let { labels ->
+            List(labels.length()) { labels.getString(it) }
+        }
+        val codeLabels = SalahPosture.classificationLabels.map { it.name }
+        require(modelLabels == codeLabels) {
+            "Model label order $modelLabels does not match code label order $codeLabels"
         }
 
         featureMean = FloatArray(meanArray.length()) { meanArray.getDouble(it).toFloat() }
         featureStd = FloatArray(stdArray.length()) { i ->
             val s = stdArray.getDouble(i).toFloat()
             if (s < 1e-7f) 1.0f else s // Avoid division by zero (matching Python)
+        }
+        require(featureMean.all { it.isFinite() } && featureStd.all { it.isFinite() && it > 0f }) {
+            "Normalization parameters must be finite with positive standard deviations"
         }
 
         // Initialize circular buffer
@@ -115,6 +129,20 @@ class SalahDetectionEngine(context: Context) : Closeable {
         }
         interpreter = Interpreter(modelBuffer, options)
 
+        val expectedInputShape = intArrayOf(1, sequenceLength, featuresPerWindow)
+        val expectedOutputShape = intArrayOf(1, SalahPosture.classificationLabels.size)
+        val actualInputShape = interpreter.getInputTensor(0).shape()
+        val actualOutputShape = interpreter.getOutputTensor(0).shape()
+        if (!actualInputShape.contentEquals(expectedInputShape) ||
+            !actualOutputShape.contentEquals(expectedOutputShape)
+        ) {
+            interpreter.close()
+            error(
+                "TFLite tensor mismatch: input=${actualInputShape.contentToString()} " +
+                    "output=${actualOutputShape.contentToString()}",
+            )
+        }
+
         Log.d(TAG, "Initialized: seq=$sequenceLength, features=$featuresPerWindow, " +
                 "model_version=$modelVersion, " +
                 "input=${interpreter.getInputTensor(0).shape().contentToString()}, " +
@@ -124,11 +152,9 @@ class SalahDetectionEngine(context: Context) : Closeable {
     /**
      * Add a new sensor sample and run classification.
      *
-     * Supports partial inference: after MIN_WINDOWS_FOR_INFERENCE windows (1 second),
-     * runs inference with zero-padded remaining slots for faster initial predictions.
-     * Full-sequence inference runs once sequenceLength windows have accumulated.
-     *
-     * Returns null if not enough windows accumulated yet or confidence is too low.
+     * Returns null until the complete sequence length used during training has
+     * accumulated, or when model confidence is too low. The model was not trained on
+     * zero-padded partial sequences, so running those would be out-of-distribution.
      */
     fun addSampleAndClassify(sample: SalahDataSample): ClassificationResult? {
         // Extract features from this window
@@ -139,45 +165,25 @@ class SalahDetectionEngine(context: Context) : Closeable {
         bufferIndex = (bufferIndex + 1) % sequenceLength
         bufferFilled = minOf(bufferFilled + 1, sequenceLength)
 
-        // Allow partial inference after MIN_WINDOWS_FOR_INFERENCE (1 second)
-        if (bufferFilled < MIN_WINDOWS_FOR_INFERENCE) return null
-
-        val isPartial = bufferFilled < sequenceLength
-        return classify(isPartial)
+        if (bufferFilled < sequenceLength) return null
+        return classify()
     }
 
     /**
      * Run classification on the current buffer contents.
      *
-     * When [isPartialSequence] is true, only bufferFilled windows contain real data;
-     * remaining slots are zero-padded. Partial predictions apply a confidence penalty.
+     * The buffer is full here, matching the sequence shape seen during training.
      */
-    private fun classify(isPartialSequence: Boolean = false): ClassificationResult? {
+    private fun classify(): ClassificationResult? {
         // Build input tensor [1, sequenceLength, featuresPerWindow]
         val inputBuffer = ByteBuffer.allocateDirect(
             4 * sequenceLength * featuresPerWindow
         ).order(ByteOrder.nativeOrder())
 
-        // For partial sequences, pad the beginning with zeros and place real data at end
-        val realWindows = if (isPartialSequence) bufferFilled else sequenceLength
-        val paddingWindows = sequenceLength - realWindows
+        // Full sequence: the oldest entry is at bufferIndex.
+        val startIdx = bufferIndex
 
-        // Write zero padding first
-        for (i in 0 until paddingWindows) {
-            for (j in 0 until featuresPerWindow) {
-                inputBuffer.putFloat(0f) // Zero = mean after normalization offset
-            }
-        }
-
-        // Write real data from circular buffer in correct order
-        val startIdx = if (isPartialSequence) {
-            // For partial: read the last `realWindows` entries
-            (bufferIndex - realWindows + sequenceLength) % sequenceLength
-        } else {
-            bufferIndex // Full sequence: oldest entry is at bufferIndex
-        }
-
-        for (i in 0 until realWindows) {
+        for (i in 0 until sequenceLength) {
             val idx = (startIdx + i) % sequenceLength
             val features = featureBuffer[idx]
             for (j in 0 until featuresPerWindow) {
@@ -205,14 +211,6 @@ class SalahDetectionEngine(context: Context) : Closeable {
 
         val probabilities = smoothedConfidences.copyOf()
 
-        // Apply confidence penalty for partial sequences (less data = less certain)
-        if (isPartialSequence) {
-            val fillRatio = bufferFilled.toFloat() / sequenceLength
-            for (i in probabilities.indices) {
-                probabilities[i] *= fillRatio
-            }
-        }
-
         // Find best class
         var bestIndex = 0
         var bestProb = probabilities[0]
@@ -235,7 +233,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
 
         if (bestProb < threshold) return null
 
-        return ClassificationResult(posture, bestProb, probabilities, isPartialSequence)
+        return ClassificationResult(posture, bestProb, probabilities, isPartialSequence = false)
     }
 
     /**
@@ -257,7 +255,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
         smoothedConfidences.fill(0f)
     }
 
-    val isReady: Boolean get() = bufferFilled >= MIN_WINDOWS_FOR_INFERENCE
+    val isReady: Boolean get() = bufferFilled >= sequenceLength
 
     override fun close() {
         interpreter.close()

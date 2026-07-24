@@ -22,7 +22,7 @@ data class VisualizationState(
     val visiblePostures: Set<SalahPosture> = SalahPosture.classificationLabels.toSet(),
     val playbackIndex: Int = 0,
     val isPlaying: Boolean = false,
-    val playbackSpeed: Float = 5f,
+    val playbackSpeed: Float = 1f,
     val axisX: String = "pitch",
     val axisY: String = "roll",
     val axisZ: String = "am",

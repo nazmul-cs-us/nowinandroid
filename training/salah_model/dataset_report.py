@@ -104,6 +104,7 @@ def build_report(
         "model_version": model_version,
         "dataset": {
             **stats,
+            "split_strategy": "session_isolated",
             "sequences": {
                 "train": _split_counts(y_train),
                 "val": _split_counts(y_val),

@@ -60,8 +60,9 @@ cd training/salah_model
 python3 inspect_data.py
 ```
 
-You get a per-file table, per-class totals against the 500-window target, a
-class-balance ratio, and ⚠️ warnings for broken files. This is your
+You get a per-file table, per-class totals against the 500-window target,
+usable-segment counts for train/validation/test splitting, a class-balance
+ratio, and ⚠️ warnings for broken or pending-review files. This is your
 data-quality dashboard — run it after every `adb pull`.
 
 **Exercise 0.1 — look at one window by hand:**
@@ -168,17 +169,18 @@ near-duplicates. Split randomly, and one lands in train and its twin in
 test — the model "generalizes" to data it effectively saw. Your test
 accuracy becomes a lie (impressively high, meaningless).
 
-**The fix in this pipeline:** `split_by_group()` in
-`train_salah_detector.py` assigns every *contiguous recording segment* a
-group ID, and splits **by group** — all sequences from one segment go to the
-same set. That's also why collecting **many separate sessions** matters more
-than one long session: with few groups, the split gets coarse and validation
-becomes noisy.
+**The fix in this pipeline:** `split_by_session()` in
+`train_salah_detector.py` assigns every *whole recording session* to exactly
+one set. This is stricter than segment grouping: windows and conditions from
+the same continuous recording cannot appear in both training and test. It does
+not provide participant isolation unless participant IDs are collected.
+That's also why collecting **many separate sessions and people** matters more
+than one long session: with few sessions, validation and test remain noisy.
 
 **Red flag you can now diagnose:** val/test accuracy ≥ 99 % but the deployed
 model performs poorly in your pocket → your dataset probably has too few
-distinct sessions per class (check `inspect_data.py` — how many files per
-posture?), so even the group split can't produce a truly unseen test set.
+distinct sessions per class (check `inspect_data.py`), or too little diversity
+between people/devices for the held-out session to represent real use.
 
 ---
 

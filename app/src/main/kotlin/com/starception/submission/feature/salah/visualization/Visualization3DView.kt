@@ -5,9 +5,27 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -260,8 +278,9 @@ fun Visualization3DView(
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
             // Custom FrameLayout that prevents LazyColumn from stealing touch events.
             // Without this, the Compose scrollable parent intercepts drags/pinches
             // before the LibGDX GL surface can process them for camera orbit/zoom.
@@ -313,7 +332,7 @@ fun Visualization3DView(
                 useAccelerometer = false
                 useCompass = false
                 useGL30 = false
-                numSamples = 2
+                numSamples = 4
             }
 
             // Get FragmentActivity from context
@@ -340,18 +359,99 @@ fun Visualization3DView(
                 .commitAllowingStateLoss()
 
             container
-        },
-        modifier = modifier,
-        update = { container ->
-            container.requestLayout()
-        },
-        onRelease = {
-            // Fallback only — the DisposableEffect above is the real teardown (it runs while the
-            // view is still attached). Idempotent: no-ops if already torn down.
-            tearDownGlFragment(hostActivityRef, fragmentRef)
-            visualizationRef = null
-            fragmentRef = null
-            hostActivityRef = null
+            },
+            modifier = Modifier.fillMaxSize(),
+            update = { container ->
+                container.requestLayout()
+            },
+            onRelease = {
+                // Fallback only — the DisposableEffect above is the real teardown (it runs while the
+                // view is still attached). Idempotent: no-ops if already torn down.
+                tearDownGlFragment(hostActivityRef, fragmentRef)
+                visualizationRef = null
+                fragmentRef = null
+                hostActivityRef = null
+            }
+        )
+
+        if (state.mode == VisualizationMode.PHONE_MODEL) {
+            val recorded = samples.getOrNull(state.playbackIndex)?.posture
+            val prediction = state.predictions?.getOrNull(state.playbackIndex)
+            val dual = state.predictions != null
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                PoseLegendChip(
+                    text = "LABEL · ${recorded?.displayName ?: "—"}",
+                    isError = false,
+                    modifier = Modifier.weight(1f),
+                )
+                if (dual) {
+                    PoseLegendChip(
+                        text = if (prediction?.predicted == null) {
+                            "MODEL · —"
+                        } else {
+                            "MODEL · ${prediction.predicted.displayName} ${(prediction.confidence * 100).toInt()}%"
+                        },
+                        isError = prediction?.predicted != null && prediction.predicted != recorded,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            FilledIconButton(
+                onClick = {
+                    onStateChange(state.copy(cameraResetToken = state.cameraResetToken + 1))
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+                    .size(40.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CenterFocusStrong,
+                    contentDescription = "Reset camera",
+                )
+            }
         }
-    )
+    }
+}
+
+@Composable
+private fun PoseLegendChip(
+    text: String,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = if (isError) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.94f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+            },
+            tonalElevation = 2.dp,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (isError) {
+                    MaterialTheme.colorScheme.onErrorContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                maxLines = 1,
+            )
+        }
+    }
 }

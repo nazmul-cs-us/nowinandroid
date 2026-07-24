@@ -222,7 +222,7 @@ fun PrayerReviewScreen(
                         )
                     } else {
                         Text(
-                            text = "Save Labels",
+                            text = "Confirm Review & Save",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }

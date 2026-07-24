@@ -4,7 +4,7 @@ Dataset inspector — the first tool to run when training data looks wrong.
 Answers, before you spend time training:
   * How many windows does each posture class have (vs the 500 target)?
   * What does each file contribute, and how long is it?
-  * Which files look broken (too short, unreviewed live recordings,
+  * Which files look broken (too short, unknown provenance, unreviewed live recordings,
     suspicious label churn, sensor dropouts)?
   * Optionally: plot a file's sensor timeline so you can SEE the postures
     and check they match the labels.
@@ -26,6 +26,7 @@ from pathlib import Path
 
 TARGET_WINDOWS_PER_CLASS = 500       # UI dataset target (100ms windows)
 MIN_USEFUL_WINDOWS = 20              # below this a file can't yield one sequence
+MIN_SPLIT_SESSIONS_PER_CLASS = 3     # one independent session per split
 POSTURE_LABELS = [
     "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD", "QIYAM_RISING",
 ]
@@ -74,17 +75,52 @@ def analyze_file(path: Path):
         gaps = sum(1 for a, b in zip(ts, ts[1:]) if b - a > 400)
 
     warnings = []
+    unreviewed_live_rows = sum(
+        1 for sample in samples
+        if sample.get("collection_mode") == "live" and sample.get("human_reviewed") is not True
+    )
+    unknown_provenance_rows = sum(
+        1 for sample in samples
+        if sample.get("collection_mode") not in {"manual", "guided", "live"}
+    )
+    is_reviewed_name = path.name.startswith("salah_reviewed_")
+    if is_reviewed_name:
+        unreviewed_live_rows += sum(
+            1 for sample in samples
+            if sample.get("collection_mode") != "live" and sample.get("human_reviewed") is not True
+        )
+    is_training_eligible = (
+        not path.name.startswith("salah_live_") and
+        unreviewed_live_rows == 0 and
+        unknown_provenance_rows == 0
+    )
     if n < MIN_USEFUL_WINDOWS:
         warnings.append(f"TOO SHORT ({n} windows < {MIN_USEFUL_WINDOWS}) — outlier, won't yield a full sequence")
     if bad_lines:
         warnings.append(f"{bad_lines} unparseable lines")
-    if path.name.startswith("salah_live_") and len(counts) == 1 and "QIYAM" in counts and not manually:
-        warnings.append("UNREVIEWED LIVE RECORDING — every label is the QIYAM placeholder; review & label it in the app or delete it")
+    if not is_training_eligible:
+        if path.name.startswith("salah_live_") or unreviewed_live_rows:
+            warnings.append(
+                "PENDING LIVE REVIEW — excluded until Confirm Review & Save marks every row human-reviewed"
+            )
+        if unknown_provenance_rows:
+            warnings.append(
+                f"UNKNOWN PROVENANCE — {unknown_provenance_rows} rows lack collection_mode and are excluded"
+            )
     short_runs = [r for r in runs if r[1] < 5 and n > 50]
     if len(short_runs) > len(runs) / 2 and len(runs) > 4:
         warnings.append(f"LABEL CHURN — {len(short_runs)}/{len(runs)} segments shorter than 0.5s; labels may be corrupted")
     if gaps:
         warnings.append(f"{gaps} sensor gaps >400ms (recording was interrupted?)")
+
+    usable_sessions = defaultdict(set)
+    per_session = defaultdict(list)
+    for sample in samples:
+        per_session[sample.get("session_id", "")].append(sample)
+    for session_id, session_samples in per_session.items():
+        for label, windows in label_runs(session_samples):
+            if label in POSTURE_LABELS and windows >= MIN_USEFUL_WINDOWS:
+                usable_sessions[label].add(session_id)
 
     return {
         "name": path.name,
@@ -93,6 +129,11 @@ def analyze_file(path: Path):
         "counts": counts,
         "segments": len(runs),
         "manually_labeled": manually,
+        "training_eligible": is_training_eligible,
+        "usable_segments": Counter(label for label, windows in runs if label in POSTURE_LABELS and windows >= MIN_USEFUL_WINDOWS),
+        "usable_sessions": {
+            label: sorted(session_ids) for label, session_ids in usable_sessions.items()
+        },
         "warnings": warnings,
     }
 
@@ -118,7 +159,8 @@ def print_report(data_dir: Path):
 
     # Class totals vs target
     totals = Counter()
-    for r in reports:
+    eligible_reports = [r for r in reports if r["training_eligible"]]
+    for r in eligible_reports:
         totals.update(r["counts"])
     print(f"\n{'-'*40}\nCLASS TOTALS (target {TARGET_WINDOWS_PER_CLASS} windows each)\n{'-'*40}")
     for label in POSTURE_LABELS:
@@ -137,6 +179,35 @@ def print_report(data_dir: Path):
     missing = [l for l in POSTURE_LABELS if totals.get(l, 0) == 0]
     if missing:
         print(f"⚠️  Classes with ZERO data: {', '.join(missing)}")
+
+    sessions_per_class = defaultdict(set)
+    for report in eligible_reports:
+        for label, session_ids in report["usable_sessions"].items():
+            sessions_per_class[label].update(session_ids)
+    print(f"\n{'-'*40}\nTRAINING SPLIT READINESS (minimum {MIN_SPLIT_SESSIONS_PER_CLASS} independent sessions/class)\n{'-'*40}")
+    for label in POSTURE_LABELS:
+        sessions = len(sessions_per_class[label])
+        status = "✓" if sessions >= MIN_SPLIT_SESSIONS_PER_CLASS else "← record more guided sessions"
+        print(f"{label:<16} {sessions:>3} sessions  {status}")
+
+    split_ready = all(
+        len(sessions_per_class[label]) >= MIN_SPLIT_SESSIONS_PER_CLASS
+        for label in POSTURE_LABELS
+    )
+    target_ready = all(
+        totals.get(label, 0) >= TARGET_WINDOWS_PER_CLASS
+        for label in POSTURE_LABELS
+    )
+    print(f"\nPipeline trainability: {'TRAINABLE' if split_ready else 'NOT TRAINABLE YET'}")
+    print(f"Recommended 500-window coverage: {'READY' if target_ready else 'COLLECT MORE DATA'}")
+    if not eligible_reports:
+        print("No reviewed, manual, or guided files are eligible for training.")
+    elif not split_ready:
+        print("A guided recording contributes valid sequences, but collect at least 3 complete guided sessions")
+        print("before the trainer can make independent train, validation, and test splits.")
+    elif not target_ready:
+        print("The pipeline can train now; keep collecting toward 500 clean windows per class")
+        print("before treating the resulting model as production-ready.")
     return reports
 
 

@@ -18,6 +18,7 @@ import com.badlogic.gdx.graphics.g3d.utils.CameraInputController
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Matrix4
+import com.badlogic.gdx.math.Quaternion
 import com.badlogic.gdx.math.Vector3
 import kotlin.math.max
 import com.starception.submission.ml.SalahDataSample
@@ -79,7 +80,7 @@ class SalahVisualization3D(
     private var visiblePostures: Set<SalahPosture> = SalahPosture.classificationLabels.toSet()
     private var playbackIndex = 0
     private var isPlaying = false
-    private var playbackSpeed = 5f
+    private var playbackSpeed = 1f
     private var playbackTimer = 0f
     private var axisX = "pitch"
     private var axisY = "roll"
@@ -118,10 +119,16 @@ class SalahVisualization3D(
         val rightUpperArm: ModelInstance,
         val leftForearm: ModelInstance,
         val rightForearm: ModelInstance,
+        val leftHand: ModelInstance,
+        val rightHand: ModelInstance,
+        val neck: ModelInstance,
+        val pelvis: ModelInstance,
         val leftUpperLeg: ModelInstance,
         val rightUpperLeg: ModelInstance,
         val leftLowerLeg: ModelInstance,
         val rightLowerLeg: ModelInstance,
+        val leftFoot: ModelInstance,
+        val rightFoot: ModelInstance,
         val mat: ModelInstance,
         /** All Models owned by this rig, for disposal. */
         val models: List<Model>,
@@ -130,6 +137,14 @@ class SalahVisualization3D(
          *  since ModelInstance may copy materials internally. */
         val clothMaterials: List<Material>,
         val matMaterial: Material,
+        /** Ordered body parts used for pose interpolation and rendering. */
+        val bodyParts: List<ModelInstance>,
+        /** Reused matrices avoid allocating every frame during transition playback. */
+        val blendFrom: Array<Matrix4>,
+        val blendTo: Array<Matrix4>,
+        /** Frame-level tweening removes the visible 100 ms steps between samples. */
+        val frameFrom: Array<Matrix4>,
+        val frameTo: Array<Matrix4>,
     )
     private var truthRig: HumanoidRig? = null
     private var predRig: HumanoidRig? = null
@@ -172,6 +187,12 @@ class SalahVisualization3D(
     // Temporary vectors for calculations
     private val tmpVec3 = Vector3()
     private val tmpMatrix = Matrix4()
+    private val poseFromPosition = Vector3()
+    private val poseToPosition = Vector3()
+    private val posePosition = Vector3()
+    private val poseScale = Vector3(1f, 1f, 1f)
+    private val poseFromRotation = Quaternion()
+    private val poseToRotation = Quaternion()
 
     override fun create() {
         // Setup camera
@@ -272,9 +293,12 @@ class SalahVisualization3D(
             VisualizationMode.GRAVITY_VECTOR -> renderGravity()
         }
 
-        // Render common elements
-        renderAxes()
-        renderGrid()
+        // Scientific references help data plots, but obscure the human pose and
+        // prayer mat. Pose mode uses a clean floor with no oversized XYZ axes.
+        if (currentMode != VisualizationMode.PHONE_MODEL) {
+            renderAxes()
+            renderGrid()
+        }
     }
 
     override fun resize(width: Int, height: Int) {
@@ -346,6 +370,7 @@ class SalahVisualization3D(
             dataPoints = samples
             applyFilter()
             playbackIndex = 0
+            updatePlaybackCallback()
 
             // Rebuild gravity vectors when data changes
             if (currentMode == VisualizationMode.GRAVITY_VECTOR) {
@@ -400,13 +425,17 @@ class SalahVisualization3D(
     fun setPlaying(playing: Boolean) {
         safePostRunnable {
             isPlaying = playing
+            if (playing && playbackIndex >= dataPoints.lastIndex && dataPoints.isNotEmpty()) {
+                playbackIndex = 0
+                updatePlaybackCallback()
+            }
             playbackTimer = 0f
         }
     }
 
     fun setPlaybackSpeed(speed: Float) {
         safePostRunnable {
-            playbackSpeed = speed.coerceIn(0.1f, 100f)
+            playbackSpeed = speed.coerceIn(0.5f, 10f)
         }
     }
 
@@ -467,7 +496,11 @@ class SalahVisualization3D(
     /** Per-window model predictions, parallel to the sample list (or null to clear). */
     fun setPredictions(preds: List<VizPrediction>?) {
         safePostRunnable {
+            val framingChanged = (predictions == null) != (preds == null)
             predictions = preds
+            if (framingChanged && currentMode == VisualizationMode.PHONE_MODEL) {
+                resetCameraForMode()
+            }
         }
     }
 
@@ -589,16 +622,29 @@ class SalahVisualization3D(
         val dual = predictionList != null && pred != null
 
         if (dual) {
-            poseHumanoid(truth, sample.posture, -HUMANOID_PAIR_OFFSET)
+            poseHumanoidForPlayback(
+                rig = truth,
+                xOffset = -HUMANOID_PAIR_OFFSET,
+                predictionLabels = null,
+            )
             val prediction = predictionList!!.getOrNull(playbackIndex)
             val predPosture = prediction?.predicted ?: sample.posture
-            poseHumanoid(pred!!, predPosture, HUMANOID_PAIR_OFFSET)
+            poseHumanoidForPlayback(
+                rig = pred!!,
+                xOffset = HUMANOID_PAIR_OFFSET,
+                predictionLabels = predictionList,
+            )
             tintPredictionRig(pred, prediction, agrees = predPosture == sample.posture)
         } else {
-            poseHumanoid(truth, sample.posture, 0f)
+            poseHumanoidForPlayback(
+                rig = truth,
+                xOffset = 0f,
+                predictionLabels = null,
+            )
         }
 
         modelBatch.begin(camera)
+        groundInstance?.let { modelBatch.render(it, environment) }
         renderRig(truth)
         if (dual) renderRig(pred!!)
         modelBatch.end()
@@ -606,16 +652,7 @@ class SalahVisualization3D(
 
     private fun renderRig(rig: HumanoidRig) {
         modelBatch.render(rig.mat, environment)
-        modelBatch.render(rig.head, environment)
-        modelBatch.render(rig.torso, environment)
-        modelBatch.render(rig.leftUpperArm, environment)
-        modelBatch.render(rig.rightUpperArm, environment)
-        modelBatch.render(rig.leftForearm, environment)
-        modelBatch.render(rig.rightForearm, environment)
-        modelBatch.render(rig.leftUpperLeg, environment)
-        modelBatch.render(rig.rightUpperLeg, environment)
-        modelBatch.render(rig.leftLowerLeg, environment)
-        modelBatch.render(rig.rightLowerLeg, environment)
+        rig.bodyParts.forEach { modelBatch.render(it, environment) }
     }
 
     /**
@@ -754,21 +791,41 @@ class SalahVisualization3D(
 
     private fun updatePlayback(delta: Float) {
         if (dataPoints.isEmpty()) return
+        if (dataPoints.size == 1) {
+            isPlaying = false
+            updatePlaybackCallback()
+            return
+        }
 
         playbackTimer += delta * playbackSpeed
 
-        // Update at 50Hz (0.02s intervals)
-        while (playbackTimer >= 0.02f) {
-            playbackTimer -= 0.02f
-            playbackIndex++
-
-            if (playbackIndex >= dataPoints.size) {
-                playbackIndex = 0
-                isPlaying = false
-            }
-
+        // SalahDataSample is a 100 ms sensor window, not one raw 50 Hz reading.
+        // Use recorded timestamps so normal playback is real-time and remains
+        // correct if a device produces slightly irregular windows.
+        var advanced = 0
+        while (playbackIndex < dataPoints.lastIndex && advanced < 500) {
+            val interval = playbackIntervalAfter(playbackIndex)
+            if (playbackTimer < interval) break
+            playbackTimer -= interval
+            playbackIndex += 1
+            advanced += 1
             updatePlaybackCallback()
+
+            if (playbackIndex == dataPoints.lastIndex) {
+                isPlaying = false
+                playbackTimer = 0f
+                updatePlaybackCallback()
+                break
+            }
         }
+    }
+
+    private fun playbackIntervalAfter(index: Int): Float {
+        val current = dataPoints.getOrNull(index) ?: return 0.1f
+        val next = dataPoints.getOrNull(index + 1) ?: return 0.1f
+        if (current.sessionId != next.sessionId) return 0.1f
+        val elapsedMs = next.timestamp - current.timestamp
+        return if (elapsedMs in 20L..500L) elapsedMs / 1_000f else 0.1f
     }
 
     private fun updatePlaybackCallback() {
@@ -789,10 +846,15 @@ class SalahVisualization3D(
     private fun resetCameraForMode() {
         when (currentMode) {
             VisualizationMode.PHONE_MODEL -> {
-                // Wide enough to frame both TRUTH and PRED figures when dual
-                // playback is active (±HUMANOID_PAIR_OFFSET); single-figure
-                // mode just has extra headroom, which reads fine.
-                camera.position.set(15f, 7f, 17f)
+                // Keep a single recorded pose large and readable; widen only
+                // when model analysis adds the side-by-side prediction figure.
+                // Negative Z is the front/Qibla side of the procedural rig, so
+                // this angle shows folded hands, ruku, and sujud rather than backs.
+                if (predictions == null) {
+                    camera.position.set(8.5f, 6.2f, -11.5f)
+                } else {
+                    camera.position.set(15f, 7f, -17f)
+                }
                 camera.lookAt(0f, 3.5f, 0f)
             }
             VisualizationMode.SCATTER, VisualizationMode.FEATURE_PCA -> fitCameraToScatterData()
@@ -915,18 +977,20 @@ class SalahVisualization3D(
         modelBuilder.begin()
 
         val groundMaterial = Material(
-            ColorAttribute.createDiffuse(Color(0.1f, 0.1f, 0.12f, 0.8f)),
-            ColorAttribute.createSpecular(Color(0.2f, 0.2f, 0.2f, 1f))
+            ColorAttribute.createDiffuse(Color(0.075f, 0.08f, 0.095f, 1f)),
+            ColorAttribute.createSpecular(Color(0.12f, 0.12f, 0.14f, 1f))
         )
         modelBuilder.part(
             "ground",
             GL20.GL_TRIANGLES,
             (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong(),
             groundMaterial
-        ).box(12f, 0.1f, 12f, 0f, -2f, 0f)
+        ).box(24f, 0.08f, 18f)
 
         groundModel = modelBuilder.end()
-        groundInstance = ModelInstance(groundModel)
+        groundInstance = ModelInstance(groundModel).apply {
+            transform.setToTranslation(0f, -0.08f, 0f)
+        }
     }
 
     private fun buildHighlightModel() {
@@ -1030,13 +1094,7 @@ class SalahVisualization3D(
     // Humanoid model building and posing
     // ============================================
 
-    /**
-     * Build a simple humanoid figure from pill-shaped (capsule) parts.
-     * Each body part is a cylinder capped with spheres at both ends,
-     * approximated by using a capsule shape (cylinder + 2 spheres).
-     * LibGDX ModelBuilder doesn't have a native capsule, so we build
-     * each part as a single cylinder — the visual effect is close enough.
-     */
+    /** Build a smooth procedural humanoid from rounded, high-detail parts. */
     private fun buildHumanoid() {
         truthRig = buildHumanoidRig()
         predRig = buildHumanoidRig()
@@ -1052,68 +1110,90 @@ class SalahVisualization3D(
         val attrs = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
 
         // Skin color — warm tone
-        val skinColor = Color(0.85f, 0.7f, 0.55f, 1f)
-        val clothColor = Color(0.95f, 0.95f, 0.95f, 1f)   // white thobe/clothing
-        val pantsColor = Color(0.3f, 0.3f, 0.35f, 1f)     // dark pants
+        val skinColor = Color(0.82f, 0.64f, 0.48f, 1f)
+        val clothColor = Color(0.88f, 0.91f, 0.92f, 1f)   // soft white thobe/clothing
+        val pantsColor = Color(0.22f, 0.23f, 0.29f, 1f)   // charcoal trousers
 
         val skinMat = Material(
             ColorAttribute.createDiffuse(skinColor),
-            ColorAttribute.createSpecular(Color(0.3f, 0.3f, 0.3f, 1f))
+            ColorAttribute.createSpecular(Color(0.12f, 0.12f, 0.12f, 1f))
         )
         val clothMat = Material(
             ColorAttribute.createDiffuse(clothColor),
-            ColorAttribute.createSpecular(Color(0.4f, 0.4f, 0.4f, 1f))
+            ColorAttribute.createSpecular(Color(0.14f, 0.14f, 0.14f, 1f))
         )
         val pantsMat = Material(
             ColorAttribute.createDiffuse(pantsColor),
-            ColorAttribute.createSpecular(Color(0.2f, 0.2f, 0.2f, 1f))
+            ColorAttribute.createSpecular(Color(0.08f, 0.08f, 0.08f, 1f))
         )
 
-        // Head — sphere (radius ~0.5)
+        // A slightly oval head and tapered-looking torso read less like a robot.
         mb.begin()
         mb.part("head", GL20.GL_TRIANGLES, attrs, skinMat)
-            .sphere(1f, 1f, 1f, 12, 12)
+            .sphere(0.94f, 1.08f, 0.9f, 48, 36)
         val headModel = mb.end()
         val head = ModelInstance(headModel)
 
-        // Torso — tall cylinder (clothing color)
         mb.begin()
         mb.part("torso", GL20.GL_TRIANGLES, attrs, clothMat)
-            .capsule(0.6f, 3f, 12)
+            .sphere(1.26f, 3.02f, 0.8f, 48, 36)
         val torsoModel = mb.end()
         val torso = ModelInstance(torsoModel)
 
-        // Upper arm — cylinder
+        // Higher radial subdivision keeps limbs round even in close camera views.
         mb.begin()
         mb.part("upper_arm", GL20.GL_TRIANGLES, attrs, clothMat)
-            .capsule(0.22f, 1.6f, 8)
+            .capsule(0.23f, 1.62f, 28)
         val upperArmModel = mb.end()
         val leftUpperArm = ModelInstance(upperArmModel)
         val rightUpperArm = ModelInstance(upperArmModel)
 
-        // Forearm — cylinder (skin)
         mb.begin()
         mb.part("forearm", GL20.GL_TRIANGLES, attrs, skinMat)
-            .capsule(0.18f, 1.4f, 8)
+            .capsule(0.19f, 1.42f, 28)
         val forearmModel = mb.end()
         val leftForearm = ModelInstance(forearmModel)
         val rightForearm = ModelInstance(forearmModel)
 
-        // Upper leg — cylinder (pants)
+        mb.begin()
+        mb.part("hand", GL20.GL_TRIANGLES, attrs, skinMat)
+            .sphere(0.42f, 0.3f, 0.34f, 32, 22)
+        val handModel = mb.end()
+        val leftHand = ModelInstance(handModel)
+        val rightHand = ModelInstance(handModel)
+
+        mb.begin()
+        mb.part("neck", GL20.GL_TRIANGLES, attrs, skinMat)
+            .capsule(0.2f, 0.5f, 28)
+        val neckModel = mb.end()
+        val neck = ModelInstance(neckModel)
+
+        mb.begin()
+        mb.part("pelvis", GL20.GL_TRIANGLES, attrs, pantsMat)
+            .sphere(1.1f, 0.7f, 0.75f, 40, 28)
+        val pelvisModel = mb.end()
+        val pelvis = ModelInstance(pelvisModel)
+
         mb.begin()
         mb.part("upper_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
-            .capsule(0.28f, 2f, 8)
+            .capsule(0.3f, 2.04f, 28)
         val upperLegModel = mb.end()
         val leftUpperLeg = ModelInstance(upperLegModel)
         val rightUpperLeg = ModelInstance(upperLegModel)
 
-        // Lower leg — cylinder (pants)
         mb.begin()
         mb.part("lower_leg", GL20.GL_TRIANGLES, attrs, pantsMat)
-            .capsule(0.22f, 1.8f, 8)
+            .capsule(0.24f, 1.84f, 28)
         val lowerLegModel = mb.end()
         val leftLowerLeg = ModelInstance(lowerLegModel)
         val rightLowerLeg = ModelInstance(lowerLegModel)
+
+        mb.begin()
+        mb.part("foot", GL20.GL_TRIANGLES, attrs, pantsMat)
+            .capsule(0.23f, 0.92f, 28)
+        val footModel = mb.end()
+        val leftFoot = ModelInstance(footModel)
+        val rightFoot = ModelInstance(footModel)
 
         // Prayer mat — flat box (green)
         mb.begin()
@@ -1134,6 +1214,24 @@ class SalahVisualization3D(
             rightUpperArm.materials.firstOrNull()
         ).distinct()
         val matMaterialActual = mat.materials.firstOrNull() ?: matMaterial
+        val bodyParts = listOf(
+            head,
+            torso,
+            leftUpperArm,
+            rightUpperArm,
+            leftForearm,
+            rightForearm,
+            leftHand,
+            rightHand,
+            neck,
+            pelvis,
+            leftUpperLeg,
+            rightUpperLeg,
+            leftLowerLeg,
+            rightLowerLeg,
+            leftFoot,
+            rightFoot,
+        )
 
         return HumanoidRig(
             head = head,
@@ -1142,14 +1240,37 @@ class SalahVisualization3D(
             rightUpperArm = rightUpperArm,
             leftForearm = leftForearm,
             rightForearm = rightForearm,
+            leftHand = leftHand,
+            rightHand = rightHand,
+            neck = neck,
+            pelvis = pelvis,
             leftUpperLeg = leftUpperLeg,
             rightUpperLeg = rightUpperLeg,
             leftLowerLeg = leftLowerLeg,
             rightLowerLeg = rightLowerLeg,
+            leftFoot = leftFoot,
+            rightFoot = rightFoot,
             mat = mat,
-            models = listOf(headModel, torsoModel, upperArmModel, forearmModel, upperLegModel, lowerLegModel, matModel),
+            models = listOf(
+                headModel,
+                torsoModel,
+                upperArmModel,
+                forearmModel,
+                handModel,
+                neckModel,
+                pelvisModel,
+                upperLegModel,
+                lowerLegModel,
+                footModel,
+                matModel,
+            ),
             clothMaterials = clothMaterials,
-            matMaterial = matMaterialActual
+            matMaterial = matMaterialActual,
+            bodyParts = bodyParts,
+            blendFrom = Array(bodyParts.size) { Matrix4() },
+            blendTo = Array(bodyParts.size) { Matrix4() },
+            frameFrom = Array(bodyParts.size) { Matrix4() },
+            frameTo = Array(bodyParts.size) { Matrix4() },
         )
     }
 
@@ -1168,9 +1289,152 @@ class SalahVisualization3D(
      *   Knee:             y = hipY - upperLegLength
      *   Foot:             y = kneeY - lowerLegLength
      */
-    private fun poseHumanoid(rig: HumanoidRig, posture: SalahPosture, xOffset: Float) {
+    private fun poseHumanoidAtIndex(
+        rig: HumanoidRig,
+        posture: SalahPosture,
+        xOffset: Float,
+        index: Int,
+        predictionLabels: List<VizPrediction>?,
+    ) {
+        val transition = when (posture) {
+            SalahPosture.QIYAM_RISING -> SalahPosture.RUKU to SalahPosture.QIYAM
+            SalahPosture.GOING_TO_SUJUD -> {
+                val runStart = transitionRunBounds(index, posture, predictionLabels).first
+                val previous = postureAt(runStart - 1, predictionLabels)
+                val source = if (previous == SalahPosture.JALSA) SalahPosture.JALSA else SalahPosture.QIYAM
+                source to SalahPosture.SUJUD
+            }
+            else -> null
+        }
+
+        if (transition == null) {
+            poseStatic(rig, posture, xOffset)
+        } else {
+            val progress = transitionProgress(index, posture, predictionLabels)
+            poseBlended(rig, transition.first, transition.second, progress, xOffset)
+        }
+        rig.mat.transform.setToTranslation(xOffset, -0.025f, 0f)
+    }
+
+    /**
+     * Poses the current sample, then blends toward the next sample using the
+     * fraction of its timestamp interval already played. Sensor windows arrive
+     * roughly every 100 ms; rendering this tween every frame makes motion fluid
+     * without inventing or changing any stored training labels.
+     */
+    private fun poseHumanoidForPlayback(
+        rig: HumanoidRig,
+        xOffset: Float,
+        predictionLabels: List<VizPrediction>?,
+    ) {
+        val index = playbackIndex
+        val posture = postureAt(index, predictionLabels) ?: return
+        poseHumanoidAtIndex(rig, posture, xOffset, index, predictionLabels)
+
+        if (!isPlaying || index >= dataPoints.lastIndex) return
+        val current = dataPoints[index]
+        val next = dataPoints[index + 1]
+        val elapsedMs = next.timestamp - current.timestamp
+        if (current.sessionId != next.sessionId || elapsedMs !in 20L..500L) return
+
+        rig.bodyParts.forEachIndexed { partIndex, part ->
+            rig.frameFrom[partIndex].set(part.transform)
+        }
+
+        val nextPosture = postureAt(index + 1, predictionLabels) ?: return
+        poseHumanoidAtIndex(rig, nextPosture, xOffset, index + 1, predictionLabels)
+        rig.bodyParts.forEachIndexed { partIndex, part ->
+            rig.frameTo[partIndex].set(part.transform)
+        }
+
+        val linear = (playbackTimer / playbackIntervalAfter(index)).coerceIn(0f, 1f)
+        val smooth = linear * linear * (3f - 2f * linear)
+        applyPoseBlend(rig, rig.frameFrom, rig.frameTo, smooth)
+    }
+
+    private fun postureAt(index: Int, predictionLabels: List<VizPrediction>?): SalahPosture? {
+        val sample = dataPoints.getOrNull(index) ?: return null
+        return predictionLabels?.getOrNull(index)?.predicted ?: sample.posture
+    }
+
+    private fun transitionRunBounds(
+        index: Int,
+        posture: SalahPosture,
+        predictionLabels: List<VizPrediction>?,
+    ): Pair<Int, Int> {
+        fun connected(left: Int, right: Int): Boolean {
+            val a = dataPoints.getOrNull(left) ?: return false
+            val b = dataPoints.getOrNull(right) ?: return false
+            val elapsed = b.timestamp - a.timestamp
+            return a.sessionId == b.sessionId && elapsed in 1L..500L
+        }
+
+        var start = index
+        while (start > 0 && postureAt(start - 1, predictionLabels) == posture && connected(start - 1, start)) {
+            start -= 1
+        }
+        var end = index
+        while (end < dataPoints.lastIndex && postureAt(end + 1, predictionLabels) == posture && connected(end, end + 1)) {
+            end += 1
+        }
+        return start to end
+    }
+
+    private fun transitionProgress(
+        index: Int,
+        posture: SalahPosture,
+        predictionLabels: List<VizPrediction>?,
+    ): Float {
+        val (start, end) = transitionRunBounds(index, posture, predictionLabels)
+        if (start == end) return 0.5f
+        val startTime = dataPoints[start].timestamp
+        val duration = dataPoints[end].timestamp - startTime
+        val linear = if (duration > 0L) {
+            ((dataPoints[index].timestamp - startTime).toFloat() / duration).coerceIn(0f, 1f)
+        } else {
+            ((index - start).toFloat() / (end - start)).coerceIn(0f, 1f)
+        }
+        // Smoothstep keeps both ends stable while preserving the recorded duration.
+        return linear * linear * (3f - 2f * linear)
+    }
+
+    private fun poseBlended(
+        rig: HumanoidRig,
+        from: SalahPosture,
+        to: SalahPosture,
+        progress: Float,
+        xOffset: Float,
+    ) {
+        poseStatic(rig, from, xOffset)
+        rig.bodyParts.forEachIndexed { index, part -> rig.blendFrom[index].set(part.transform) }
+
+        poseStatic(rig, to, xOffset)
+        rig.bodyParts.forEachIndexed { index, part -> rig.blendTo[index].set(part.transform) }
+
+        applyPoseBlend(rig, rig.blendFrom, rig.blendTo, progress)
+    }
+
+    private fun applyPoseBlend(
+        rig: HumanoidRig,
+        from: Array<Matrix4>,
+        to: Array<Matrix4>,
+        progress: Float,
+    ) {
+        rig.bodyParts.forEachIndexed { index, part ->
+            from[index].getTranslation(poseFromPosition)
+            to[index].getTranslation(poseToPosition)
+            posePosition.set(poseFromPosition).lerp(poseToPosition, progress)
+            from[index].getRotation(poseFromRotation, true)
+            to[index].getRotation(poseToRotation, true)
+            poseFromRotation.slerp(poseToRotation, progress)
+            part.transform.set(posePosition, poseFromRotation, poseScale)
+        }
+    }
+
+    private fun poseStatic(rig: HumanoidRig, posture: SalahPosture, xOffset: Float) {
         when (posture) {
-            SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> poseStanding(rig, xOffset)
+            SalahPosture.QIYAM -> poseStanding(rig, xOffset)
+            SalahPosture.QIYAM_RISING -> poseStanding(rig, xOffset)
             SalahPosture.RUKU -> poseRuku(rig, xOffset)
             SalahPosture.GOING_TO_SUJUD -> poseGoingToSujud(rig, xOffset)
             SalahPosture.SUJUD -> poseSujud(rig, xOffset)
@@ -1178,10 +1442,9 @@ class SalahVisualization3D(
             SalahPosture.TASHAHHUD -> poseTashahhud(rig, xOffset)
             else -> poseStanding(rig, xOffset)
         }
-        rig.mat.transform.setToTranslation(xOffset, -0.025f, 0f)
     }
 
-    /** Standing upright — Qiyam position, arms at sides */
+    /** Standing upright — Qiyam position with hands folded in front. */
     private fun poseStanding(rig: HumanoidRig, xOffset: Float) {
         // Build upward from ground (y=0 = feet level)
         // Lower leg capsule h=1.8 → center at 0.9
@@ -1198,24 +1461,33 @@ class SalahVisualization3D(
         rig.torso.transform.setToTranslation(xOffset, torsoY, 0f)
         rig.head.transform.setToTranslation(xOffset, headY, 0f)
 
-        // Arms hanging at sides
+        // Upper arms relaxed beside the torso; forearms overlap horizontally
+        // in front to read clearly as folded prayer hands from the default view.
         rig.leftUpperArm.transform.idt()
-        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.9f, torsoY + 0.7f, 0f)
+        rig.leftUpperArm.transform.setToTranslation(xOffset - 0.72f, torsoY + 0.55f, -0.08f)
 
         rig.rightUpperArm.transform.idt()
-        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.9f, torsoY + 0.7f, 0f)
+        rig.rightUpperArm.transform.setToTranslation(xOffset + 0.72f, torsoY + 0.55f, -0.08f)
 
         rig.leftForearm.transform.idt()
-        rig.leftForearm.transform.setToTranslation(xOffset - 0.9f, torsoY - 0.6f, 0f)
+        rig.leftForearm.transform.setToTranslation(xOffset, torsoY - 0.25f, -0.66f)
+        rig.leftForearm.transform.rotate(Vector3.Z, 90f)
 
         rig.rightForearm.transform.idt()
-        rig.rightForearm.transform.setToTranslation(xOffset + 0.9f, torsoY - 0.6f, 0f)
+        rig.rightForearm.transform.setToTranslation(xOffset, torsoY - 0.08f, -0.72f)
+        rig.rightForearm.transform.rotate(Vector3.Z, 90f)
 
         // Legs
         rig.leftUpperLeg.transform.setToTranslation(xOffset - 0.4f, upperLegY, 0f)
         rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, upperLegY, 0f)
         rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, lowerLegY, 0f)
         rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, lowerLegY, 0f)
+
+        rig.neck.transform.setToTranslation(xOffset, headY - 0.62f, 0f)
+        rig.pelvis.transform.setToTranslation(xOffset, hipY, 0f)
+        rig.leftHand.transform.setToTranslation(xOffset - 0.58f, torsoY - 0.25f, -0.68f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.58f, torsoY - 0.08f, -0.73f)
+        poseFeetStanding(rig, xOffset)
     }
 
     /** Bowing — Ruku position: torso bent ~90 degrees forward, hands on knees */
@@ -1254,6 +1526,14 @@ class SalahVisualization3D(
         rig.rightUpperLeg.transform.setToTranslation(xOffset + 0.4f, upperLegY, 0f)
         rig.leftLowerLeg.transform.setToTranslation(xOffset - 0.4f, lowerLegY, 0f)
         rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, lowerLegY, 0f)
+
+        rig.neck.transform.idt()
+        rig.neck.transform.setToTranslation(xOffset, hipY + 0.3f, -2.28f)
+        rig.neck.transform.rotate(Vector3.X, 90f)
+        rig.pelvis.transform.setToTranslation(xOffset, hipY, -0.05f)
+        rig.leftHand.transform.setToTranslation(xOffset - 0.5f, hipY - 1.05f, -0.58f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.5f, hipY - 1.05f, -0.58f)
+        poseFeetStanding(rig, xOffset)
     }
 
     /** Transitioning down — partway between standing and prostration */
@@ -1302,6 +1582,16 @@ class SalahVisualization3D(
         rig.rightLowerLeg.transform.idt()
         rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.5f, 1.0f)
         rig.rightLowerLeg.transform.rotate(Vector3.X, -70f)
+
+        rig.neck.transform.idt()
+        rig.neck.transform.setToTranslation(xOffset, hipY + 1f, -1.38f)
+        rig.neck.transform.rotate(Vector3.X, 45f)
+        rig.pelvis.transform.idt()
+        rig.pelvis.transform.setToTranslation(xOffset, hipY - 0.05f, 0.15f)
+        rig.pelvis.transform.rotate(Vector3.X, -25f)
+        rig.leftHand.transform.setToTranslation(xOffset - 0.7f, hipY - 0.95f, -2.05f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.7f, hipY - 0.95f, -2.05f)
+        poseFeetFolded(rig, xOffset, z = 1.65f)
     }
 
     /** Prostration — Sujud: face on ground, back arched, knees on ground */
@@ -1347,6 +1637,16 @@ class SalahVisualization3D(
         rig.rightLowerLeg.transform.idt()
         rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.15f, 2f)
         rig.rightLowerLeg.transform.rotate(Vector3.X, -90f)
+
+        rig.neck.transform.idt()
+        rig.neck.transform.setToTranslation(xOffset, groundY + 0.38f, -2.05f)
+        rig.neck.transform.rotate(Vector3.X, 90f)
+        rig.pelvis.transform.idt()
+        rig.pelvis.transform.setToTranslation(xOffset, groundY + 0.78f, 0.55f)
+        rig.pelvis.transform.rotate(Vector3.X, -55f)
+        rig.leftHand.transform.setToTranslation(xOffset - 0.7f, groundY + 0.13f, -2.78f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.7f, groundY + 0.13f, -2.78f)
+        poseFeetFolded(rig, xOffset, z = 2.72f)
     }
 
     /** Sitting between prostrations — Jalsa: kneeling upright */
@@ -1392,6 +1692,12 @@ class SalahVisualization3D(
         rig.rightLowerLeg.transform.idt()
         rig.rightLowerLeg.transform.setToTranslation(xOffset + 0.4f, groundY + 0.15f, 1.3f)
         rig.rightLowerLeg.transform.rotate(Vector3.X, -90f)
+
+        rig.neck.transform.setToTranslation(xOffset, seatY + 2f, 0f)
+        rig.pelvis.transform.setToTranslation(xOffset, seatY + 0.05f, 0.15f)
+        rig.leftHand.transform.setToTranslation(xOffset - 0.55f, seatY + 0.12f, -0.72f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.55f, seatY + 0.12f, -0.72f)
+        poseFeetFolded(rig, xOffset, z = 1.92f)
     }
 
     /** Final sitting — Tashahhud: similar to Jalsa but right index finger extended */
@@ -1403,6 +1709,25 @@ class SalahVisualization3D(
         rig.rightForearm.transform.idt()
         rig.rightForearm.transform.setToTranslation(xOffset + 0.5f, 1.4f, -0.8f)
         rig.rightForearm.transform.rotate(Vector3.X, 40f)
+        rig.rightHand.transform.setToTranslation(xOffset + 0.5f, 1.1f, -1.25f)
+    }
+
+    private fun poseFeetStanding(rig: HumanoidRig, xOffset: Float) {
+        rig.leftFoot.transform.idt()
+        rig.leftFoot.transform.setToTranslation(xOffset - 0.4f, 0.2f, -0.3f)
+        rig.leftFoot.transform.rotate(Vector3.X, 90f)
+        rig.rightFoot.transform.idt()
+        rig.rightFoot.transform.setToTranslation(xOffset + 0.4f, 0.2f, -0.3f)
+        rig.rightFoot.transform.rotate(Vector3.X, 90f)
+    }
+
+    private fun poseFeetFolded(rig: HumanoidRig, xOffset: Float, z: Float) {
+        rig.leftFoot.transform.idt()
+        rig.leftFoot.transform.setToTranslation(xOffset - 0.4f, 0.2f, z)
+        rig.leftFoot.transform.rotate(Vector3.X, 90f)
+        rig.rightFoot.transform.idt()
+        rig.rightFoot.transform.setToTranslation(xOffset + 0.4f, 0.2f, z)
+        rig.rightFoot.transform.rotate(Vector3.X, 90f)
     }
 
     private fun buildGravityVectors() {

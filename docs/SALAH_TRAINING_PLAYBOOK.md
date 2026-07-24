@@ -123,12 +123,23 @@ mid-session.
 1. Choose the hold duration per posture (10/15/20/30 s — 15 s default).
 2. Tap **Start Guided Recording**, put the phone in your pocket.
 3. TTS announces each posture; the sequence is a full rak'ah:
-   `QIYAM → RUKU → GOING_TO_SUJUD → SUJUD → JALSA → SUJUD → QIYAM_RISING → TASHAHHUD`
-   (transitions get a fixed 8 s slot; statics get your chosen duration).
+   `QIYAM → RUKU → QIYAM_RISING → GOING_TO_SUJUD → SUJUD → JALSA → GOING_TO_SUJUD → SUJUD → TASHAHHUD`.
+   Static postures use your chosen duration. The two transition classes use a
+   focused 4 s capture; follow the "move now" cue and move smoothly for the
+   full interval.
 4. "Recording complete. You can take your phone out now." — **no trim is
-   applied** (TTS finishes before you touch the phone, so the tail is clean).
+   applied** (capture is paused before the completion message).
 
-Labels are written live by the guide, so no relabeling is needed.
+Labels are written live by the guide, so no relabeling is needed. Sensor
+capture is paused during the initial countdown, spoken preparation, and
+unmodelled posture boundaries; those movements cannot leak into a static
+posture label.
+
+Guided files are named `salah_guided_{yyyyMMdd_HHmmss}_{8charId}.jsonl`.
+One complete guided recording contributes trainable 2-second sequences for
+all seven classes. Record **at least 3 complete guided sessions** before
+training so every class has an independent session for the train, validation,
+and test splits. You still want 500 clean windows per class for a useful model.
 
 ### Mode C — Live prayer recording (most realistic data)
 
@@ -138,12 +149,14 @@ will actually face. **Requires a review pass afterwards.**
 1. Tap **Record Live Prayer** → read the instruction card → **Start Prayer
    Recording** → pocket the phone → pray normally.
 2. The screen shows live ML detection (posture, confidence, rak'ah count)
-   while you pray — this is display-only, it does not label the file.
+   while you pray. These predictions become provisional labels only.
 3. Take the phone out, tap **Stop Recording** (auto-stops after 30 min).
    Last 3 s auto-trimmed.
-4. **Every sample is written with the placeholder label `QIYAM`** — you MUST
-   tap **Review & Label** and fix the segments, or the file will poison the
-   dataset. Discard instead of saving if the recording went wrong.
+4. You MUST tap **Review & Label** and correct the provisional segments.
+   Pending `salah_live_*` files are excluded by the trainer; **Confirm Review
+   & Save** marks all rows `human_reviewed` and renames the file to
+   `salah_reviewed_*`. The trainer verifies both markers. Discard it if the
+   recording went wrong.
 
 Files: `salah_live_{yyyyMMdd_HHmmss}_{8charId}.jsonl`
 
@@ -152,6 +165,8 @@ Files: `salah_live_{yyyyMMdd_HHmmss}_{8charId}.jsonl`
 - The timeline shows colored segments (consecutive same-label windows). Tap
   a segment → pick the correct posture chip. Edited segments are saved with
   `"manually_labeled": true` and the `original_posture` retained.
+- **Confirm Review & Save** marks every row `human_reviewed`, records label
+  provenance, and can safely migrate legacy files that predate schema v2.
 - **Analyze data quality** runs the deployed model over the file and shows
   model-vs-label agreement. Segments where the model disagrees confidently
   (≥ 3 consecutive windows at ≥ 0.5 confidence) get a red `!` marker — tap
@@ -262,10 +277,10 @@ python train_salah_detector.py --data_dir data/salah_training_data --output_dir 
 ### What the script does (so you can trust the numbers)
 
 1. Loads every JSONL window, drops non-classification labels.
-2. Builds 20-window sequences **grouped by contiguous posture segment**, then
-   splits train/val/test (70/15/15) **by group** — overlapping sequences from
-   the same segment can never straddle a split, so accuracy numbers aren't
-   inflated by leakage.
+2. Builds 20-window sequences grouped by contiguous posture segment, then
+   splits train/val/test (approximately 70/15/15) **by whole recording
+   session**. No posture, placement, or overlapping sequence from one session
+   can appear in another partition.
 3. Balances classes (oversamples minorities), augments (train split only),
    and Z-score normalizes using **train-set statistics only**.
 4. Trains the 1D CNN (Conv1D 32→64→128 + GAP + Dense64 + softmax-7) with
@@ -306,6 +321,11 @@ python train_salah_detector.py --data_dir data/salah_training_data --output_dir 
 ```bash
 python export_tflite.py --model_dir output --deploy
 ```
+
+Deployment fails closed unless the report uses session-isolated splits, test
+accuracy is ≥80%, every posture has test F1 ≥60%, and every posture has at
+least 10 test sequences. `--force-deploy` exists only for explicitly
+experimental builds.
 
 Optionally add int8 quantization (smaller/faster; run the feature step first
 so it has a representative dataset for calibration — and note `--data_dir`
@@ -389,7 +409,7 @@ Each cycle, in order:
 |---|---|
 | `No JSONL files found in …` | `--data_dir` must directly contain the `.jsonl` files: use `data/salah_training_data` |
 | Quantize step says no representative dataset | Run `python feature_engineering.py data/salah_training_data` first (creates `processed/X_sequences.npy`) |
-| Val accuracy 99 %+ but real-world detection poor | Not enough distinct sessions — overlapping sequences from few recordings; collect more separate sessions, they split by group |
+| Val accuracy 99 %+ but real-world detection poor | Not enough variety across people, pockets, or devices; collect more independent sessions and users |
 | One class F1 near 0 | Check `windows_per_class` — likely < 30 sequences; collect more, or its recordings are mislabeled |
 | App shows old model numbers after deploy | Assets are baked at build time — rebuild + reinstall the APK after `--deploy` |
 | Guided recording button disabled | TTS engine not downloaded (Settings card shows the download button) |
@@ -405,8 +425,10 @@ Each cycle, in order:
 
 ```
 /storage/emulated/0/Android/data/com.starception.submission.demo.debug/files/salah_training_data/
-├── salah_data_20260312_234318_56b7cf1a.jsonl   ← manual/guided recordings
-└── salah_live_20260719_101502_9f21ab7e.jsonl   ← live prayer recordings
+├── salah_data_20260312_234318_56b7cf1a.jsonl     ← manual recording
+├── salah_guided_20260724_101502_9f21ab7e.jsonl   ← guided recording
+├── salah_reviewed_20260724_111502_0123abcd.jsonl ← reviewed live recording
+└── salah_live_20260724_121502_4567efab.jsonl     ← pending live review
 ```
 
 ### Repo layout

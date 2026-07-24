@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from deployment_quality import deployment_quality_issues
 
 
 def export_tflite(
@@ -143,6 +144,8 @@ def main():
                         help="Data directory for representative dataset (quantization)")
     parser.add_argument("--deploy", action="store_true",
                         help="Copy TFLite model to Android assets directory")
+    parser.add_argument("--force-deploy", action="store_true",
+                        help="Deploy despite failed quality gates (experimental use only)")
 
     args = parser.parse_args()
 
@@ -155,6 +158,15 @@ def main():
         if not model_path.exists():
             print(f"Model not found in {model_dir}")
             sys.exit(1)
+
+    if args.deploy and not args.force_deploy:
+        issues = deployment_quality_issues(model_dir / "dataset_report.json")
+        if issues:
+            print("Refusing to deploy: the model did not pass production quality gates:")
+            for issue in issues:
+                print(f"  - {issue}")
+            print("Use --force-deploy only for an explicitly experimental build.")
+            sys.exit(2)
 
     output_path = args.output or str(model_dir / "salah_detector.tflite")
 

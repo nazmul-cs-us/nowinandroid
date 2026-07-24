@@ -25,11 +25,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.SkipNext
@@ -274,7 +274,7 @@ private fun SegmentedModeSelector(
 ) {
     val modes = listOf(
         Triple(VisualizationMode.SCATTER, "Scatter", Icons.Default.Grain),
-        Triple(VisualizationMode.PHONE_MODEL, "Phone", Icons.Default.PhoneAndroid),
+        Triple(VisualizationMode.PHONE_MODEL, "Pose", Icons.Default.AccessibilityNew),
         Triple(VisualizationMode.GRAVITY_VECTOR, "Gravity", Icons.Default.Public),
         Triple(VisualizationMode.FEATURE_PCA, "PCA", Icons.Default.BubbleChart)
     )
@@ -525,8 +525,8 @@ fun PlaybackBar(
                 Slider(
                     value = state.playbackSpeed,
                     onValueChange = { onStateChange(state.copy(playbackSpeed = it)) },
-                    valueRange = 1f..50f,
-                    steps = 48,
+                    valueRange = 0.5f..10f,
+                    steps = 18,
                     modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
@@ -539,7 +539,11 @@ fun PlaybackBar(
                     color = MaterialTheme.colorScheme.surfaceContainerHighest
                 ) {
                     Text(
-                        text = "${state.playbackSpeed.toInt()}x",
+                        text = if (state.playbackSpeed % 1f == 0f) {
+                            "${state.playbackSpeed.toInt()}x"
+                        } else {
+                            "${"%.1f".format(state.playbackSpeed)}x"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,

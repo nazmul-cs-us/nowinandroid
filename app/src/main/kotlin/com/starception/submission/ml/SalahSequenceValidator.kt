@@ -8,7 +8,7 @@ import android.util.Log
  * Enforces:
  * 1. Valid posture transitions with relaxed rules for real-world ML detection
  * 2. Minimum duration per posture (prevents rapid flipping)
- * 3. Prayer confirmation after detecting any standing + prostration pattern
+ * 3. Prayer confirmation after detecting standing + bowing + prostration
  * 4. Rak'ah counting for complete prayer tracking
  *
  * One rak'ah sequence (ideal):
@@ -32,10 +32,10 @@ class SalahSequenceValidator {
         private const val MIN_POSTURE_DURATION_MS = 200L
 
         // Minimum consecutive detections at same posture to confirm it
-        // Reduced from 2 to 1: the EMA smoothing (alpha=0.6) in SalahDetectionEngine
-        // already requires sustained signal to flip the argmax, so requiring additional
-        // stability here was double-filtering and suppressing real transitions.
-        private const val MIN_STABLE_COUNT = 1
+        // Three consecutive 100ms predictions prevent a single confident model spike
+        // from changing prayer state. EMA alone is not a debounce: with alpha 0.6, one
+        // new prediction can outweigh all prior history.
+        private const val MIN_STABLE_COUNT = 3
 
         // Prayer timeout: auto-complete if no posture change for 10 minutes
         private const val PRAYER_TIMEOUT_MS = 10 * 60 * 1000L
@@ -73,6 +73,7 @@ class SalahSequenceValidator {
                 SalahPosture.QIYAM_RISING     // Rising for next rak'ah
             ),
             SalahPosture.JALSA to setOf(
+                SalahPosture.GOING_TO_SUJUD, // Descent into the second sujud
                 SalahPosture.SUJUD,           // Second sujud
                 SalahPosture.QIYAM_RISING,    // Rising for next rak'ah
                 SalahPosture.TASHAHHUD         // Model may confuse JALSA/TASHAHHUD
@@ -296,27 +297,21 @@ class SalahSequenceValidator {
         when (newPosture) {
             SalahPosture.RUKU -> {
                 seenRukuInRakah = true
-                // Confirm prayer once we see standing + bowing (strong prayer signal)
-                if (prayerState == PrayerState.DETECTING && seenStandingInSession) {
-                    prayerState = PrayerState.CONFIRMED
-                    Log.d(TAG, "Prayer CONFIRMED: standing + ruku detected")
-                }
             }
             SalahPosture.GOING_TO_SUJUD -> {
-                // Also a strong prayer signal (going to prostration)
-                if (prayerState == PrayerState.DETECTING && seenStandingInSession) {
-                    prayerState = PrayerState.CONFIRMED
-                    Log.d(TAG, "Prayer CONFIRMED: standing + going to sujud detected")
-                }
+                // Transitional evidence only; common daily movements can resemble it.
             }
             SalahPosture.SUJUD -> {
                 seenSujudInRakah = true
                 sujudCountInRakah++
 
-                // Confirm prayer after seeing any prostration if we saw standing
-                if (prayerState == PrayerState.DETECTING && seenStandingInSession) {
+                // Require the characteristic standing -> bowing -> prostration pattern.
+                // Standing plus one bend is too common outside prayer to be trustworthy.
+                if (prayerState == PrayerState.DETECTING &&
+                    seenStandingInSession && seenRukuInRakah
+                ) {
                     prayerState = PrayerState.CONFIRMED
-                    Log.d(TAG, "Prayer CONFIRMED: standing + sujud detected")
+                    Log.d(TAG, "Prayer CONFIRMED: standing + ruku + sujud detected")
                 }
             }
             SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> {
@@ -354,11 +349,6 @@ class SalahSequenceValidator {
                     sujudCountInRakah = 0
                     seenRukuInRakah = false
                     seenSujudInRakah = false
-                }
-                // Confirm prayer if we see tashahhud after standing
-                if (prayerState == PrayerState.DETECTING && seenStandingInSession) {
-                    prayerState = PrayerState.CONFIRMED
-                    Log.d(TAG, "Prayer CONFIRMED: standing + tashahhud detected")
                 }
             }
             else -> { /* No special tracking */ }

@@ -9,6 +9,7 @@ Output: NumPy arrays ready for model training
 """
 
 import json
+import math
 import numpy as np
 import os
 from pathlib import Path
@@ -23,10 +24,43 @@ NUM_CLASSES = len(POSTURE_LABELS)
 # Feature extraction constants
 SEQUENCE_LENGTH = 20  # 20 windows x 100ms = 2 seconds
 FEATURES_PER_WINDOW = 30
+WINDOW_SIZE = 5
+MAX_SEQUENCE_GAP_MS = 400
+GROUP_SEPARATOR = "\x1f"
+SENSOR_ARRAY_FIELDS = (
+    "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z",
+)
+SUMMARY_FIELDS = ("pitch", "roll", "accel_magnitude", "gyro_magnitude")
+
+
+def validate_training_sample(sample: dict) -> Optional[str]:
+    """Return None for a model-compatible JSONL row, otherwise an error string."""
+    if not isinstance(sample, dict):
+        return "row is not a JSON object"
+    if sample.get("posture") not in POSTURE_TO_INDEX:
+        return "unknown posture label"
+    if not isinstance(sample.get("session_id"), str) or not sample["session_id"].strip():
+        return "missing session_id"
+    timestamp = sample.get("timestamp")
+    if not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp):
+        return "invalid timestamp"
+
+    for field in SENSOR_ARRAY_FIELDS:
+        values = sample.get(field)
+        if not isinstance(values, list) or len(values) != WINDOW_SIZE:
+            return f"{field} must contain exactly {WINDOW_SIZE} values"
+        if any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in values):
+            return f"{field} contains a non-finite value"
+
+    for field in SUMMARY_FIELDS:
+        value = sample.get(field)
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return f"missing or invalid {field}"
+    return None
 
 
 def load_jsonl_files(data_dir: str) -> List[dict]:
-    """Load all JSONL files from a directory into a list of sample dicts."""
+    """Load reviewed, schema-valid JSONL rows from a directory."""
     samples = []
     data_path = Path(data_dir)
 
@@ -36,26 +70,64 @@ def load_jsonl_files(data_dir: str) -> List[dict]:
         return samples
 
     for filepath in jsonl_files:
+        # The app marks and renames a live file only after Review & Label.
+        # Never let provisional model-generated labels silently become ground truth.
+        if filepath.name.startswith("salah_live_"):
+            print(f"Skipping {filepath.name}: pending in-app review")
+            continue
         print(f"Loading {filepath.name}...")
         line_count = 0
+        invalid_count = 0
+        provenance_count = 0
         with open(filepath, 'r') as f:
-            for line in f:
+            for line_number, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     sample = json.loads(line)
-                    # Skip non-classification postures
-                    posture = sample.get("posture", "")
-                    if posture in POSTURE_TO_INDEX:
-                        # Tag provenance for the dataset report (underscore key
-                        # so it can't collide with recorded sensor fields).
-                        sample["_source_file"] = filepath.name
-                        samples.append(sample)
-                        line_count += 1
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as exc:
+                    invalid_count += 1
+                    if invalid_count <= 3:
+                        print(f"  Skipping line {line_number}: invalid JSON ({exc.msg})")
                     continue
-        print(f"  Loaded {line_count} samples")
+
+                error = validate_training_sample(sample)
+                if error is not None:
+                    invalid_count += 1
+                    if invalid_count <= 3:
+                        print(f"  Skipping line {line_number}: {error}")
+                    continue
+
+                # Live labels originate from the model under evaluation. They become
+                # ground truth only after an explicit in-app human review. Check row
+                # metadata as well as the filename so a rename cannot bypass this gate.
+                collection_mode = sample.get("collection_mode")
+                if collection_mode not in {"manual", "guided", "live"}:
+                    provenance_count += 1
+                    if provenance_count <= 3:
+                        print(f"  Skipping line {line_number}: missing/unknown collection_mode")
+                    continue
+                is_live_origin = collection_mode == "live"
+                is_reviewed_file = filepath.name.startswith("salah_reviewed_")
+                if (is_live_origin or is_reviewed_file) and sample.get("human_reviewed") is not True:
+                    provenance_count += 1
+                    if provenance_count <= 3:
+                        print(f"  Skipping line {line_number}: live label is not human-reviewed")
+                    continue
+
+                # Tag provenance for the dataset report (underscore key so it
+                # cannot collide with recorded sensor fields).
+                sample["_source_file"] = filepath.name
+                samples.append(sample)
+                line_count += 1
+        skipped_parts = []
+        if invalid_count:
+            skipped_parts.append(f"{invalid_count} invalid")
+        if provenance_count:
+            skipped_parts.append(f"{provenance_count} unreviewed live")
+        suffix = f", skipped {', '.join(skipped_parts)}" if skipped_parts else ""
+        print(f"  Loaded {line_count} samples{suffix}")
 
     print(f"\nTotal samples: {len(samples)}")
     return samples
@@ -199,12 +271,18 @@ def create_sequences(
             # Collect consecutive samples with same posture
             group = []
             while i < len(session_samples) and session_samples[i]["posture"] == posture:
+                if group:
+                    gap_ms = session_samples[i]["timestamp"] - group[-1]["timestamp"]
+                    if gap_ms <= 0 or gap_ms > MAX_SEQUENCE_GAP_MS:
+                        break
                 group.append(session_samples[i])
                 i += 1
 
             # Create sequences from this posture group
             if len(group) >= sequence_length:
-                group_id = f"{session_id}:{posture}:{group[0]['timestamp']}"
+                group_id = GROUP_SEPARATOR.join(
+                    (session_id, posture, str(group[0]["timestamp"]))
+                )
                 for start in range(0, len(group) - sequence_length + 1, stride):
                     window = group[start:start + sequence_length]
                     features = np.array([extract_window_features(w) for w in window])
@@ -236,6 +314,62 @@ def create_sequences(
         return X, y, groups
 
     return X, y
+
+
+def session_ids_from_groups(groups: np.ndarray) -> np.ndarray:
+    """Return the source recording/session id for each generated sequence."""
+    return np.array([str(group).split(GROUP_SEPARATOR, 1)[0] for group in groups])
+
+
+def assign_sessions_to_splits(
+    y: np.ndarray,
+    groups: np.ndarray,
+    random_state: int = 42,
+    test_ratio: float = 0.15,
+    val_ratio: float = 0.15,
+) -> Tuple[set, set, set]:
+    """Assign whole recording sessions to train/validation/test.
+
+    Overlapping sequences and every posture from one recording stay in exactly one
+    partition. Candidate shuffles are tried until every partition contains all seven
+    labels; callers should first ensure each label appears in at least three sessions.
+    Participant-level isolation additionally requires collecting a participant id.
+    """
+    session_ids = session_ids_from_groups(groups)
+    unique_sessions = np.unique(session_ids)
+    if len(unique_sessions) < 3:
+        raise ValueError("Need at least 3 independent recording sessions")
+
+    test_count = max(1, int(round(len(unique_sessions) * test_ratio)))
+    val_count = max(1, int(round(len(unique_sessions) * val_ratio)))
+    while test_count + val_count >= len(unique_sessions):
+        if test_count >= val_count and test_count > 1:
+            test_count -= 1
+        elif val_count > 1:
+            val_count -= 1
+        else:
+            break
+
+    required_labels = set(range(NUM_CLASSES))
+    rng = np.random.default_rng(random_state)
+    for _ in range(5000):
+        shuffled = unique_sessions.copy()
+        rng.shuffle(shuffled)
+        test_sessions = set(shuffled[:test_count])
+        val_sessions = set(shuffled[test_count:test_count + val_count])
+        train_sessions = set(shuffled[test_count + val_count:])
+
+        split_sessions = (train_sessions, val_sessions, test_sessions)
+        if all(
+            set(y[np.isin(session_ids, list(selected))]) == required_labels
+            for selected in split_sessions
+        ):
+            return split_sessions
+
+    raise ValueError(
+        "Could not create session-isolated splits containing every posture; "
+        "collect more complete guided sessions"
+    )
 
 
 def extract_single_window_features(samples: List[dict]) -> Tuple[np.ndarray, np.ndarray]:

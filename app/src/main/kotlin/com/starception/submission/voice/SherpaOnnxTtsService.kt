@@ -324,12 +324,14 @@ class SherpaOnnxTtsService @Inject constructor(
      * @param speed Speech speed (0.5 = half speed, 2.0 = double speed)
      * @param speakerId Speaker ID for multi-speaker models (0 for single speaker)
      * @param onComplete Callback when speech is complete
+     * @param onPlaybackStart Callback immediately before the first audio samples play
      */
     suspend fun speak(
         text: String,
         speed: Float = DEFAULT_SPEED,
         speakerId: Int = DEFAULT_SPEAKER_ID,
-        onComplete: (() -> Unit)? = null
+        onComplete: (() -> Unit)? = null,
+        onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
         _isPreparingAudio.value = true
         stopRequested = false
@@ -345,7 +347,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
         return try {
             isSpeakingNow = true
-            speakInternal(text, speed, speakerId, onComplete)
+            speakInternal(text, speed, speakerId, onComplete, onPlaybackStart)
         } finally {
             // Covers every exit (success, failure, cancellation); during normal
             // playback the flag already cleared when audio started.
@@ -358,13 +360,22 @@ class SherpaOnnxTtsService @Inject constructor(
         text: String,
         speed: Float,
         speakerId: Int,
-        onComplete: (() -> Unit)?
+        onComplete: (() -> Unit)?,
+        onPlaybackStart: (() -> Unit)?,
     ): Boolean {
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
                 // Use mutex to prevent concurrent TTS access (native library is not thread-safe)
                 ttsMutex.withLock {
                 try {
+                    var playbackStartNotified = false
+                    fun notifyPlaybackStart() {
+                        if (!playbackStartNotified) {
+                            playbackStartNotified = true
+                            onPlaybackStart?.invoke()
+                        }
+                    }
+
                     // Double-check TTS is still valid after acquiring lock
                     if (tts == null || !isInitialized) {
                         Log.w(TAG, "TTS became unavailable, reinitializing...")
@@ -413,6 +424,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
                         if (allSamples.isNotEmpty()) {
                             Log.d(TAG, "Playing ${allSamples.size} samples continuously")
+                            notifyPlaybackStart()
                             playAudioSamples(allSamples.toFloatArray(), sampleRate)
                             playedAnySamples = true
                         }
@@ -463,6 +475,7 @@ class SherpaOnnxTtsService @Inject constructor(
                             val samples = result.getOrNull() ?: break
                             batchNumber++
                             Log.d(TAG, "Playing batch $batchNumber/${batches.size}")
+                            notifyPlaybackStart()
                             playAudioSamples(samples, sampleRate)
                             playedAnySamples = true
                         }
@@ -862,7 +875,8 @@ class SherpaOnnxTtsService @Inject constructor(
         text: String,
         speakerId: Int = DEFAULT_SPEAKER_ID,
         speed: Float = DEFAULT_SPEED,
-        onComplete: (() -> Unit)? = null
+        onComplete: (() -> Unit)? = null,
+        onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
         val textHash = text.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
@@ -896,6 +910,7 @@ class SherpaOnnxTtsService @Inject constructor(
             deleteDiskCache(textHash)
             try {
                 isSpeakingNow = true
+                onPlaybackStart?.invoke()
                 // playAudioSamples blocks (Thread.sleep) for the whole clip. The
                 // caller invokes this from Dispatchers.Main, so run the playback
                 // on IO — otherwise the main thread sleeps and the app ANRs.
@@ -912,7 +927,13 @@ class SherpaOnnxTtsService @Inject constructor(
 
         // Not cached, generate and play normally
         Log.d(TAG, "Cache miss (hash=$textHash), generating normally")
-        return speak(text, speed, speakerId, onComplete)
+        return speak(
+            text = text,
+            speed = speed,
+            speakerId = speakerId,
+            onComplete = onComplete,
+            onPlaybackStart = onPlaybackStart,
+        )
     }
 
     /**

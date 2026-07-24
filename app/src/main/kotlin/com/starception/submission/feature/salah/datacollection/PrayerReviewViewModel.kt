@@ -20,6 +20,7 @@ import org.json.JSONObject
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
+import java.util.Date
 import javax.inject.Inject
 
 data class PostureSegment(
@@ -230,8 +231,15 @@ class PrayerReviewViewModel @Inject constructor(
                 try {
                     val segments = _state.value.segments
                     val file = File(_state.value.filePath)
+                    val isLegacy = rawLines.any { line ->
+                        JSONObject(line).optString("collection_mode", "") !in
+                            setOf("manual", "guided", "live")
+                    }
 
-                    // Rewrite each line with corrected posture
+                    // Saving this screen is an explicit human review action. Mark every
+                    // row, including unchanged segments, so the training loader can tell
+                    // reviewed labels apart from provisional model predictions.
+                    val reviewedAt = Date().time
                     BufferedWriter(FileWriter(file, false)).use { writer ->
                         for (seg in segments) {
                             for (idx in seg.startIndex..seg.endIndex) {
@@ -239,6 +247,11 @@ class PrayerReviewViewModel @Inject constructor(
                                     val json = JSONObject(rawLines[idx])
                                     val originalPosture = json.optString("posture", "")
                                     json.put("posture", seg.posture.name)
+                                    json.put("human_reviewed", true)
+                                    json.put("reviewed_at", reviewedAt)
+                                    json.put("label_source", "human_reviewed")
+                                    json.put("schema_version", 2)
+                                    if (isLegacy) json.put("collection_mode", "live")
                                     if (seg.wasEdited) {
                                         json.put("original_posture", originalPosture)
                                         json.put("manually_labeled", true)
@@ -250,15 +263,20 @@ class PrayerReviewViewModel @Inject constructor(
                         }
                     }
 
-                    // Reviewed live recordings graduate into the same aggregate pool as
-                    // manually-collected data (see SalahDataCollectionService.getGlobalPostureCounts,
-                    // which excludes salah_live_* files from dataset totals until this happens).
+                    // Reviewed live recordings graduate into the aggregate pool under a
+                    // distinct prefix. Their JSON metadata remains the authoritative guard.
                     var savedPath = file.absolutePath
-                    if (file.name.startsWith(SalahDataCollectionService.LIVE_FILE_PREFIX)) {
+                    if (file.name.startsWith(SalahDataCollectionService.LIVE_FILE_PREFIX) || isLegacy) {
+                        val suffix = when {
+                            file.name.startsWith(SalahDataCollectionService.LIVE_FILE_PREFIX) ->
+                                file.name.removePrefix(SalahDataCollectionService.LIVE_FILE_PREFIX)
+                            file.name.startsWith(SalahDataCollectionService.MANUAL_FILE_PREFIX) ->
+                                file.name.removePrefix(SalahDataCollectionService.MANUAL_FILE_PREFIX)
+                            else -> "legacy_${file.name}"
+                        }
                         val renamed = File(
                             file.parentFile,
-                            SalahDataCollectionService.REVIEWED_FILE_PREFIX +
-                                file.name.removePrefix(SalahDataCollectionService.LIVE_FILE_PREFIX)
+                            SalahDataCollectionService.REVIEWED_FILE_PREFIX + suffix
                         )
                         if (file.renameTo(renamed)) {
                             savedPath = renamed.absolutePath
