@@ -219,72 +219,78 @@ fun PullToSyncContainer(
         )
     )
 
-    // Refreshing/downloading/media state: Animatable for instant snap-to
-    // This eliminates the gap where wobbleIntensity would drop between drag release and hold
-    // Media needs a touch more vertical room than sync so the MediaMiniBar's
-    // title + subtitle (e.g. "البقرة / Al-Baqarah") clear the safeDrawing
-    // top inset without the subtitle being clipped on devices with tall
-    // hole-punch cutouts.
-    val maxRevealDpForBanners =
+    // Persistent banner height is derived from what is actually rendered. The
+    // previous fixed fractions left a large empty band above a single prayer
+    // alert and could still clip a status row stacked over the media controls.
+    val baseMaxRevealDp =
         if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 130f else 220f
-    val mediaHoldFraction = 0.58f
-    // Single-line status banners (silent window, prayer alert, Islamic event):
-    // the strip must fit the REAL status-bar inset plus the REAL text line at
-    // the user's font scale plus margins — a fixed fraction under-sizes on tall
-    // insets / large font scales and the text gets clipped ("squeezed").
     val bannerDensity = LocalDensity.current
     val bannerTopInsetDp = with(bannerDensity) {
         WindowInsets.safeDrawing.getTop(this).toDp()
     }
-    val bannerLineDp = with(bannerDensity) { 20.sp.toDp() } // labelMedium line height, font-scale aware
-    val bannerHoldFraction = (
-        (bannerTopInsetDp + bannerLineDp + 34.dp) /* breathing above + 16dp bottom margin */
-            .value / maxRevealDpForBanners
-        ).coerceIn(0.32f, 0.62f)
-    // When media AND a prayer alert (or silent-mode status) are live, the strip
-    // stacks a chip above the MediaMiniBar — that needs more vertical room than
-    // either alone.
-    val stackedHoldFraction = 0.72f
+    // Match the rendered rows, while still allowing text to grow with the
+    // user's font scale. Standalone rows use an 18dp indicator; compact rows
+    // above media use a 14dp indicator.
+    val bannerRowDp = maxOf(18.dp, with(bannerDensity) { 16.sp.toDp() })
+    val compactBannerRowDp = maxOf(14.dp, with(bannerDensity) { 14.sp.toDp() })
+    val mediaTextDp = with(bannerDensity) { 44.sp.toDp() }
+    val mediaRowDp = maxOf(48.dp, mediaTextDp)
+    // Let persistent banners sit 2dp inside the conservative safe-drawing
+    // boundary. There is no additional top padding; keep 6dp below the row.
+    val bannerTopInsetPadding = (bannerTopInsetDp - 2.dp).coerceAtLeast(0.dp)
+    val bannerTopPadding = 0.dp
+    val bannerBottomPadding = 6.dp
+    val bannerVerticalPadding = bannerTopPadding + bannerBottomPadding
+    val stackedRowSpacing = 4.dp
     val isMushafActive = mushafState != null
+
+    // Match the same priority as the rendering branches below. In particular,
+    // media remains the visible row while TTS is preparing, so its height must
+    // win over the generic preparing-audio banner height.
+    val targetHoldHeightDp = when {
+        mediaState.isVisible -> {
+            val statusRowDp = if (isPrayerAlert || isSilentMode) {
+                compactBannerRowDp + stackedRowSpacing
+            } else {
+                0.dp
+            }
+            bannerTopInsetPadding + bannerVerticalPadding + statusRowDp + mediaRowDp
+        }
+        isPrayerAlert || isIslamicEvent || isSilentMode ->
+            bannerTopInsetPadding + bannerVerticalPadding + bannerRowDp
+        isMushafActive -> bannerTopInsetPadding + bannerVerticalPadding + mediaRowDp
+        isRefreshing || isDownloading || isTtsPreparing -> {
+            val holdFraction = if (isDownloading) downloadingHoldFraction else refreshingHoldFraction
+            (baseMaxRevealDp * holdFraction).dp
+        }
+        else -> 0.dp
+    }
+    // Normally the pull gesture can reveal more than any persistent banner. At
+    // large font scales or in landscape, allow a stacked banner to expand past
+    // the old cap rather than clipping it.
+    val maxRevealDpForBanners = maxOf(baseMaxRevealDp, targetHoldHeightDp.value)
+    val targetHoldFraction =
+        (targetHoldHeightDp.value / maxRevealDpForBanners).coerceIn(0f, 1f)
+
+    // Animatable keeps the page attached to the banner as rows appear/disappear.
+    // Sync/download preparation still snaps immediately to avoid a one-frame gap.
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(isRefreshing, isDownloading, isTtsPreparing, mediaState.isVisible, isPrayerAlert, isSilentMode, isIslamicEvent, isMushafActive) {
-        if (isRefreshing || isDownloading || isTtsPreparing) {
-            refreshingOffset.snapTo(
-                if (isDownloading) downloadingHoldFraction else refreshingHoldFraction,
-            )
-        } else if (mediaState.isVisible) {
-            refreshingOffset.animateTo(
-                targetValue = if (isPrayerAlert || isSilentMode) stackedHoldFraction else mediaHoldFraction,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        } else if (isPrayerAlert || isSilentMode || isIslamicEvent) {
-            refreshingOffset.animateTo(
-                targetValue = bannerHoldFraction,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        } else if (isMushafActive) {
-            // Same vertical room as media so the Surah/page line clears the
-            // tall hole-punch top inset and stays fully visible.
-            refreshingOffset.animateTo(
-                targetValue = mediaHoldFraction,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
+    LaunchedEffect(targetHoldFraction, isRefreshing, isDownloading, isTtsPreparing, mediaState.isVisible) {
+        val snapToHold = !mediaState.isVisible &&
+            (isRefreshing || isDownloading || isTtsPreparing)
+        if (snapToHold) {
+            refreshingOffset.snapTo(targetHoldFraction)
         } else {
             refreshingOffset.animateTo(
-                targetValue = 0f,
+                targetValue = targetHoldFraction,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
+                    stiffness = if (targetHoldFraction == 0f) {
+                        Spring.StiffnessMedium
+                    } else {
+                        Spring.StiffnessMediumLow
+                    },
+                ),
             )
         }
     }
@@ -452,7 +458,8 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                        .padding(top = bannerTopInsetPadding)
+                        .padding(top = bannerTopPadding, bottom = bannerBottomPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(
@@ -542,7 +549,7 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = bannerTopInsetPadding)
                         .pointerInput(Unit) {
                             var totalDrag = 0f
                             detectVerticalDragGestures(
@@ -558,8 +565,13 @@ fun PullToSyncContainer(
                                 },
                             )
                         }
-                        .padding(bottom = 16.dp),
-                    contentAlignment = Alignment.BottomCenter,
+                        .padding(
+                            start = 16.dp,
+                            top = bannerTopPadding,
+                            end = 16.dp,
+                            bottom = bannerBottomPadding,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -601,7 +613,7 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = bannerTopInsetPadding)
                         .pointerInput(islamicEventState.eventKey) {
                             var totalDrag = 0f
                             detectVerticalDragGestures(
@@ -617,8 +629,13 @@ fun PullToSyncContainer(
                                 },
                             )
                         }
-                        .padding(bottom = 16.dp),
-                    contentAlignment = Alignment.BottomCenter,
+                        .padding(
+                            start = 16.dp,
+                            top = bannerTopPadding,
+                            end = 16.dp,
+                            bottom = bannerBottomPadding,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -650,9 +667,14 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                        .padding(bottom = 16.dp),
-                    contentAlignment = Alignment.BottomCenter,
+                        .padding(top = bannerTopInsetPadding)
+                        .padding(
+                            start = 16.dp,
+                            top = bannerTopPadding,
+                            end = 16.dp,
+                            bottom = bannerBottomPadding,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -678,7 +700,8 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+                        .padding(top = bannerTopInsetPadding)
+                        .padding(top = bannerTopPadding, bottom = bannerBottomPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     MushafMiniBar(
