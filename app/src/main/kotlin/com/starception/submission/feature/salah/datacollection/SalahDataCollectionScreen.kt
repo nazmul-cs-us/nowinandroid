@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -103,11 +104,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.starception.submission.feature.salah.visualization.CurrentSampleCard
 import com.starception.submission.feature.salah.visualization.DataQualitySummary
 import com.starception.submission.feature.salah.visualization.PlaybackBar
-import com.starception.submission.feature.salah.visualization.Visualization3DTeardown
 import com.starception.submission.feature.salah.visualization.Visualization3DView
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
@@ -211,10 +213,8 @@ fun SalahDataCollectionScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = FloatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Same workflow order as portrait: needs → baseline →
-                    // posture → record → alternative modes.
+                    // Keep the collection action together; model diagnostics come later.
                     item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
-                    item { deployedModel?.let { DeployedModelCard(it) } }
                     item { PostureSelector(uiState, viewModel) }
                     item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
@@ -228,6 +228,7 @@ fun SalahDataCollectionScreen(
                         item { LivePrayerRecordingCard(onNavigateToLiveRecording) }
                     }
                     item { TrainingProgress(uiState) }
+                    item { deployedModel?.let { DeployedModelCard(it) } }
                     // 3D Visualization Card
                     item {
                         Visualization3DCard(
@@ -235,10 +236,6 @@ fun SalahDataCollectionScreen(
                             vizState = vizState,
                             showVisualization = showVisualization,
                             onToggleVisualization = {
-                                // Hiding removes the GL AndroidView from composition; LibGDX must
-                                // be torn down BEFORE its surface detaches, or its pause handshake
-                                // deadlocks and kills the whole process.
-                                if (!it) Visualization3DTeardown.disposeActive()
                                 showVisualization = it
                                 if (it) viewModel.loadAllSamples()
                             },
@@ -277,11 +274,8 @@ fun SalahDataCollectionScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Workflow order: what the dataset needs next → deployed model
-                // baseline → pick a posture → record it. The alternative modes
-                // (guided / live) follow as secondary entry points.
+                // Workflow order: recommendation → choose → record → review.
                 item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
-                item { deployedModel?.let { DeployedModelCard(it) } }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
@@ -300,6 +294,7 @@ fun SalahDataCollectionScreen(
                 }
                 item { SessionStats(uiState) }
                 item { TrainingProgress(uiState) }
+                item { deployedModel?.let { DeployedModelCard(it) } }
                 // 3D Visualization Card
                 item {
                     Visualization3DCard(
@@ -307,8 +302,6 @@ fun SalahDataCollectionScreen(
                         vizState = vizState,
                         showVisualization = showVisualization,
                         onToggleVisualization = {
-                            // Same pre-detach teardown as the landscape call site above.
-                            if (!it) Visualization3DTeardown.disposeActive()
                             showVisualization = it
                             if (it) viewModel.loadAllSamples()
                         },
@@ -1049,7 +1042,7 @@ private fun NextUpCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "RECORD NEXT",
+                    text = "RECOMMENDED NEXT",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
@@ -1377,6 +1370,57 @@ private fun RecordingHero(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (uiState.isRecording) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "2",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (uiState.isRecording) {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            } else {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            },
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (uiState.isRecording) {
+                            "Recording ${uiState.currentPosture.displayName}"
+                        } else {
+                            "Record ${uiState.currentPosture.displayName}"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = if (uiState.isRecording) {
+                            "Hold the pose, then stop when the sample is complete"
+                        } else {
+                            "Start, place the phone securely, then perform the selected pose"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             // Countdown
             if (uiState.isCountingDown) {
                 val infiniteTransition = rememberInfiniteTransition(label = "countdown_pulse")
@@ -1619,7 +1663,7 @@ private fun PostureSelector(
                         )
                     }
                     Text(
-                        text = "Select to Record",
+                        text = "1 · Choose a posture",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -2817,6 +2861,7 @@ private fun Visualization3DCard(
     onAnalyzePredictions: () -> Unit = {},
     onPlaybackTick: ((Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit)? = null
 ) {
+    var isFullscreen by remember { mutableStateOf(false) }
     val shadowElevation by animateFloatAsState(
         targetValue = if (showVisualization) 5f else 2f,
         label = "shadowElevation"
@@ -2873,7 +2918,7 @@ private fun Visualization3DCard(
                     }
                     Column {
                         Text(
-                            text = "3D Visualization",
+                            text = "3 · Review in 3D",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -2975,19 +3020,30 @@ private fun Visualization3DCard(
                         }
                     } else {
                         // 3D View
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(350.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF1C1C1E)
-                        ) {
-                            Visualization3DView(
-                                samples = allSamples,
-                                state = vizState,
-                                onStateChange = onVizStateChange,
-                                onPlaybackTick = onPlaybackTick,
-                                modifier = Modifier.fillMaxSize()
+                        if (!isFullscreen) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(350.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFF1C1C1E)
+                            ) {
+                                Visualization3DView(
+                                    samples = allSamples,
+                                    state = vizState,
+                                    onStateChange = onVizStateChange,
+                                    onPlaybackTick = onPlaybackTick,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onFullscreenChange = { isFullscreen = it },
+                                )
+                            }
+                        } else {
+                            // Keep the card's layout stable while the Filament surface is
+                            // hosted by the fullscreen dialog. Only one renderer stays alive.
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(350.dp),
                             )
                         }
 
@@ -3012,6 +3068,47 @@ private fun Visualization3DCard(
                             onStateChange = onVizStateChange,
                             modifier = Modifier.fillMaxWidth(),
                             onAnalyzePredictions = onAnalyzePredictions
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (isFullscreen && allSamples.isNotEmpty()) {
+        Dialog(
+            onDismissRequest = { isFullscreen = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF080D10)),
+            ) {
+                Visualization3DView(
+                    samples = allSamples,
+                    state = vizState,
+                    onStateChange = onVizStateChange,
+                    onPlaybackTick = onPlaybackTick,
+                    modifier = Modifier.fillMaxSize(),
+                    isFullscreen = true,
+                    onFullscreenChange = { isFullscreen = it },
+                )
+
+                if (vizState.totalSamples > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    ) {
+                        PlaybackBar(
+                            state = vizState,
+                            onStateChange = onVizStateChange,
                         )
                     }
                 }

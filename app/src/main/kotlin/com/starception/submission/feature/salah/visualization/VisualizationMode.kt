@@ -18,7 +18,7 @@ data class VizPrediction(
 )
 
 data class VisualizationState(
-    val mode: VisualizationMode = VisualizationMode.SCATTER,
+    val mode: VisualizationMode = VisualizationMode.PHONE_MODEL,
     val visiblePostures: Set<SalahPosture> = SalahPosture.classificationLabels.toSet(),
     val playbackIndex: Int = 0,
     val isPlaying: Boolean = false,

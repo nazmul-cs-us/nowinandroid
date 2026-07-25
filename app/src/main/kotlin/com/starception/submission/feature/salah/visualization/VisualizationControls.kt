@@ -482,33 +482,28 @@ fun PlaybackBar(
                 )
             }
 
-            // Progress bar
-            val progress = if (state.totalSamples > 1) {
-                state.playbackIndex.toFloat() / (state.totalSamples - 1)
-            } else 0f
-            val animatedProgress by animateFloatAsState(
-                targetValue = progress,
-                animationSpec = tween(200, easing = FastOutSlowInEasing),
-                label = "progress"
-            )
-
-            Box(
+            // Scrubbable timeline: reviewing a specific pose should not require stepping
+            // through thousands of sensor windows one at a time.
+            Slider(
+                value = state.playbackIndex.toFloat(),
+                onValueChange = { index ->
+                    onStateChange(
+                        state.copy(
+                            playbackIndex = index.toInt().coerceIn(0, state.totalSamples - 1),
+                            isPlaying = false,
+                        )
+                    )
+                },
+                valueRange = 0f..(state.totalSamples - 1).coerceAtLeast(1).toFloat(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(animatedProgress)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
-            }
+                    .height(28.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
+            )
 
             // Speed control
             Row(

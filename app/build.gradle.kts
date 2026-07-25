@@ -103,9 +103,6 @@ android {
     namespace = "com.starception.submission"
 }
 
-// Custom configuration for LibGDX native .so extraction
-val natives by configurations.creating
-
 dependencies {
     implementation(projects.feature.interests)
     implementation(projects.feature.foryou)
@@ -136,15 +133,8 @@ dependencies {
     implementation(libs.litert)
     implementation(libs.litert.support)
 
-    // LibGDX for 3D sensor data visualization
-    implementation(libs.libgdx.core)
-    implementation(libs.libgdx.backend.android)
-    // glTF 2.0 loading (rigged humanoid with skeletal animation clips)
-    implementation(libs.libgdx.gltf)
-    "natives"(variantOf(libs.libgdx.platform) { classifier("natives-arm64-v8a") })
-    "natives"(variantOf(libs.libgdx.platform) { classifier("natives-armeabi-v7a") })
-    "natives"(variantOf(libs.libgdx.platform) { classifier("natives-x86") })
-    "natives"(variantOf(libs.libgdx.platform) { classifier("natives-x86_64") })
+    // Compose-native Google Filament renderer for Salah training visualization.
+    implementation(libs.sceneview)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -260,25 +250,6 @@ dependencies {
     androidTestImplementation(libs.kotlin.test)
 
     baselineProfile(projects.benchmarks)
-}
-
-// Extract LibGDX native .so files from platform JARs into jniLibs at configuration time
-// LibGDX packages .so at JAR root, not in lib/<abi>/, so Android plugin can't find them
-natives.files.forEach { nativeJar ->
-    val abi = when {
-        nativeJar.name.contains("arm64-v8a") -> "arm64-v8a"
-        nativeJar.name.contains("armeabi-v7a") -> "armeabi-v7a"
-        nativeJar.name.contains("x86_64") -> "x86_64"
-        nativeJar.name.contains("x86") -> "x86"
-        else -> return@forEach
-    }
-    val outputDir = file("src/main/jniLibs/$abi")
-    outputDir.mkdirs()
-    copy {
-        from(zipTree(nativeJar))
-        into(outputDir)
-        include("*.so")
-    }
 }
 
 baselineProfile {

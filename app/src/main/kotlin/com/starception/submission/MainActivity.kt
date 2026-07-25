@@ -126,15 +126,10 @@ import kotlinx.coroutines.delay
  * - Modify service startup sequence
  */
 @AndroidEntryPoint
-class MainActivity : FragmentActivity(), com.badlogic.gdx.backends.android.AndroidFragmentApplication.Callbacks {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MainActivityViewModel by lazy {
         ViewModelProvider(this)[MainActivityViewModel::class.java]
-    }
-
-    override fun exit() {
-        // Required by LibGDX AndroidFragmentApplication.Callbacks
-        // No-op: we don't want LibGDX to exit the activity
     }
 
     // Volume keys turn Mushaf pages while the Surah reader is in foreground.

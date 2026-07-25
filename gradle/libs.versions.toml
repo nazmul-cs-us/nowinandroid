@@ -69,8 +69,7 @@ secrets = "2.0.1"
 truth = "1.4.4"
 turbine = "1.2.0"
 reorderable = "2.4.3"
-libgdx = "1.13.1"
-gdxGltf = "2.2.1"
+sceneview = "3.3.0"
 skydovesColorpicker = "1.1.4"
 
 [bundles]
@@ -180,10 +179,7 @@ litert-support = { group = "com.google.ai.edge.litert", name = "litert-support",
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
-libgdx-core = { group = "com.badlogicgames.gdx", name = "gdx", version.ref = "libgdx" }
-libgdx-backend-android = { group = "com.badlogicgames.gdx", name = "gdx-backend-android", version.ref = "libgdx" }
-libgdx-platform = { group = "com.badlogicgames.gdx", name = "gdx-platform", version.ref = "libgdx" }
-libgdx-gltf = { group = "com.github.mgsx-dev.gdx-gltf", name = "gltf", version.ref = "gdxGltf" }
+sceneview = { group = "io.github.sceneview", name = "sceneview", version.ref = "sceneview" }
 
 # Dependencies of the included build-logic
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
