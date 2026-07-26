@@ -56,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 
 /**
@@ -85,13 +87,14 @@ fun NotificationsSection(
                 )
             },
             leadingContent = {
-                Icon(
-                    imageVector = if (preferences.notificationsEnabled)
-                        Icons.Default.NotificationsActive
+                FlaticonIcon(
+                    glyph = if (preferences.notificationsEnabled)
+                        FlaticonIcons.NOTIFICATIONS_ACTIVE
                     else
-                        Icons.Default.Notifications,
+                        FlaticonIcons.NOTIFICATIONS,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    fontSize = 23.sp,
                 )
             },
             trailingContent = {
@@ -315,14 +318,14 @@ private fun CollapsibleSubSection(
                     )
                 }
 
-                Icon(
-                    imageVector = if (isExpanded)
-                        Icons.Default.KeyboardArrowUp
+                FlaticonIcon(
+                    glyph = if (isExpanded)
+                        FlaticonIcons.ANGLE_UP
                     else
-                        Icons.Default.KeyboardArrowDown,
+                        FlaticonIcons.ANGLE_DOWN,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    fontSize = 18.sp,
                 )
             }
 

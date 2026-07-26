@@ -64,10 +64,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
@@ -106,15 +109,19 @@ fun UnifiedSettingsScreen(
 
     val listState = rememberLazyListState()
 
-    // Accordion sections in list order (hero card is item 0). Used to scroll a
-    // newly expanded section to the top so its content is visible immediately —
-    // without this, expanding a lower section opens entirely below the fold.
-    val sectionIds = remember(contentCategories.isNotEmpty()) {
-        buildList {
-            add("appearance"); add("prayer"); add("notifications"); add("traveldua")
-            add("voice"); add("tts"); add("salah")
-            if (contentCategories.isNotEmpty()) add("content")
-            add("about"); add("developer")
+    // Absolute LazyColumn indices include the hero and the three group labels.
+    val sectionItemIndices = remember(contentCategories.isNotEmpty()) {
+        buildMap {
+            put("appearance", 2)
+            put("prayer", 3)
+            put("notifications", 4)
+            put("traveldua", 5)
+            put("voice", 7)
+            put("tts", 8)
+            put("salah", 9)
+            put("content", 11)
+            put("about", if (contentCategories.isNotEmpty()) 12 else 11)
+            put("developer", if (contentCategories.isNotEmpty()) 13 else 12)
         }
     }
     var skipInitialExpandScroll by remember { mutableStateOf(true) }
@@ -124,14 +131,14 @@ fun UnifiedSettingsScreen(
             return@LaunchedEffect
         }
         val id = expandedSections.firstOrNull() ?: return@LaunchedEffect
-        val index = sectionIds.indexOf(id)
-        if (index >= 0) {
+        val index = sectionItemIndices[id]
+        if (index != null) {
             kotlinx.coroutines.delay(120) // let the expand animation begin first
-            listState.animateScrollToItem(index + 1)
+            listState.animateScrollToItem(index)
         }
     }
     val density = LocalDensity.current
-    val headerHeight = 156.dp
+    val headerHeight = 132.dp
     val headerHeightPx = with(density) { headerHeight.toPx() }
     val toolbarHeight = 64.dp
     val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
@@ -249,12 +256,14 @@ fun UnifiedSettingsScreen(
                     )
                 }
 
+                item { SettingsGroupLabel("Prayer & personalization") }
+
                 // Appearance Section
                 item {
                     SettingsSection(
                         title = "Appearance",
                         subtitle = "Theme, colors & display mode",
-                        icon = Icons.Outlined.Palette,
+                iconGlyph = FlaticonIcons.APPEARANCE,
                         isExpanded = expandedSections.contains("appearance"),
                         onToggleExpanded = { viewModel.toggleSection("appearance") }
                     ) {
@@ -273,7 +282,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Prayer Times",
                         subtitle = "Calculation method & location",
-                        icon = Icons.Outlined.Schedule,
+                iconGlyph = FlaticonIcons.PRAYER_TIMES,
                         isExpanded = expandedSections.contains("prayer"),
                         onToggleExpanded = { viewModel.toggleSection("prayer") }
                     ) {
@@ -292,7 +301,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Notifications",
                         subtitle = "Prayer alerts & reminders",
-                        icon = Icons.Outlined.Notifications,
+                iconGlyph = FlaticonIcons.NOTIFICATIONS,
                         isExpanded = expandedSections.contains("notifications"),
                         onToggleExpanded = { viewModel.toggleSection("notifications") }
                     ) {
@@ -308,7 +317,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Travel Dua",
                         subtitle = "Auto-play dua when driving",
-                        icon = Icons.Outlined.DirectionsCar,
+                iconGlyph = FlaticonIcons.TRAVEL,
                         isExpanded = expandedSections.contains("traveldua"),
                         onToggleExpanded = { viewModel.toggleSection("traveldua") }
                     ) {
@@ -322,12 +331,14 @@ fun UnifiedSettingsScreen(
                     }
                 }
 
+                item { SettingsGroupLabel("Voice & Salah intelligence") }
+
                 // Voice Settings Section
                 item {
                     SettingsSection(
                         title = "Voice Recognition",
                         subtitle = "Speech detection engine",
-                        icon = Icons.Outlined.Mic,
+                iconGlyph = FlaticonIcons.MICROPHONE,
                         isExpanded = expandedSections.contains("voice"),
                         onToggleExpanded = { viewModel.toggleSection("voice") }
                     ) {
@@ -347,7 +358,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Text-to-Speech",
                         subtitle = "Voice output settings",
-                        icon = Icons.Outlined.VolumeUp,
+                iconGlyph = FlaticonIcons.VOLUME,
                         isExpanded = expandedSections.contains("tts"),
                         onToggleExpanded = { viewModel.toggleSection("tts") }
                     ) {
@@ -368,7 +379,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Salah Training",
                         subtitle = "ML posture detection training",
-                        icon = Icons.Outlined.FitnessCenter,
+                iconGlyph = FlaticonIcons.SALAH_TRAINING,
                         isExpanded = expandedSections.contains("salah"),
                         onToggleExpanded = { viewModel.toggleSection("salah") }
                     ) {
@@ -378,13 +389,15 @@ fun UnifiedSettingsScreen(
                     }
                 }
 
+                item { SettingsGroupLabel("App & support") }
+
                 // Content Management Section
                 if (contentCategories.isNotEmpty()) {
                     item {
                         SettingsSection(
                             title = "Content & Storage",
                             subtitle = "Manage downloaded content",
-                            icon = Icons.Outlined.Storage,
+                    iconGlyph = FlaticonIcons.STORAGE,
                             isExpanded = expandedSections.contains("content"),
                             onToggleExpanded = { viewModel.toggleSection("content") }
                         ) {
@@ -403,7 +416,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "About",
                         subtitle = "Version & legal info",
-                        icon = Icons.Outlined.Info,
+                iconGlyph = FlaticonIcons.INFO,
                         isExpanded = expandedSections.contains("about"),
                         onToggleExpanded = { viewModel.toggleSection("about") }
                     ) {
@@ -416,7 +429,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Developer Options",
                         subtitle = "Debug & testing tools",
-                        icon = Icons.Outlined.Code,
+                iconGlyph = FlaticonIcons.DEVELOPER,
                         isExpanded = expandedSections.contains("developer"),
                         onToggleExpanded = { viewModel.toggleSection("developer") }
                     ) {
@@ -509,10 +522,11 @@ private fun ModernSettingsTopBar(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f + (0.07f * collapseProgress)),
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.ARROW_BACK,
                         contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 20.sp,
                     )
                 }
             }
@@ -586,10 +600,10 @@ private fun SettingsHeroSection(
             // No extra horizontal padding: the LazyColumn's 16dp contentPadding
             // already lines the title up with the back button and section cards.
             .padding(
-                top = 96.dp,
-                bottom = 24.dp,
+                top = 76.dp,
+                bottom = 12.dp,
             ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // Invisible placeholder - actual title is rendered by SettingsFloatingTitle
         // Use positionInWindow for coordinates that work with the floating title's graphicsLayer
@@ -607,14 +621,26 @@ private fun SettingsHeroSection(
         )
         // Subtitle fades out as user scrolls
         Text(
-            text = "Personalize prayer times, audio, notifications, and offline content.",
-            style = MaterialTheme.typography.bodyLarge,
+            text = "Prayer, audio, notifications and app preferences.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.graphicsLayer {
                 alpha = 1f - collapseProgress
             },
         )
     }
+}
+
+@Composable
+private fun SettingsGroupLabel(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 0.8.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 10.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
@@ -636,10 +662,10 @@ private fun SalahTrainingSection(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.FitnessCenter,
+            FlaticonIcon(
+                glyph = FlaticonIcons.SALAH_TRAINING,
                 contentDescription = null,
-                modifier = Modifier.size(22.dp)
+                fontSize = 22.sp,
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(

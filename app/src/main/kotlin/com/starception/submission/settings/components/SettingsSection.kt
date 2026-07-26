@@ -9,6 +9,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,11 +47,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 
 @Composable
 fun SettingsSection(
     title: String,
     icon: ImageVector? = null,
+    iconGlyph: String? = null,
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,15 +75,27 @@ fun SettingsSection(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
-                elevation = if (isExpanded) 6.dp else 1.dp,
-                shape = RoundedCornerShape(16.dp),
+                elevation = if (isExpanded) 4.dp else 0.dp,
+                shape = RoundedCornerShape(20.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = if (isExpanded) {
+                MaterialTheme.colorScheme.surface
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isExpanded) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+            },
+        ),
     ) {
         Column {
             // Header - clickable to expand/collapse
@@ -93,33 +110,35 @@ fun SettingsSection(
                         ),
                         onClick = onToggleExpanded
                     )
-                    .padding(16.dp),
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Icon with gradient background
-                if (icon != null) {
+                if (icon != null || iconGlyph != null) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        if (iconGlyph != null) {
+                            FlaticonIcon(
+                                glyph = iconGlyph,
+                                contentDescription = null,
+                                fontSize = 21.sp,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        } else if (icon != null) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(13.dp))
                 }
 
                 // Title and subtitle
@@ -144,7 +163,7 @@ fun SettingsSection(
 
                 // Expand/collapse chevron with circular background
                 Surface(
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(30.dp),
                     shape = CircleShape,
                     color = if (isExpanded)
                         MaterialTheme.colorScheme.primaryContainer
@@ -152,16 +171,15 @@ fun SettingsSection(
                         MaterialTheme.colorScheme.surfaceContainerHighest
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.ExpandMore,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.ANGLE_DOWN,
                             contentDescription = if (isExpanded) "Collapse" else "Expand",
                             tint = if (isExpanded)
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .rotate(rotationAngle)
+                            modifier = Modifier.rotate(rotationAngle),
+                            fontSize = 18.sp,
                         )
                     }
                 }

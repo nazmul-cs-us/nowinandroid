@@ -27,7 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -90,11 +93,11 @@ fun DeveloperSettingsSection(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.WARNING,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
+                    fontSize = 20.sp,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -215,10 +218,10 @@ private fun RefreshAllCard(
                     style = MaterialTheme.typography.labelLarge
                 )
             } else {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.REFRESH,
                     contentDescription = null,
-                    modifier = Modifier.size(22.dp)
+                    fontSize = 22.sp,
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
@@ -302,11 +305,11 @@ private fun DatabaseInfoCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.REFRESH,
                         contentDescription = "Refresh",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 20.sp,
                     )
                 }
             }

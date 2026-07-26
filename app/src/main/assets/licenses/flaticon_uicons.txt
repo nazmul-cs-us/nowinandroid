@@ -1,0 +1,10 @@
+Flaticon UIcons attribution
+
+The Settings category icons use the Rounded Regular UIcons family.
+
+UIcons by Flaticon
+https://www.flaticon.com/uicons
+
+Used under the Flaticon free license with attribution. The font has been subset to
+the glyphs used by this application and is not offered as a standalone download.
+License information: https://www.flaticon.com/terms-of-use

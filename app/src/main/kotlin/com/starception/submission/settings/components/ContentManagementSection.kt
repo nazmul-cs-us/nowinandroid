@@ -39,6 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.download.CategoryDownloadState
 
@@ -138,18 +141,18 @@ private fun ContentGroupCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (allComplete) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.COMPLETED,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
+                            fontSize = 20.sp,
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.Download,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.DOWNLOAD,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
+                            fontSize = 20.sp,
                         )
                     }
                 }
@@ -177,11 +180,11 @@ private fun ContentGroupCard(
                     )
                 }
 
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                FlaticonIcon(
+                    glyph = if (isExpanded) FlaticonIcons.ANGLE_UP else FlaticonIcons.ANGLE_DOWN,
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
+                    fontSize = 22.sp,
                 )
             }
 
@@ -290,20 +293,20 @@ private fun ContentCategoryRow(
         // Action
         if (!state.isComplete) {
             IconButton(onClick = onDownload, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Download,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.DOWNLOAD,
                     contentDescription = "Download",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
+                    fontSize = 18.sp,
                 )
             }
         } else if (onDelete != null) {
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.DELETE,
                     contentDescription = "Delete",
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(18.dp),
+                    fontSize = 18.sp,
                 )
             }
         }

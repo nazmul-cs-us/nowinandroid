@@ -21,7 +21,7 @@ import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 private const val PRIVACY_POLICY_URL = "https://policies.google.com/privacy"
 private const val BRAND_GUIDELINES_URL = "https://developer.android.com/distribute/marketing-tools/brand-guidelines"
 private const val FEEDBACK_URL = "https://goo.gle/nia-app-feedback"
-private const val FLATICON_URL = "https://www.flaticon.com"
+private const val FLATICON_URL = "https://www.flaticon.com/uicons"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -54,7 +54,7 @@ fun AboutSection(
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "Topic icons are from Flaticon (flaticon.com).",
+            text = "Topic and interface icons use UIcons by Flaticon.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -97,7 +97,7 @@ fun AboutSection(
             TextButton(
                 onClick = { uriHandler.openUri(FLATICON_URL) }
             ) {
-                Text(text = "Icons by Flaticon")
+                Text(text = "UIcons by Flaticon")
             }
         }
     }

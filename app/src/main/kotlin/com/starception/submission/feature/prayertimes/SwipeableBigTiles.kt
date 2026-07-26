@@ -1,18 +1,13 @@
 /**
  * SWIPEABLE BIG TILES COMPONENT
  *
- * The four dashboard tiles of the Prayer Times screen, presented as a vertical
- * CARD DECK: the front card is live while the cards behind it peek out at the
- * bottom. Swiping up or left lifts the front card off the deck and tucks it in
- * at the back; swiping down or right plays the same flight in reverse, bringing
- * the previous card back onto the front. The whole transition is driven by one
- * progress value, so it is fully scrubbable and can be caught mid-flight and reversed.
+ * The four dashboard tiles of the Prayer Times screen, presented as a Material
+ * hero carousel. The focused card gets the visual emphasis while the neighboring
+ * cards collapse into rounded previews and expand as the user swipes.
  *
  * WHAT IT DOES:
- * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles as a deck
- * - 2-axis drag/fling with spring physics; hard flicks wheel-shuffle multiple cards
- * - True restack: the tossed card visibly returns to the back of the deck
- * - Device-tilt parallax gives the stack real 3D depth
+ * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles
+ * - Uses Material 3 carousel keylines, masking and single-item snapping
  * - Clickable page-indicator dots and a swipe-hint row for navigation
  *
  * WHERE IT'S USED:
@@ -24,12 +19,6 @@
  * - SmartInfoTile(): Context-aware content based on time of day
  * - DailyStatsTile(): Prayer completion progress and statistics
  * - QiblaGlobeTile(): 3D globe with the great-circle path to the Kaaba
- *
- * PERFORMANCE:
- * - Every continuous value (drag offset, flight path, parallax, depth dim) is
- *   read inside graphicsLayer/draw lambdas, so a moving deck redraws without
- *   recomposing any tile content
- * - Tiles are keyed by page, so their internal state survives deck rotation
  *
  * DEPENDENCIES:
  * - PrayerTimeHelpers.kt: For prayer time calculations and formatting
@@ -97,6 +86,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.foundation.gestures.animateScrollBy
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -1020,8 +1015,270 @@ fun SmartIndicator(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
+    prayerTimes: DayPrayerTimes?,
+    currentTime: LocalTime,
+    locationService: EnhancedLocationService,
+    getNextPrayer: () -> Pair<String, LocalTime>?,
+    getCurrentPrayer: () -> Pair<String, LocalTime>?,
+    getPrayerStatus: (String) -> String,
+    getPrayerTimeDisplay: (String) -> String,
+    getTimeUntilNextPrayer: () -> String,
+    getCurrentDate: () -> String,
+    getSmartTitle: () -> String,
+    getSmartContent: () -> String,
+    getSmartFooter: () -> String,
+    getTimeSinceCurrentPrayer: () -> String,
+    getPrayerProgress: () -> Pair<Int, Int>,
+    getDailyStatsTitle: () -> String,
+    getDailyStatsMessage: () -> String,
+    getPrayed: () -> Int = { 0 },
+    getCurrentActivity: () -> String,
+    onCompassClick: () -> Unit,
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+    isLandscape: Boolean = false,
+    onSurahClick: (Int) -> Unit = {},
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    goToMosqueDurationMinutes: (String) -> Int = { 20 },
+) {
+    val carouselState = rememberCarouselState { 4 }
+    var currentTile by remember { mutableIntStateOf(0) }
+    val globeLive by remember {
+        derivedStateOf { currentTile == 3 && !carouselState.isScrollInProgress }
+    }
+    val coroutineScope = rememberCoroutineScope()
+    val view = LocalView.current
+    val context = LocalContext.current
+    var showGlobePopup by remember { mutableStateOf(false) }
+    var hasActivityPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACTIVITY_RECOGNITION,
+                ) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val activityPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasActivityPermission = granted
+    }
+
+    LaunchedEffect(currentTile) {
+        val smartTileFocused = currentTile == 1
+        com.starception.submission.util.ActivityTracker.setSmartActivityTileInFocus(smartTileFocused)
+        if (smartTileFocused) {
+            if (!hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+            com.starception.submission.util.ActivityTracker.initialize(
+                context,
+                startDetectionNow = true,
+            )
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            com.starception.submission.util.ActivityTracker.setSmartActivityTileInFocus(false)
+        }
+    }
+
+    val cardShape = RoundedCornerShape(32.dp)
+    Box(modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
+        Column(
+            modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            val carouselModifier = if (isLandscape) {
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .height(231.dp)
+            }
+
+            val preferredItemWidth = if (isLandscape) 560.dp else 320.dp
+            HorizontalMultiBrowseCarousel(
+                state = carouselState,
+                preferredItemWidth = preferredItemWidth,
+                modifier = carouselModifier,
+                itemSpacing = 10.dp,
+                flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(carouselState),
+                minSmallItemWidth = 24.dp,
+                maxSmallItemWidth = 34.dp,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+            ) { page ->
+                val itemDrawInfo = carouselItemDrawInfo
+                LaunchedEffect(page, itemDrawInfo) {
+                    snapshotFlow {
+                        itemDrawInfo.size >= itemDrawInfo.maxSize - 0.5f
+                    }
+                        .distinctUntilChanged()
+                        .collect { isHero ->
+                            if (isHero) currentTile = page
+                        }
+                }
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .maskClip(cardShape),
+                    shape = cardShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 3.dp,
+                ) {
+                    when (page) {
+                        0 -> NextPrayerTile(
+                            prayerTimes = prayerTimes,
+                            currentTime = currentTime,
+                            locationService = locationService,
+                            getNextPrayer = getNextPrayer,
+                            getCurrentPrayer = getCurrentPrayer,
+                            getPrayerStatus = getPrayerStatus,
+                            getPrayerTimeDisplay = getPrayerTimeDisplay,
+                            getTimeUntilNextPrayer = getTimeUntilNextPrayer,
+                            getTimeSinceCurrentPrayer = getTimeSinceCurrentPrayer,
+                            onCompassClick = onCompassClick,
+                            timeOffsets = timeOffsets,
+                            isLandscape = isLandscape,
+                            isCarouselScrolling = carouselState.isScrollInProgress,
+                            goToMosqueDurationMinutes = goToMosqueDurationMinutes,
+                        )
+
+                        1 -> SmartInfoTile(
+                            getSmartTitle = getSmartTitle,
+                            getSmartContent = getSmartContent,
+                            getCurrentDate = getCurrentDate,
+                            getSmartFooter = getSmartFooter,
+                            getCurrentActivity = getCurrentActivity,
+                            getPrayed = getPrayed,
+                            prayerTimes = prayerTimes,
+                            currentTime = currentTime,
+                            timeOffsets = timeOffsets,
+                            isLandscape = isLandscape,
+                        )
+
+                        2 -> DailyStatsTile(
+                            getPrayerProgress = getPrayerProgress,
+                            getDailyStatsTitle = getDailyStatsTitle,
+                            getDailyStatsMessage = getDailyStatsMessage,
+                            getPrayed = getPrayed,
+                            isLandscape = isLandscape,
+                            onSurahClick = onSurahClick,
+                            onSurahClickWithAyah = onSurahClickWithAyah,
+                        )
+
+                        3 -> QiblaGlobeTile(
+                            prayerTimes = prayerTimes,
+                            onFullscreenClick = { showGlobePopup = true },
+                            isActiveTile = globeLive,
+                            surfaceClipBounds = itemDrawInfo.maskRect.let { mask ->
+                                android.graphics.Rect(
+                                    mask.left.toInt(),
+                                    mask.top.toInt(),
+                                    mask.right.toInt(),
+                                    mask.bottom.toInt(),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (isLandscape) 2.dp else 1.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(4) { index ->
+                    val selected = currentTile == index
+                    Box(
+                        modifier = Modifier
+                            .size(
+                                if (selected) {
+                                    if (isLandscape) 8.dp else 12.dp
+                                } else {
+                                    if (isLandscape) 6.dp else 8.dp
+                                },
+                            )
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                },
+                            )
+                            .clickable {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                coroutineScope.launch {
+                                    val direction = index - currentTile
+                                    carouselState.animateScrollBy(
+                                        with(view.resources.displayMetrics) {
+                                            (preferredItemWidth.value + 10f) * density * direction
+                                        },
+                                    )
+                                }
+                            },
+                    )
+                    if (index < 3) {
+                        Spacer(Modifier.width(if (isLandscape) 4.dp else 8.dp))
+                    }
+                }
+            }
+
+            if (!isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Swipe for more insights",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+
+        if (showGlobePopup) {
+            prayerTimes?.location?.let { locationData ->
+                GlobePopupScreen(
+                    userLatitude = locationData.latitude,
+                    userLongitude = locationData.longitude,
+                    onDismiss = { showGlobePopup = false },
+                )
+            }
+        }
+    }
+}
+
+@Suppress("UNUSED_PARAMETER")
+@Composable
+private fun LegacySwipeableBigTilesDeck(
     prayerTimes: DayPrayerTimes?,
     currentTime: LocalTime,
     locationService: EnhancedLocationService,
@@ -1807,6 +2064,7 @@ private fun NextPrayerTile(
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
+    isCarouselScrolling: Boolean = false,
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
     val view = LocalView.current
@@ -1888,7 +2146,7 @@ private fun NextPrayerTile(
                             locationService = locationService,
                             userLatitude = prayerTimes?.location?.latitude ?: 0.0,
                             userLongitude = prayerTimes?.location?.longitude ?: 0.0,
-                            showGlobe = true
+                            showGlobe = !isCarouselScrolling
                         )
                     }
                 }
@@ -2472,6 +2730,7 @@ private fun QiblaGlobeTile(
     prayerTimes: DayPrayerTimes?,
     onFullscreenClick: () -> Unit = {},
     isActiveTile: Boolean = true,
+    surfaceClipBounds: android.graphics.Rect? = null,
 ) {
     val density = LocalDensity.current
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -2505,6 +2764,7 @@ private fun QiblaGlobeTile(
                     userLongitude = locationData.longitude,
                     modifier = Modifier.fillMaxSize(),
                     isActiveTile = isActiveTile,
+                    surfaceClipBounds = surfaceClipBounds,
                 )
 
                 // Fullscreen button in top-left corner (with liquid glass effect)

@@ -93,6 +93,8 @@ import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -114,6 +116,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -130,19 +133,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import androidx.compose.ui.zIndex
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 
 /**
  * Lesson data model with memorization and time tracking
@@ -384,6 +395,35 @@ fun CourseDetailScreen(
         label = "toolbarAlpha"
     )
 
+    // Stable item positions power the in-page navigator. These are derived from
+    // the same conditions used by the LazyColumn, so navigation stays correct for
+    // every course type and enrollment state.
+    var nextSectionIndex = 3 // hero, stats, section navigator
+    if (isEnrolled) nextSectionIndex++
+    if (isEnrolled && progressPercent > 0) nextSectionIndex++
+    if (isEnrolled && (course.id == "memorize_3_ayahs" || course.id == "juz_amma")) {
+        nextSectionIndex++
+    }
+    if (isEnrolled && totalTimeSpentMinutes > 0) nextSectionIndex++
+    val outcomesSectionIndex = nextSectionIndex++
+    if (course.id == "daily_bukhari") nextSectionIndex++
+    if (course.id == "complete_quran_listening") nextSectionIndex++
+    if (course.id == "daily_bukhari" || course.id == "complete_quran_listening") {
+        nextSectionIndex++
+    }
+    val lessonsSectionIndex = nextSectionIndex
+    val selectedCourseSection by remember(outcomesSectionIndex, lessonsSectionIndex) {
+        derivedStateOf {
+            when {
+                listState.firstVisibleItemIndex >= lessonsSectionIndex -> 2
+                listState.firstVisibleItemIndex >= outcomesSectionIndex -> 1
+                else -> 0
+            }
+        }
+    }
+    val courseNavigationScope = rememberCoroutineScope()
+    val courseNavigationHaptics = LocalHapticFeedback.current
+
     Box(modifier = modifier.fillMaxSize()) {
         // Main Content
         LazyColumn(
@@ -412,6 +452,36 @@ fun CourseDetailScreen(
                     completedCount = completedCount,
                     totalLessons = totalLessons,
                 )
+            }
+
+            item(key = "course_section_navigator") {
+                CourseSectionNavigator(
+                    selectedIndex = selectedCourseSection,
+                    onSectionSelected = { sectionIndex ->
+                        courseNavigationHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        val targetIndex = when (sectionIndex) {
+                            1 -> outcomesSectionIndex
+                            2 -> lessonsSectionIndex
+                            else -> 0
+                        }
+                        courseNavigationScope.launch {
+                            listState.animateScrollToItem(targetIndex)
+                        }
+                    },
+                )
+            }
+
+            // Put the next lesson directly after the overview so returning learners
+            // can resume without scrolling through analytics first.
+            if (isEnrolled) {
+                item {
+                    ContinueLearningCard(
+                        modules = modules,
+                        completedLessons = completedLessons,
+                        onLessonClick = onLessonClick,
+                        course = course,
+                    )
+                }
             }
 
             // Certificate Progress (if enrolled and has progress)
@@ -476,18 +546,6 @@ fun CourseDetailScreen(
                         lessonsWithTime = timeSpentPerLesson.count { it.value > 0 },
                         totalLessons = totalLessons,
                         accentColor = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-
-            // Continue Learning Card (if enrolled)
-            if (isEnrolled) {
-                item {
-                    ContinueLearningCard(
-                        modules = modules,
-                        completedLessons = completedLessons,
-                        onLessonClick = onLessonClick,
-                        course = course,
                     )
                 }
             }
@@ -762,10 +820,10 @@ fun CourseDetailScreen(
         }
     }
 
-    // Lesson Completion Dialog (more stable than ModalBottomSheet during predictive back)
+    // Lesson completion bottom sheet
     showCompletionSheet?.let { lesson ->
-        Log.d("CourseDetail_TRACE", "🎯 Rendering LessonCompletionDialog for: ${lesson.id} - ${lesson.title}")
-        LessonCompletionDialog(
+        Log.d("CourseDetail_TRACE", "🎯 Rendering LessonCompletionBottomSheet for: ${lesson.id} - ${lesson.title}")
+        LessonCompletionBottomSheet(
             lessonTitle = lesson.title,
             courseId = course.id,
             lessonId = lesson.id,
@@ -843,10 +901,11 @@ private fun CourseDetailTopBar(
                 color = contentColor.copy(alpha = 0.15f),
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.ARROW_BACK,
                         contentDescription = "Back",
                         tint = contentColor,
+                        fontSize = 20.sp,
                     )
                 }
             }
@@ -854,18 +913,20 @@ private fun CourseDetailTopBar(
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onShareClick) {
-                Icon(
-                    imageVector = Icons.Default.Share,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.SHARE,
                     contentDescription = "Share",
                     tint = contentColor,
+                    fontSize = 20.sp,
                 )
             }
 
             IconButton(onClick = onBookmarkClick) {
-                Icon(
-                    imageVector = Icons.Outlined.BookmarkBorder,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.BOOKMARK,
                     contentDescription = "Bookmark",
                     tint = contentColor,
+                    fontSize = 20.sp,
                 )
             }
         }
@@ -969,10 +1030,10 @@ private fun CourseHeroSection(
                     val isTitleLong = course.title.length > 18
                     val hasSubtitle = course.subtitle.isNotBlank()
                     val titleSpacerHeight = when {
-                        isTitleLong && hasSubtitle -> 176.dp
-                        isTitleLong && !hasSubtitle -> 148.dp
-                        !isTitleLong && hasSubtitle -> 128.dp
-                        else -> 96.dp
+                        isTitleLong && hasSubtitle -> 164.dp
+                        isTitleLong && !hasSubtitle -> 136.dp
+                        !isTitleLong && hasSubtitle -> 120.dp
+                        else -> 92.dp
                     }
                     Spacer(modifier = Modifier.height(titleSpacerHeight))
 
@@ -989,7 +1050,7 @@ private fun CourseHeroSection(
                         text = course.description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         lineHeight = 20.sp,
                     )
@@ -1052,10 +1113,10 @@ private fun CourseHeroSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SignalCellularAlt,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.DIFFICULTY,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp),
+                            fontSize = 14.sp,
                         )
                         Text(course.difficulty.label)
                     }
@@ -1071,11 +1132,11 @@ private fun CourseHeroSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.STAR,
                             contentDescription = null,
                             tint = Color(0xFFFFB800),
-                            modifier = Modifier.size(14.dp),
+                            fontSize = 14.sp,
                         )
                         Text("4.8")
                     }
@@ -1097,11 +1158,11 @@ private fun CourseHeroSection(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Progress section
-                        Icon(
-                            imageVector = Icons.Outlined.CheckCircle,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.COMPLETED,
                             contentDescription = null,
                             tint = accentColor,
-                            modifier = Modifier.size(18.dp),
+                            fontSize = 18.sp,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
@@ -1131,11 +1192,11 @@ private fun CourseHeroSection(
                             Spacer(modifier = Modifier.width(16.dp))
 
                             // Last activity section
-                            Icon(
-                                imageVector = Icons.Outlined.AccessTime,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.SCHEDULE,
                                 contentDescription = null,
                                 tint = accentColor,
-                                modifier = Modifier.size(18.dp),
+                                fontSize = 18.sp,
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
@@ -1229,62 +1290,137 @@ private fun DrivingChainPlaybackCard(
 }
 
 @Composable
-private fun QuickStatsPills(
-    course: Course,
-    completedCount: Int,
-    totalLessons: Int,
+private fun CourseSectionNavigator(
+    selectedIndex: Int,
+    onSectionSelected: (Int) -> Unit,
 ) {
-    LazyRow(
+    val sections = listOf(
+        FlaticonIcons.INFO to "Overview",
+        FlaticonIcons.CHECK to "Outcomes",
+        FlaticonIcons.BOOK to "Lessons",
+    )
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        ),
     ) {
-        item {
-            StatPill(
-                icon = Icons.Outlined.PlayCircle,
-                value = "$totalLessons",
-                label = "Lessons",
-                accentColor = MaterialTheme.colorScheme.primary,
-            )
-        }
-        item {
-            StatPill(
-                icon = Icons.Outlined.Schedule,
-                value = "${course.estimatedDays}",
-                label = "Days",
-                accentColor = MaterialTheme.colorScheme.primary,
-            )
-        }
-        item {
-            StatPill(
-                icon = Icons.Outlined.CheckCircle,
-                value = "$completedCount",
-                label = "Completed",
-                accentColor = MaterialTheme.colorScheme.primary,
-            )
-        }
-        item {
-            StatPill(
-                icon = Icons.Outlined.School,
-                value = course.difficulty.label,
-                label = "Level",
-                accentColor = MaterialTheme.colorScheme.primary,
-            )
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            sections.forEachIndexed { index, (glyph, label) ->
+                val selected = selectedIndex == index
+                val containerColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    },
+                    animationSpec = tween(durationMillis = 180),
+                    label = "courseSectionContainer",
+                )
+                val contentColor by animateColorAsState(
+                    targetValue = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    animationSpec = tween(durationMillis = 180),
+                    label = "courseSectionContent",
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .semantics {
+                            contentDescription = "$label section"
+                            this.selected = selected
+                        }
+                        .clickable { onSectionSelected(index) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = containerColor,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FlaticonIcon(
+                            glyph = glyph,
+                            contentDescription = null,
+                            tint = contentColor,
+                            fontSize = 16.sp,
+                        )
+                        Spacer(modifier = Modifier.width(7.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = contentColor,
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
+private fun QuickStatsPills(
+    course: Course,
+    completedCount: Int,
+    totalLessons: Int,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        StatPill(
+            iconGlyph = FlaticonIcons.PLAY,
+            value = "$totalLessons",
+            label = "Lessons",
+            accentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        StatPill(
+            iconGlyph = FlaticonIcons.SCHEDULE,
+            value = "${course.estimatedDays}",
+            label = "Days",
+            accentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        StatPill(
+            iconGlyph = FlaticonIcons.COMPLETED,
+            value = "$completedCount",
+            label = "Done",
+            accentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
 private fun StatPill(
-    icon: ImageVector,
+    iconGlyph: String,
     value: String,
     label: String,
     accentColor: Color,
+    modifier: Modifier = Modifier,
 ) {
     // Material 3 Expressive StatPill with larger corners and layered styling
     Surface(
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = accentColor.copy(alpha = 0.08f),
         border = androidx.compose.foundation.BorderStroke(
@@ -1294,13 +1430,13 @@ private fun StatPill(
         tonalElevation = 1.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Icon with expressive container
             Surface(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(36.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = accentColor.copy(alpha = 0.15f),
             ) {
@@ -1308,11 +1444,11 @@ private fun StatPill(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = icon,
+                    FlaticonIcon(
+                        glyph = iconGlyph,
                         contentDescription = null,
                         tint = accentColor,
-                        modifier = Modifier.size(22.dp),
+                        fontSize = 20.sp,
                     )
                 }
             }
@@ -1390,11 +1526,12 @@ private fun CertificateProgressCard(
                         ),
                     )
                 }
-                Icon(
-                    imageVector = Icons.Outlined.WorkspacePremium,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.MEDAL,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp),
+                    fontSize = 24.sp,
                 )
             }
 
@@ -1425,11 +1562,12 @@ private fun CertificateProgressCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.EmojiEvents,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.TROPHY,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(14.dp),
+                                fontSize = 14.sp,
                             )
                             Text(
                                 text = "Certificate Earned!",
@@ -1521,11 +1659,12 @@ private fun ContinueLearningCard(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.PLAY,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(30.dp),
+                                fontSize = 28.sp,
                             )
                         }
                     }
@@ -1568,11 +1707,12 @@ private fun ContinueLearningCard(
                     }
                 }
 
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.ANGLE_RIGHT,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(24.dp),
+                    fontSize = 22.sp,
                 )
                 }
             }
@@ -1615,11 +1755,12 @@ private fun WhatYouWillLearnSection(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.School,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.SCHOOL,
                             contentDescription = null,
                             tint = accentColor,
                             modifier = Modifier.size(20.dp),
+                            fontSize = 20.sp,
                         )
                     }
                 }
@@ -1641,11 +1782,12 @@ private fun WhatYouWillLearnSection(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.COMPLETED,
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(20.dp),
+                        fontSize = 20.sp,
                     )
                     Text(
                         text = outcome,
@@ -1694,11 +1836,12 @@ private fun InstructorSection(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Psychology,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.KNOWLEDGE,
                             contentDescription = null,
                             tint = accentColor,
                             modifier = Modifier.size(20.dp),
+                            fontSize = 20.sp,
                         )
                     }
                 }
@@ -1754,11 +1897,12 @@ private fun InstructorSection(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        Icon(
-                            imageVector = Icons.Outlined.Verified,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.VERIFIED,
                             contentDescription = "Verified",
                             tint = accentColor,
                             modifier = Modifier.size(16.dp),
+                            fontSize = 16.sp,
                         )
                     }
 
@@ -1815,11 +1959,12 @@ private fun InstructorSection(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.STAR,
                                     contentDescription = null,
                                     tint = Color(0xFFFFB800),
                                     modifier = Modifier.size(14.dp),
+                                    fontSize = 14.sp,
                                 )
                                 Text(
                                     text = "${instructor.rating}",
@@ -1861,11 +2006,12 @@ private fun SyllabusHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.MenuBook,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.BOOK,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(16.dp),
+                    fontSize = 16.sp,
                 )
                 Text(
                     text = "Learning path",
@@ -2005,11 +2151,12 @@ private fun EnhancedModuleCard(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (isModuleComplete) {
-                                Icon(
-                                    imageVector = Icons.Filled.CheckCircle,
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.COMPLETED,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp),
+                                    fontSize = 18.sp,
                                 )
                             } else {
                                 Text(
@@ -2047,8 +2194,8 @@ private fun EnhancedModuleCard(
                     modifier = Modifier.size(36.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.ExpandMore,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.ANGLE_DOWN,
                             contentDescription = if (isExpanded) "Collapse" else "Expand",
                             modifier = Modifier
                                 .rotate(rotationAngle)
@@ -2145,11 +2292,11 @@ private fun EnhancedLessonItem(
                     modifier = Modifier.size(36.dp),
                     enabled = !lesson.isLocked,
                 ) {
-                    Icon(
-                        imageVector = if (lesson.isCompleted) {
-                            Icons.Filled.CheckCircle
+                    FlaticonIcon(
+                        glyph = if (lesson.isCompleted) {
+                            FlaticonIcons.COMPLETED
                         } else {
-                            Icons.Outlined.RadioButtonUnchecked
+                            FlaticonIcons.INCOMPLETE
                         },
                         contentDescription = if (lesson.isCompleted) "Completed" else "Mark complete",
                         tint = if (lesson.isCompleted) {
@@ -2157,7 +2304,7 @@ private fun EnhancedLessonItem(
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         },
-                        modifier = Modifier.size(24.dp),
+                        fontSize = 24.sp,
                     )
                 }
             } else {
@@ -2214,11 +2361,12 @@ private fun EnhancedLessonItem(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(top = 2.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Schedule,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.SCHEDULE,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier.size(12.dp),
+                            fontSize = 12.sp,
                         )
                         Text(
                             text = formatTimeSpent(timeSpentMinutes),
@@ -2231,18 +2379,20 @@ private fun EnhancedLessonItem(
 
             // Lock or Play Icon
             if (lesson.isLocked) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.LOCK,
                     contentDescription = "Locked",
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                     modifier = Modifier.size(18.dp),
+                    fontSize = 18.sp,
                 )
             } else if (isEnrolled && !lesson.isCompleted) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.PLAY,
                     contentDescription = "Play",
                     tint = accentColor,
                     modifier = Modifier.size(20.dp),
+                    fontSize = 20.sp,
                 )
             }
         }
@@ -2308,12 +2458,13 @@ private fun ReviewsSection(
                     )
                     Row {
                         repeat(5) { index ->
-                            Icon(
-                                imageVector = Icons.Filled.Star,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.STAR,
                                 contentDescription = null,
                                 tint = if (index < averageRating.toInt()) Color(0xFFFFB800)
                                 else Color(0xFFFFB800).copy(alpha = 0.3f),
                                 modifier = Modifier.size(16.dp),
+                                fontSize = 16.sp,
                             )
                         }
                     }
@@ -2417,12 +2568,13 @@ private fun ReviewCard(review: Review) {
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         repeat(5) { index ->
-                            Icon(
-                                imageVector = Icons.Filled.Star,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.STAR,
                                 contentDescription = null,
                                 tint = if (index < review.rating.toInt()) Color(0xFFFFB800)
                                 else Color(0xFFFFB800).copy(alpha = 0.3f),
                                 modifier = Modifier.size(12.dp),
+                                fontSize = 12.sp,
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -2469,62 +2621,60 @@ private fun EnhancedBottomBar(
         color = MaterialTheme.colorScheme.surface,
     ) {
         if (isEnrolled) {
-            // Enrolled state - show progress and continue button
-            Column(
+            // Compact enrolled state: progress remains visible without repeating
+            // the full-width progress block already shown in the page content.
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Progress section
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
-                    Text(
-                        text = "Your Progress",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "${progressPercent.toInt()}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
+                    ) {
+                        Text(
+                            text = "${progressPercent.toInt()}%",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Text(
+                            text = "Progress",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { progressPercent / 100f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    strokeCap = StrokeCap.Round,
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Full-width Continue button
-                NiaOutlinedButton(
+                Button(
                     onClick = onContinue,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .height(56.dp),
                     enabled = progressPercent < 100f,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 ) {
-                    Icon(
-                        imageVector = if (progressPercent >= 100f) Icons.Filled.CheckCircle else Icons.Default.PlayArrow,
+                    FlaticonIcon(
+                        glyph = if (progressPercent >= 100f) FlaticonIcons.COMPLETED else FlaticonIcons.PLAY,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp),
+                        fontSize = 20.sp,
                     )
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (progressPercent >= 100f) "Course Completed" else "Continue Learning",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -2551,15 +2701,21 @@ private fun EnhancedBottomBar(
                     )
                 }
 
-                NiaOutlinedButton(
+                Button(
                     onClick = onEnroll,
                     modifier = Modifier.height(52.dp),
+                    shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.PLAY,
                         contentDescription = null,
                         modifier = Modifier.size(22.dp),
+                        fontSize = 22.sp,
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
@@ -3039,11 +3195,12 @@ private fun MemorizationProgressSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.MenuBook,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.BOOK,
                     contentDescription = null,
                     tint = accentColor,
                     modifier = Modifier.size(24.dp),
+                    fontSize = 24.sp,
                 )
                 Text(
                     text = "Memorization Progress",
@@ -3230,11 +3387,12 @@ private fun TimeSpentCard(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Schedule,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.SCHEDULE,
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(26.dp),
+                        fontSize = 26.sp,
                     )
                 }
             }

@@ -65,6 +65,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
@@ -102,7 +105,8 @@ enum class TtsVoice(
     val dataDir: String,
     val lexiconFile: String,
     val voicesFile: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val iconGlyph: String
 ) {
     KOKORO_EN(
         displayName = "Kokoro",
@@ -115,7 +119,8 @@ enum class TtsVoice(
         dataDir = "kokoro-int8-en-v0_19/espeak-ng-data",
         lexiconFile = "",
         voicesFile = "kokoro-int8-en-v0_19/voices.bin",
-        icon = Icons.Outlined.GraphicEq
+        icon = Icons.Outlined.GraphicEq,
+        iconGlyph = FlaticonIcons.VOICE
     ),
     VITS_VCTK(
         displayName = "VCTK British",
@@ -128,7 +133,8 @@ enum class TtsVoice(
         dataDir = "",
         lexiconFile = "vits-vctk/lexicon.txt",
         voicesFile = "",
-        icon = Icons.Outlined.RecordVoiceOver
+        icon = Icons.Outlined.RecordVoiceOver,
+        iconGlyph = FlaticonIcons.VOLUME
     )
 }
 
@@ -318,14 +324,14 @@ private fun ModernVoiceCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = voice.icon,
+                FlaticonIcon(
+                    glyph = voice.iconGlyph,
                     contentDescription = null,
                     tint = if (isSelected)
                         MaterialTheme.colorScheme.onPrimary
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+                    fontSize = 24.sp,
                 )
             }
 
@@ -375,11 +381,11 @@ private fun ModernVoiceCard(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.CHECK,
                         contentDescription = "Selected",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp)
+                        fontSize = 16.sp,
                     )
                 }
             }
@@ -448,14 +454,14 @@ private fun ModernSpeakerSelector(
                             MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.ANGLE_LEFT,
                                 contentDescription = "Previous",
                                 tint = if (selectedSpeaker > 0)
                                     MaterialTheme.colorScheme.primary
                                 else
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                modifier = Modifier.size(20.dp)
+                                fontSize = 20.sp,
                             )
                         }
                     }
@@ -495,14 +501,14 @@ private fun ModernSpeakerSelector(
                             MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.ANGLE_RIGHT,
                                 contentDescription = "Next",
                                 tint = if (selectedSpeaker < totalSpeakers - 1)
                                     MaterialTheme.colorScheme.primary
                                 else
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                modifier = Modifier.size(20.dp)
+                                fontSize = 20.sp,
                             )
                         }
                     }
@@ -690,11 +696,11 @@ private fun ModernTtsTestCard(
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                FlaticonIcon(
+                    glyph = if (isActive) FlaticonIcons.PAUSE else FlaticonIcons.PLAY,
                     contentDescription = if (isActive) "Stop" else "Play",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(28.dp)
+                    fontSize = 28.sp,
                 )
             }
 

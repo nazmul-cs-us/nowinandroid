@@ -102,6 +102,7 @@ fun QiblaGlobeView(
     modifier: Modifier = Modifier,
     showControls: Boolean = true,  // Set to false to hide overlay buttons and info cards
     isActiveTile: Boolean = true,  // When this becomes true, plays a one-time day/night sweep
+    surfaceClipBounds: android.graphics.Rect? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -414,6 +415,7 @@ fun QiblaGlobeView(
                     worldWindow.isFocusableInTouchMode = false
                     worldWindow.isClickable = false
                     worldWindow.setOnTouchListener { _, _ -> false }
+                    worldWindow.clipBounds = surfaceClipBounds
 
                     // Survive app pause/resume without re-uploading textures.
                     worldWindow.preserveEGLContextOnPause = true
@@ -459,6 +461,7 @@ fun QiblaGlobeView(
                 },
                 modifier = Modifier.fillMaxSize(),
                 update = { worldWindow ->
+                    worldWindow.clipBounds = surfaceClipBounds
                     worldWindow.requestLayout()
                     if (!worldWindow.hasFocus()) {
                         worldWindow.requestFocus()

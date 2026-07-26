@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -71,6 +70,8 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 
 /**
  * Compact Travel Dua settings section with Material 3 design.
@@ -166,7 +167,7 @@ fun TravelDuaSection(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     CompactSliderCard(
-                        icon = Icons.Outlined.Timer,
+                        iconGlyph = FlaticonIcons.TIMER,
                         label = "Driving",
                         description = "How long you need to drive before the Travel Dua plays. Prevents triggering during short trips.",
                         value = settings.playbackDelaySeconds,
@@ -179,7 +180,7 @@ fun TravelDuaSection(
                         }
                     )
                     CompactSliderCard(
-                        icon = Icons.Outlined.Schedule,
+                        iconGlyph = FlaticonIcons.SCHEDULE,
                         label = "Cooldown",
                         description = "Minimum wait time before the dua can play again. Prevents repeating on the same journey.",
                         value = settings.cooldownMinutes,
@@ -198,7 +199,7 @@ fun TravelDuaSection(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     CompactSliderCard(
-                        icon = Icons.Outlined.Traffic,
+                        iconGlyph = FlaticonIcons.TRAFFIC,
                         label = "Gap",
                         description = "How long you can stop (traffic light, etc.) before the driving timer resets.",
                         value = settings.gapToleranceMinutes,
@@ -211,7 +212,7 @@ fun TravelDuaSection(
                         }
                     )
                     CompactSliderCard(
-                        icon = Icons.Outlined.Speed,
+                        iconGlyph = FlaticonIcons.SPEED,
                         label = "Speed",
                         description = "Minimum speed to be considered 'driving'. Lower values may trigger while walking.",
                         value = settings.drivingSpeedThresholdKmh,
@@ -252,10 +253,10 @@ fun TravelDuaSection(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            FlaticonIcon(
+                                glyph = if (playing) FlaticonIcons.PAUSE else FlaticonIcons.PLAY,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp)
+                                fontSize = 20.sp,
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -286,7 +287,7 @@ fun TravelDuaSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompactSliderCard(
-    icon: ImageVector,
+    iconGlyph: String,
     label: String,
     description: String = "",
     value: Int,
@@ -330,11 +331,11 @@ private fun CompactSliderCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = icon,
+                        FlaticonIcon(
+                            glyph = iconGlyph,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
+                            fontSize = 14.sp,
                         )
                         Text(
                             text = label,
@@ -343,11 +344,11 @@ private fun CompactSliderCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (description.isNotEmpty()) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.INFO,
                                 contentDescription = "Info",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(12.dp)
+                                fontSize = 12.sp,
                             )
                         }
                     }

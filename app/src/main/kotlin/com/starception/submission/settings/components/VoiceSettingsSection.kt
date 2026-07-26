@@ -63,13 +63,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -82,19 +84,19 @@ enum class VoiceRecognitionEngine(
     val displayName: String,
     val description: String,
     val speed: String,
-    val icon: ImageVector
+    val iconGlyph: String
 ) {
     SHERPA_KWS(
         displayName = "Fast Keywords",
         description = "Real-time yes/no detection, optimized for hands-free responses",
         speed = "~100ms",
-        icon = Icons.Outlined.Bolt
+        iconGlyph = FlaticonIcons.QUICK_ACTION
     ),
     WHISPER(
         displayName = "Full Transcription",
         description = "Complete speech-to-text using Whisper.cpp for accurate offline transcription",
         speed = "~2 sec",
-        icon = Icons.Outlined.RecordVoiceOver
+        iconGlyph = FlaticonIcons.VOICE
     )
 }
 
@@ -298,14 +300,14 @@ private fun ModernEngineCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = engine.icon,
+                FlaticonIcon(
+                    glyph = engine.iconGlyph,
                     contentDescription = null,
                     tint = if (isSelected)
                         MaterialTheme.colorScheme.onPrimary
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
+                    fontSize = 24.sp,
                 )
             }
 
@@ -361,11 +363,11 @@ private fun ModernEngineCard(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.CHECK,
                         contentDescription = "Selected",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp)
+                        fontSize = 16.sp,
                     )
                 }
             }
@@ -627,11 +629,11 @@ private fun AnimatedMicButton(
                 contentAlignment = Alignment.Center
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.Campaign,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.ANNOUNCEMENT,
                         contentDescription = if (isActive) "Listening" else "Tap to speak",
                         tint = Color.White,
-                        modifier = Modifier.size((28f * iconScale).dp)
+                        fontSize = (28f * iconScale).sp,
                     )
 
                     if (isActive) {

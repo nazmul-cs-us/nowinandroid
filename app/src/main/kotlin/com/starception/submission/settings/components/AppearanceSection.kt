@@ -42,11 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
@@ -175,17 +177,17 @@ fun AppearanceSection(
                 options = listOf(
                     SegmentOption(
                         label = "System",
-                        icon = Icons.Outlined.SettingsBrightness,
+                        iconGlyph = FlaticonIcons.SYSTEM_THEME,
                         selected = themeSettings.darkThemeConfig == DarkThemeConfig.FOLLOW_SYSTEM
                     ),
                     SegmentOption(
                         label = "Light",
-                        icon = Icons.Outlined.LightMode,
+                        iconGlyph = FlaticonIcons.LIGHT_THEME,
                         selected = themeSettings.darkThemeConfig == DarkThemeConfig.LIGHT
                     ),
                     SegmentOption(
                         label = "Dark",
-                        icon = Icons.Outlined.DarkMode,
+                        iconGlyph = FlaticonIcons.DARK_THEME,
                         selected = themeSettings.darkThemeConfig == DarkThemeConfig.DARK
                     )
                 ),
@@ -281,11 +283,11 @@ private fun ThemePill(
 
             if (selected) {
                 Spacer(modifier = Modifier.size(4.dp))
-                Icon(
-                    imageVector = Icons.Outlined.Check,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.CHECK,
                     contentDescription = "Selected",
                     tint = color,
-                    modifier = Modifier.size(14.dp)
+                    fontSize = 14.sp,
                 )
             }
         }
@@ -294,7 +296,7 @@ private fun ThemePill(
 
 data class SegmentOption(
     val label: String,
-    val icon: ImageVector? = null,
+    val iconGlyph: String? = null,
     val selected: Boolean = false
 )
 
@@ -344,15 +346,15 @@ fun ModernSegmentedButtons(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        if (option.icon != null) {
-                            Icon(
-                                imageVector = option.icon,
+                        if (option.iconGlyph != null) {
+                            FlaticonIcon(
+                                glyph = option.iconGlyph,
                                 contentDescription = null,
                                 tint = if (option.selected)
                                     MaterialTheme.colorScheme.primary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                fontSize = 18.sp,
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                         }
