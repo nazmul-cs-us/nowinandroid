@@ -58,6 +58,9 @@ data class TravelDuaSettings(
         const val KEY_PLAYBACK_DELAY_SECONDS = "travel_dua_playback_delay_seconds"
         const val KEY_GAP_TOLERANCE_MINUTES = "travel_dua_gap_tolerance_minutes"
         const val KEY_DRIVING_SPEED_THRESHOLD_KMH = "travel_dua_driving_speed_threshold_kmh"
+        const val KEY_PENDING_ALARM_TOKEN = "travel_dua_pending_alarm_token"
+        const val KEY_PENDING_ALARM_TRIGGER_ELAPSED = "travel_dua_pending_alarm_trigger_elapsed"
+        const val KEY_IS_DRIVING = "travel_dua_is_driving"
 
         // Default values
         const val DEFAULT_COOLDOWN_MINUTES = 5

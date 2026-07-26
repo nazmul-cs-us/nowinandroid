@@ -430,6 +430,12 @@ class DrivingAudioService : Service() {
                 return
             }
 
+            // Alarm-triggered playback intentionally starts this service immediately,
+            // without waiting for database work in a BroadcastReceiver. Reconstruct the
+            // optional Daily Bukhari continuation here so background reliability does not
+            // remove the existing Travel Dua → Hadith chain.
+            preparePendingHadithIfNeeded()
+
             // 🔄 PRE-GENERATE: Start generating hadith TTS in background while travel dua plays
             // This eliminates the gap between travel dua and hadith playback
             preGenerateHadithTtsInBackground()
@@ -460,6 +466,48 @@ class DrivingAudioService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error playing travel dua", e)
             onTravelDuaComplete()
+        }
+    }
+
+    private fun preparePendingHadithIfNeeded() {
+        if (pendingHadithNumber != null) return
+
+        val prefs = getSharedPreferences("course_progress", Context.MODE_PRIVATE)
+        val enrolledCourses = prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
+        if ("daily_bukhari" !in enrolledCourses ||
+            !prefs.getBoolean("play_daily_bukhari_after_travel_dua", true)
+        ) {
+            return
+        }
+
+        if (!com.starception.submission.core.hadithdatabase.HadithDatabase.isDatabaseAvailable(
+                this,
+                "sahih_bukhari.db",
+            )
+        ) {
+            getSharedPreferences("content_prompt_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("missing_bukhari_prompt", true)
+                .apply()
+            return
+        }
+
+        val completedLessons = CourseProgressTracker.getCompletedLessons(this, "daily_bukhari")
+        val nextHadithNumber = (1..365).firstOrNull { "hadith_$it" !in completedLessons } ?: 1
+        pendingHadithNumber = nextHadithNumber
+        pendingCourseId = "daily_bukhari"
+        pendingLessonId = "hadith_$nextHadithNumber"
+
+        scope.launch {
+            val selectedLanguage =
+                com.starception.submission.core.translation.TranslationService.getInstance(
+                    this@DrivingAudioService,
+                ).getSelectedLanguage()
+            if (selectedLanguage != "bn") {
+                pendingHadithText = getHadithTextForNumber(nextHadithNumber)
+            }
+            preGenerateHadithTtsInBackground()
+            Log.i(TAG, "📚 Prepared alarm-triggered continuation with hadith #$nextHadithNumber")
         }
     }
 

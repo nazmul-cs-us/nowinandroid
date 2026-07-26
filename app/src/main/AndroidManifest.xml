@@ -172,6 +172,11 @@
                 <action android:name="com.starception.submission.MARK_AS_PRAYED" />
             </intent-filter>
         </receiver>
+
+        <!-- Exact wake-up alarm for Travel Dua playback while the app is sleeping. -->
+        <receiver
+            android:name=".util.TravelDuaAlarmReceiver"
+            android:exported="false" />
         
         <!-- Prayer Notification Receiver for AlarmManager-triggered notifications -->
         <receiver

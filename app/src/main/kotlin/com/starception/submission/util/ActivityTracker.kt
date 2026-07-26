@@ -1,9 +1,11 @@
 package com.starception.submission.util
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.AssetFileDescriptor
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
@@ -113,7 +115,6 @@ object ActivityTracker {
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
     private var hadithMediaPlayer: MediaPlayer? = null  // Separate player for hadith audio
-    private var previousActivity: String = ""
 
     // TextToSpeech for hadith playback after travel dua
     private var textToSpeech: TextToSpeech? = null
@@ -224,10 +225,6 @@ object ActivityTracker {
     private var travelDuaPlaybackDelayMillis: Long = TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS * 1000L
     private var travelDuaGapToleranceMillis: Long = TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES * 60 * 1000L
 
-    // Handler for delayed dua playback
-    private val duaHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var pendingDuaRunnable: Runnable? = null
-    
     /**
      * Lifecycle observer to track app foreground/background state
      * Used to suppress sound/vibration notifications when app is in background
@@ -375,7 +372,7 @@ object ActivityTracker {
             Log.w("ActivityTracker", "Missing permissions: $missingPermissions")
         }
     }
-    
+
     /**
      * Get a user-friendly string of missing permissions
      */
@@ -409,18 +406,26 @@ object ActivityTracker {
      */
     fun updateActivity(activity: String) {
         val currentTime = System.currentTimeMillis()
-        val oldActivity = previousActivity
-        previousActivity = _currentActivity.value
-        _currentActivity.value = activity
+        // Sensor detection uses title case ("Driving") while Google Play Services
+        // reports upper case ("DRIVING"). Keep one canonical value so background
+        // transitions follow the same Travel Dua path as in-app sensor updates.
+        val normalizedActivity = normalizeActivityName(activity)
+        val oldActivity = normalizeActivityName(_currentActivity.value)
+        _currentActivity.value = normalizedActivity
+        persistDrivingState(normalizedActivity == "Driving")
 
         // Trigger callback if activity actually changed (for notification icon update)
-        if (oldActivity != activity && activityChangeCallback != null) {
-            Log.d("ActivityTracker", "🔄 Activity changed: $oldActivity → $activity - triggering notification update")
-            activityChangeCallback?.invoke(activity)
+        if (oldActivity != normalizedActivity && activityChangeCallback != null) {
+            Log.d("ActivityTracker", "🔄 Activity changed: $oldActivity → $normalizedActivity - triggering notification update")
+            activityChangeCallback?.invoke(normalizedActivity)
         }
 
         // ========== DRIVING STARTED ==========
-        if (activity == "Driving" && oldActivity != "Driving") {
+        if (normalizedActivity == "Driving" && oldActivity != "Driving") {
+            // DrivingAudioService owns the authoritative cooldown timestamp and writes
+            // it only after playback starts. Refresh it before every eligibility check.
+            refreshLastDuaPlayTime()
+
             // Check if travel dua feature is enabled
             if (!travelDuaEnabled) {
                 Log.d("ActivityTracker", "🚗 Travel dua disabled in settings")
@@ -434,7 +439,7 @@ object ActivityTracker {
 
             // Enhanced diagnostic logging for cooldown debugging
             Log.i("ActivityTracker", "🚗 ========== DRIVING DETECTED ==========")
-            Log.i("ActivityTracker", "🚗 Transition: $oldActivity → $activity")
+            Log.i("ActivityTracker", "🚗 Transition: $oldActivity → $normalizedActivity")
             Log.i("ActivityTracker", "🚗 Last dua played: ${if (lastDuaPlayTime == 0L) "NEVER" else "${timeSinceLastDua / 1000}s ago"}")
             Log.i("ActivityTracker", "🚗 Cooldown setting: ${cooldownMinutes}min (${travelDuaCooldownMillis}ms)")
             Log.i("ActivityTracker", "🚗 Cooldown status: ${if (timeSinceLastDua < travelDuaCooldownMillis) "ACTIVE ⏳" else "EXPIRED ✅"}")
@@ -468,8 +473,8 @@ object ActivityTracker {
                         scheduleDrivingDuaWithRemainingTime(remainingTime)
                     } else {
                         // Already accumulated enough time, play dua now
-                        Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - playing travel dua now!")
-                        playDrivingAudio()
+                        Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - scheduling immediate wake-up")
+                        scheduleDrivingDuaWithRemainingTime(0L)
                         resetDrivingAccumulation()
                         duaPlayedForCurrentSession = true
                         // Set driving start time since user is now driving
@@ -500,7 +505,7 @@ object ActivityTracker {
         }
 
         // ========== DRIVING STOPPED ==========
-        if (activity != "Driving" && oldActivity == "Driving") {
+        if (normalizedActivity != "Driving" && oldActivity == "Driving") {
             // Calculate how long we were driving in this session
             val sessionDrivingTime = currentTime - drivingStartTime
             accumulatedDrivingTime += sessionDrivingTime
@@ -515,9 +520,22 @@ object ActivityTracker {
         }
 
         // Track driving time
-        if (activity == "Driving") {
+        if (normalizedActivity == "Driving") {
             lastDrivingTime = currentTime
         }
+    }
+
+    private fun normalizeActivityName(activity: String): String = when {
+        activity.equals("driving", ignoreCase = true) -> "Driving"
+        activity.equals("still", ignoreCase = true) -> "Still"
+        activity.equals("walking", ignoreCase = true) -> "Walking"
+        activity.equals("running", ignoreCase = true) -> "Running"
+        activity.equals("cycling", ignoreCase = true) -> "Cycling"
+        activity.equals("on_foot", ignoreCase = true) -> "On Foot"
+        activity.equals("tilting", ignoreCase = true) -> "Tilting"
+        activity.equals("unknown", ignoreCase = true) -> "Unknown"
+        activity.equals("other", ignoreCase = true) -> "Other"
+        else -> activity
     }
 
     /**
@@ -585,6 +603,9 @@ object ActivityTracker {
      *                         If false, just pauses detection (can resume quickly)
      */
     fun stopDetection(releaseResources: Boolean = false) {
+        persistDrivingState(false)
+        cancelPendingDua()
+
         if (activityDetectionService?.isRunning() != true) {
             Log.d("ActivityTracker", "📍 Detection not running, nothing to stop")
             return
@@ -593,9 +614,6 @@ object ActivityTracker {
         activityDetectionService?.stopDetection()
         _currentActivity.value = "Stopped"
         Log.i("ActivityTracker", "⏹️ Activity detection STOPPED")
-
-        // Cancel any pending dua
-        cancelPendingDua()
 
         // Only release resources if explicitly requested (e.g., app closing)
         if (releaseResources) {
@@ -804,98 +822,96 @@ object ActivityTracker {
      * Schedule driving dua with remaining time - for resuming after brief stop
      */
     private fun scheduleDrivingDuaWithRemainingTime(remainingTimeMillis: Long) {
-        // Cancel any existing pending dua
-        cancelPendingDua()
-
-        val scheduledTime = System.currentTimeMillis()
-        val delaySeconds = remainingTimeMillis / 1000
-
-        // Create new runnable
-        pendingDuaRunnable = Runnable {
-            val actualDelay = (System.currentTimeMillis() - scheduledTime) / 1000
-            // Verify user is still driving before playing
-            if (_currentActivity.value == "Driving") {
-                val totalDrivingTime = (accumulatedDrivingTime + (System.currentTimeMillis() - drivingStartTime)) / 1000
-                Log.i("ActivityTracker", "✅ Total driving time: ${totalDrivingTime}s - playing travel dua now!")
-                playDrivingAudio()
-                resetDrivingAccumulation()  // Reset after playing
-                duaPlayedForCurrentSession = true  // Prevent replay on brief stops
-                // IMPORTANT: Reset driving start time since user is still driving
-                // This prevents session time from becoming huge when they stop later
-                drivingStartTime = System.currentTimeMillis()
-                Log.d("ActivityTracker", "🔄 Reset driving start time for continued driving session")
-            } else {
-                Log.w("ActivityTracker", "⏭️ Skipping travel dua - user stopped driving after ${actualDelay}s (current: ${_currentActivity.value})")
-            }
-            pendingDuaRunnable = null
+        val ctx = context ?: run {
+            Log.w("ActivityTracker", "Cannot schedule Travel Dua alarm: context is unavailable")
+            return
         }
 
-        // Schedule for remaining time
-        duaHandler.postDelayed(pendingDuaRunnable!!, remainingTimeMillis)
-        Log.i("ActivityTracker", "⏰ Travel dua scheduled - will play in ${delaySeconds}s if user stays driving")
+        cancelPendingDua()
+
+        val safeDelay = remainingTimeMillis.coerceAtLeast(0L)
+        val triggerAtElapsed = SystemClock.elapsedRealtime() + safeDelay
+        val sessionToken = System.currentTimeMillis()
+        val pendingIntent = TravelDuaAlarmReceiver.pendingIntent(ctx, sessionToken)
+        val alarmManager = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val alarmStatePersisted = ctx.getSharedPreferences(
+            TravelDuaSettings.PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
+            .edit()
+            .putBoolean(TravelDuaSettings.KEY_IS_DRIVING, true)
+            .putLong(TravelDuaSettings.KEY_PENDING_ALARM_TOKEN, sessionToken)
+            .putLong(TravelDuaSettings.KEY_PENDING_ALARM_TRIGGER_ELAPSED, triggerAtElapsed)
+            .commit()
+        if (!alarmStatePersisted) {
+            Log.e("ActivityTracker", "Failed to persist Travel Dua alarm state")
+            return
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerAtElapsed,
+                    pendingIntent,
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerAtElapsed,
+                    pendingIntent,
+                )
+                Log.w("ActivityTracker", "Exact alarms unavailable; using an inexact wake-up alarm")
+            }
+            Log.i(
+                "ActivityTracker",
+                "⏰ Travel Dua wake-up alarm scheduled in ${safeDelay / 1000}s " +
+                    "(token=$sessionToken)",
+            )
+        } catch (e: Exception) {
+            Log.e("ActivityTracker", "Failed to schedule Travel Dua wake-up alarm", e)
+            clearPendingAlarmState(ctx)
+        }
     }
     
     /**
      * Cancel pending dua playback
      */
     private fun cancelPendingDua() {
-        pendingDuaRunnable?.let {
-            duaHandler.removeCallbacks(it)
-            pendingDuaRunnable = null
-            Log.d("ActivityTracker", "❌ Cancelled pending travel dua - user stopped driving")
+        context?.let { ctx ->
+            try {
+                val alarmManager = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                alarmManager.cancel(TravelDuaAlarmReceiver.pendingIntent(ctx, 0L))
+                clearPendingAlarmState(ctx)
+                Log.d("ActivityTracker", "❌ Cancelled pending Travel Dua wake-up alarm")
+            } catch (e: Exception) {
+                Log.w("ActivityTracker", "Unable to cancel pending Travel Dua alarm", e)
+            }
         }
     }
-    
-    /**
-     * Play driving audio (travel dua) when driving starts.
-     * Uses DrivingAudioService for proper MediaSession and notification controls.
-     */
-    private fun playDrivingAudio() {
-        try {
-            context?.let { ctx ->
-                Log.i("ActivityTracker", "🎵 ========== STARTING DRIVING AUDIO SERVICE ==========")
 
-                // Set cooldown timestamp when dua starts playing
-                val previousPlayTime = lastDuaPlayTime
-                lastDuaPlayTime = System.currentTimeMillis()
-                val cooldownMinutes = travelDuaCooldownMillis / 60000
+    private fun clearPendingAlarmState(ctx: Context) {
+        ctx.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(TravelDuaSettings.KEY_PENDING_ALARM_TOKEN)
+            .remove(TravelDuaSettings.KEY_PENDING_ALARM_TRIGGER_ELAPSED)
+            .apply()
+    }
 
-                // Persist cooldown to survive app restarts
-                saveLastDuaPlayTime(ctx, lastDuaPlayTime)
+    private fun persistDrivingState(isDriving: Boolean) {
+        context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean(TravelDuaSettings.KEY_IS_DRIVING, isDriving)
+            ?.apply()
+    }
 
-                Log.i("ActivityTracker", "🎵 Cooldown NOW ACTIVE for ${cooldownMinutes}min")
-                Log.i("ActivityTracker", "🎵 Previous play time: ${if (previousPlayTime == 0L) "NEVER" else "${(lastDuaPlayTime - previousPlayTime) / 1000}s ago"}")
-
-                // Prepare hadith info for the service
-                scope.launch {
-                    val hadithInfo = getNextHadithInfo(ctx)
-
-                    // Start DrivingAudioService with travel dua
-                    val serviceIntent = Intent(ctx, DrivingAudioService::class.java).apply {
-                        putExtra(DrivingAudioService.EXTRA_AUDIO_TYPE, DrivingAudioService.TYPE_TRAVEL_DUA)
-
-                        // Pass hadith info if enrolled
-                        hadithInfo?.let { (number, text, useAudio) ->
-                            putExtra(DrivingAudioService.EXTRA_HADITH_NUMBER, number)
-                            if (!useAudio && text != null) {
-                                putExtra(DrivingAudioService.EXTRA_HADITH_TEXT, text)
-                            }
-                            putExtra(DrivingAudioService.EXTRA_COURSE_ID, "daily_bukhari")
-                            putExtra(DrivingAudioService.EXTRA_LESSON_ID, "hadith_$number")
-                        }
-                    }
-
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        ctx.startForegroundService(serviceIntent)
-                    } else {
-                        ctx.startService(serviceIntent)
-                    }
-
-                    Log.i("ActivityTracker", "🎵 DrivingAudioService started with notification controls")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("ActivityTracker", "Failed to start driving audio service: ${e.message}")
+    private fun refreshLastDuaPlayTime() {
+        context?.let { ctx ->
+            lastDuaPlayTime = ctx.getSharedPreferences(
+                TravelDuaSettings.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            ).getLong(KEY_LAST_DUA_PLAY_TIME, lastDuaPlayTime)
         }
     }
 
@@ -2101,20 +2117,6 @@ object ActivityTracker {
             }
         } catch (e: Exception) {
             Log.e("ActivityTracker", "❌ Failed to load travel dua settings, using defaults: ${e.message}")
-        }
-    }
-
-    /**
-     * Save the last dua play time to SharedPreferences
-     * Called when dua actually plays to persist cooldown across app restarts
-     */
-    private fun saveLastDuaPlayTime(context: Context, timestamp: Long) {
-        try {
-            val prefs = context.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putLong(KEY_LAST_DUA_PLAY_TIME, timestamp).apply()
-            Log.d("ActivityTracker", "💾 Saved last dua play time to persist cooldown")
-        } catch (e: Exception) {
-            Log.e("ActivityTracker", "❌ Failed to save last dua play time: ${e.message}")
         }
     }
 
