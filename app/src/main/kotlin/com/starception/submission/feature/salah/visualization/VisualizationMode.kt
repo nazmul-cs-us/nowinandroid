@@ -11,6 +11,11 @@ enum class VisualizationMode {
     FEATURE_PCA,
 }
 
+enum class PosePlaybackSource {
+    RECORDED,
+    TWO_RAKAH_SAMPLE,
+}
+
 /** Per-window model prediction paired to the sample at the same index. */
 data class VizPrediction(
     val predicted: SalahPosture?,
@@ -19,6 +24,10 @@ data class VizPrediction(
 
 data class VisualizationState(
     val mode: VisualizationMode = VisualizationMode.PHONE_MODEL,
+    val bodyShapeStyle: BodyShapeStyle = BodyShapeStyle.REFERENCE,
+    val posePlaybackSource: PosePlaybackSource = PosePlaybackSource.RECORDED,
+    val twoRakahStepIndex: Int = 0,
+    val isTwoRakahPlaying: Boolean = false,
     val visiblePostures: Set<SalahPosture> = SalahPosture.classificationLabels.toSet(),
     val playbackIndex: Int = 0,
     val isPlaying: Boolean = false,

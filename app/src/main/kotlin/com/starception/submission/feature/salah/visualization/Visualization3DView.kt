@@ -2,11 +2,14 @@ package com.starception.submission.feature.salah.visualization
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -71,9 +74,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.coroutines.coroutineContext
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.acos
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -129,8 +135,12 @@ fun Visualization3DView(
     }
 
     // Filament is render-only here; playback timing remains deterministic Compose state.
-    LaunchedEffect(state.isPlaying, state.playbackSpeed, samples) {
-        if (!state.isPlaying || samples.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(state.isPlaying, state.playbackSpeed, samples, state.posePlaybackSource) {
+        if (
+            state.posePlaybackSource != PosePlaybackSource.RECORDED ||
+            !state.isPlaying ||
+            samples.isEmpty()
+        ) return@LaunchedEffect
         if (samples.size == 1) {
             dispatchPlayback(0, false)
             return@LaunchedEffect
@@ -153,13 +163,48 @@ fun Visualization3DView(
         }
     }
 
+    // The built-in sample advances by prayer positions instead of sensor timestamps.
+    // Keying on the step makes pause, skip, scrub, and speed changes take effect immediately.
+    LaunchedEffect(
+        state.posePlaybackSource,
+        state.isTwoRakahPlaying,
+        state.twoRakahStepIndex,
+        state.playbackSpeed,
+    ) {
+        if (
+            state.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE ||
+            !state.isTwoRakahPlaying
+        ) return@LaunchedEffect
+
+        val index = state.twoRakahStepIndex.coerceIn(twoRakahSample.indices)
+        val step = twoRakahSample[index]
+        delay(
+            (step.durationMillis / state.playbackSpeed.coerceIn(0.5f, 10f))
+                .toLong()
+                .coerceAtLeast(120L),
+        )
+        if (
+            latestState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE &&
+            latestState.isTwoRakahPlaying &&
+            latestState.twoRakahStepIndex == index
+        ) {
+            latestOnStateChange(
+                latestState.copy(
+                    twoRakahStepIndex = (index + 1).coerceAtMost(twoRakahSample.lastIndex),
+                    isTwoRakahPlaying = index < twoRakahSample.lastIndex,
+                ),
+            )
+        }
+    }
+
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
     val environment = rememberEnvironment(environmentLoader, isOpaque = false)
     val filamentView = rememberView(engine)
     val renderer = rememberRenderer(engine)
-    val dualFigure = state.predictions != null
+    val dualFigure = state.predictions != null &&
+        state.posePlaybackSource == PosePlaybackSource.RECORDED
     val cameraFrame = remember(state.mode, dualFigure) {
         cameraFrame(state.mode, dualFigure)
     }
@@ -282,36 +327,122 @@ fun Visualization3DView(
             }
         }
 
-        if (state.mode == VisualizationMode.PHONE_MODEL) {
-            val recorded = samples.getOrNull(state.playbackIndex)?.posture
-            val prediction = state.predictions?.getOrNull(state.playbackIndex)
-            Row(
+        if (isFullscreen) {
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
-                    .padding(
-                        start = 12.dp,
-                        top = 10.dp,
-                        end = if (onFullscreenChange != null) 58.dp else 12.dp,
-                        bottom = 10.dp,
+                    .height(132.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.62f), Color.Transparent),
+                        ),
                     ),
-            ) {
-                PoseLegendChip(
-                    text = "LABEL · ${recorded?.displayName ?: "—"}",
-                    isError = false,
-                    modifier = Modifier.weight(1f),
-                )
-                if (dualFigure) {
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(230.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
+                        ),
+                    ),
+            )
+        }
+
+        if (state.mode == VisualizationMode.PHONE_MODEL) {
+            val twoRakahStep = if (
+                state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+            ) state.currentTwoRakahStep() else null
+            val recorded = twoRakahStep?.posture ?: samples.getOrNull(state.playbackIndex)?.posture
+            val prediction = if (twoRakahStep == null) {
+                state.predictions?.getOrNull(state.playbackIndex)
+            } else {
+                null
+            }
+            if (isFullscreen) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(start = 16.dp, top = 14.dp, end = 72.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xE6111A1B),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                        Text(
+                            text = if (twoRakahStep != null) {
+                                "2 RAK'AH SAMPLE · STEP ${state.twoRakahStepIndex + 1} OF ${twoRakahSample.size}"
+                            } else {
+                                "3D POSE REVIEW"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF62E2C2),
+                        )
+                        Text(
+                            text = if (twoRakahStep != null) {
+                                "Rak'ah ${twoRakahStep.rakah} · ${twoRakahStep.label}"
+                            } else {
+                                recorded?.displayName ?: "No pose selected"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFF1F7F4),
+                        )
+                        if (dualFigure) {
+                            Text(
+                                text = if (prediction?.predicted == null) {
+                                    "Model prediction unavailable"
+                                } else {
+                                    "Model · ${prediction.predicted.displayName} ${(prediction.confidence * 100).toInt()}%"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (prediction?.predicted != null && prediction.predicted != recorded) {
+                                    Color(0xFFFF8A9B)
+                                } else {
+                                    Color(0xFFACBBB5)
+                                },
+                            )
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(
+                            start = 12.dp,
+                            top = 10.dp,
+                            end = if (onFullscreenChange != null) 58.dp else 12.dp,
+                            bottom = 10.dp,
+                        ),
+                ) {
                     PoseLegendChip(
-                        text = if (prediction?.predicted == null) {
-                            "MODEL · —"
+                        text = if (twoRakahStep != null) {
+                            "RAK'AH ${twoRakahStep.rakah} · ${twoRakahStep.label.uppercase()}"
                         } else {
-                            "MODEL · ${prediction.predicted.displayName} ${(prediction.confidence * 100).toInt()}%"
+                            "LABEL · ${recorded?.displayName ?: "—"}"
                         },
-                        isError = prediction?.predicted != null && prediction.predicted != recorded,
+                        isError = false,
                         modifier = Modifier.weight(1f),
                     )
+                    if (dualFigure) {
+                        PoseLegendChip(
+                            text = if (prediction?.predicted == null) {
+                                "MODEL · —"
+                            } else {
+                                "MODEL · ${prediction.predicted.displayName} ${(prediction.confidence * 100).toInt()}%"
+                            },
+                            isError = prediction?.predicted != null && prediction.predicted != recorded,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
@@ -322,11 +453,11 @@ fun Visualization3DView(
                 modifier = Modifier
                     .align(if (isFullscreen) Alignment.CenterEnd else Alignment.BottomEnd)
                     .then(if (isFullscreen) Modifier.navigationBarsPadding() else Modifier)
-                    .padding(10.dp)
-                    .size(40.dp),
+                    .padding(if (isFullscreen) 16.dp else 10.dp)
+                    .size(if (isFullscreen) 42.dp else 40.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = Color(0xE6111A1B),
+                    contentColor = Color(0xFFF1F7F4),
                 ),
             ) {
                 Icon(
@@ -342,11 +473,11 @@ fun Visualization3DView(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
-                    .padding(10.dp)
-                    .size(40.dp),
+                    .padding(if (isFullscreen) 16.dp else 10.dp)
+                    .size(if (isFullscreen) 42.dp else 40.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = Color(0xE6111A1B),
+                    contentColor = Color(0xFFF1F7F4),
                 ),
             ) {
                 Icon(
@@ -583,9 +714,16 @@ private fun SceneScope.HumanoidScene(
     gridMaterial: MaterialInstance,
 ) {
     val sample = samples.getOrNull(state.playbackIndex)
-    val recorded = sample?.posture ?: SalahPosture.QIYAM
-    val prediction = state.predictions?.getOrNull(state.playbackIndex)
-    val dual = state.predictions != null
+    val twoRakahStep = if (
+        state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+    ) state.currentTwoRakahStep() else null
+    val recorded = twoRakahStep?.posture ?: sample?.posture ?: SalahPosture.QIYAM
+    val prediction = if (twoRakahStep == null) {
+        state.predictions?.getOrNull(state.playbackIndex)
+    } else {
+        null
+    }
+    val dual = state.predictions != null && twoRakahStep == null
     val disagrees = prediction?.predicted != null && prediction.predicted != recorded
 
     // The figure uses a shaded material (multiplies base colour by the baked per-vertex shade);
@@ -633,6 +771,7 @@ private fun SceneScope.HumanoidScene(
     HolographicHumanoid(
         engine = engine,
         pose = skeletonPose(recorded, if (dual) -0.58f else 0f),
+        bodyShapeStyle = state.bodyShapeStyle,
         material = truthMaterial,
     )
 
@@ -643,6 +782,7 @@ private fun SceneScope.HumanoidScene(
             HolographicHumanoid(
                 engine = engine,
                 pose = skeletonPose(predictedPosture, 0.58f),
+                bodyShapeStyle = state.bodyShapeStyle,
                 material = predictionMaterial,
             )
         }
@@ -684,6 +824,7 @@ private data class SkeletonPose(val joints: Map<Joint, Position>)
 private fun SceneScope.HolographicHumanoid(
     engine: Engine,
     pose: SkeletonPose,
+    bodyShapeStyle: BodyShapeStyle,
     material: MaterialInstance,
 ) {
     val animated = buildMap {
@@ -724,14 +865,52 @@ private fun SceneScope.HolographicHumanoid(
     val shoulderCenter = lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.5f)
     val hipCenter = lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.5f)
     val torsoSplit = lerp(shoulderCenter, hipCenter, 0.5f)
+    val proportions = bodyMeasurements(animated).toFeatures()
+    val synthesizedShape = ShapeProportionModel.synthesize(proportions, bodyShapeStyle)
+    val shoulderBreadth = distance(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER))
+    val hipBreadth = distance(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP))
+    val bodyWidthDirection = normalizedDirection(
+        j(Joint.LEFT_SHOULDER),
+        j(Joint.RIGHT_SHOULDER),
+    )
 
-    val specs = buildList {
-        // Head (sphere) + neck — each a distinct shape.
-        add(CapsuleSpec(head, head, 0.16f))
+    val specs = buildList<FigurePartSpec> {
+        // A vertical oval is closer to the paper's annotated head than a plain sphere.
+        add(
+            CapsuleSpec(
+                Position(head.x, head.y - 0.045f, head.z),
+                Position(head.x, head.y + 0.045f, head.z),
+                0.125f,
+            ),
+        )
         add(CapsuleSpec(lerp(neck, head, 0.18f), lerp(neck, head, 0.58f), 0.05f))
-        // Torso: separate chest and pelvis ovals with a visible waist between them.
-        add(CapsuleSpec(lerp(shoulderCenter, torsoSplit, 0.12f), lerp(shoulderCenter, torsoSplit, 0.88f), 0.17f))
-        add(CapsuleSpec(lerp(torsoSplit, hipCenter, 0.2f), hipCenter, 0.135f))
+
+        // The PDF's central idea: torso and abdomen are independent primitive-shape blends.
+        // These are true 3D superellipse/frustum volumes, not fixed-radius limb capsules.
+        add(
+            ShapeVolumeSpec(
+                from = lerp(shoulderCenter, torsoSplit, 0.06f),
+                to = lerp(shoulderCenter, torsoSplit, 0.94f),
+                widthDirection = bodyWidthDirection,
+                fromHalfWidth = shoulderBreadth * 0.44f * synthesizedShape.torsoWidthScale,
+                toHalfWidth = hipBreadth * 0.50f * synthesizedShape.abdomenWidthScale,
+                halfDepth = 0.115f * synthesizedShape.depthScale,
+                weights = synthesizedShape.torsoWeights,
+                triangleWideAtStart = true,
+            ),
+        )
+        add(
+            ShapeVolumeSpec(
+                from = lerp(torsoSplit, hipCenter, 0.08f),
+                to = lerp(torsoSplit, hipCenter, 0.96f),
+                widthDirection = bodyWidthDirection,
+                fromHalfWidth = hipBreadth * 0.50f * synthesizedShape.abdomenWidthScale,
+                toHalfWidth = hipBreadth * 0.56f * synthesizedShape.abdomenWidthScale,
+                halfDepth = 0.105f * synthesizedShape.depthScale,
+                weights = synthesizedShape.abdomenWeights,
+                triangleWideAtStart = false,
+            ),
+        )
         // Thin shoulder + hip girdles keep the figure's width, inset to stay distinct.
         add(CapsuleSpec(lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.22f), lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.78f), 0.055f))
         add(CapsuleSpec(lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.18f), lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.82f), 0.07f))
@@ -764,7 +943,24 @@ private fun SceneScope.HolographicHumanoid(
     FigureMeshNode(engine = engine, specs = specs, material = material)
 }
 
-private data class CapsuleSpec(val from: Position, val to: Position, val radius: Float)
+private sealed interface FigurePartSpec
+
+private data class CapsuleSpec(
+    val from: Position,
+    val to: Position,
+    val radius: Float,
+) : FigurePartSpec
+
+private data class ShapeVolumeSpec(
+    val from: Position,
+    val to: Position,
+    val widthDirection: Position,
+    val fromHalfWidth: Float,
+    val toHalfWidth: Float,
+    val halfDepth: Float,
+    val weights: PrimitiveShapeWeights,
+    val triangleWideAtStart: Boolean,
+) : FigurePartSpec
 
 private class FigureMesh(
     val vertexBuffer: VertexBuffer,
@@ -776,7 +972,7 @@ private class FigureMesh(
 @Composable
 private fun SceneScope.FigureMeshNode(
     engine: Engine,
-    specs: List<CapsuleSpec>,
+    specs: List<FigurePartSpec>,
     material: MaterialInstance,
 ) {
     // Rebuild the mesh only when the pose (specs) changes; dispose the GPU buffers when it does.
@@ -796,11 +992,23 @@ private fun SceneScope.FigureMeshNode(
     )
 }
 
-private fun buildFigureMesh(engine: Engine, specs: List<CapsuleSpec>): FigureMesh {
+private fun buildFigureMesh(engine: Engine, specs: List<FigurePartSpec>): FigureMesh {
     val positions = ArrayList<Float>(16384)
     val colors = ArrayList<Float>(16384)
     val indices = ArrayList<Int>(32768)
-    specs.forEach { appendCapsule(positions, colors, indices, it.from, it.to, it.radius) }
+    specs.forEach { spec ->
+        when (spec) {
+            is CapsuleSpec -> appendCapsule(
+                positions,
+                colors,
+                indices,
+                spec.from,
+                spec.to,
+                spec.radius,
+            )
+            is ShapeVolumeSpec -> appendShapeVolume(positions, colors, indices, spec)
+        }
+    }
 
     val positionBuffer = ByteBuffer
         .allocateDirect(positions.size * 4)
@@ -853,6 +1061,108 @@ private fun buildFigureMesh(engine: Engine, specs: List<CapsuleSpec>): FigureMes
         (maxX - minX) * 0.5f + 0.02f, (maxY - minY) * 0.5f + 0.02f, (maxZ - minZ) * 0.5f + 0.02f,
     )
     return FigureMesh(vertexBuffer, indexBuffer, box, indices.size)
+}
+
+/**
+ * Builds a closed torso/abdomen volume whose silhouette is a continuous blend of the paper's
+ * circle, square, and triangle primitives. Circle controls mid-body fullness, square controls
+ * superellipse corner strength, and triangle controls the top-to-bottom taper.
+ */
+private fun appendShapeVolume(
+    positions: MutableList<Float>,
+    colors: MutableList<Float>,
+    indices: MutableList<Int>,
+    spec: ShapeVolumeSpec,
+    lengthSegments: Int = 10,
+    radialSegments: Int = 40,
+) {
+    val axis = normalizedDirection(spec.from, spec.to)
+    val widthDotAxis = dot(spec.widthDirection, axis)
+    val projectedWidth = Position(
+        spec.widthDirection.x - widthDotAxis * axis.x,
+        spec.widthDirection.y - widthDotAxis * axis.y,
+        spec.widthDirection.z - widthDotAxis * axis.z,
+    )
+    val width = normalize(projectedWidth, fallback = Position(1f, 0f, 0f))
+    val depth = normalize(cross(axis, width), fallback = Position(0f, 0f, 1f))
+    val exponent = 2f + 6.5f * spec.weights.square
+    val curvePower = 2f / exponent
+    val ringStarts = ArrayList<Int>(lengthSegments + 1)
+
+    val light = normalize(Position(0.428f, 0.771f, 0.471f), Position(0f, 1f, 0f))
+    fun addColor(nx: Float, ny: Float, nz: Float) {
+        val normalLength = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(0.0001f)
+        val nDotL = (nx * light.x + ny * light.y + nz * light.z) / normalLength
+        val shade = 0.4f + 0.6f * (0.5f * nDotL + 0.5f)
+        colors.add(shade); colors.add(shade); colors.add(shade); colors.add(1f)
+    }
+
+    for (ring in 0..lengthSegments) {
+        val t = ring.toFloat() / lengthSegments
+        val center = lerp(spec.from, spec.to, t)
+        val middle = sin(PI.toFloat() * t)
+        val triangleDirection = if (spec.triangleWideAtStart) 1f - 2f * t else 2f * t - 1f
+        val triangleTaper = 1f + 0.16f * spec.weights.triangle * triangleDirection
+        val circleBulge = 1f + 0.13f * spec.weights.circle * middle
+        val halfWidth = lerp(spec.fromHalfWidth, spec.toHalfWidth, t) *
+            triangleTaper * circleBulge
+        val halfDepth = spec.halfDepth *
+            (1f + 0.10f * spec.weights.circle * middle) *
+            (1f - 0.035f * spec.weights.triangle * abs(triangleDirection))
+
+        ringStarts.add(positions.size / 3)
+        for (segment in 0 until radialSegments) {
+            val angle = segment.toFloat() / radialSegments * PI.toFloat() * 2f
+            val cosAngle = cos(angle)
+            val sinAngle = sin(angle)
+            val shapeX = signedPower(cosAngle, curvePower)
+            val shapeZ = signedPower(sinAngle, curvePower)
+            val x = shapeX * halfWidth
+            val z = shapeZ * halfDepth
+
+            positions.add(center.x + width.x * x + depth.x * z)
+            positions.add(center.y + width.y * x + depth.y * z)
+            positions.add(center.z + width.z * x + depth.z * z)
+
+            // Gradient of the corresponding ellipse is a stable shading approximation for a
+            // superellipse and avoids adding another vertex stream solely for normals.
+            addColor(
+                width.x * shapeX / halfWidth + depth.x * shapeZ / halfDepth,
+                width.y * shapeX / halfWidth + depth.y * shapeZ / halfDepth,
+                width.z * shapeX / halfWidth + depth.z * shapeZ / halfDepth,
+            )
+        }
+    }
+
+    for (ring in 0 until lengthSegments) {
+        val current = ringStarts[ring]
+        val next = ringStarts[ring + 1]
+        for (segment in 0 until radialSegments) {
+            val following = (segment + 1) % radialSegments
+            val a = current + segment
+            val b = current + following
+            val c = next + following
+            val d = next + segment
+            indices.add(a); indices.add(b); indices.add(d)
+            indices.add(b); indices.add(c); indices.add(d)
+        }
+    }
+
+    fun cap(center: Position, ringStart: Int, normalScale: Float, reverse: Boolean) {
+        val centerIndex = positions.size / 3
+        positions.add(center.x); positions.add(center.y); positions.add(center.z)
+        addColor(axis.x * normalScale, axis.y * normalScale, axis.z * normalScale)
+        for (segment in 0 until radialSegments) {
+            val next = (segment + 1) % radialSegments
+            if (reverse) {
+                indices.add(centerIndex); indices.add(ringStart + next); indices.add(ringStart + segment)
+            } else {
+                indices.add(centerIndex); indices.add(ringStart + segment); indices.add(ringStart + next)
+            }
+        }
+    }
+    cap(spec.from, ringStarts.first(), -1f, reverse = true)
+    cap(spec.to, ringStarts.last(), 1f, reverse = false)
 }
 
 // Appends a capsule (cylinder + two hemispherical caps) from `from` to `to` in world space,
@@ -988,6 +1298,86 @@ private fun distance(from: Position, to: Position): Float {
     val dy = to.y - from.y
     val dz = to.z - from.z
     return sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+private fun normalizedDirection(from: Position, to: Position): Position = normalize(
+    Position(to.x - from.x, to.y - from.y, to.z - from.z),
+    fallback = Position(0f, 1f, 0f),
+)
+
+private fun normalize(vector: Position, fallback: Position): Position {
+    val length = sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z)
+    if (length <= 0.0001f) return fallback
+    return Position(vector.x / length, vector.y / length, vector.z / length)
+}
+
+private fun dot(a: Position, b: Position): Float = a.x * b.x + a.y * b.y + a.z * b.z
+
+private fun cross(a: Position, b: Position): Position = Position(
+    a.y * b.z - a.z * b.y,
+    a.z * b.x - a.x * b.z,
+    a.x * b.y - a.y * b.x,
+)
+
+private fun signedPower(value: Float, power: Float): Float = when {
+    value > 0f -> value.pow(power)
+    value < 0f -> -(-value).pow(power)
+    else -> 0f
+}
+
+private fun lerp(from: Float, to: Float, amount: Float): Float =
+    from + (to - from) * amount
+
+private fun angleDegrees(a: Position, b: Position): Float {
+    val na = normalize(a, Position(0f, 1f, 0f))
+    val nb = normalize(b, Position(0f, 1f, 0f))
+    return (acos(dot(na, nb).coerceIn(-1f, 1f)) * 180f / PI.toFloat())
+}
+
+private fun bodyMeasurements(joints: Map<Joint, Position>): BodyMeasurements {
+    fun j(joint: Joint) = joints.getValue(joint)
+    fun vector(from: Position, to: Position) = Position(
+        to.x - from.x,
+        to.y - from.y,
+        to.z - from.z,
+    )
+
+    val shoulderCenter = lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.5f)
+    val hipCenter = lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.5f)
+    val ankleCenter = lerp(j(Joint.LEFT_ANKLE), j(Joint.RIGHT_ANKLE), 0.5f)
+    val shoulderBreadth = distance(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER))
+    val hipBreadth = distance(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP))
+    val leftLegLength = distance(j(Joint.LEFT_HIP), j(Joint.LEFT_KNEE)) +
+        distance(j(Joint.LEFT_KNEE), j(Joint.LEFT_ANKLE))
+    val rightLegLength = distance(j(Joint.RIGHT_HIP), j(Joint.RIGHT_KNEE)) +
+        distance(j(Joint.RIGHT_KNEE), j(Joint.RIGHT_ANKLE))
+    val bodyDown = vector(shoulderCenter, hipCenter)
+    val leftArmAngle = angleDegrees(
+        bodyDown,
+        vector(j(Joint.LEFT_SHOULDER), j(Joint.LEFT_ELBOW)),
+    )
+    val rightArmAngle = angleDegrees(
+        bodyDown,
+        vector(j(Joint.RIGHT_SHOULDER), j(Joint.RIGHT_ELBOW)),
+    )
+    val legAngle = angleDegrees(
+        vector(hipCenter, j(Joint.LEFT_ANKLE)),
+        vector(hipCenter, j(Joint.RIGHT_ANKLE)),
+    )
+
+    return BodyMeasurements(
+        // Head radius (0.125 * 2) plus the visible neck-to-head distance.
+        headAndNeckHeight = 0.25f + distance(j(Joint.HEAD), j(Joint.NECK)),
+        upperBodyHeight = distance(shoulderCenter, hipCenter),
+        lowerBodyHeight = ((leftLegLength + rightLegLength) * 0.5f)
+            .coerceAtLeast(distance(hipCenter, ankleCenter)),
+        abdomenBreadth = hipBreadth + 0.03f,
+        shoulderBreadth = shoulderBreadth,
+        shoulderCurve = distance(j(Joint.NECK), shoulderCenter) /
+            shoulderBreadth.coerceAtLeast(0.0001f),
+        armAngleDegrees = (leftArmAngle + rightArmAngle) * 0.5f,
+        legAngleDegrees = legAngle,
+    )
 }
 
 private fun extendFrom(from: Position, through: Position, amount: Float): Position {
@@ -1178,10 +1568,15 @@ private fun PoseLegendChip(
         Surface(
             shape = RoundedCornerShape(50),
             color = if (isError) {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.94f)
+                Color(0xEB3A151B)
             } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+                Color(0xEB111A1B)
             },
+            border = BorderStroke(
+                1.dp,
+                if (isError) Color(0xFFFF8A9B).copy(alpha = 0.35f)
+                else Color.White.copy(alpha = 0.12f),
+            ),
             tonalElevation = 2.dp,
         ) {
             Text(
@@ -1189,9 +1584,9 @@ private fun PoseLegendChip(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (isError) {
-                    MaterialTheme.colorScheme.onErrorContainer
+                    Color(0xFFFFC2CA)
                 } else {
-                    MaterialTheme.colorScheme.onSurface
+                    Color(0xFFF1F7F4)
                 },
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 maxLines = 1,

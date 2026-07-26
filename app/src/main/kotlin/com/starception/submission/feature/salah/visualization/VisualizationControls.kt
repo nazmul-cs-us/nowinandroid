@@ -83,12 +83,63 @@ fun VisualizationControls(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ── Mode Selector ──────────────────────────────
-        SectionHeader("Mode")
-        SegmentedModeSelector(
-            currentMode = state.mode,
-            onModeSelected = { onStateChange(state.copy(mode = it)) }
-        )
+        if (state.mode == VisualizationMode.PHONE_MODEL) {
+            SectionHeader("Pose sample")
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                FilterChip(
+                    selected = state.posePlaybackSource == PosePlaybackSource.RECORDED,
+                    enabled = state.totalSamples > 0,
+                    onClick = {
+                        onStateChange(
+                            state.copy(
+                                posePlaybackSource = PosePlaybackSource.RECORDED,
+                                isPlaying = false,
+                                isTwoRakahPlaying = false,
+                            ),
+                        )
+                    },
+                    label = { Text("Recorded") },
+                )
+                FilterChip(
+                    selected = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE,
+                    onClick = {
+                        onStateChange(
+                            state.copy(
+                                posePlaybackSource = PosePlaybackSource.TWO_RAKAH_SAMPLE,
+                                mode = VisualizationMode.PHONE_MODEL,
+                                isPlaying = false,
+                                isTwoRakahPlaying = false,
+                            ),
+                        )
+                    },
+                    label = { Text("2 Rak'ah") },
+                )
+            }
+
+            SectionHeader("Body shape")
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                BodyShapeStyle.entries.forEach { style ->
+                    FilterChip(
+                        selected = state.bodyShapeStyle == style,
+                        onClick = { onStateChange(state.copy(bodyShapeStyle = style)) },
+                        label = { Text(style.displayName) },
+                    )
+                }
+            }
+            Text(
+                text = "Torso and abdomen use pose/proportion shape synthesis",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         // ── Model Diagnostics ──────────────────────────
         if (state.mode == VisualizationMode.SCATTER || state.mode == VisualizationMode.FEATURE_PCA) {
@@ -268,9 +319,10 @@ private fun SectionHeader(title: String) {
 // ═══════════════════════════════════════════════════════
 
 @Composable
-private fun SegmentedModeSelector(
-    currentMode: VisualizationMode,
-    onModeSelected: (VisualizationMode) -> Unit
+fun VisualizationModePicker(
+    state: VisualizationState,
+    onStateChange: (VisualizationState) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val modes = listOf(
         Triple(VisualizationMode.SCATTER, "Scatter", Icons.Default.Grain),
@@ -279,60 +331,90 @@ private fun SegmentedModeSelector(
         Triple(VisualizationMode.FEATURE_PCA, "PCA", Icons.Default.BubbleChart)
     )
 
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            modes.forEach { (mode, label, icon) ->
-                val isSelected = currentMode == mode
-                val bgColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                    else Color.Transparent,
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    label = "mode_bg"
-                )
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    label = "mode_content"
-                )
+            Text(
+                text = "3D VIEW",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.2.sp,
+            )
+            Text(
+                text = modes.first { it.first == state.mode }.second,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
-                Surface(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                modes.forEach { (mode, label, icon) ->
+                    val isSelected = state.mode == mode
+                    val bgColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                        else Color.Transparent,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        label = "mode_bg",
+                    )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        label = "mode_content",
+                    )
+
+                    Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .height(38.dp)
+                        .height(42.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onModeSelected(mode) },
+                        .clickable { onStateChange(state.copy(mode = mode)) },
                     shape = RoundedCornerShape(12.dp),
                     color = bgColor,
-                    shadowElevation = if (isSelected) 2.dp else 0.dp
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                    shadowElevation = if (isSelected) 2.dp else 0.dp,
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = contentColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = contentColor
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = contentColor,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -407,6 +489,12 @@ fun PlaybackBar(
     state: VisualizationState,
     onStateChange: (VisualizationState) -> Unit
 ) {
+    val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+    val itemCount = if (isTwoRakah) twoRakahSample.size else state.totalSamples
+    val currentIndex = if (isTwoRakah) state.twoRakahStepIndex else state.playbackIndex
+    val isPlaying = if (isTwoRakah) state.isTwoRakahPlaying else state.isPlaying
+    val currentStep = if (isTwoRakah) state.currentTwoRakahStep() else null
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -425,10 +513,16 @@ fun PlaybackBar(
                 // Skip Previous
                 IconButton(
                     onClick = {
-                        val newIndex = (state.playbackIndex - 1).coerceAtLeast(0)
-                        onStateChange(state.copy(playbackIndex = newIndex, isPlaying = false))
+                        val newIndex = (currentIndex - 1).coerceAtLeast(0)
+                        onStateChange(
+                            if (isTwoRakah) {
+                                state.copy(twoRakahStepIndex = newIndex, isTwoRakahPlaying = false)
+                            } else {
+                                state.copy(playbackIndex = newIndex, isPlaying = false)
+                            },
+                        )
                     },
-                    enabled = state.playbackIndex > 0,
+                    enabled = currentIndex > 0,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -440,7 +534,19 @@ fun PlaybackBar(
 
                 // Play/Pause (prominent)
                 FilledIconButton(
-                    onClick = { onStateChange(state.copy(isPlaying = !state.isPlaying)) },
+                    onClick = {
+                        onStateChange(
+                            if (isTwoRakah) {
+                                state.copy(
+                                    twoRakahStepIndex = if (!isPlaying && currentIndex == itemCount - 1) 0 else currentIndex,
+                                    isTwoRakahPlaying = !isPlaying,
+                                    isPlaying = false,
+                                )
+                            } else {
+                                state.copy(isPlaying = !isPlaying, isTwoRakahPlaying = false)
+                            },
+                        )
+                    },
                     modifier = Modifier.size(42.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -448,8 +554,8 @@ fun PlaybackBar(
                     )
                 ) {
                     Icon(
-                        imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -457,10 +563,16 @@ fun PlaybackBar(
                 // Skip Next
                 IconButton(
                     onClick = {
-                        val newIndex = (state.playbackIndex + 1).coerceAtMost(state.totalSamples - 1)
-                        onStateChange(state.copy(playbackIndex = newIndex, isPlaying = false))
+                        val newIndex = (currentIndex + 1).coerceAtMost(itemCount - 1)
+                        onStateChange(
+                            if (isTwoRakah) {
+                                state.copy(twoRakahStepIndex = newIndex, isTwoRakahPlaying = false)
+                            } else {
+                                state.copy(playbackIndex = newIndex, isPlaying = false)
+                            },
+                        )
                     },
-                    enabled = state.playbackIndex < state.totalSamples - 1,
+                    enabled = currentIndex < itemCount - 1,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -474,7 +586,11 @@ fun PlaybackBar(
 
                 // Sample counter
                 Text(
-                    text = "${state.playbackIndex + 1} / ${state.totalSamples}",
+                    text = if (currentStep != null) {
+                        "RAK'AH ${currentStep.rakah} · ${currentIndex + 1} / $itemCount"
+                    } else {
+                        "${currentIndex + 1} / $itemCount"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
@@ -485,16 +601,23 @@ fun PlaybackBar(
             // Scrubbable timeline: reviewing a specific pose should not require stepping
             // through thousands of sensor windows one at a time.
             Slider(
-                value = state.playbackIndex.toFloat(),
+                value = currentIndex.toFloat(),
                 onValueChange = { index ->
                     onStateChange(
-                        state.copy(
-                            playbackIndex = index.toInt().coerceIn(0, state.totalSamples - 1),
-                            isPlaying = false,
-                        )
+                        if (isTwoRakah) {
+                            state.copy(
+                                twoRakahStepIndex = index.toInt().coerceIn(0, itemCount - 1),
+                                isTwoRakahPlaying = false,
+                            )
+                        } else {
+                            state.copy(
+                                playbackIndex = index.toInt().coerceIn(0, itemCount - 1),
+                                isPlaying = false,
+                            )
+                        },
                     )
                 },
-                valueRange = 0f..(state.totalSamples - 1).coerceAtLeast(1).toFloat(),
+                valueRange = 0f..(itemCount - 1).coerceAtLeast(1).toFloat(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(28.dp),
@@ -551,12 +674,202 @@ fun PlaybackBar(
     }
 }
 
+/** Compact, dark playback deck designed specifically for the immersive 3D surface. */
+@Composable
+fun VisualizationPlaybackDeck(
+    state: VisualizationState,
+    onStateChange: (VisualizationState) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+    val itemCount = if (isTwoRakah) twoRakahSample.size else state.totalSamples
+    val currentIndex = if (isTwoRakah) state.twoRakahStepIndex else state.playbackIndex
+    val isPlaying = if (isTwoRakah) state.isTwoRakahPlaying else state.isPlaying
+    val currentStep = if (isTwoRakah) state.currentTwoRakahStep() else null
+    val posture = currentStep?.posture ?: state.currentPosture
+    val accent = Color(0xFF62E2C2)
+    val primaryText = Color(0xFFF1F7F4)
+    val secondaryText = Color(0xFFACBBB5)
+
+    fun selectIndex(index: Int) {
+        val safeIndex = index.coerceIn(0, itemCount - 1)
+        onStateChange(
+            if (isTwoRakah) {
+                state.copy(twoRakahStepIndex = safeIndex, isTwoRakahPlaying = false)
+            } else {
+                state.copy(playbackIndex = safeIndex, isPlaying = false)
+            },
+        )
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = Color(0xEB111A1B),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        shadowElevation = 12.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (currentStep != null) {
+                            "RAK'AH ${currentStep.rakah}"
+                        } else {
+                            "RECORDED POSE"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = accent,
+                        letterSpacing = 1.sp,
+                    )
+                    Text(
+                        text = currentStep?.label ?: posture?.displayName ?: "No pose selected",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primaryText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color.White.copy(alpha = 0.08f),
+                ) {
+                    Text(
+                        text = "${currentIndex + 1} / $itemCount",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = primaryText,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
+
+            Slider(
+                value = currentIndex.toFloat(),
+                onValueChange = { selectIndex(it.toInt()) },
+                valueRange = 0f..(itemCount - 1).coerceAtLeast(1).toFloat(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.16f),
+                ),
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(
+                    onClick = { selectIndex(currentIndex - 1) },
+                    enabled = currentIndex > 0,
+                    modifier = Modifier.size(38.dp),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = primaryText,
+                        disabledContentColor = primaryText.copy(alpha = 0.25f),
+                    ),
+                ) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous pose")
+                }
+                FilledIconButton(
+                    onClick = {
+                        onStateChange(
+                            if (isTwoRakah) {
+                                state.copy(
+                                    twoRakahStepIndex = if (!isPlaying && currentIndex == itemCount - 1) 0 else currentIndex,
+                                    isTwoRakahPlaying = !isPlaying,
+                                    isPlaying = false,
+                                )
+                            } else {
+                                state.copy(isPlaying = !isPlaying, isTwoRakahPlaying = false)
+                            },
+                        )
+                    },
+                    modifier = Modifier.size(46.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = accent,
+                        contentColor = Color(0xFF082019),
+                    ),
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                    )
+                }
+                IconButton(
+                    onClick = { selectIndex(currentIndex + 1) },
+                    enabled = currentIndex < itemCount - 1,
+                    modifier = Modifier.size(38.dp),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = primaryText,
+                        disabledContentColor = primaryText.copy(alpha = 0.25f),
+                    ),
+                ) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Next pose")
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "SPEED",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = secondaryText,
+                )
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable {
+                            val speeds = listOf(0.5f, 1f, 2f, 5f)
+                            val next = speeds.firstOrNull { it > state.playbackSpeed + 0.01f }
+                                ?: speeds.first()
+                            onStateChange(state.copy(playbackSpeed = next))
+                        },
+                    shape = RoundedCornerShape(50),
+                    color = accent.copy(alpha = 0.13f),
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.30f)),
+                ) {
+                    Text(
+                        text = if (state.playbackSpeed % 1f == 0f) {
+                            "${state.playbackSpeed.toInt()}x"
+                        } else {
+                            "${"%.1f".format(state.playbackSpeed)}x"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = accent,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════
 // Current Sample Card
 // ═══════════════════════════════════════════════════════
 
 @Composable
 fun CurrentSampleCard(state: VisualizationState) {
+    val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+    val currentStep = if (isTwoRakah) state.currentTwoRakahStep() else null
+    val displayedPosture = currentStep?.posture ?: state.currentPosture
+
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -567,7 +880,7 @@ fun CurrentSampleCard(state: VisualizationState) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Posture name with color indicator
-            state.currentPosture?.let { posture ->
+            displayedPosture?.let { posture ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -597,13 +910,22 @@ fun CurrentSampleCard(state: VisualizationState) {
                 }
             }
 
+            if (currentStep != null) {
+                Text(
+                    text = "Rak'ah ${currentStep.rakah} · ${currentStep.label}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
             // Model prediction vs label at the current playback window — red when
             // they disagree, so scrubbing a flagged run shows instantly whether the
             // label or the model is wrong.
-            val prediction = state.predictions?.getOrNull(state.playbackIndex)
-            if (prediction != null && state.currentPosture != null) {
+            val prediction = if (isTwoRakah) null else state.predictions?.getOrNull(state.playbackIndex)
+            if (prediction != null && displayedPosture != null) {
                 val predicted = prediction.predicted
-                val agrees = predicted == state.currentPosture
+                val agrees = predicted == displayedPosture
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -643,14 +965,16 @@ fun CurrentSampleCard(state: VisualizationState) {
             }
 
             // Sensor values in a clean grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                SensorReadout("Pitch", "${"%.1f".format(state.currentPitch)}\u00B0")
-                SensorReadout("Roll", "${"%.1f".format(state.currentRoll)}\u00B0")
-                SensorReadout("Accel", "${"%.2f".format(state.currentAccelMag)}")
-                SensorReadout("Gyro", "${"%.3f".format(state.currentGyroMag)}")
+            if (!isTwoRakah) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    SensorReadout("Pitch", "${"%.1f".format(state.currentPitch)}\u00B0")
+                    SensorReadout("Roll", "${"%.1f".format(state.currentRoll)}\u00B0")
+                    SensorReadout("Accel", "${"%.2f".format(state.currentAccelMag)}")
+                    SensorReadout("Gyro", "${"%.3f".format(state.currentGyroMag)}")
+                }
             }
         }
     }

@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -109,7 +110,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.starception.submission.feature.salah.visualization.CurrentSampleCard
 import com.starception.submission.feature.salah.visualization.DataQualitySummary
-import com.starception.submission.feature.salah.visualization.PlaybackBar
+import com.starception.submission.feature.salah.visualization.VisualizationModePicker
+import com.starception.submission.feature.salah.visualization.VisualizationPlaybackDeck
+import com.starception.submission.feature.salah.visualization.PosePlaybackSource
 import com.starception.submission.feature.salah.visualization.Visualization3DView
 import com.starception.submission.feature.salah.visualization.VisualizationControls
 import com.starception.submission.feature.salah.visualization.VisualizationState
@@ -2972,12 +2975,15 @@ private fun Visualization3DCard(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    if (allSamples.isEmpty()) {
+                    if (
+                        allSamples.isEmpty() &&
+                        vizState.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE
+                    ) {
                         // Empty state
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp),
+                                .height(240.dp),
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow
                         ) {
@@ -3012,30 +3018,70 @@ private fun Visualization3DCard(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Record training data to visualize",
+                                    text = "Record training data or open the built-in sample",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                NiaOutlinedButton(
+                                    onClick = {
+                                        onVizStateChange(
+                                            vizState.copy(
+                                                mode = com.starception.submission.feature.salah.visualization.VisualizationMode.PHONE_MODEL,
+                                                posePlaybackSource = PosePlaybackSource.TWO_RAKAH_SAMPLE,
+                                            ),
+                                        )
+                                    },
+                                ) {
+                                    Text("View 2 Rak'ah sample")
+                                }
                             }
                         }
                     } else {
+                        VisualizationModePicker(
+                            state = vizState,
+                            onStateChange = onVizStateChange,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
                         // 3D View
                         if (!isFullscreen) {
-                            Surface(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(350.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color(0xFF1C1C1E)
+                                    .height(520.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(Color(0xFF080D10))
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color(0xFF62E2C2).copy(alpha = 0.18f),
+                                        shape = RoundedCornerShape(22.dp),
+                                    ),
                             ) {
                                 Visualization3DView(
                                     samples = allSamples,
                                     state = vizState,
                                     onStateChange = onVizStateChange,
                                     onPlaybackTick = onPlaybackTick,
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(bottom = 138.dp),
                                     onFullscreenChange = { isFullscreen = it },
                                 )
+
+                                if (
+                                    vizState.totalSamples > 0 ||
+                                    vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+                                ) {
+                                    VisualizationPlaybackDeck(
+                                        state = vizState,
+                                        onStateChange = onVizStateChange,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                    )
+                                }
                             }
                         } else {
                             // Keep the card's layout stable while the Filament surface is
@@ -3043,24 +3089,25 @@ private fun Visualization3DCard(
                             Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(350.dp),
+                                    .height(520.dp),
                             )
                         }
 
-                        // Playback controls directly below 3D view
-                        if (vizState.totalSamples > 0) {
-                            PlaybackBar(
-                                state = vizState,
-                                onStateChange = onVizStateChange
-                            )
+                        // Recorded sensor details remain available below the immersive stage.
+                        if (
+                            vizState.totalSamples > 0 &&
+                            vizState.posePlaybackSource == PosePlaybackSource.RECORDED
+                        ) {
                             CurrentSampleCard(vizState)
                         }
 
                         // Data quality summary
-                        DataQualitySummary(
-                            samples = allSamples,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (allSamples.isNotEmpty()) {
+                            DataQualitySummary(
+                                samples = allSamples,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
 
                         // Controls
                         VisualizationControls(
@@ -3075,7 +3122,10 @@ private fun Visualization3DCard(
         }
     }
 
-    if (isFullscreen && allSamples.isNotEmpty()) {
+    if (
+        isFullscreen &&
+        (allSamples.isNotEmpty() || vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE)
+    ) {
         Dialog(
             onDismissRequest = { isFullscreen = false },
             properties = DialogProperties(
@@ -3098,17 +3148,22 @@ private fun Visualization3DCard(
                     onFullscreenChange = { isFullscreen = it },
                 )
 
-                if (vizState.totalSamples > 0) {
+                if (
+                    vizState.totalSamples > 0 ||
+                    vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+                ) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
+                            .fillMaxWidth(0.94f)
+                            .widthIn(max = 720.dp)
                             .navigationBarsPadding()
-                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                            .padding(bottom = 14.dp),
                     ) {
-                        PlaybackBar(
+                        VisualizationPlaybackDeck(
                             state = vizState,
                             onStateChange = onVizStateChange,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
