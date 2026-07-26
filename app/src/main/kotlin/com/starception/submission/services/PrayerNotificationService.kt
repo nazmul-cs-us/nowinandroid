@@ -706,6 +706,15 @@ class PrayerNotificationService : Service() {
                     Log.d(TAG, "Calling updatePrayerNotificationWithRealData()...")
                     updatePrayerNotificationWithRealData()
                     updateCount++
+
+                    // Safety net for silent-during-prayer: if the window has ended but DND is
+                    // still on (e.g. the one-shot restore alarm was dropped), turn it back off.
+                    // This runs every ~minute in the always-on service, so DND is recovered even
+                    // when the user never reopens the app.
+                    runCatching {
+                        com.starception.submission.prayer.silent.PrayerSilentModeController(applicationContext)
+                            .recoverIfNeeded()
+                    }.onFailure { Log.e(TAG, "Silent-mode recovery check failed", it) }
                     
                     val iterationDuration = System.currentTimeMillis() - iterationStartTime
                     Log.d(TAG, "✓ Prayer update #$updateCount/$maxUpdates completed in ${iterationDuration}ms")

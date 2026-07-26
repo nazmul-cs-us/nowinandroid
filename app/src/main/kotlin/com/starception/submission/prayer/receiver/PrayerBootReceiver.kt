@@ -53,6 +53,13 @@ class PrayerBootReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_PACKAGE_REPLACED -> {
                 Log.d(TAG, "🚀 Device booted or app updated - rescheduling prayer notifications and restarting activity detection")
+                // Alarms don't survive a reboot, so a silent-during-prayer window that was still
+                // running (or that just expired) would otherwise leave DND stuck on. Recover it:
+                // restore now if the window elapsed, or re-arm the restore alarm if still active.
+                runCatching {
+                    com.starception.submission.prayer.silent.PrayerSilentModeController(context.applicationContext)
+                        .recoverIfNeeded()
+                }.onFailure { Log.e(TAG, "Silent-mode recovery on boot failed", it) }
                 // goAsync keeps the process alive until scheduling finishes —
                 // otherwise the system may kill us right after onReceive returns
                 // and the alarms are never registered.

@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,10 +37,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.google.android.filament.Box
 import com.google.android.filament.Colors
+import com.google.android.filament.Engine
+import com.google.android.filament.IndexBuffer
 import com.google.android.filament.Material
 import com.google.android.filament.MaterialInstance
+import com.google.android.filament.RenderableManager
 import com.google.android.filament.Renderer
+import com.google.android.filament.VertexBuffer
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import io.github.sceneview.Scene
 import io.github.sceneview.SceneScope
 import io.github.sceneview.SurfaceType
@@ -264,6 +272,7 @@ fun Visualization3DView(
                     gridMaterial = gridMaterial,
                 )
                 VisualizationMode.PHONE_MODEL -> HumanoidScene(
+                    engine = engine,
                     samples = samples,
                     state = state,
                     materialLoader = materialLoader,
@@ -566,6 +575,7 @@ private fun SceneScope.GravityScene(
 
 @Composable
 private fun SceneScope.HumanoidScene(
+    engine: Engine,
     samples: List<SalahDataSample>,
     state: VisualizationState,
     materialLoader: io.github.sceneview.loaders.MaterialLoader,
@@ -578,17 +588,19 @@ private fun SceneScope.HumanoidScene(
     val dual = state.predictions != null
     val disagrees = prediction?.predicted != null && prediction.predicted != recorded
 
-    val truthMaterial = remember(materialLoader, unlitColorMaterial) {
-        materialLoader.createUnlitColorInstance(unlitColorMaterial, 0.07f, 0.78f, 0.61f)
+    // The figure uses a shaded material (multiplies base colour by the baked per-vertex shade);
+    // the stage/grid keep the plain unlit material since they carry no vertex colours.
+    val shadedColorMaterial = remember(materialLoader) {
+        materialLoader.createMaterial("materials/salah_shaded_color.filamat")
     }
-    val truthJointMaterial = remember(materialLoader, unlitColorMaterial) {
-        materialLoader.createUnlitColorInstance(unlitColorMaterial, 0.57f, 1f, 0.86f)
+    val truthMaterial = remember(materialLoader, shadedColorMaterial) {
+        materialLoader.createUnlitColorInstance(shadedColorMaterial, 0.09f, 0.85f, 0.66f)
     }
-    val predictionGood = remember(materialLoader, unlitColorMaterial) {
-        materialLoader.createUnlitColorInstance(unlitColorMaterial, 0.42f, 0.89f, 0.25f)
+    val predictionGood = remember(materialLoader, shadedColorMaterial) {
+        materialLoader.createUnlitColorInstance(shadedColorMaterial, 0.45f, 0.92f, 0.28f)
     }
-    val predictionBad = remember(materialLoader, unlitColorMaterial) {
-        materialLoader.createUnlitColorInstance(unlitColorMaterial, 1f, 0.23f, 0.38f)
+    val predictionBad = remember(materialLoader, shadedColorMaterial) {
+        materialLoader.createUnlitColorInstance(shadedColorMaterial, 1f, 0.28f, 0.42f)
     }
     val matMaterial = remember(materialLoader, unlitColorMaterial) {
         materialLoader.createUnlitColorInstance(unlitColorMaterial, 0.035f, 0.12f, 0.10f)
@@ -619,9 +631,9 @@ private fun SceneScope.HumanoidScene(
     }
 
     HolographicHumanoid(
+        engine = engine,
         pose = skeletonPose(recorded, if (dual) -0.58f else 0f),
-        bodyMaterial = truthMaterial,
-        jointMaterial = truthJointMaterial,
+        material = truthMaterial,
     )
 
     if (dual) {
@@ -629,9 +641,9 @@ private fun SceneScope.HumanoidScene(
         val predictionMaterial = if (disagrees) predictionBad else predictionGood
         key(disagrees) {
             HolographicHumanoid(
+                engine = engine,
                 pose = skeletonPose(predictedPosture, 0.58f),
-                bodyMaterial = predictionMaterial,
-                jointMaterial = predictionMaterial,
+                material = predictionMaterial,
             )
         }
     }
@@ -670,9 +682,9 @@ private data class SkeletonPose(val joints: Map<Joint, Position>)
 
 @Composable
 private fun SceneScope.HolographicHumanoid(
+    engine: Engine,
     pose: SkeletonPose,
-    bodyMaterial: MaterialInstance,
-    jointMaterial: MaterialInstance,
+    material: MaterialInstance,
 ) {
     val animated = buildMap {
         pose.joints.forEach { (joint, target) ->
@@ -695,110 +707,254 @@ private fun SceneScope.HolographicHumanoid(
         }
     }
 
-    // Oval-mannequin scaffold (matches the artist's construction reference): every body
-    // segment is a plump ellipsoid and every articulation a small sphere, so the figure
-    // reads as a built-up mannequin instead of a thin stick/wireframe. The ovals stay
-    // pinned to the animated joints, so proportions hold through every pose.
-    val head = animated.getValue(Joint.HEAD)
-    val neck = animated.getValue(Joint.NECK)
-    val leftShoulder = animated.getValue(Joint.LEFT_SHOULDER)
-    val rightShoulder = animated.getValue(Joint.RIGHT_SHOULDER)
-    val leftHip = animated.getValue(Joint.LEFT_HIP)
-    val rightHip = animated.getValue(Joint.RIGHT_HIP)
-    val shoulderCenter = lerp(leftShoulder, rightShoulder, 0.5f)
-    val hipCenter = lerp(leftHip, rightHip, 0.5f)
+    // Build the whole figure as ONE custom mesh we hand to Filament directly (buildFigureMesh).
+    // SceneView's SphereNode/CylinderNode render flattened or hollow in this build, so instead
+    // each body segment is a real capsule (cylinder + hemispherical caps) and each joint a
+    // sphere, all fused into a single solid, continuous mannequin.
+    fun j(joint: Joint) = animated.getValue(joint)
+    // A distinct capsule for one bone, inset from both joints so neighbouring parts stay
+    // visually separate (articulated) instead of fusing into a single blob.
+    fun bone(a: Joint, b: Joint, radius: Float, inset: Float = 0.18f): CapsuleSpec {
+        val pa = j(a)
+        val pb = j(b)
+        return CapsuleSpec(lerp(pa, pb, inset), lerp(pa, pb, 1f - inset), radius)
+    }
+    val head = j(Joint.HEAD)
+    val neck = j(Joint.NECK)
+    val shoulderCenter = lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.5f)
+    val hipCenter = lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.5f)
     val torsoSplit = lerp(shoulderCenter, hipCenter, 0.5f)
 
-    // Head — a rounded sphere sitting on the neck.
-    SphereNode(
-        radius = 0.2f,
-        stacks = 22,
-        slices = 30,
-        materialInstance = bodyMaterial,
-        position = head,
-    )
-
-    // Neck, chest oval, pelvis oval, and the shoulder/hip girdles that tie them together.
-    OvalPart(neck, lerp(neck, head, 0.45f), 0.085f, jointMaterial)
-    OvalPart(shoulderCenter, torsoSplit, 0.26f, bodyMaterial)
-    OvalPart(torsoSplit, hipCenter, 0.21f, bodyMaterial)
-    OvalPart(leftShoulder, rightShoulder, 0.11f, bodyMaterial)
-    OvalPart(leftHip, rightHip, 0.12f, bodyMaterial)
-
-    // Arms: upper arm, forearm, and a small hand oval past the wrist.
-    listOf(
-        Triple(Joint.LEFT_SHOULDER, Joint.LEFT_ELBOW, 0.125f),
-        Triple(Joint.RIGHT_SHOULDER, Joint.RIGHT_ELBOW, 0.125f),
-        Triple(Joint.LEFT_ELBOW, Joint.LEFT_WRIST, 0.1f),
-        Triple(Joint.RIGHT_ELBOW, Joint.RIGHT_WRIST, 0.1f),
-    ).forEach { (start, end, width) ->
-        OvalPart(animated.getValue(start), animated.getValue(end), width, bodyMaterial)
-    }
-    listOf(
-        Joint.LEFT_ELBOW to Joint.LEFT_WRIST,
-        Joint.RIGHT_ELBOW to Joint.RIGHT_WRIST,
-    ).forEach { (elbowJoint, wristJoint) ->
-        val elbow = animated.getValue(elbowJoint)
-        val wrist = animated.getValue(wristJoint)
-        OvalPart(wrist, extendFrom(elbow, wrist, 0.085f), 0.088f, bodyMaterial)
-    }
-
-    // Legs: thigh, calf, and foot ovals with progressively lighter proportions.
-    listOf(
-        Triple(Joint.LEFT_HIP, Joint.LEFT_KNEE, 0.17f),
-        Triple(Joint.RIGHT_HIP, Joint.RIGHT_KNEE, 0.17f),
-        Triple(Joint.LEFT_KNEE, Joint.LEFT_ANKLE, 0.135f),
-        Triple(Joint.RIGHT_KNEE, Joint.RIGHT_ANKLE, 0.135f),
-        Triple(Joint.LEFT_ANKLE, Joint.LEFT_TOE, 0.1f),
-        Triple(Joint.RIGHT_ANKLE, Joint.RIGHT_TOE, 0.1f),
-    ).forEach { (start, end, width) ->
-        OvalPart(animated.getValue(start), animated.getValue(end), width, bodyMaterial)
+    val specs = buildList {
+        // Head (sphere) + neck — each a distinct shape.
+        add(CapsuleSpec(head, head, 0.16f))
+        add(CapsuleSpec(lerp(neck, head, 0.18f), lerp(neck, head, 0.58f), 0.05f))
+        // Torso: separate chest and pelvis ovals with a visible waist between them.
+        add(CapsuleSpec(lerp(shoulderCenter, torsoSplit, 0.12f), lerp(shoulderCenter, torsoSplit, 0.88f), 0.17f))
+        add(CapsuleSpec(lerp(torsoSplit, hipCenter, 0.2f), hipCenter, 0.135f))
+        // Thin shoulder + hip girdles keep the figure's width, inset to stay distinct.
+        add(CapsuleSpec(lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.22f), lerp(j(Joint.LEFT_SHOULDER), j(Joint.RIGHT_SHOULDER), 0.78f), 0.055f))
+        add(CapsuleSpec(lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.18f), lerp(j(Joint.LEFT_HIP), j(Joint.RIGHT_HIP), 0.82f), 0.07f))
+        // Arms: distinct upper arm and forearm ovals.
+        add(bone(Joint.LEFT_SHOULDER, Joint.LEFT_ELBOW, 0.072f))
+        add(bone(Joint.RIGHT_SHOULDER, Joint.RIGHT_ELBOW, 0.072f))
+        add(bone(Joint.LEFT_ELBOW, Joint.LEFT_WRIST, 0.056f))
+        add(bone(Joint.RIGHT_ELBOW, Joint.RIGHT_WRIST, 0.056f))
+        // Hands.
+        add(CapsuleSpec(lerp(j(Joint.LEFT_WRIST), extendFrom(j(Joint.LEFT_ELBOW), j(Joint.LEFT_WRIST), 0.075f), 0.35f), extendFrom(j(Joint.LEFT_ELBOW), j(Joint.LEFT_WRIST), 0.075f), 0.048f))
+        add(CapsuleSpec(lerp(j(Joint.RIGHT_WRIST), extendFrom(j(Joint.RIGHT_ELBOW), j(Joint.RIGHT_WRIST), 0.075f), 0.35f), extendFrom(j(Joint.RIGHT_ELBOW), j(Joint.RIGHT_WRIST), 0.075f), 0.048f))
+        // Legs: distinct thigh and calf ovals.
+        add(bone(Joint.LEFT_HIP, Joint.LEFT_KNEE, 0.098f))
+        add(bone(Joint.RIGHT_HIP, Joint.RIGHT_KNEE, 0.098f))
+        add(bone(Joint.LEFT_KNEE, Joint.LEFT_ANKLE, 0.07f))
+        add(bone(Joint.RIGHT_KNEE, Joint.RIGHT_ANKLE, 0.07f))
+        // Feet.
+        add(bone(Joint.LEFT_ANKLE, Joint.LEFT_TOE, 0.05f, 0.1f))
+        add(bone(Joint.RIGHT_ANKLE, Joint.RIGHT_TOE, 0.05f, 0.1f))
+        // Small joint spheres (connector circles) at each articulation.
+        listOf(
+            Joint.LEFT_SHOULDER to 0.058f, Joint.RIGHT_SHOULDER to 0.058f,
+            Joint.LEFT_ELBOW to 0.048f, Joint.RIGHT_ELBOW to 0.048f,
+            Joint.LEFT_HIP to 0.07f, Joint.RIGHT_HIP to 0.07f,
+            Joint.LEFT_KNEE to 0.058f, Joint.RIGHT_KNEE to 0.058f,
+            Joint.LEFT_ANKLE to 0.048f, Joint.RIGHT_ANKLE to 0.048f,
+        ).forEach { (joint, r) -> add(CapsuleSpec(j(joint), j(joint), r)) }
     }
 
-    // Construction spheres at each articulation, sized to sit inside the ovals they join.
-    animated.filterKeys { it != Joint.HEAD }.forEach { (joint, position) ->
-        SphereNode(
-            radius = when (joint) {
-                Joint.NECK -> 0.09f
-                Joint.LEFT_SHOULDER, Joint.RIGHT_SHOULDER -> 0.135f
-                Joint.LEFT_HIP, Joint.RIGHT_HIP -> 0.155f
-                Joint.LEFT_ELBOW, Joint.RIGHT_ELBOW -> 0.115f
-                Joint.LEFT_KNEE, Joint.RIGHT_KNEE -> 0.14f
-                Joint.LEFT_WRIST, Joint.RIGHT_WRIST -> 0.098f
-                Joint.LEFT_ANKLE, Joint.RIGHT_ANKLE -> 0.11f
-                Joint.LEFT_TOE, Joint.RIGHT_TOE -> 0.08f
-                Joint.HEAD -> error("Head is rendered as a sphere")
-            },
-            stacks = 12,
-            slices = 16,
-            materialInstance = jointMaterial,
-            position = position,
-        )
-    }
+    FigureMeshNode(engine = engine, specs = specs, material = material)
 }
 
+private data class CapsuleSpec(val from: Position, val to: Position, val radius: Float)
+
+private class FigureMesh(
+    val vertexBuffer: VertexBuffer,
+    val indexBuffer: IndexBuffer,
+    val boundingBox: Box,
+    val indexCount: Int,
+)
+
 @Composable
-private fun SceneScope.OvalPart(
-    from: Position,
-    to: Position,
-    width: Float,
+private fun SceneScope.FigureMeshNode(
+    engine: Engine,
+    specs: List<CapsuleSpec>,
     material: MaterialInstance,
 ) {
-    val length = distance(from, to)
-    if (length <= 0.0001f) return
-    // CylinderNode renders as a hollow wire outline in this SceneView build, whereas SphereNode
-    // renders as a solid volume — but the spheres also render vertically flattened, so they only
-    // overlap into a solid limb when packed very tightly. Pack them densely so every limb reads
-    // as one continuous solid capsule regardless of its orientation.
-    val steps = max(3, ceil(length / (width * 0.22f)).toInt())
-    for (i in 0..steps) {
-        SphereNode(
-            radius = width,
-            stacks = 10,
-            slices = 14,
-            materialInstance = material,
-            position = lerp(from, to, i.toFloat() / steps),
-        )
+    // Rebuild the mesh only when the pose (specs) changes; dispose the GPU buffers when it does.
+    val mesh = remember(specs) { buildFigureMesh(engine, specs) }
+    DisposableEffect(mesh) {
+        onDispose {
+            engine.destroyVertexBuffer(mesh.vertexBuffer)
+            engine.destroyIndexBuffer(mesh.indexBuffer)
+        }
+    }
+    MeshNode(
+        RenderableManager.PrimitiveType.TRIANGLES,
+        mesh.vertexBuffer,
+        mesh.indexBuffer,
+        mesh.boundingBox,
+        material,
+    )
+}
+
+private fun buildFigureMesh(engine: Engine, specs: List<CapsuleSpec>): FigureMesh {
+    val positions = ArrayList<Float>(16384)
+    val colors = ArrayList<Float>(16384)
+    val indices = ArrayList<Int>(32768)
+    specs.forEach { appendCapsule(positions, colors, indices, it.from, it.to, it.radius) }
+
+    val positionBuffer = ByteBuffer
+        .allocateDirect(positions.size * 4)
+        .order(ByteOrder.nativeOrder())
+    positions.forEach { positionBuffer.putFloat(it) }
+    positionBuffer.flip()
+
+    val colorBuffer = ByteBuffer
+        .allocateDirect(colors.size * 4)
+        .order(ByteOrder.nativeOrder())
+    colors.forEach { colorBuffer.putFloat(it) }
+    colorBuffer.flip()
+
+    val indexBufferData = ByteBuffer
+        .allocateDirect(indices.size * 4)
+        .order(ByteOrder.nativeOrder())
+    indices.forEach { indexBufferData.putInt(it) }
+    indexBufferData.flip()
+
+    val vertexBuffer = VertexBuffer.Builder()
+        .bufferCount(2)
+        .vertexCount(positions.size / 3)
+        .attribute(VertexBuffer.VertexAttribute.POSITION, 0, VertexBuffer.AttributeType.FLOAT3, 0, 12)
+        .attribute(VertexBuffer.VertexAttribute.COLOR, 1, VertexBuffer.AttributeType.FLOAT4, 0, 16)
+        .build(engine)
+    vertexBuffer.setBufferAt(engine, 0, positionBuffer)
+    vertexBuffer.setBufferAt(engine, 1, colorBuffer)
+
+    val indexBuffer = IndexBuffer.Builder()
+        .indexCount(indices.size)
+        .bufferType(IndexBuffer.Builder.IndexType.UINT)
+        .build(engine)
+    indexBuffer.setBuffer(engine, indexBufferData)
+
+    var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE; var minZ = Float.MAX_VALUE
+    var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE; var maxZ = -Float.MAX_VALUE
+    var i = 0
+    while (i < positions.size) {
+        val x = positions[i]; val y = positions[i + 1]; val z = positions[i + 2]
+        if (x < minX) minX = x
+        if (y < minY) minY = y
+        if (z < minZ) minZ = z
+        if (x > maxX) maxX = x
+        if (y > maxY) maxY = y
+        if (z > maxZ) maxZ = z
+        i += 3
+    }
+    val box = Box(
+        (minX + maxX) * 0.5f, (minY + maxY) * 0.5f, (minZ + maxZ) * 0.5f,
+        (maxX - minX) * 0.5f + 0.02f, (maxY - minY) * 0.5f + 0.02f, (maxZ - minZ) * 0.5f + 0.02f,
+    )
+    return FigureMesh(vertexBuffer, indexBuffer, box, indices.size)
+}
+
+// Appends a capsule (cylinder + two hemispherical caps) from `from` to `to` in world space,
+// writing a per-vertex surface normal baked into a soft light-to-dark shade (vertex colour) so
+// the figure reads as a smooth rounded volume. When from == to the caps meet to form a plain
+// sphere (used for joints and the head).
+private fun appendCapsule(
+    positions: MutableList<Float>,
+    colors: MutableList<Float>,
+    indices: MutableList<Int>,
+    from: Position,
+    to: Position,
+    radius: Float,
+    radialSegments: Int = 36,
+    capRings: Int = 14,
+) {
+    val dx = to.x - from.x
+    val dy = to.y - from.y
+    val dz = to.z - from.z
+    val len = sqrt(dx * dx + dy * dy + dz * dz)
+    val ax: Float
+    val ay: Float
+    val az: Float
+    if (len < 1e-5f) {
+        ax = 0f; ay = 1f; az = 0f
+    } else {
+        ax = dx / len; ay = dy / len; az = dz / len
+    }
+
+    // Orthonormal basis (u, v) perpendicular to the capsule axis.
+    val hx: Float
+    val hy: Float
+    val hz: Float
+    if (kotlin.math.abs(ay) < 0.99f) {
+        hx = 0f; hy = 1f; hz = 0f
+    } else {
+        hx = 1f; hy = 0f; hz = 0f
+    }
+    var ux = ay * hz - az * hy
+    var uy = az * hx - ax * hz
+    var uz = ax * hy - ay * hx
+    val ul = sqrt(ux * ux + uy * uy + uz * uz).coerceAtLeast(1e-5f)
+    ux /= ul; uy /= ul; uz /= ul
+    val vx = ay * uz - az * uy
+    val vy = az * ux - ax * uz
+    val vz = ax * uy - ay * ux
+
+    // Fixed key-light direction (world space), pre-dotted with the basis so shading is a smooth
+    // half-lambert gradient computed once per vertex — independent of the scene's exposure.
+    val lx = 0.428f
+    val ly = 0.771f
+    val lz = 0.471f
+    val axisDotL = ax * lx + ay * ly + az * lz
+    val uDotL = ux * lx + uy * ly + uz * lz
+    val vDotL = vx * lx + vy * ly + vz * lz
+
+    val ringStart = ArrayList<Int>(2 * (capRings + 1))
+
+    // na/nr are the axial and radial components of the outward surface normal for this ring.
+    fun addRing(cx: Float, cy: Float, cz: Float, rr: Float, na: Float, nr: Float) {
+        ringStart.add(positions.size / 3)
+        for (s in 0 until radialSegments) {
+            val phi = s.toFloat() / radialSegments * (PI.toFloat() * 2f)
+            val cphi = cos(phi)
+            val sphi = sin(phi)
+            positions.add(cx + rr * (cphi * ux + sphi * vx))
+            positions.add(cy + rr * (cphi * uy + sphi * vy))
+            positions.add(cz + rr * (cphi * uz + sphi * vz))
+            val nDotL = na * axisDotL + nr * (cphi * uDotL + sphi * vDotL)
+            val shade = 0.4f + 0.6f * (0.5f * nDotL + 0.5f)
+            colors.add(shade); colors.add(shade); colors.add(shade); colors.add(1f)
+        }
+    }
+
+    // Bottom hemisphere: pole beyond `from` up to the equator ring centred on `from`.
+    for (k in 0..capRings) {
+        val ang = k.toFloat() / capRings * (PI.toFloat() / 2f)
+        val cosA = cos(ang)
+        val sinA = sin(ang)
+        addRing(from.x - radius * cosA * ax, from.y - radius * cosA * ay, from.z - radius * cosA * az, radius * sinA, -cosA, sinA)
+    }
+    // Top hemisphere: equator ring centred on `to` up to the pole beyond `to`.
+    for (k in 0..capRings) {
+        val ang = k.toFloat() / capRings * (PI.toFloat() / 2f)
+        val cosA = cos(ang)
+        val sinA = sin(ang)
+        addRing(to.x + radius * sinA * ax, to.y + radius * sinA * ay, to.z + radius * sinA * az, radius * cosA, sinA, cosA)
+    }
+
+    // Stitch consecutive rings into triangles (material is double-sided, so winding is free).
+    for (r in 0 until ringStart.size - 1) {
+        val a0 = ringStart[r]
+        val b0 = ringStart[r + 1]
+        for (s in 0 until radialSegments) {
+            val s2 = (s + 1) % radialSegments
+            val a = a0 + s
+            val b = a0 + s2
+            val c = b0 + s2
+            val d = b0 + s
+            indices.add(a); indices.add(b); indices.add(d)
+            indices.add(b); indices.add(c); indices.add(d)
+        }
     }
 }
 

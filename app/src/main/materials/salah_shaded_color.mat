@@ -1,0 +1,22 @@
+material {
+    name : SalahShadedColor,
+    shadingModel : unlit,
+    doubleSided : true,
+    requires : [ color ],
+    parameters : [
+        {
+            type : float4,
+            name : color
+        }
+    ]
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        // The per-vertex colour carries a baked grey shading gradient (computed from the surface
+        // normal at mesh-build time), so multiplying it into the base colour gives a smooth
+        // rounded look without depending on scene lighting.
+        material.baseColor = materialParams.color * getColor();
+    }
+}
