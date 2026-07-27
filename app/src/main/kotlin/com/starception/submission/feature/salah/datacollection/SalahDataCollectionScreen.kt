@@ -591,23 +591,15 @@ private fun GuidedRecordingCard(
                         }
                     }
 
-                    // Duration selector
-                    Text(
-                        text = "Hold duration per posture",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    // Connected segmented control: one track, the selected
-                    // segment slides as a filled primary pill.
+                    // Choose between one selected label and the complete sequence.
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(modifier = Modifier.padding(4.dp)) {
-                            listOf(10, 15, 20, 30).forEach { duration ->
-                                val isSelected = uiState.guidedSelectedDuration == duration
+                            listOf(true to "Specific", false to "Full prayer").forEach { (specific, label) ->
+                                val isSelected = uiState.guidedSpecificOnly == specific
                                 val segColor by animateColorAsState(
                                     targetValue = if (isSelected) MaterialTheme.colorScheme.primary
                                     else Color.Transparent,
@@ -624,14 +616,14 @@ private fun GuidedRecordingCard(
                                             indication = ripple(bounded = true),
                                             onClick = {
                                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                viewModel.setGuidedDuration(duration)
+                                                viewModel.setGuidedSpecificOnly(specific)
                                             }
                                         )
                                         .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "${duration}s",
+                                        text = label,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) MaterialTheme.colorScheme.onPrimary
@@ -642,8 +634,103 @@ private fun GuidedRecordingCard(
                         }
                     }
 
+                    val selectedIsMovement = uiState.currentPosture in setOf(
+                        SalahPosture.QIYAM_RISING,
+                        SalahPosture.GOING_TO_SUJUD,
+                        SalahPosture.RISING_TO_QIYAM,
+                    )
+                    if (uiState.guidedSpecificOnly) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                Text(
+                                    text = "SELECTED ${if (selectedIsMovement) "MOVEMENT" else "POSTURE"}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.sp,
+                                )
+                                Text(
+                                    text = uiState.currentPosture.displayName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                Text(
+                                    text = "Change this using the posture and movement choices above.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                )
+                            }
+                        }
+                    }
+
+                    if (!uiState.guidedSpecificOnly || !selectedIsMovement) {
+                        Text(
+                            text = if (uiState.guidedSpecificOnly) "Hold duration" else "Hold duration per posture",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.padding(4.dp)) {
+                                listOf(10, 15, 20, 30).forEach { duration ->
+                                    val isSelected = uiState.guidedSelectedDuration == duration
+                                    val segColor by animateColorAsState(
+                                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent,
+                                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                                        label = "durationColor"
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(50))
+                                            .background(segColor)
+                                            .clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = ripple(bounded = true),
+                                                onClick = {
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    viewModel.setGuidedDuration(duration)
+                                                }
+                                            )
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${duration}s",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "The guide records 5 separate takes. Each 4-second capture begins with “Move now,” then pauses while you return to the starting position.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
                     Text(
-                        text = "Before starting: turn up media volume and secure the phone in one trouser pocket. Keep the same placement for the full session; vary placement between sessions. Record at least 3 complete sessions for train, validation, and test splits.",
+                        text = if (uiState.guidedSpecificOnly) {
+                            "Before starting: secure the phone in one trouser pocket. Use a separate take for each movement starting position, and collect at least 3 independent sessions."
+                        } else {
+                            "Before starting: turn up media volume and secure the phone in one trouser pocket. Keep the same placement for the full session; vary placement between sessions. Record at least 3 complete sessions for train, validation, and test splits."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp,
@@ -718,7 +805,10 @@ private fun GuidedRecordingCard(
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Start Guided Recording", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (uiState.guidedSpecificOnly) "Guide This Selection" else "Start Full Guided Recording",
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
 
@@ -1745,24 +1835,31 @@ private fun PostureSelector(
                 letterSpacing = 1.sp,
             )
             Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf(
-                    SalahPosture.QIYAM_RISING to "Ruku\n→ Standing",
-                    SalahPosture.GOING_TO_SUJUD to "Standing or Sitting\n→ Sujud",
-                ).forEach { (posture, label) ->
-                    Box(modifier = Modifier.weight(1f)) {
-                        PostureChip(
-                            posture = posture,
-                            label = label,
-                            isSelected = uiState.currentPosture == posture,
-                            isRecording = uiState.isRecording,
-                            sessionCount = uiState.postureCounts[posture] ?: 0,
-                            globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
-                            onClick = { viewModel.setPosture(posture) },
-                        )
+            listOf(
+                SalahPosture.QIYAM_RISING to "Ruku\n→ Standing",
+                SalahPosture.GOING_TO_SUJUD to "Standing or Sitting\n→ Sujud",
+                SalahPosture.RISING_TO_QIYAM to "Second Sujud or Sitting\n→ Standing",
+            ).chunked(2).forEachIndexed { rowIndex, rowMovements ->
+                if (rowIndex > 0) Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowMovements.forEach { (posture, label) ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            PostureChip(
+                                posture = posture,
+                                label = label,
+                                isSelected = uiState.currentPosture == posture,
+                                isRecording = uiState.isRecording,
+                                sessionCount = uiState.postureCounts[posture] ?: 0,
+                                globalCount = uiState.globalPostureCounts[posture.name] ?: 0,
+                                onClick = { viewModel.setPosture(posture) },
+                            )
+                        }
+                    }
+                    repeat(2 - rowMovements.size) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1777,6 +1874,8 @@ private fun postureRecordingGuidance(posture: SalahPosture): String = when (post
         "Static posture: hold ruku with your hands on your knees and remain still."
     SalahPosture.QIYAM_RISING ->
         "Record only RUKU → STANDING. Begin already in ruku and stop fully upright. Do not continue toward sujud."
+    SalahPosture.RISING_TO_QIYAM ->
+        "Record only SECOND SUJUD OR TASHAHHUD → STANDING. Start fully down or seated, rise naturally into the next rak‘ah, and stop upright. Record both starting variants in separate takes."
     SalahPosture.GOING_TO_SUJUD ->
         "Record only STANDING OR SITTING → SUJUD. Begin already upright or already seated. Do not include rising from ruku; record that movement separately."
     SalahPosture.SUJUD ->
@@ -2385,7 +2484,7 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                         ) {
 
                 val target = 500
-                val postureOrder = listOf("QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD", "QIYAM_RISING")
+                val postureOrder = SalahPosture.recordingLabels.map { it.name }
                 val postureDisplayNames = mapOf(
                     "QIYAM" to "Qiyam",
                     "RUKU" to "Ruku",
@@ -2393,7 +2492,8 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                     "SUJUD" to "Sujud",
                     "JALSA" to "Jalsa",
                     "TASHAHHUD" to "Tashahhud",
-                    "QIYAM_RISING" to "Ruku to Standing"
+                    "QIYAM_RISING" to "Ruku to Standing",
+                    "RISING_TO_QIYAM" to "Rise to Next Rak‘ah",
                 )
 
                 postureOrder.forEach { posture ->
@@ -2695,7 +2795,8 @@ private fun DataFileItem(
         "SUJUD" to "Sujud",
         "JALSA" to "Jalsa",
         "TASHAHHUD" to "Tashahhud",
-        "QIYAM_RISING" to "Ruku to Standing"
+        "QIYAM_RISING" to "Ruku to Standing",
+        "RISING_TO_QIYAM" to "Rise to Next Rak‘ah",
     )
 
     Card(
@@ -3350,6 +3451,7 @@ private fun isPostureOrientationOk(posture: SalahPosture, pitch: Float, roll: Fl
         SalahPosture.JALSA -> abs(pitch) < 45f
         SalahPosture.TASHAHHUD -> abs(pitch) < 45f
         SalahPosture.QIYAM_RISING -> true  // movement expected
+        SalahPosture.RISING_TO_QIYAM -> true  // movement expected
     }
 }
 
@@ -3380,6 +3482,7 @@ private fun getSimpleGuidance(posture: SalahPosture, isStable: Boolean, orientat
         SalahPosture.JALSA -> "Sitting position looks great"
         SalahPosture.TASHAHHUD -> "Final sitting looks great"
         SalahPosture.QIYAM_RISING -> "Keep rising smoothly"
+        SalahPosture.RISING_TO_QIYAM -> "Rise naturally and stop fully upright"
         else -> "Data is being captured"
     }
 }

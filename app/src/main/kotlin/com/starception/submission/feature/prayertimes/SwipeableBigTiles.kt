@@ -1108,7 +1108,7 @@ fun SwipeableBigTiles(
                 preferredItemWidth = preferredItemWidth,
                 modifier = carouselModifier,
                 itemSpacing = 10.dp,
-                flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(carouselState),
+                flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselState),
                 minSmallItemWidth = 24.dp,
                 maxSmallItemWidth = 34.dp,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),

@@ -1387,7 +1387,7 @@ private fun QuickStatsPills(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         StatPill(
-            iconGlyph = FlaticonIcons.PLAY,
+            iconGlyph = FlaticonIcons.OPEN_BOOK,
             value = "$totalLessons",
             label = "Lessons",
             accentColor = MaterialTheme.colorScheme.primary,
@@ -1660,7 +1660,7 @@ private fun ContinueLearningCard(
                             contentAlignment = Alignment.Center,
                         ) {
                             FlaticonIcon(
-                                glyph = FlaticonIcons.PLAY,
+                                glyph = FlaticonIcons.OPEN_BOOK,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(30.dp),
@@ -2388,7 +2388,7 @@ private fun EnhancedLessonItem(
                 )
             } else if (isEnrolled && !lesson.isCompleted) {
                 FlaticonIcon(
-                    glyph = FlaticonIcons.PLAY,
+                    glyph = FlaticonIcons.ANGLE_RIGHT,
                     contentDescription = "Play",
                     tint = accentColor,
                     modifier = Modifier.size(20.dp),
@@ -2653,24 +2653,13 @@ private fun EnhancedBottomBar(
                     }
                 }
 
-                Button(
+                NiaOutlinedButton(
                     onClick = onContinue,
                     modifier = Modifier
                         .weight(1f)
                         .height(56.dp),
                     enabled = progressPercent < 100f,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
                 ) {
-                    FlaticonIcon(
-                        glyph = if (progressPercent >= 100f) FlaticonIcons.COMPLETED else FlaticonIcons.PLAY,
-                        contentDescription = null,
-                        fontSize = 20.sp,
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (progressPercent >= 100f) "Course Completed" else "Continue Learning",
                         style = MaterialTheme.typography.titleSmall,
@@ -2701,23 +2690,11 @@ private fun EnhancedBottomBar(
                     )
                 }
 
-                Button(
+                NiaOutlinedButton(
                     onClick = onEnroll,
                     modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(18.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
                 ) {
-                    FlaticonIcon(
-                        glyph = FlaticonIcons.PLAY,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        fontSize = 22.sp,
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Enroll Now",
                         style = MaterialTheme.typography.titleSmall,

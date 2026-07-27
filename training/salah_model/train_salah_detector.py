@@ -3,7 +3,7 @@ Train a salah posture detection model.
 
 Architecture: 1D CNN (TFLite-compatible, no LSTM/RNN ops)
 Input: sequences of 20 windows x 30 features (2 seconds of sensor data)
-Output: 7-class classification (QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)
+Output: 8-class classification (QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING, RISING_TO_QIYAM)
 
 Usage:
     python train_salah_detector.py --data_dir ../data

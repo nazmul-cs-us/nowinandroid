@@ -71,4 +71,57 @@ class SalahSequenceValidatorTest {
         assertEquals(1, result?.rakahCount)
         assertEquals(1, validator.completedRakahs)
     }
+
+    @Test
+    fun risingFromSecondSujudCountsRakahButRukuRisingDoesNot() {
+        val validator = SalahSequenceValidator()
+        listOf(
+            SalahPosture.QIYAM,
+            SalahPosture.RUKU,
+            SalahPosture.QIYAM_RISING,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+            SalahPosture.JALSA,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+        ).forEach { validator.stabilize(it) }
+
+        assertEquals(0, validator.completedRakahs)
+        val rising = validator.stabilize(SalahPosture.RISING_TO_QIYAM)
+
+        assertTrue(rising.accepted)
+        assertEquals(1, rising.rakahCount)
+    }
+
+    @Test
+    fun twoRakahSequenceConfirmsPrayerAndCountsExactlyTwo() {
+        val validator = SalahSequenceValidator()
+        val firstRakah = listOf(
+            SalahPosture.QIYAM,
+            SalahPosture.RUKU,
+            SalahPosture.QIYAM_RISING,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+            SalahPosture.JALSA,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+            SalahPosture.RISING_TO_QIYAM,
+        )
+        val secondRakah = listOf(
+            SalahPosture.QIYAM,
+            SalahPosture.RUKU,
+            SalahPosture.QIYAM_RISING,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+            SalahPosture.JALSA,
+            SalahPosture.GOING_TO_SUJUD,
+            SalahPosture.SUJUD,
+            SalahPosture.TASHAHHUD,
+        )
+
+        (firstRakah + secondRakah).forEach { validator.stabilize(it) }
+
+        assertTrue(validator.isPrayerConfirmed)
+        assertEquals(2, validator.completedRakahs)
+    }
 }

@@ -1414,7 +1414,7 @@ private fun SceneScope.BeadedSegment(
 private fun skeletonPose(posture: SalahPosture, xOffset: Float): SkeletonPose {
     fun p(x: Float, y: Float, z: Float) = Position(x + xOffset, y, z)
     val joints = when (posture) {
-        SalahPosture.QIYAM -> mapOf(
+        SalahPosture.QIYAM, SalahPosture.RISING_TO_QIYAM -> mapOf(
             Joint.HEAD to p(0f, 1.78f, 0f), Joint.NECK to p(0f, 1.57f, 0f),
             Joint.LEFT_SHOULDER to p(-0.19f, 1.49f, 0f), Joint.RIGHT_SHOULDER to p(0.19f, 1.49f, 0f),
             Joint.LEFT_ELBOW to p(-0.25f, 1.22f, -0.03f), Joint.RIGHT_ELBOW to p(0.25f, 1.22f, -0.03f),
@@ -1536,6 +1536,7 @@ private fun normalizedPlotPoints(
 private fun postureColor(posture: SalahPosture): Color = when (posture) {
     SalahPosture.QIYAM -> Color(0xFF48D9FF)
     SalahPosture.QIYAM_RISING -> Color(0xFF42F5D4)
+    SalahPosture.RISING_TO_QIYAM -> Color(0xFF16C79A)
     SalahPosture.RUKU -> Color(0xFFFFB347)
     SalahPosture.GOING_TO_SUJUD -> Color(0xFFFF4FA3)
     SalahPosture.SUJUD -> Color(0xFF72ED7D)

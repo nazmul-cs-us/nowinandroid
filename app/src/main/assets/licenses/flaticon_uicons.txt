@@ -1,6 +1,7 @@
 Flaticon UIcons attribution
 
-The Settings category icons use the Rounded Regular UIcons family.
+The Settings category icons use the Rounded Regular UIcons 2.5.1 family,
+including the person-praying glyph for Salah data collection.
 
 UIcons by Flaticon
 https://www.flaticon.com/uicons

@@ -769,6 +769,7 @@ private fun getPostureColor(posture: SalahPosture): Color {
         SalahPosture.TASHAHHUD -> Color(0xFFFFEB3B) // Yellow
         SalahPosture.GOING_TO_SUJUD -> Color(0xFF009688) // Teal
         SalahPosture.QIYAM_RISING -> Color(0xFF00BCD4) // Cyan
+        SalahPosture.RISING_TO_QIYAM -> Color(0xFF16C79A) // Emerald
         else -> Color.Gray
     }
 }

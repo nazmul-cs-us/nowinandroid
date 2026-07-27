@@ -62,6 +62,7 @@ data class SalahDataCollectionUiState(
     val guidedPostureDuration: Int = 0,
     val guidedTotalPostures: Int = GUIDED_POSTURE_SEQUENCE.size,
     val guidedSelectedDuration: Int = 15,
+    val guidedSpecificOnly: Boolean = true,
     val guidedMessage: String = "",
     // TTS download state
     val isTtsAvailable: Boolean = false,
@@ -171,9 +172,51 @@ val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
     ),
 )
 
+private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture) {
+    SalahPosture.QIYAM -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Move into qiyam. Stand upright with your hands folded, become still, and keep holding until recording finishes.",
+    )
+    SalahPosture.RUKU -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Move into ruku with your hands on your knees, become still, and keep holding until recording finishes.",
+    )
+    SalahPosture.SUJUD -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Move fully into sujud, become still, and keep holding until recording finishes.",
+    )
+    SalahPosture.JALSA -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Sit upright between the two prostrations, become still, and keep holding until recording finishes.",
+    )
+    SalahPosture.TASHAHHUD -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Sit in the tashahhud position, become still, and keep holding until recording finishes.",
+    )
+    SalahPosture.QIYAM_RISING -> GuidedStep(
+        posture, isTransition = true,
+        instruction = "Begin fully in ruku and do not move yet. When you hear move now, rise until you are fully upright, then stop.",
+        recordingLabel = "Ruku → Standing",
+        movementCue = "Move now. Rise from ruku until you are fully upright, then stop.",
+    )
+    SalahPosture.GOING_TO_SUJUD -> GuidedStep(
+        posture, isTransition = true,
+        instruction = "For this take, choose either standing to first sujud or sitting to second sujud. Begin in that start position and do not move yet. When you hear move now, lower fully into sujud.",
+        recordingLabel = "Lowering → Sujud",
+        movementCue = "Move now. Lower smoothly from your chosen start position into sujud.",
+    )
+    SalahPosture.RISING_TO_QIYAM -> GuidedStep(
+        posture, isTransition = true,
+        instruction = "For this take, begin either in the second sujud or seated after tashahhud. Do not move yet. When you hear move now, rise naturally into the next rak‘ah and stop fully upright.",
+        recordingLabel = "Rise to Next Rak‘ah",
+        movementCue = "Move now. Rise naturally into the next rak‘ah and stop fully upright.",
+    )
+}
+
 // Twenty 100ms windows are needed for one training sequence. Four seconds gives each
 // deliberately slow transition enough clean data without labelling a long destination hold.
 private const val TRANSITION_DURATION = 4
+private const val FOCUSED_MOVEMENT_REPETITIONS = 5
 private const val STATIC_SETTLE_MS = 1_500L
 private const val TAG = "GuidedRecording"
 
@@ -486,11 +529,27 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         _uiState.update { it.copy(guidedSelectedDuration = seconds) }
     }
 
+    fun setGuidedSpecificOnly(specificOnly: Boolean) {
+        _uiState.update { it.copy(guidedSpecificOnly = specificOnly) }
+    }
+
     fun startGuidedRecording() {
         guidedJob?.cancel()
         guidedJob = viewModelScope.launch {
-            val duration = _uiState.value.guidedSelectedDuration
-            Log.i(TAG, "Starting guided recording (duration=$duration s per posture)")
+            val startState = _uiState.value
+            val duration = startState.guidedSelectedDuration
+            val isSpecific = startState.guidedSpecificOnly
+            val focusedStep = focusedGuidedStep(startState.currentPosture)
+            val steps = if (isSpecific) {
+                if (focusedStep.isTransition) {
+                    List(FOCUSED_MOVEMENT_REPETITIONS) { focusedStep }
+                } else {
+                    listOf(focusedStep)
+                }
+            } else {
+                GUIDED_POSTURE_SEQUENCE
+            }
+            Log.i(TAG, "Starting guided recording (specific=$isSpecific, steps=${steps.size}, duration=$duration)")
 
             // 1. WELCOME
             _uiState.update {
@@ -498,16 +557,24 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     guidedState = GuidedRecordingState.WELCOME,
                     guidedMessage = "Turn up the media volume, place the phone securely in one trouser pocket, and leave it there for the whole session.",
                     guidedPostureIndex = 0,
+                    guidedTotalPostures = steps.size,
                     trimmedSamples = 0,
                     totalSamples = 0,
                     postureCounts = emptyMap(),
                 )
             }
             val welcomeSpoken = speakAndWait(
-                "Guided prayer recording is starting. Turn up the media volume. " +
+                (if (isSpecific) "Focused guided recording is starting. " else "Guided prayer recording is starting. ") +
+                    "Turn up the media volume. " +
                     "Place the phone fully inside one trouser pocket, in the position you normally carry it. " +
                     "Leave the phone in the same pocket for the entire session. " +
-                    "After bowing, rise fully upright and wait for a separate instruction before lowering into prostration. " +
+                    (if (isSpecific) {
+                        "You will record only ${focusedStep.recordingLabel}. " +
+                            if (focusedStep.isTransition) {
+                                "The guide will capture $FOCUSED_MOVEMENT_REPETITIONS separate repetitions. Return to the starting position only while capture is paused. "
+                            } else ""
+                    } else
+                        "After bowing, rise fully upright and wait for a separate instruction before lowering into prostration. ") +
                     "Follow only the voice instructions. Move immediately when an instruction begins with: now. " +
                     "If an instruction says: do not move yet, wait for the separate cue: move now."
             )
@@ -547,7 +614,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
 
             // 4. Loop through the prayer sequence.
-            for ((index, step) in GUIDED_POSTURE_SEQUENCE.withIndex()) {
+            for ((index, step) in steps.withIndex()) {
                 val posture = step.posture
                 val postureDuration = if (step.isTransition) TRANSITION_DURATION else duration
 

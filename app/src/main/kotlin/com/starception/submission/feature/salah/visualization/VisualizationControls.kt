@@ -1138,6 +1138,7 @@ fun getPostureColor(posture: SalahPosture): Color {
     return when (posture) {
         SalahPosture.QIYAM -> Color(0xFF00BFFF)
         SalahPosture.QIYAM_RISING -> Color(0xFF00CED1)
+        SalahPosture.RISING_TO_QIYAM -> Color(0xFF16C79A)
         SalahPosture.RUKU -> Color(0xFFFF8C00)
         SalahPosture.GOING_TO_SUJUD -> Color(0xFFFF1493)
         SalahPosture.SUJUD -> Color(0xFF32CD32)

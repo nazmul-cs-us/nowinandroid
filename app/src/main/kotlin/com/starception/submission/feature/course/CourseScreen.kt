@@ -24,6 +24,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -136,6 +137,21 @@ fun CourseScreen(
     // Separate enrolled and not enrolled
     val myCourses = availableCourses.filter { it.id in enrolledCourseIds }
     val exploreCourses = availableCourses.filter { it.id !in enrolledCourseIds }
+    var selectedCourseFilter by rememberSaveable { mutableStateOf("MY_COURSES") }
+    var showAllCoursesSheet by rememberSaveable { mutableStateOf(false) }
+    val categoryFilteredCourses = when (selectedCourseFilter) {
+        "QURAN" -> myCourses.filter { it.category == CourseCategory.QURAN }
+        "HADITH" -> myCourses.filter { it.category == CourseCategory.HADITH }
+        "MEMORIZATION" -> myCourses.filter { it.category == CourseCategory.MEMORIZATION }
+        else -> myCourses
+    }
+    val filteredMyCourses = categoryFilteredCourses
+    val featuredCourses = when (selectedCourseFilter) {
+        "QURAN" -> availableCourses.filter { it.category == CourseCategory.QURAN }
+        "HADITH" -> availableCourses.filter { it.category == CourseCategory.HADITH }
+        "MEMORIZATION" -> availableCourses.filter { it.category == CourseCategory.MEMORIZATION }
+        else -> availableCourses
+    }
 
     // Track progress updates to trigger recomposition
     var progressUpdateTrigger by remember { mutableStateOf(0) }
@@ -226,6 +242,18 @@ fun CourseScreen(
         )
     }
 
+    if (showAllCoursesSheet) {
+        CourseCatalogBottomSheet(
+            courses = availableCourses,
+            enrolledCourseIds = enrolledCourseIds,
+            onDismiss = { showAllCoursesSheet = false },
+            onCourseClick = { course ->
+                showAllCoursesSheet = false
+                onCourseClick(course.id)
+            },
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -235,9 +263,8 @@ fun CourseScreen(
         // Header
         item {
             CourseHeader(
-                enrolledCount = myCourses.size,
-                completedLessons = courseProgress.values.sum(),
-                totalLessons = myCourses.sumOf { it.totalLessons },
+                selectedFilter = selectedCourseFilter,
+                onFilterSelected = { selectedCourseFilter = it },
             )
         }
 
@@ -245,14 +272,16 @@ fun CourseScreen(
         if (myCourses.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = "Continue learning",
-                    subtitle = "${myCourses.size} active",
+                    title = "Featured courses",
+                    subtitle = "See all",
+                    onActionClick = { showAllCoursesSheet = true },
                 )
             }
 
             item {
                 CourseSwipeableTiles(
-                    enrolledCourses = myCourses,
+                    enrolledCourses = featuredCourses,
+                    enrolledCourseIds = enrolledCourseIds,
                     courseProgress = courseProgress,
                     onCourseClick = { course ->
                         // Navigate to course detail screen
@@ -322,52 +351,22 @@ fun CourseScreen(
                 )
             }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-        }
-
-        // Explore Courses Section
-        if (exploreCourses.isNotEmpty()) {
             item {
                 SectionTitle(
-                    title = if (myCourses.isEmpty()) "Start your journey" else "Explore courses",
-                    subtitle = "${exploreCourses.size} available",
+                    title = "Ongoing",
+                    subtitle = "",
                 )
             }
-        }
 
-        items(exploreCourses) { course ->
-            Column {
-                CourseCard(
-                    course = course,
-                    onClick = {
-                        // Preview course before enrolling
-                        onCourseClick(course.id)
-                    },
-                    onEnroll = {
-                        if (course.id == "daily_bukhari" && !HadithDatabase.isDatabaseAvailable(context, "sahih_bukhari.db")) {
-                            pendingBukhariEnrollment = true
-                        } else {
-                            enrollCourse(course.id)
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+            item {
+                OngoingCourseList(
+                    courses = filteredMyCourses,
+                    courseProgress = courseProgress,
+                    onCourseClick = { onCourseClick(it.id) },
                 )
-
-                if (course.id == "daily_bukhari" && pendingBukhariEnrollment) {
-                    MissingContentCard(
-                        resourceName = "Sahih Bukhari",
-                        category = "hadith_sahih_bukhari",
-                        description = "Download Sahih Bukhari to enable Daily Hadith enrollment and play the hadith automatically after travel dua when you start the audio chain.",
-                        downloadManager = downloadManager,
-                        onDownloadComplete = {
-                            HadithDatabase.clearInstance(context, "sahih_bukhari.db")
-                            pendingBukhariEnrollment = false
-                            enrollCourse(course.id)
-                        },
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
             }
+
+            item { Spacer(modifier = Modifier.height(12.dp)) }
         }
 
         // All Courses enrolled - Rich achievement section
@@ -1584,144 +1583,161 @@ private fun CourseProgressRow(
 
 @Composable
 private fun CourseHeader(
-    enrolledCount: Int,
-    completedLessons: Int,
-    totalLessons: Int,
+    selectedFilter: String,
+    onFilterSelected: (String) -> Unit,
 ) {
-    val hubAccent = MaterialTheme.colorScheme.primary
-    val hubShape = RoundedCornerShape(30.dp)
-    val overallProgress = if (totalLessons > 0) {
-        (completedLessons.toFloat() / totalLessons).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val filters = listOf(
+        "MY_COURSES" to "Recent",
+        "QURAN" to "Quran",
+        "HADITH" to "Hadith",
+        "MEMORIZATION" to "Memorize",
+    )
 
-    Box(
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 14.dp)
-            .clip(hubShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                shape = hubShape,
-            ),
+            .padding(top = 14.dp, bottom = 6.dp),
+        contentPadding = PaddingValues(horizontal = 22.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 38.dp, y = (-42).dp)
-                .size(150.dp)
-                .border(28.dp, hubAccent.copy(alpha = 0.045f), CircleShape),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 24.dp, y = 42.dp)
-                .size(94.dp)
-                .background(Color(0xFFE6B95C).copy(alpha = 0.10f), CircleShape),
-        )
-
-        Column(
-            modifier = Modifier.padding(22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        items(filters, key = { it.first }) { (filter, label) ->
+            val selected = selectedFilter == filter
+            val selectedColor = when (filter) {
+                "QURAN" -> MaterialTheme.colorScheme.primaryContainer
+                "HADITH" -> MaterialTheme.colorScheme.secondaryContainer
+                "MEMORIZATION" -> MaterialTheme.colorScheme.tertiaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerHighest
+            }
+            val selectedContentColor = when (filter) {
+                "QURAN" -> MaterialTheme.colorScheme.onPrimaryContainer
+                "HADITH" -> MaterialTheme.colorScheme.onSecondaryContainer
+                "MEMORIZATION" -> MaterialTheme.colorScheme.onTertiaryContainer
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+            Surface(
+                modifier = Modifier.clickable { onFilterSelected(filter) },
+                shape = RoundedCornerShape(999.dp),
+                color = if (selected) selectedColor else MaterialTheme.colorScheme.surface,
+                border = if (selected) null else BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                ),
+                shadowElevation = if (selected) 0.dp else 1.dp,
             ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = 17.dp, vertical = 9.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) selectedContentColor else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun CourseCatalogBottomSheet(
+    courses: List<Course>,
+    enrolledCourseIds: Set<String>,
+    onDismiss: () -> Unit,
+    onCourseClick: (Course) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "All courses",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Choose a course to view its lessons and learning plan.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            courses.forEach { course ->
+                val (containerColor, contentColor) = when (course.category) {
+                    CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primaryContainer to
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    CourseCategory.HADITH -> MaterialTheme.colorScheme.secondaryContainer to
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiaryContainer to
+                        MaterialTheme.colorScheme.onTertiaryContainer
+                }
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    contentColor = hubAccent,
-                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onCourseClick(course) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        FlaticonIcon(
-                            glyph = FlaticonIcons.SCHOOL,
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(containerColor, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FlaticonIcon(
+                                glyph = course.iconGlyph,
+                                contentDescription = null,
+                                tint = contentColor,
+                                fontSize = 23.sp,
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = course.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = "${course.totalLessons} lessons · ${course.difficulty.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (course.id in enrolledCourseIds) {
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                            ) {
+                                Text(
+                                    text = "Enrolled",
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
-                            tint = hubAccent,
-                            fontSize = 15.sp,
-                        )
-                        Text(
-                            text = "LEARNING HUB",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
                         )
                     }
-                }
-
-                Surface(
-                    color = Color(0xFFFFE7AD).copy(alpha = 0.65f),
-                    contentColor = Color(0xFF8A6200),
-                    shape = CircleShape,
-                ) {
-                    Box(
-                        modifier = Modifier.size(38.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        FlaticonIcon(
-                            glyph = FlaticonIcons.TROPHY,
-                            contentDescription = null,
-                            tint = Color(0xFF8A6200),
-                            fontSize = 19.sp,
-                        )
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    text = if (enrolledCount > 0) "Keep your momentum" else "Begin with one small step",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = if (enrolledCount > 0) {
-                        "$completedLessons lessons completed across $enrolledCount ${if (enrolledCount == 1) "course" else "courses"}"
-                    } else {
-                        "Guided Quran and Hadith lessons, designed for a steady daily rhythm."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (enrolledCount > 0) {
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = "Overall progress",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "${(overallProgress * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = hubAccent,
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { overallProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(7.dp)
-                            .clip(RoundedCornerShape(999.dp)),
-                        color = hubAccent,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        strokeCap = StrokeCap.Round,
-                    )
                 }
             }
         }
@@ -1732,11 +1748,12 @@ private fun CourseHeader(
 private fun SectionTitle(
     title: String,
     subtitle: String,
+    onActionClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 22.dp, vertical = 10.dp),
+            .padding(horizontal = 22.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1746,15 +1763,330 @@ private fun SectionTitle(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
+        if (onActionClick != null) {
+            TextButton(
+                onClick = onActionClick,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        } else if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OngoingCourseList(
+    courses: List<Course>,
+    courseProgress: Map<String, Int>,
+    onCourseClick: (Course) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        courses.forEach { course ->
+            val progress = courseProgress[course.id] ?: 0
+            val progressFraction = if (course.totalLessons > 0) {
+                (progress.toFloat() / course.totalLessons).coerceIn(0f, 1f)
+            } else 0f
+            val (accentContainer, accentContent) = when (course.category) {
+                CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.tertiaryContainer to
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                CourseCategory.HADITH -> MaterialTheme.colorScheme.secondaryContainer to
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                CourseCategory.QURAN -> MaterialTheme.colorScheme.primaryContainer to
+                    MaterialTheme.colorScheme.onPrimaryContainer
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onCourseClick(course) },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                shadowElevation = 1.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .background(accentContainer, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FlaticonIcon(
+                            glyph = course.iconGlyph,
+                            contentDescription = null,
+                            tint = accentContent,
+                            fontSize = 24.sp,
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = course.title,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontSize = 16.sp,
+                                lineHeight = 19.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        Text(
+                            text = course.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 13.sp,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "$progress of ${course.totalLessons} lessons",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "${(progressFraction * 100).toInt()}% complete",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progressFraction)
+                                    .height(4.dp)
+                                    .background(accentContent),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingCourseOverviewCard(
+    course: Course,
+    progress: Int,
+    onClick: () -> Unit,
+) {
+    val accent = Color(0xFFD80058)
+    val progressFraction = if (course.totalLessons > 0) {
+        (progress.toFloat() / course.totalLessons).coerceIn(0f, 1f)
+    } else 0f
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 4.dp)
+            .height(142.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = if (isSystemInDarkTheme()) {
+            MaterialTheme.colorScheme.surfaceContainer
+        } else {
+            Color(0xFFF8EDF6)
+        },
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val pattern = accent.copy(alpha = 0.055f)
+                drawCircle(pattern, radius = 44f, center = Offset(size.width * 0.78f, size.height * 0.26f))
+                drawCircle(pattern, radius = 24f, center = Offset(size.width * 0.62f, size.height * 0.72f))
+                drawLine(
+                    color = pattern,
+                    start = Offset(size.width * 0.48f, size.height * 0.15f),
+                    end = Offset(size.width * 0.92f, size.height * 0.78f),
+                    strokeWidth = 4f,
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Surface(shape = CircleShape, color = accent) {
+                        Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                            FlaticonIcon(
+                                glyph = course.iconGlyph,
+                                contentDescription = null,
+                                tint = Color.White,
+                                fontSize = 17.sp,
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = accent,
+                    ) {
+                        Text(
+                            text = "${(progressFraction * 100).toInt()}%",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = course.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "$progress of ${course.totalLessons} lessons completed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFF36B16), Color(0xFFD80058)),
+                                ),
+                                CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Open ${course.title}",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LearningInsightCard(
+    course: Course,
+    progress: Int,
+    onClick: () -> Unit,
+) {
+    val nextLesson = (progress + 1).coerceAtMost(course.totalLessons)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 14.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = if (isSystemInDarkTheme()) {
+            MaterialTheme.colorScheme.surfaceContainer
+        } else {
+            Color(0xFFE3F0EC)
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0xFF18A99A)),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "NEXT BEST STEP",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF118D82),
+                    letterSpacing = 0.8.sp,
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = if (progress >= course.totalLessons) {
+                        "Review ${course.title} and keep the learning fresh."
+                    } else {
+                        "Lesson $nextLesson in ${course.title} is ready."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            FlaticonIcon(
+                glyph = FlaticonIcons.ANGLE_RIGHT,
+                contentDescription = "Open course",
+                tint = MaterialTheme.colorScheme.onSurface,
+                fontSize = 18.sp,
             )
         }
     }
@@ -1859,11 +2191,102 @@ private fun EnrolledCourseCard(
     }
 }
 
-/**
- * Professional Course Card - Udemy/Coursera style
- */
 @Composable
 private fun CourseCard(
+    course: Course,
+    onClick: () -> Unit,
+    onEnroll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = when (course.category) {
+        CourseCategory.MEMORIZATION -> Color(0xFFD80058)
+        CourseCategory.HADITH -> Color(0xFFF06418)
+        CourseCategory.QURAN -> Color(0xFFE83F77)
+    }
+    val tint = when (course.category) {
+        CourseCategory.MEMORIZATION -> Color(0xFFF8EDF6)
+        CourseCategory.HADITH -> Color(0xFFFFE9D4)
+        CourseCategory.QURAN -> Color(0xFFFCE8EF)
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(156.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceContainer else tint,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                val pattern = accent.copy(alpha = 0.05f)
+                drawCircle(pattern, 52f, Offset(size.width * 0.75f, size.height * 0.22f))
+                drawCircle(pattern, 30f, Offset(size.width * 0.55f, size.height * 0.78f))
+            }
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(shape = CircleShape, color = accent) {
+                        Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                            FlaticonIcon(
+                                glyph = course.iconGlyph,
+                                contentDescription = null,
+                                tint = Color.White,
+                                fontSize = 17.sp,
+                            )
+                        }
+                    }
+                    Surface(shape = RoundedCornerShape(999.dp), color = accent) {
+                        Text(
+                            text = "FREE",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = course.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "${course.totalLessons} lessons · ${course.difficulty.label}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NiaOutlinedButton(
+                        onClick = onEnroll,
+                        modifier = Modifier.height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 13.dp, vertical = 0.dp),
+                    ) {
+                        Text("Enroll", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Legacy expanded course card retained while compact cards are rolled out. */
+@Composable
+private fun LegacyCourseCard(
     course: Course,
     onClick: () -> Unit,
     onEnroll: () -> Unit,
@@ -2056,7 +2479,7 @@ private fun CourseCard(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             CourseStatItem(
-                                iconGlyph = FlaticonIcons.PLAY,
+                                iconGlyph = FlaticonIcons.OPEN_BOOK,
                                 value = course.totalLessons.toString(),
                                 label = if (course.totalLessons == 1) "lesson" else "lessons",
                                 modifier = Modifier.weight(1f),
@@ -2073,7 +2496,6 @@ private fun CourseCard(
 
                         CoursePrimaryActionButton(
                             text = "Enroll Now",
-                            iconGlyph = FlaticonIcons.PLAY,
                             onClick = onEnroll,
                         )
                     }
@@ -2134,7 +2556,6 @@ private fun CourseMetaChip(
 @Composable
 private fun CoursePrimaryActionButton(
     text: String,
-    iconGlyph: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
@@ -2146,12 +2567,6 @@ private fun CoursePrimaryActionButton(
         enabled = enabled,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
     ) {
-        FlaticonIcon(
-            glyph = iconGlyph,
-            contentDescription = null,
-            fontSize = 22.sp,
-        )
-        Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.titleSmall,
@@ -2299,6 +2714,7 @@ internal fun getAvailableCourses(): List<Course> {
 @Composable
 private fun CourseSwipeableTiles(
     enrolledCourses: List<Course>,
+    enrolledCourseIds: Set<String>,
     courseProgress: Map<String, Int>,
     onCourseClick: (Course) -> Unit,
     onContinueCourse: (Course) -> Unit,
@@ -2306,274 +2722,130 @@ private fun CourseSwipeableTiles(
 ) {
     if (enrolledCourses.isEmpty()) return
 
-    val pagerState = rememberPagerState(
-        pageCount = { enrolledCourses.size },
-        initialPage = 0,
-    )
-    val coroutineScope = rememberCoroutineScope()
-
-    Column(
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 22.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Swipeable Pager
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp),
-            pageSpacing = 12.dp,
-            contentPadding = PaddingValues(horizontal = 22.dp),
-        ) { page ->
-            val course = enrolledCourses[page]
+        items(enrolledCourses, key = { it.id }) { course ->
             val progress = courseProgress[course.id] ?: 0
-
             CourseBigTile(
                 course = course,
                 progress = progress,
+                isEnrolled = course.id in enrolledCourseIds,
                 onClick = { onCourseClick(course) },
                 onContinue = { onContinueCourse(course) },
                 onUnenroll = { onUnenroll(course) },
-            )
-        }
-
-        // Page Indicators
-        if (enrolledCourses.size > 1) {
-            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                enrolledCourses.forEachIndexed { index, _ ->
-                    val isSelected = pagerState.currentPage == index
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp)
-                            .size(if (isSelected) 10.dp else 8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                }
-                            )
-                            .clickable {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(index)
-                                }
-                            }
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = "Swipe for more courses",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                    .width(156.dp)
+                    .height(164.dp),
+            )
         }
     }
 }
 
 /**
- * Big Tile for a single enrolled course - Professional Udemy/Coursera style
- * Shows progress, next action, and quick continue button
+ * Bright featured course tile following the reference layout. Progress belongs to
+ * ongoing cards; the featured tile remains a clean discovery surface.
  */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun CourseBigTile(
     course: Course,
     progress: Int,
+    isEnrolled: Boolean,
     onClick: () -> Unit,
     onContinue: () -> Unit,
     onUnenroll: () -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val progressPercent = if (course.totalLessons > 0) {
         (progress * 100f / course.totalLessons).coerceIn(0f, 100f)
     } else 0f
 
-    val isCompleted = progress >= course.totalLessons
+    val isCompleted = isEnrolled && progress >= course.totalLessons
     var showMenu by remember { mutableStateOf(false) }
     var showUnenrollConfirmation by remember { mutableStateOf(false) }
 
-    val actionColor = when (course.category) {
-        CourseCategory.MEMORIZATION -> Color(0xFF4F377D)
-        CourseCategory.HADITH -> Color(0xFF07594F)
-        CourseCategory.QURAN -> Color(0xFF083E55)
+    val (actionColor, actionContentColor) = when (course.category) {
+        CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primary to
+            MaterialTheme.colorScheme.onPrimary
+        CourseCategory.HADITH -> MaterialTheme.colorScheme.secondary to
+            MaterialTheme.colorScheme.onSecondary
+        CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiary to
+            MaterialTheme.colorScheme.onTertiary
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxSize()
+    Surface(
+        modifier = modifier
             .shadow(
-                elevation = 10.dp,
-                shape = RoundedCornerShape(26.dp),
-                spotColor = actionColor.copy(alpha = 0.16f),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                spotColor = Color.Black.copy(alpha = 0.10f),
             ),
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape = RoundedCornerShape(18.dp),
+        color = actionColor,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .clickable(onClick = onClick)
-                .padding(18.dp),
+                .padding(13.dp),
         ) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawCircle(
+                    color = actionContentColor.copy(alpha = 0.10f),
+                    radius = size.minDimension * 0.42f,
+                    center = Offset(size.width * 0.86f, size.height * 0.82f),
+                )
+            }
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 50.dp, y = (-62).dp)
-                    .size(170.dp)
-                    .border(30.dp, actionColor.copy(alpha = 0.045f), CircleShape),
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween,
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 8.dp, y = 8.dp)
+                    .size(88.dp)
+                    .background(actionContentColor.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = actionColor.copy(alpha = 0.12f),
-                        ) {
-                            Box(
-                                modifier = Modifier.size(44.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                FlaticonIcon(
-                                    glyph = course.iconGlyph,
-                                    contentDescription = null,
-                                    tint = actionColor,
-                                    fontSize = 24.sp,
-                                )
-                            }
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = actionColor.copy(alpha = 0.10f),
-                        ) {
-                            Text(
-                                text = course.category.label.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = actionColor,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                letterSpacing = 0.8.sp,
-                            )
-                        }
-                    }
+                FlaticonIcon(
+                    glyph = course.iconGlyph,
+                    contentDescription = null,
+                    tint = actionContentColor.copy(alpha = 0.82f),
+                    fontSize = 48.sp,
+                )
+            }
 
-                    Box {
-                        IconButton(
-                            onClick = { showMenu = true },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                        ) {
-                            FlaticonIcon(
-                                glyph = FlaticonIcons.MORE,
-                                contentDescription = "More options",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 18.sp,
-                            )
-                        }
-                    }
-                }
+            Column(modifier = Modifier.padding(end = 30.dp)) {
+                Text(
+                    text = course.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = actionContentColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${course.totalLessons} lessons",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = actionContentColor.copy(alpha = 0.80f),
+                )
+            }
 
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = course.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = course.subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = if (progress == 0) "READY TO START" else "${progressPercent.toInt()}% COMPLETE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = actionColor,
-                            letterSpacing = 0.6.sp,
-                        )
-                        Text(
-                            text = "$progress/${course.totalLessons} lessons",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { progressPercent / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(999.dp)),
-                        color = actionColor,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        strokeCap = StrokeCap.Round,
-                    )
-
-                    Button(
-                        onClick = onContinue,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        enabled = !isCompleted,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = actionColor,
-                            contentColor = Color.White,
-                            disabledContainerColor = actionColor.copy(alpha = 0.35f),
-                            disabledContentColor = Color.White.copy(alpha = 0.75f),
-                        ),
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                    ) {
-                        FlaticonIcon(
-                            glyph = if (isCompleted) FlaticonIcons.COMPLETED else FlaticonIcons.PLAY,
-                            contentDescription = null,
-                            tint = LocalContentColor.current,
-                            fontSize = 20.sp,
-                        )
-                        Spacer(modifier = Modifier.width(9.dp))
-                        Text(
-                            text = if (isCompleted) "Completed" else "Continue learning",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
+            IconButton(
+                onClick = { showMenu = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(30.dp)
+                    .background(actionContentColor.copy(alpha = 0.18f), CircleShape),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreHoriz,
+                    contentDescription = "More options",
+                    tint = actionContentColor,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -2648,6 +2920,20 @@ private fun CourseBigTile(
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+
+                if (isEnrolled && !isCompleted) {
+                    CourseOptionRow(
+                        iconGlyph = FlaticonIcons.OPEN_BOOK,
+                        title = "Continue learning",
+                        description = "Open the next lesson in this course",
+                        iconColor = MaterialTheme.colorScheme.primary,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                        onClick = {
+                            showMenu = false
+                            onContinue()
+                        },
+                    )
+                }
 
                 CourseOptionRow(
                     iconGlyph = FlaticonIcons.INFO,

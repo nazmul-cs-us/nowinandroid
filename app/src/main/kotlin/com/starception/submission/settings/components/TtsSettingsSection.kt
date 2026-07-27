@@ -697,7 +697,7 @@ private fun ModernTtsTestCard(
                 contentAlignment = Alignment.Center
             ) {
                 FlaticonIcon(
-                    glyph = if (isActive) FlaticonIcons.PAUSE else FlaticonIcons.PLAY,
+                    glyph = if (isActive) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
                     contentDescription = if (isActive) "Stop" else "Play",
                     tint = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 28.sp,

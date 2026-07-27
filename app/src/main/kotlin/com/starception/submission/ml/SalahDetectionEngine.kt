@@ -47,7 +47,8 @@ class SalahDetectionEngine(context: Context) : Closeable {
             SalahPosture.SUJUD to 0.35f,           // Prostration is very distinctive (inverted)
             SalahPosture.JALSA to 0.40f,           // Sitting between sujuds
             SalahPosture.TASHAHHUD to 0.40f,       // Final sitting (similar to JALSA)
-            SalahPosture.QIYAM_RISING to 0.40f     // Brief transition
+            SalahPosture.QIYAM_RISING to 0.40f,    // Brief transition
+            SalahPosture.RISING_TO_QIYAM to 0.40f  // Next-rak'ah transition
         )
         private const val DEFAULT_CONFIDENCE = 0.40f
 
@@ -69,6 +70,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
     private val featureStd: FloatArray
     private val sequenceLength: Int
     private val featuresPerWindow: Int
+    private val modelPostures: List<SalahPosture>
 
     // Circular buffer of feature vectors
     private val featureBuffer: Array<FloatArray>
@@ -76,7 +78,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
     private var bufferFilled = 0
 
     // EMA smoothed confidence scores (one per posture class)
-    private val smoothedConfidences = FloatArray(SalahPosture.classificationLabels.size)
+    private val smoothedConfidences: FloatArray
 
     init {
         // Load normalization parameters
@@ -106,9 +108,11 @@ class SalahDetectionEngine(context: Context) : Closeable {
             List(labels.length()) { labels.getString(it) }
         }
         val codeLabels = SalahPosture.classificationLabels.map { it.name }
-        require(modelLabels == codeLabels) {
-            "Model label order $modelLabels does not match code label order $codeLabels"
+        require(modelLabels == codeLabels.take(modelLabels.size)) {
+            "Model label order $modelLabels is not a supported prefix of $codeLabels"
         }
+        modelPostures = modelLabels.map(SalahPosture::valueOf)
+        smoothedConfidences = FloatArray(modelPostures.size)
 
         featureMean = FloatArray(meanArray.length()) { meanArray.getDouble(it).toFloat() }
         featureStd = FloatArray(stdArray.length()) { i ->
@@ -130,7 +134,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
         interpreter = Interpreter(modelBuffer, options)
 
         val expectedInputShape = intArrayOf(1, sequenceLength, featuresPerWindow)
-        val expectedOutputShape = intArrayOf(1, SalahPosture.classificationLabels.size)
+        val expectedOutputShape = intArrayOf(1, modelPostures.size)
         val actualInputShape = interpreter.getInputTensor(0).shape()
         val actualOutputShape = interpreter.getOutputTensor(0).shape()
         if (!actualInputShape.contentEquals(expectedInputShape) ||
@@ -195,7 +199,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
         inputBuffer.rewind()
 
         // Output tensor [1, NUM_CLASSES]
-        val numClasses = SalahPosture.classificationLabels.size
+        val numClasses = modelPostures.size
         val output = Array(1) { FloatArray(numClasses) }
 
         // Run inference
@@ -222,11 +226,11 @@ class SalahDetectionEngine(context: Context) : Closeable {
         }
 
         // Use per-posture confidence threshold
-        val posture = SalahPosture.fromIndex(bestIndex)
+        val posture = modelPostures[bestIndex]
         val threshold = POSTURE_CONFIDENCE_THRESHOLDS[posture] ?: DEFAULT_CONFIDENCE
 
         // Debug: log raw ML output vs smoothed output for diagnosis
-        val labels = SalahPosture.classificationLabels
+        val labels = modelPostures
         val rawStr = rawProbabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
         val smoothStr = probabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
         Log.d(TAG, "RAW[$rawStr] EMA[$smoothStr] best=${posture.displayName} conf=%.3f thr=%.2f ${if (bestProb < threshold) "REJECTED" else "ACCEPTED"}".format(bestProb, threshold))

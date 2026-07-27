@@ -254,7 +254,7 @@ fun TravelDuaSection(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             FlaticonIcon(
-                                glyph = if (playing) FlaticonIcons.PAUSE else FlaticonIcons.PLAY,
+                                glyph = if (playing) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
                                 contentDescription = null,
                                 fontSize = 20.sp,
                             )

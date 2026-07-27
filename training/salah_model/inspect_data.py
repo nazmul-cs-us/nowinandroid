@@ -28,7 +28,8 @@ TARGET_WINDOWS_PER_CLASS = 500       # UI dataset target (100ms windows)
 MIN_USEFUL_WINDOWS = 20              # below this a file can't yield one sequence
 MIN_SPLIT_SESSIONS_PER_CLASS = 3     # one independent session per split
 POSTURE_LABELS = [
-    "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD", "QIYAM_RISING",
+    "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD",
+    "QIYAM_RISING", "RISING_TO_QIYAM",
 ]
 
 

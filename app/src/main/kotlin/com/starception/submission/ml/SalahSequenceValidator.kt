@@ -13,6 +13,7 @@ import android.util.Log
  *
  * One rak'ah sequence (ideal):
  *   QIYAM → RUKU → QIYAM_RISING → GOING_TO_SUJUD → SUJUD → JALSA → SUJUD
+ *   → RISING_TO_QIYAM (when another rak'ah follows)
  *
  * Last rak'ah ends with:
  *   ... → SUJUD → TASHAHHUD
@@ -70,17 +71,21 @@ class SalahSequenceValidator {
             SalahPosture.SUJUD to setOf(
                 SalahPosture.JALSA,
                 SalahPosture.TASHAHHUD,
-                SalahPosture.QIYAM_RISING     // Rising for next rak'ah
+                SalahPosture.RISING_TO_QIYAM  // Rising after the second sujud
             ),
             SalahPosture.JALSA to setOf(
                 SalahPosture.GOING_TO_SUJUD, // Descent into the second sujud
                 SalahPosture.SUJUD,           // Second sujud
-                SalahPosture.QIYAM_RISING,    // Rising for next rak'ah
+                SalahPosture.RISING_TO_QIYAM, // Rising for next rak'ah
                 SalahPosture.TASHAHHUD         // Model may confuse JALSA/TASHAHHUD
             ),
             SalahPosture.TASHAHHUD to setOf(
                 SalahPosture.QIYAM,           // Next rak'ah
-                SalahPosture.QIYAM_RISING     // Rising for next rak'ah
+                SalahPosture.RISING_TO_QIYAM  // Rising for next rak'ah
+            ),
+            SalahPosture.RISING_TO_QIYAM to setOf(
+                SalahPosture.QIYAM,
+                SalahPosture.RUKU
             )
         )
 
@@ -89,7 +94,7 @@ class SalahSequenceValidator {
         private val ADJACENT_OVERRIDES: Map<SalahPosture, Set<SalahPosture>> = mapOf(
             SalahPosture.QIYAM to setOf(SalahPosture.GOING_TO_SUJUD),      // Skipped RUKU detection
             SalahPosture.RUKU to setOf(SalahPosture.SUJUD),                 // Skipped GOING_TO_SUJUD
-            SalahPosture.SUJUD to setOf(SalahPosture.QIYAM),               // Skipped JALSA/QIYAM_RISING
+            SalahPosture.SUJUD to setOf(SalahPosture.QIYAM),               // Legacy model skips rise class
             SalahPosture.JALSA to setOf(SalahPosture.GOING_TO_SUJUD),      // Going to second sujud
             SalahPosture.GOING_TO_SUJUD to setOf(SalahPosture.JALSA)       // Brief transition
         )
@@ -314,8 +319,9 @@ class SalahSequenceValidator {
                     Log.d(TAG, "Prayer CONFIRMED: standing + ruku + sujud detected")
                 }
             }
-            SalahPosture.QIYAM, SalahPosture.QIYAM_RISING -> {
-                // Rising to standing from sitting postures means new rak'ah
+            SalahPosture.RISING_TO_QIYAM -> {
+                // This movement is direct evidence that the current rak'ah ended and
+                // another is beginning. Unlike QIYAM_RISING, it never means i'tidal.
                 if (oldPosture == SalahPosture.JALSA || oldPosture == SalahPosture.TASHAHHUD) {
                     if (sujudCountInRakah >= 2) {
                         rakahCount++
@@ -330,7 +336,6 @@ class SalahSequenceValidator {
                     seenRukuInRakah = false
                     seenSujudInRakah = false
                 }
-                // Also count rak'ah if rising from sujud directly (skipping JALSA)
                 else if (oldPosture == SalahPosture.SUJUD) {
                     if (sujudCountInRakah >= 1) {
                         rakahCount++
@@ -340,6 +345,19 @@ class SalahSequenceValidator {
                     seenRukuInRakah = false
                     seenSujudInRakah = false
                 }
+            }
+            SalahPosture.QIYAM -> {
+                // Backward-compatible fallback for the currently deployed seven-class
+                // model, which cannot yet emit RISING_TO_QIYAM.
+                if (oldPosture == SalahPosture.JALSA || oldPosture == SalahPosture.SUJUD) {
+                    if (sujudCountInRakah >= 1) rakahCount++
+                    sujudCountInRakah = 0
+                    seenRukuInRakah = false
+                    seenSujudInRakah = false
+                }
+            }
+            SalahPosture.QIYAM_RISING -> {
+                // I'tidal (ruku to standing) is not a rak'ah boundary.
             }
             SalahPosture.TASHAHHUD -> {
                 // Tashahhud might be final sitting - count the rak'ah

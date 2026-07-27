@@ -12,10 +12,17 @@ enum class SalahPosture(val displayName: String, val arabicName: String) {
     SUJUD("Prostration", "سجود"),
     JALSA("Sitting", "جلسة"),
     TASHAHHUD("Final Sitting", "تشهد"),
-    QIYAM_RISING("Ruku to Standing", "اعتدال");
+    QIYAM_RISING("Ruku to Standing", "اعتدال"),
+    RISING_TO_QIYAM("Rise to Next Rak‘ah", "نهوض للقيام");
 
     companion object {
-        val classificationLabels = listOf(QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING)
+        /** Canonical label order. New labels are always appended to preserve old model indices. */
+        val classificationLabels = listOf(
+            QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD,
+            QIYAM_RISING, RISING_TO_QIYAM,
+        )
+
+        val recordingLabels = classificationLabels
 
         fun fromIndex(index: Int): SalahPosture {
             return classificationLabels.getOrElse(index) { QIYAM }

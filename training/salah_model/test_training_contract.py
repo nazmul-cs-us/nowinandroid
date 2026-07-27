@@ -28,6 +28,7 @@ GUIDED_LABEL_ORDER = [
     "GOING_TO_SUJUD",
     "SUJUD",
     "TASHAHHUD",
+    "RISING_TO_QIYAM",
 ]
 
 
