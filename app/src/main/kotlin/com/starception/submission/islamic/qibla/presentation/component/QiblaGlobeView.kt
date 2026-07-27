@@ -853,11 +853,11 @@ private fun createWorldWindow(
 
     android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters/1000).toInt()}km, midpoint=($midLat, $midLon)")
 
-    // Pulled back so the whole Earth reads as a sphere with the day/night atmosphere
-    // glow visible all around the limb (the user dot + Kaaba markers are smaller as a
-    // result). Range stays in [1.8, 3.2] x Earth radius regardless of user↔Kaaba gap.
+    // Pulled back so the whole Earth reads as a sphere inside the wide carousel card.
+    // 1.8x still clipped the lower limb in this short viewport; 2.05x preserves a small
+    // black margin around the complete disc and its atmosphere glow.
     val baseRange = distanceMeters * 1.8
-    val minRange = earthRadius * 1.8   // full disc + glow fit, framed a touch closer
+    val minRange = earthRadius * 2.05
     val maxRange = earthRadius * 3.2
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 
@@ -912,7 +912,7 @@ private fun resetCameraToShowBoth(
 
     // Calculate range to show the full sphere (matches createWorldWindow framing)
     val baseRange = distanceMeters * 1.8
-    val minRange = earthRadius * 1.8
+    val minRange = earthRadius * 2.05
     val maxRange = earthRadius * 3.2
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 

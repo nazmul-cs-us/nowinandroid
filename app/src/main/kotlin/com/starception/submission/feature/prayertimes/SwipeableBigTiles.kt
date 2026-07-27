@@ -1152,7 +1152,11 @@ fun SwipeableBigTiles(
                         .onGloballyPositioned { itemInRoot = it.positionInRoot() }
                         .maskClip(cardShape),
                     shape = cardShape,
-                    color = MaterialTheme.colorScheme.surface,
+                    color = if (page == 3 && globeLive) {
+                        Color.Transparent
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
                     shadowElevation = 3.dp,
                 ) {
                     when (page) {
@@ -1170,6 +1174,7 @@ fun SwipeableBigTiles(
                             timeOffsets = timeOffsets,
                             isLandscape = isLandscape,
                             isCarouselScrolling = carouselState.isScrollInProgress,
+                            isActiveTile = currentTile == 0,
                             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
                         )
 
@@ -1202,8 +1207,31 @@ fun SwipeableBigTiles(
                         3 -> Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color(0xFF070B10)),
-                        )
+                                .background(
+                                    if (globeLive) Color.Transparent else Color(0xFF070B10),
+                                ),
+                        ) {
+                            if (globeLive) {
+                                IconButton(
+                                    onClick = { showGlobePopup = true },
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(10.dp)
+                                        .size(40.dp)
+                                        .background(
+                                            color = Color.Black.copy(alpha = 0.5f),
+                                            shape = CircleShape,
+                                        ),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Fullscreen,
+                                        contentDescription = "Open fullscreen globe",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1300,12 +1328,12 @@ fun SwipeableBigTiles(
                     .requiredSize(overlayWidth, overlayHeight)
                     .clip(cardShape)
                     .alpha(if (globeLive) 1f else 0f)
-                    .zIndex(if (globeLive) 5f else -1f),
+                    .zIndex(-1f),
             ) {
                 QiblaGlobeTile(
                     prayerTimes = prayerTimes,
-                    onFullscreenClick = { showGlobePopup = true },
                     isActiveTile = globeLive,
+                    showFullscreenButton = false,
                 )
             }
         }
@@ -2111,6 +2139,7 @@ private fun NextPrayerTile(
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
     isCarouselScrolling: Boolean = false,
+    isActiveTile: Boolean = true,
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
     val view = LocalView.current
@@ -2192,7 +2221,7 @@ private fun NextPrayerTile(
                             locationService = locationService,
                             userLatitude = prayerTimes?.location?.latitude ?: 0.0,
                             userLongitude = prayerTimes?.location?.longitude ?: 0.0,
-                            showGlobe = !isCarouselScrolling
+                            showGlobe = isActiveTile && !isCarouselScrolling
                         )
                     }
                 }
@@ -2776,6 +2805,7 @@ private fun QiblaGlobeTile(
     prayerTimes: DayPrayerTimes?,
     onFullscreenClick: () -> Unit = {},
     isActiveTile: Boolean = true,
+    showFullscreenButton: Boolean = true,
 ) {
     val density = LocalDensity.current
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -2814,7 +2844,7 @@ private fun QiblaGlobeTile(
                 )
 
                 // Fullscreen button in top-left corner (with liquid glass effect)
-                if (isActiveTile) Box(
+                if (isActiveTile && showFullscreenButton) Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
