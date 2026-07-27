@@ -56,10 +56,7 @@ import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RecordVoiceOver
-import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ViewInAr
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Card
@@ -118,6 +115,8 @@ import com.starception.submission.feature.salah.visualization.VisualizationContr
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import java.text.SimpleDateFormat
@@ -464,11 +463,11 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.SelfImprovement,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.PRAYER_TIMES,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
+                    fontSize = 22.sp,
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
@@ -487,11 +486,11 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
                     lineHeight = 16.sp
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            FlaticonIcon(
+                glyph = FlaticonIcons.ANGLE_RIGHT,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                fontSize = 20.sp,
             )
         }
     }
@@ -566,11 +565,11 @@ private fun GuidedRecordingCard(
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.RecordVoiceOver,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.SALAH_TRAINING,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
+                                fontSize = 22.sp,
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))

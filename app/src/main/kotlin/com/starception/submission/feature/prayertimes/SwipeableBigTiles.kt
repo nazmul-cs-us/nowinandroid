@@ -57,6 +57,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
@@ -128,6 +130,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
@@ -1051,7 +1054,10 @@ fun SwipeableBigTiles(
     val coroutineScope = rememberCoroutineScope()
     val view = LocalView.current
     val context = LocalContext.current
+    val overlayDensity = LocalDensity.current
     var showGlobePopup by remember { mutableStateOf(false) }
+    var carouselHostInRoot by remember { mutableStateOf(Offset.Zero) }
+    var globeOverlayRect by remember { mutableStateOf<Rect?>(null) }
     var hasActivityPermission by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
@@ -1087,7 +1093,10 @@ fun SwipeableBigTiles(
     }
 
     val cardShape = RoundedCornerShape(32.dp)
-    Box(modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
+    Box(
+        modifier = (if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+            .onGloballyPositioned { carouselHostInRoot = it.positionInRoot() },
+    ) {
         Column(
             modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1114,18 +1123,33 @@ fun SwipeableBigTiles(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
             ) { page ->
                 val itemDrawInfo = carouselItemDrawInfo
-                LaunchedEffect(page, itemDrawInfo) {
+                var itemInRoot by remember(page) { mutableStateOf(Offset.Zero) }
+                LaunchedEffect(page, itemDrawInfo, itemInRoot, carouselHostInRoot) {
                     snapshotFlow {
-                        itemDrawInfo.size >= itemDrawInfo.maxSize - 0.5f
+                        Triple(
+                            itemDrawInfo.size >= itemDrawInfo.maxSize - 0.5f,
+                            carouselState.isScrollInProgress,
+                            itemDrawInfo.maskRect,
+                        )
                     }
                         .distinctUntilChanged()
-                        .collect { isHero ->
+                        .collect { (isHero, isScrolling, mask) ->
                             if (isHero) currentTile = page
+                            if (page == 3 && isHero && !isScrolling) {
+                                val localItem = itemInRoot - carouselHostInRoot
+                                globeOverlayRect = Rect(
+                                    left = localItem.x + mask.left,
+                                    top = localItem.y + mask.top,
+                                    right = localItem.x + mask.right,
+                                    bottom = localItem.y + mask.bottom,
+                                )
+                            }
                         }
                 }
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onGloballyPositioned { itemInRoot = it.positionInRoot() }
                         .maskClip(cardShape),
                     shape = cardShape,
                     color = MaterialTheme.colorScheme.surface,
@@ -1172,18 +1196,13 @@ fun SwipeableBigTiles(
                             onSurahClickWithAyah = onSurahClickWithAyah,
                         )
 
-                        3 -> QiblaGlobeTile(
-                            prayerTimes = prayerTimes,
-                            onFullscreenClick = { showGlobePopup = true },
-                            isActiveTile = globeLive,
-                            surfaceClipBounds = itemDrawInfo.maskRect.let { mask ->
-                                android.graphics.Rect(
-                                    mask.left.toInt(),
-                                    mask.top.toInt(),
-                                    mask.right.toInt(),
-                                    mask.bottom.toInt(),
-                                )
-                            },
+                        // A SurfaceView cannot safely travel inside the carousel's
+                        // transformed lazy item. The single live globe is hoisted into
+                        // the fixed overlay below; this moving card is only its backdrop.
+                        3 -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFF070B10)),
                         )
                     }
                 }
@@ -1261,6 +1280,33 @@ fun SwipeableBigTiles(
                         modifier = Modifier.size(18.dp),
                     )
                 }
+            }
+        }
+
+        // Keep one fixed, warmed GL surface alive after the globe tile is first visited.
+        // It never participates in carousel transforms, eliminating SurfaceView ghosting,
+        // neighbor bleed and EGL recreation on every swipe.
+        globeOverlayRect?.let { bounds ->
+            val overlayWidth = with(overlayDensity) { bounds.width.toDp() }
+            val overlayHeight = with(overlayDensity) { bounds.height.toDp() }
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            x = bounds.left.toInt(),
+                            y = bounds.top.toInt(),
+                        )
+                    }
+                    .requiredSize(overlayWidth, overlayHeight)
+                    .clip(cardShape)
+                    .alpha(if (globeLive) 1f else 0f)
+                    .zIndex(if (globeLive) 5f else -1f),
+            ) {
+                QiblaGlobeTile(
+                    prayerTimes = prayerTimes,
+                    onFullscreenClick = { showGlobePopup = true },
+                    isActiveTile = globeLive,
+                )
             }
         }
 
@@ -2730,7 +2776,6 @@ private fun QiblaGlobeTile(
     prayerTimes: DayPrayerTimes?,
     onFullscreenClick: () -> Unit = {},
     isActiveTile: Boolean = true,
-    surfaceClipBounds: android.graphics.Rect? = null,
 ) {
     val density = LocalDensity.current
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -2763,12 +2808,13 @@ private fun QiblaGlobeTile(
                     userLatitude = locationData.latitude,
                     userLongitude = locationData.longitude,
                     modifier = Modifier.fillMaxSize(),
+                    showControls = isActiveTile,
                     isActiveTile = isActiveTile,
-                    surfaceClipBounds = surfaceClipBounds,
+                    surfaceCornerRadius = 32.dp,
                 )
 
                 // Fullscreen button in top-left corner (with liquid glass effect)
-                Box(
+                if (isActiveTile) Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)

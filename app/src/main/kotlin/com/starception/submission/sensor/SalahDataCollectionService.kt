@@ -81,6 +81,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     @Volatile
     private var isSampleCaptureEnabled = false
     private var isLiveMode: Boolean = false
+    private var liveTargetRakahCount: Int? = null
     private var collectionMode: CollectionMode = CollectionMode.MANUAL
 
     // Live mode auto-stop timer
@@ -522,6 +523,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                     )
                     if (collectionMode == CollectionMode.LIVE) {
                         put("human_reviewed", false)
+                        liveTargetRakahCount?.let { put("target_rakah_count", it) }
                     }
                 }
                 write(json.toString())
@@ -549,10 +551,14 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
      * Creates file named salah_live_{timestamp}_{sessionId}.jsonl
      * Auto-stops after 30 minutes.
      */
-    fun startLivePrayerRecording() {
+    fun startLivePrayerRecording(targetRakahCount: Int = 2) {
         if (isRecording) {
             Log.w(TAG, "Already recording")
             return
+        }
+
+        require(targetRakahCount in 2..4) {
+            "Live prayer target must be 2, 3, or 4 rak'ahs"
         }
 
         sessionId = UUID.randomUUID().toString().take(8)
@@ -561,6 +567,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         clearSensorBuffers()
         isSampleCaptureEnabled = true
         isLiveMode = true
+        liveTargetRakahCount = targetRakahCount
         collectionMode = CollectionMode.LIVE
         currentPosture = SalahPosture.QIYAM // Default posture for live mode
 
@@ -579,6 +586,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         Log.i(TAG, "🕌 Starting LIVE salah prayer recording")
         Log.i(TAG, "   Session: $sessionId")
+        Log.i(TAG, "   Prayer length: $targetRakahCount rak'ahs")
         Log.i(TAG, "   Output: ${outputFile?.absolutePath}")
         Log.i(TAG, "   Auto-stop: 30 minutes")
 
@@ -661,6 +669,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         val filePath = outputFile?.absolutePath
         currentPosture = SalahPosture.QIYAM // Reset posture
+        liveTargetRakahCount = null
         return filePath
     }
 

@@ -59,7 +59,7 @@ object FlaticonIcons {
     const val PRAYER_TIMES = "\uf978"
     const val APPEARANCE = "\uf9ed"
     const val PAUSE = "\ufa0c"
-    const val SALAH_TRAINING = "\ufac8"
+    const val SALAH_TRAINING = "\ufd5f"
     const val QUIZ = "\ufafa"
     const val REFRESH = "\ufb34"
     const val SCHOOL = "\ufba1"

@@ -102,7 +102,7 @@ fun QiblaGlobeView(
     modifier: Modifier = Modifier,
     showControls: Boolean = true,  // Set to false to hide overlay buttons and info cards
     isActiveTile: Boolean = true,  // When this becomes true, plays a one-time day/night sweep
-    surfaceClipBounds: android.graphics.Rect? = null,
+    surfaceCornerRadius: Dp = 16.dp,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -112,6 +112,7 @@ fun QiblaGlobeView(
     val makkahLongitude = 39.8262
 
     val density = LocalDensity.current
+    val surfaceCornerRadiusPx = with(density) { surfaceCornerRadius.toPx() }
     val haptic = LocalHapticFeedback.current
 
     // Use BoxWithConstraints to get actual tile dimensions for proper centering
@@ -142,6 +143,7 @@ fun QiblaGlobeView(
     var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
     var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
     var magneticFieldStrength by remember { mutableFloatStateOf(50f) } // For strength-based accuracy like Smart Prediction
+    var hasPlayedDayNightSweep by remember { mutableStateOf(false) }
 
     // Debounce direction changes to prevent flickering when angle is near 180°
     var stableDirection by remember { mutableStateOf<Boolean?>(null) } // true = turn right, false = turn left
@@ -317,18 +319,21 @@ fun QiblaGlobeView(
             worldWindowRef?.requestRedraw()
         }
 
-        // One-time sweep: ease the atmosphere time a full 24h forward so the terminator
-        // makes one complete loop and returns to the present.
-        val baseMs = System.currentTimeMillis()
-        val dayMs = 24L * 60 * 60 * 1000
-        val durationMs = 4000L
-        val startMs = System.currentTimeMillis()
-        while (true) {
-            val t = ((System.currentTimeMillis() - startMs).toFloat() / durationMs).coerceIn(0f, 1f)
-            val eased = 0.5f - 0.5f * kotlin.math.cos((t * Math.PI).toFloat()) // ease in/out
-            setTime(kotlin.time.Instant.fromEpochMilliseconds(baseMs + (eased * dayMs).toLong()))
-            if (t >= 1f) break
-            kotlinx.coroutines.delay(16)
+        if (!hasPlayedDayNightSweep) {
+            // Play this once for the retained surface, not after every carousel swipe.
+            val baseMs = System.currentTimeMillis()
+            val dayMs = 24L * 60 * 60 * 1000
+            val durationMs = 4000L
+            val startMs = System.currentTimeMillis()
+            while (true) {
+                val t = ((System.currentTimeMillis() - startMs).toFloat() / durationMs)
+                    .coerceIn(0f, 1f)
+                val eased = 0.5f - 0.5f * kotlin.math.cos((t * Math.PI).toFloat())
+                setTime(kotlin.time.Instant.fromEpochMilliseconds(baseMs + (eased * dayMs).toLong()))
+                if (t >= 1f) break
+                kotlinx.coroutines.delay(16)
+            }
+            hasPlayedDayNightSweep = true
         }
 
         // Settle on real time, then keep it current while the tile stays active + foreground.
@@ -345,22 +350,18 @@ fun QiblaGlobeView(
     // The EGL context is preserved across the pause, so coming back is a fast
     // redraw with warm textures — not the black-flashing cold recreate the
     // old live/static composition swap caused.
-    // ONE live globe across deck shuffles. The surface is PARKED off-screen
-    // while the card is stacked — NOT hidden: an INVISIBLE SurfaceView
-    // destroys its surface, and the next show waits several frames for a
-    // fresh buffer (a black/white gap on landing). A parked surface keeps
-    // its last rendered frame, so translating it back is instant. While
-    // parked, sensors and redraw loops are gated off, so the GL thread
-    // (render-on-demand) stays idle and costs nothing.
+    // Keep the SurfaceView laid out at one stable position. Alpha does not destroy its
+    // Surface, so the last GL buffer is immediately available when the carousel returns.
+    // Translating a SurfaceView off-screen caused stale SurfaceControl copies to bleed
+    // into adjacent carousel items on some devices.
     LaunchedEffect(isActiveTile, worldWindowRef) {
         val ww = worldWindowRef ?: return@LaunchedEffect
+        ww.translationX = 0f
         if (isActiveTile) {
-            android.util.Log.d("GlobeSurface", "⬅️ UNPARK (translationX=0) @${android.os.SystemClock.uptimeMillis()}")
-            ww.translationX = 0f
+            ww.alpha = 1f
             ww.requestRedraw()
         } else {
-            android.util.Log.d("GlobeSurface", "➡️ PARK (translationX=100000) @${android.os.SystemClock.uptimeMillis()}")
-            ww.translationX = 100_000f
+            ww.alpha = 0f
         }
     }
 
@@ -415,7 +416,17 @@ fun QiblaGlobeView(
                     worldWindow.isFocusableInTouchMode = false
                     worldWindow.isClickable = false
                     worldWindow.setOnTouchListener { _, _ -> false }
-                    worldWindow.clipBounds = surfaceClipBounds
+                    worldWindow.alpha = if (isActiveTile) 1f else 0f
+                    worldWindow.clipToOutline = true
+                    worldWindow.outlineProvider = object : android.view.ViewOutlineProvider() {
+                        override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                            outline.setRoundRect(0, 0, view.width, view.height, surfaceCornerRadiusPx)
+                        }
+                    }
+                    worldWindow.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                        view.clipBounds = android.graphics.Rect(0, 0, view.width, view.height)
+                        view.invalidateOutline()
+                    }
 
                     // Survive app pause/resume without re-uploading textures.
                     worldWindow.preserveEGLContextOnPause = true
@@ -433,13 +444,6 @@ fun QiblaGlobeView(
                             android.util.Log.d("GlobeSurface", "🔴 surfaceDestroyed @${android.os.SystemClock.uptimeMillis()}")
                         }
                     })
-                    if (!isActiveTile) {
-                        // Composed while stacked: start parked off-screen; the
-                        // isActiveTile effect slides it in when the card lands
-                        // on front. The surface stays alive the whole time.
-                        worldWindow.translationX = 100_000f
-                    }
-
                     // Add lifecycle observer to properly manage GLSurfaceView
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
@@ -456,16 +460,18 @@ fun QiblaGlobeView(
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
 
-                    worldWindow.requestFocus()
                     worldWindow
                 },
                 modifier = Modifier.fillMaxSize(),
                 update = { worldWindow ->
-                    worldWindow.clipBounds = surfaceClipBounds
-                    worldWindow.requestLayout()
-                    if (!worldWindow.hasFocus()) {
-                        worldWindow.requestFocus()
-                    }
+                    worldWindow.alpha = if (isActiveTile) 1f else 0f
+                    worldWindow.clipBounds = android.graphics.Rect(
+                        0,
+                        0,
+                        worldWindow.width,
+                        worldWindow.height,
+                    )
+                    worldWindow.invalidateOutline()
                 },
                 onRelease = { worldWindow ->
                     android.util.Log.d("GlobeSurface", "🗑️ WorldWindow RELEASED @${android.os.SystemClock.uptimeMillis()}")

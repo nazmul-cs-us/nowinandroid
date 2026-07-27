@@ -1,14 +1,11 @@
 package com.starception.submission.feature.salah.datacollection
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,8 +19,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.File
 
@@ -42,9 +42,10 @@ fun LivePrayerRecordingScreen(
                 title = { Text("Live Prayer Recording") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.ARROW_BACK,
+                            contentDescription = "Back",
+                            fontSize = 20.sp,
                         )
                     }
                 }
@@ -70,6 +71,7 @@ fun LivePrayerRecordingScreen(
                         elapsedSeconds = state.elapsedSeconds,
                         sampleCount = state.sampleCount,
                         rakahCount = state.rakahCount,
+                        targetRakahCount = state.targetRakahCount,
                         onNavigateToReview = onNavigateToReview,
                         onDiscard = {
                             // Delete the file and go back
@@ -88,12 +90,15 @@ fun LivePrayerRecordingScreen(
                         detectedPosture = state.detectedPosture,
                         detectedConfidence = state.detectedConfidence,
                         rakahCount = state.rakahCount,
+                        targetRakahCount = state.targetRakahCount,
                         onStopRecording = { viewModel.stopRecording() }
                     )
                 }
                 // Pre-recording state
                 else -> {
                     PreRecordingContent(
+                        selectedRakahCount = state.targetRakahCount,
+                        onRakahCountSelected = viewModel::selectTargetRakahCount,
                         onStartRecording = { viewModel.startRecording() }
                     )
                 }
@@ -104,16 +109,26 @@ fun LivePrayerRecordingScreen(
 
 @Composable
 private fun PreRecordingContent(
+    selectedRakahCount: Int,
+    onRakahCountSelected: (Int) -> Unit,
     onStartRecording: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Card(
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(
@@ -150,11 +165,11 @@ private fun PreRecordingContent(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.INFO,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            fontSize = 20.sp,
                         )
                     }
                     Text(
@@ -194,7 +209,12 @@ private fun PreRecordingContent(
             }
         }
 
-        Card(
+            PrayerLengthSelector(
+                selectedRakahCount = selectedRakahCount,
+                onRakahCountSelected = onRakahCountSelected,
+            )
+
+            Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(
@@ -231,11 +251,11 @@ private fun PreRecordingContent(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Assessment,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.SALAH_TRAINING,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            fontSize = 18.sp,
                         )
                     }
                     Text(
@@ -250,9 +270,8 @@ private fun PreRecordingContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            }
         }
-
-        Spacer(modifier = Modifier.weight(1f))
 
         NiaOutlinedButton(
             onClick = {
@@ -264,8 +283,123 @@ private fun PreRecordingContent(
                 .height(56.dp),
         ) {
             Text(
-                text = "Start Prayer Recording",
+                text = "Start $selectedRakahCount Rakʿah Recording",
                 style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrayerLengthSelector(
+    selectedRakahCount: Int,
+    onRakahCountSelected: (Int) -> Unit,
+) {
+    val hapticFeedback = LocalHapticFeedback.current
+    val prayerExamples = mapOf(
+        2 to "Fajr or sunnah",
+        3 to "Maghrib",
+        4 to "Dhuhr, Asr or Isha",
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.PRAYER_TIMES,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        fontSize = 18.sp,
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Prayer length",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Select the prayer you will record",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                prayerExamples.forEach { (count, example) ->
+                    val selected = selectedRakahCount == count
+                    Surface(
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onRakahCountSelected(count)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                        contentColor = if (selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = count.toString(),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "rakʿahs",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = prayerExamples.getValue(selectedRakahCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
             )
         }
     }
@@ -278,6 +412,7 @@ private fun RecordingContent(
     detectedPosture: com.starception.submission.ml.SalahPosture?,
     detectedConfidence: Float,
     rakahCount: Int,
+    targetRakahCount: Int,
     onStopRecording: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -392,11 +527,11 @@ private fun RecordingContent(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Assessment,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.SALAH_TRAINING,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            fontSize = 18.sp,
                         )
                     }
                     Text(
@@ -462,14 +597,32 @@ private fun RecordingContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Rak'ahs Counted:",
+                        text = "Rakʿahs Detected:",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = rakahCount.toString(),
+                        text = "$rakahCount / $targetRakahCount",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                LinearProgressIndicator(
+                    progress = {
+                        (rakahCount.toFloat() / targetRakahCount.toFloat()).coerceIn(0f, 1f)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+
+                if (rakahCount >= targetRakahCount) {
+                    Text(
+                        text = "Target reached. Complete your prayer, then stop recording.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
 
@@ -523,6 +676,7 @@ private fun PostRecordingContent(
     elapsedSeconds: Int,
     sampleCount: Int,
     rakahCount: Int,
+    targetRakahCount: Int,
     onNavigateToReview: (String) -> Unit,
     onDiscard: () -> Unit
 ) {
@@ -574,11 +728,11 @@ private fun PostRecordingContent(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.COMPLETED,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            fontSize = 22.sp,
                         )
                     }
                     Text(
@@ -629,11 +783,11 @@ private fun PostRecordingContent(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Assessment,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.SALAH_TRAINING,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            fontSize = 20.sp,
                         )
                     }
                     Text(
@@ -678,7 +832,22 @@ private fun PostRecordingContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Rak'ahs Detected:",
+                        text = "Prayer selected:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "$targetRakahCount rakʿahs",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Rakʿahs detected:",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(

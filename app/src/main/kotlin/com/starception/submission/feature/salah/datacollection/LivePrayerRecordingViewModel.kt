@@ -21,6 +21,7 @@ import javax.inject.Inject
 
 data class LiveRecordingState(
     val isRecording: Boolean = false,
+    val targetRakahCount: Int = 2,
     val elapsedSeconds: Int = 0,
     val sampleCount: Int = 0,
     val detectedPosture: SalahPosture? = null,
@@ -46,10 +47,16 @@ class LivePrayerRecordingViewModel @Inject constructor(
     private val sequenceValidator = SalahSequenceValidator()
     private var timerJob: kotlinx.coroutines.Job? = null
 
+    fun selectTargetRakahCount(count: Int) {
+        if (_state.value.isRecording || count !in 2..4) return
+        _state.update { it.copy(targetRakahCount = count) }
+    }
+
     fun startRecording() {
         if (_state.value.isRecording) return
 
-        Log.i(TAG, "Starting live prayer recording...")
+        val targetRakahCount = _state.value.targetRakahCount
+        Log.i(TAG, "Starting $targetRakahCount rak'ah live prayer recording...")
 
         // Initialize ML detection engine for real-time predictions
         try {
@@ -104,8 +111,11 @@ class LivePrayerRecordingViewModel @Inject constructor(
             detectionEngine = null
         }
 
-        collectionService.startLivePrayerRecording()
-        _state.value = LiveRecordingState(isRecording = true)
+        collectionService.startLivePrayerRecording(targetRakahCount)
+        _state.value = LiveRecordingState(
+            isRecording = true,
+            targetRakahCount = targetRakahCount,
+        )
         sequenceValidator.reset()
 
         // Start elapsed time counter
