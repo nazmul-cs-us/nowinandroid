@@ -17,6 +17,7 @@
 package com.starception.submission.feature.course.navigation
 
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -60,6 +61,8 @@ fun NavGraphBuilder.courseScreen(
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
             onSearchSubmit = onSearchSubmit,
+            searchPillContainerColor = Color(0xFFE9E6D8),
+            searchPillContentColor = Color(0xFF0A0808),
         ) {
             CourseScreen(
                 onSurahClick = onSurahClick,

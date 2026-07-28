@@ -89,10 +89,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
-import androidx.compose.foundation.gestures.animateScrollBy
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.LinearEasing
@@ -1092,7 +1090,7 @@ fun SwipeableBigTiles(
         }
     }
 
-    val cardShape = RoundedCornerShape(32.dp)
+    val cardShape = MaterialTheme.shapes.extraLarge
     Box(
         modifier = (if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .onGloballyPositioned { carouselHostInRoot = it.positionInRoot() },
@@ -1111,16 +1109,13 @@ fun SwipeableBigTiles(
                     .height(231.dp)
             }
 
-            val preferredItemWidth = if (isLandscape) 560.dp else 320.dp
-            HorizontalMultiBrowseCarousel(
+            val maxItemWidth = if (isLandscape) 560.dp else 320.dp
+            HorizontalCenteredHeroCarousel(
                 state = carouselState,
-                preferredItemWidth = preferredItemWidth,
+                maxItemWidth = maxItemWidth,
                 modifier = carouselModifier,
-                itemSpacing = 10.dp,
-                flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselState),
-                minSmallItemWidth = 24.dp,
-                maxSmallItemWidth = 34.dp,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                itemSpacing = 8.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             ) { page ->
                 val itemDrawInfo = carouselItemDrawInfo
                 var itemInRoot by remember(page) { mutableStateOf(Offset.Zero) }
@@ -1265,12 +1260,7 @@ fun SwipeableBigTiles(
                             .clickable {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 coroutineScope.launch {
-                                    val direction = index - currentTile
-                                    carouselState.animateScrollBy(
-                                        with(view.resources.displayMetrics) {
-                                            (preferredItemWidth.value + 10f) * density * direction
-                                        },
-                                    )
+                                    carouselState.animateScrollToItem(index)
                                 }
                             },
                     )

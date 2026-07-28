@@ -112,6 +112,8 @@ fun AppTopSearchBar(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
     topInset: Dp = 0.dp,
+    pillContainerColor: ComposeColor = ComposeColor.Unspecified,
+    pillContentColor: ComposeColor = ComposeColor.Unspecified,
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
@@ -130,8 +132,20 @@ fun AppTopSearchBar(
     // Use primaryContainer so the SearchBar pill takes on the user's selected
     // brand color (e.g. Royal -> pale Lapis blue) instead of the near-cream
     // surfaceVariant that's visually indistinguishable from the page background.
-    val pillBackground = MaterialTheme.colorScheme.primaryContainer.toArgb()
-    val pillTextColor = MaterialTheme.colorScheme.onPrimaryContainer.toArgb()
+    val pillBackground = (
+        if (pillContainerColor == ComposeColor.Unspecified) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            pillContainerColor
+        }
+    ).toArgb()
+    val pillTextColor = (
+        if (pillContentColor == ComposeColor.Unspecified) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            pillContentColor
+        }
+    ).toArgb()
     // Inflated SearchView ships M3 default lavender — repaint with brand colors.
     val searchViewBg = MaterialTheme.colorScheme.surface.toArgb()
     val accentColor = MaterialTheme.colorScheme.primary.toArgb()

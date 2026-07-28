@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 
 /**
@@ -83,6 +84,8 @@ fun TopLevelTopBarScaffold(
     @Suppress("UNUSED_PARAMETER") onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     showTopBar: Boolean = true,
+    searchPillContainerColor: Color = Color.Unspecified,
+    searchPillContentColor: Color = Color.Unspecified,
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
@@ -99,6 +102,8 @@ fun TopLevelTopBarScaffold(
             title = stringResource(id = titleRes),
             onSettingsClick = onSettingsClick,
             topInset = dynamicTopInset,
+            pillContainerColor = searchPillContainerColor,
+            pillContentColor = searchPillContentColor,
             // Both the scaffold's explicit override and the NavHost-level
             // SearchNavCallbacks fire — the override exists for legacy callers
             // that pre-date the CompositionLocal; new code paths only need to
