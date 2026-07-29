@@ -717,7 +717,7 @@ private fun GuidedRecordingCard(
                         }
                     } else {
                         Text(
-                            text = "The guide records 5 separate takes. Each 4-second capture begins with “Move now,” then pauses while you return to the starting position.",
+                            text = "The guide records 5 separate takes. Each 5-second capture begins with “Move now,” then pauses while you return to the starting position.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth(),

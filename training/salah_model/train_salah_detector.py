@@ -31,7 +31,7 @@ from data_augmentation import augment_dataset, balance_classes
 from dataset_report import build_report, write_report
 
 # Small splits can miss rare classes entirely; passing explicit labels keeps
-# report/confusion-matrix shapes fixed at 7 classes either way.
+# report/confusion-matrix shapes fixed at all model classes either way.
 ALL_CLASS_IDS = list(range(NUM_CLASSES))
 
 

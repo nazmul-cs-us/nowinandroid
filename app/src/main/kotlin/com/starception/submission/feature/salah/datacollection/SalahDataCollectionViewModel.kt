@@ -119,13 +119,14 @@ data class GuidedStep(
 }
 
 /**
- * Posture sequence for guided recording, mirroring one real rak'ah that ends like the
- * final rak'ah of a prayer (same ideal order the SalahSequenceValidator enforces):
+ * Posture sequence for guided recording, mirroring a rak'ah that continues into the
+ * next rak'ah (same ideal order the SalahSequenceValidator enforces):
  * QIYAM → RUKU → QIYAM_RISING (i'tidal) → GOING_TO_SUJUD → SUJUD → JALSA
- * → GOING_TO_SUJUD → SUJUD → TASHAHHUD.
+ * → GOING_TO_SUJUD → SUJUD → TASHAHHUD → RISING_TO_QIYAM.
  * After ruku the worshipper always straightens back up to standing before descending to
- * sujud, and the tashahhud sitting follows the second sujud directly — so the recorded
- * transitions match the ones the model will see in real prayers.
+ * sujud. The guided flow then records the next-rak'ah rise after tashahhud so every model
+ * class is represented in each complete session and can participate in session-isolated
+ * train, validation, and test splits.
  */
 val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
     GuidedStep(
@@ -168,7 +169,13 @@ val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
     ),
     GuidedStep(
         SalahPosture.TASHAHHUD, isTransition = false,
-        instruction = "Now sit up into the final seated position for tashahhud. Become still. Keep holding until the recording is complete.",
+        instruction = "Now sit up into the seated position for tashahhud. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.RISING_TO_QIYAM, isTransition = true,
+        instruction = "Remain seated after tashahhud and do not move yet. When you hear move now, rise naturally into the next rak‘ah and stop fully upright.",
+        recordingLabel = "Tashahhud → Next Rak‘ah",
+        movementCue = "Move now. Rise naturally into the next rak‘ah and stop fully upright.",
     ),
 )
 
@@ -213,9 +220,9 @@ private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture
     )
 }
 
-// Twenty 100ms windows are needed for one training sequence. Four seconds gives each
-// deliberately slow transition enough clean data without labelling a long destination hold.
-private const val TRANSITION_DURATION = 4
+// With the production stride of 3, five seconds yields at least 10 held-out sequences
+// from one complete session, matching the deployment quality gate for every movement class.
+private const val TRANSITION_DURATION = 5
 private const val FOCUSED_MOVEMENT_REPETITIONS = 5
 private const val STATIC_SETTLE_MS = 1_500L
 private const val TAG = "GuidedRecording"
@@ -652,7 +659,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
                 if (step.isTransition) {
                     // Capture begins when cue playback actually starts, not while the
-                    // TTS engine is still generating audio. This keeps the four-second
+                    // TTS engine is still generating audio. This keeps the five-second
                     // movement label aligned with the user's physical transition.
                     val transitionCaptured = captureSpokenTransition(
                         posture = posture,

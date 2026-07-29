@@ -7,6 +7,7 @@
 package com.starception.submission.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -19,6 +20,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
+import com.starception.submission.core.designsystem.theme.mainPageTopColor
 
 /**
  * Wobble intensity (0f..1f) from the app-level PullToSyncContainer. Read by
@@ -86,11 +89,18 @@ fun TopLevelTopBarScaffold(
     showTopBar: Boolean = true,
     searchPillContainerColor: Color = Color.Unspecified,
     searchPillContentColor: Color = Color.Unspecified,
+    pageContainerColor: Color = Color.Unspecified,
     onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onSearchSubmit: (query: String) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     if (showTopBar) {
+        val resolvedPageTopColor = if (pageContainerColor == Color.Unspecified) {
+            mainPageTopColor()
+        } else {
+            pageContainerColor
+        }
+        val pageBackground = mainPageBackgroundBrush()
         val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
             .asPaddingValues()
             .calculateTopPadding()
@@ -99,6 +109,7 @@ fun TopLevelTopBarScaffold(
         val pullToSyncModifier = LocalPullToSyncModifier.current
         val searchNav = LocalSearchNavCallbacks.current
         AppTopSearchBar(
+            modifier = Modifier.background(resolvedPageTopColor),
             title = stringResource(id = titleRes),
             onSettingsClick = onSettingsClick,
             topInset = dynamicTopInset,
@@ -117,6 +128,7 @@ fun TopLevelTopBarScaffold(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(pageBackground)
                     .then(pullToSyncModifier)
                     .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
             ) {
@@ -124,9 +136,11 @@ fun TopLevelTopBarScaffold(
             }
         }
     } else {
+        val pageBackground = mainPageBackgroundBrush()
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(pageBackground)
                 .consumeWindowInsets(WindowInsets(0, 0, 0, 0)),
         ) {
             content()

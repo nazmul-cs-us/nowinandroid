@@ -1499,6 +1499,7 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
+                idleContainerColor = Color.Transparent,
                 downloadProgress = downloadProgress,
                 downloadLabel = downloadLabel,
                 mediaState = mediaState,
@@ -1546,7 +1547,6 @@ fun PrayerTimesScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
             ) {
             
             if (isLoading) {
@@ -1818,18 +1818,6 @@ fun PrayerTimesScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // Let the tile deck BLEED 9dp into each side margin
-                        // (24dp screen padding → 15dp effective for the deck)
-                        // so the cards read wider than the rest of the column.
-                        .layout { measurable, constraints ->
-                            val extra = 18.dp.roundToPx()
-                            val placeable = measurable.measure(
-                                constraints.copy(maxWidth = constraints.maxWidth + extra),
-                            )
-                            layout(placeable.width - extra, placeable.height) {
-                                placeable.place(-extra / 2, 0)
-                            }
-                        }
                 ) {
                     SwipeableBigTiles(
                     prayerTimes = prayerTimes,

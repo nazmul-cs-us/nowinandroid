@@ -55,6 +55,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.prayer.model.DayPrayerSuggestions
 import com.starception.submission.prayer.model.PrayerTimeSuggestion
 import kotlinx.coroutines.launch
@@ -145,31 +148,39 @@ fun AiSuggestionsFab(
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            shape = NiaBottomSheetDefaults.FloatingShape,
+            containerColor = Color.Transparent,
+            contentColor = NiaBottomSheetDefaults.contentColor(),
+            scrimColor = NiaBottomSheetDefaults.scrimColor(),
+            tonalElevation = 0.dp,
+            dragHandle = null,
         ) {
-            AiSuggestionsContent(
-                suggestions = pendingSuggestions,
-                currentOffsets = currentOffsets,
-                onApplySuggestion = { prayerName, offset ->
-                    onApplySuggestion(prayerName, offset)
-                },
-                onApplyAll = {
-                    pendingSuggestions.forEach { suggestion ->
-                        onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset)
-                    }
-                    scope.launch {
-                        sheetState.hide()
-                        showBottomSheet = false
-                    }
-                },
-                onDismiss = {
-                    scope.launch {
-                        sheetState.hide()
-                        showBottomSheet = false
-                    }
+            NiaBottomSheetTheme {
+                NiaBottomSheetFrame {
+                AiSuggestionsContent(
+                    suggestions = pendingSuggestions,
+                    currentOffsets = currentOffsets,
+                    onApplySuggestion = { prayerName, offset ->
+                        onApplySuggestion(prayerName, offset)
+                    },
+                    onApplyAll = {
+                        pendingSuggestions.forEach { suggestion ->
+                            onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset)
+                        }
+                        scope.launch {
+                            sheetState.hide()
+                            showBottomSheet = false
+                        }
+                    },
+                    onDismiss = {
+                        scope.launch {
+                            sheetState.hide()
+                            showBottomSheet = false
+                        }
+                    },
+                )
                 }
-            )
+            }
         }
     }
 }

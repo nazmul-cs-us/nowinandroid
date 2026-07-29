@@ -334,7 +334,7 @@ def assign_sessions_to_splits(
     """Assign whole recording sessions to train/validation/test.
 
     Overlapping sequences and every posture from one recording stay in exactly one
-    partition. Candidate shuffles are tried until every partition contains all seven
+    partition. Candidate shuffles are tried until every partition contains all model
     labels; callers should first ensure each label appears in at least three sessions.
     Participant-level isolation additionally requires collecting a participant id.
     """

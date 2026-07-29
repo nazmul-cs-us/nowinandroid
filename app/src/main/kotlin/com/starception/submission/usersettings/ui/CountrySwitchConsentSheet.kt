@@ -23,10 +23,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,13 +53,24 @@ fun CountrySwitchConsentSheet(
 
     // Swiping the sheet away is NOT a decision — it reappears on the next app open. Only the
     // "Keep current" button is a terminal decline.
-    ModalBottomSheet(onDismissRequest = onDismissForNow, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(top = 4.dp, bottom = 28.dp),
-        ) {
+    ModalBottomSheet(
+        onDismissRequest = onDismissForNow,
+        sheetState = sheetState,
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
+    ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 4.dp, bottom = 28.dp),
+            ) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -127,6 +142,8 @@ fun CountrySwitchConsentSheet(
                 ) {
                     Text(if (proposal.isRestore) "Restore" else "Apply")
                 }
+            }
+            }
             }
         }
     }

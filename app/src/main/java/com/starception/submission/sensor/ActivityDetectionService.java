@@ -629,6 +629,16 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      */
     private void analyzeCurrentActivity() {
         long currentTime = System.currentTimeMillis();
+
+        // Salah is classified by the dedicated posture model. Once its sequence validator has
+        // confirmed prayer, do not let the generic movement classifier replace PRAYING with
+        // STATIONARY/ON_PHONE on its next two-second pass. Salah processing clears this flag when
+        // the prayer session ends, after which normal activity classification resumes.
+        if (isPrayerActive) {
+            logDebug("🕌 Prayer active - preserving PRAYING over generic activity analysis");
+            return;
+        }
+
         long windowStart = currentTime - (DATA_WINDOW_SIZE * 1000);
 
         // Filter recent accelerometer data (use moving average for smoother values)

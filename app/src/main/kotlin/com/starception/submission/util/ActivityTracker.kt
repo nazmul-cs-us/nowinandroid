@@ -201,8 +201,22 @@ object ActivityTracker {
      * @param handler Handler from foreground service's HandlerThread
      */
     fun setSensorHandler(handler: android.os.Handler?) {
+        val shouldMoveRunningDetector = handler != null &&
+            sensorHandler !== handler &&
+            activityDetectionService?.isRunning == true
+
         sensorHandler = handler
         Log.i("ActivityTracker", "🔧 Sensor handler ${if (handler != null) "SET from foreground service" else "CLEARED"}")
+
+        // The app process can initialize ActivityTracker before the foreground prayer service.
+        // In that case detection is already registered on its fallback internal thread. Restart
+        // once so the listeners are registered on the foreground-service handler and continue
+        // receiving sensor events while the app is backgrounded or the screen is off.
+        if (shouldMoveRunningDetector) {
+            Log.i("ActivityTracker", "🔄 Moving active sensor detection to foreground-service handler")
+            activityDetectionService?.stopDetection()
+            startDetection()
+        }
     }
 
     // Callback for activity change (used to update notification immediately)
@@ -254,7 +268,12 @@ object ActivityTracker {
 
             // Only create service instance once
             if (activityDetectionService == null) {
-                activityDetectionService = ActivityDetectionService(context.applicationContext)
+                activityDetectionService = ActivityDetectionService(context.applicationContext).also { service ->
+                    // Google Activity Recognition cannot report Salah as an activity. Prayer is
+                    // inferred by our on-device posture model, so its sensor pipeline must be
+                    // explicitly enabled when the unified activity tracker is created.
+                    service.setSalahDetectionEnabled(true)
+                }
             }
 
             // Register lifecycle observer to track foreground state (only once)

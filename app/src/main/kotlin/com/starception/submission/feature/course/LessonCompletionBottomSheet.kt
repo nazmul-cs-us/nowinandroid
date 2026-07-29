@@ -55,7 +55,6 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +63,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaTextButton
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -157,22 +159,23 @@ fun LessonCompletionBottomSheet(
             onDismiss()
         },
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 8.dp,
-        dragHandle = {
-            BottomSheetDefaults.DragHandle(
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-        },
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
         modifier = modifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
             // Completion mark
             Box(
                 modifier = Modifier
@@ -342,6 +345,8 @@ fun LessonCompletionBottomSheet(
                 ) {
                     Text("Not yet")
                 }
+            }
+            }
             }
         }
     }

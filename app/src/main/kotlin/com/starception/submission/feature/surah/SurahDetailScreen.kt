@@ -72,6 +72,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.window.Dialog
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -2899,9 +2901,11 @@ private fun AlbumPlayerContent(
             },
             sheetState = sheetState,
             containerColor = Color.Transparent,
+            scrimColor = NiaBottomSheetDefaults.scrimColor(),
             tonalElevation = 0.dp,
             dragHandle = null
         ) {
+            NiaBottomSheetTheme {
             // Wrap everything in a Box with padding to create margins from screen edges
             Box(
                 modifier = Modifier
@@ -2909,8 +2913,8 @@ private fun AlbumPlayerContent(
                     .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(16.dp),
+                    color = NiaBottomSheetDefaults.containerColor(),
+                    shape = NiaBottomSheetDefaults.FloatingShape,
                     tonalElevation = 0.dp
                 ) {
                     Column(
@@ -3202,6 +3206,7 @@ private fun AlbumPlayerContent(
                         }
                     }
                 }
+            }
             }
         }
 

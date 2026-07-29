@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -116,6 +117,7 @@ fun PullToSyncContainer(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    idleContainerColor: Color = Color.Unspecified,
     enabled: Boolean = true,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
@@ -134,6 +136,11 @@ fun PullToSyncContainer(
     onMushafNext: () -> Unit = {},
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
+    val resolvedIdleContainerColor = if (idleContainerColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.background
+    } else {
+        idleContainerColor
+    }
     val isDownloading = downloadProgress > 0f
     var prayerAlertDismissed by remember { mutableStateOf(false) }
     LaunchedEffect(prayerAlertState.displayText) {
@@ -380,7 +387,7 @@ fun PullToSyncContainer(
                     isSilentMode -> fitbitBgColorLight
                     isIslamicEvent -> fitbitBgColorLight
                     isMushafActive -> fitbitBgColorLight
-                    else -> MaterialTheme.colorScheme.background
+                    else -> resolvedIdleContainerColor
                 }
             )
     ) {
@@ -436,7 +443,7 @@ fun PullToSyncContainer(
                         bottomEnd = 0.dp
                     )
                 )
-                .background(MaterialTheme.colorScheme.background)
+                .background(resolvedIdleContainerColor)
         ) {
             // Main screen content
             content(syncState)

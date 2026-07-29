@@ -8,7 +8,7 @@
  * WHAT IT DOES:
  * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles
  * - Uses Material 3 carousel keylines, masking and single-item snapping
- * - Clickable page-indicator dots and a swipe-hint row for navigation
+ * - Clickable page-indicator pills and tappable compact previews for navigation
  *
  * WHERE IT'S USED:
  * - PrayerTimesScreen.kt: main prayer times screen, via SwipeableBigTiles()
@@ -36,6 +36,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
@@ -89,7 +90,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.*
@@ -1090,7 +1091,7 @@ fun SwipeableBigTiles(
         }
     }
 
-    val cardShape = MaterialTheme.shapes.extraLarge
+    val cardShape = RoundedCornerShape(24.dp)
     Box(
         modifier = (if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .onGloballyPositioned { carouselHostInRoot = it.positionInRoot() },
@@ -1109,28 +1110,33 @@ fun SwipeableBigTiles(
                     .height(231.dp)
             }
 
-            val maxItemWidth = if (isLandscape) 560.dp else 320.dp
-            HorizontalCenteredHeroCarousel(
-                state = carouselState,
-                maxItemWidth = maxItemWidth,
-                modifier = carouselModifier,
-                itemSpacing = 8.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-            ) { page ->
+            BoxWithConstraints(modifier = carouselModifier) {
+                val editorialCardWidth = if (isLandscape) {
+                    (maxWidth - 48.dp).coerceAtMost(560.dp)
+                } else {
+                    (maxWidth - 32.dp).coerceAtLeast(280.dp)
+                }
+                HorizontalUncontainedCarousel(
+                    state = carouselState,
+                    itemWidth = editorialCardWidth,
+                    modifier = Modifier.fillMaxSize(),
+                    itemSpacing = 12.dp,
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) { page ->
                 val itemDrawInfo = carouselItemDrawInfo
                 var itemInRoot by remember(page) { mutableStateOf(Offset.Zero) }
                 LaunchedEffect(page, itemDrawInfo, itemInRoot, carouselHostInRoot) {
                     snapshotFlow {
                         Triple(
-                            itemDrawInfo.size >= itemDrawInfo.maxSize - 0.5f,
+                            carouselState.currentItem,
                             carouselState.isScrollInProgress,
                             itemDrawInfo.maskRect,
                         )
                     }
                         .distinctUntilChanged()
-                        .collect { (isHero, isScrolling, mask) ->
-                            if (isHero) currentTile = page
-                            if (page == 3 && isHero && !isScrolling) {
+                        .collect { (focusedItem, isScrolling, mask) ->
+                            currentTile = focusedItem
+                            if (page == 3 && focusedItem == page && !isScrolling) {
                                 val localItem = itemInRoot - carouselHostInRoot
                                 globeOverlayRect = Rect(
                                     left = localItem.x + mask.left,
@@ -1152,7 +1158,11 @@ fun SwipeableBigTiles(
                     } else {
                         MaterialTheme.colorScheme.surface
                     },
-                    shadowElevation = 3.dp,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    ),
+                    shadowElevation = 0.dp,
                 ) {
                     when (page) {
                         0 -> NextPrayerTile(
@@ -1230,11 +1240,12 @@ fun SwipeableBigTiles(
                     }
                 }
             }
+            }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = if (isLandscape) 2.dp else 1.dp),
+                    .padding(top = if (isLandscape) 2.dp else 3.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1242,13 +1253,8 @@ fun SwipeableBigTiles(
                     val selected = currentTile == index
                     Box(
                         modifier = Modifier
-                            .size(
-                                if (selected) {
-                                    if (isLandscape) 8.dp else 12.dp
-                                } else {
-                                    if (isLandscape) 6.dp else 8.dp
-                                },
-                            )
+                            .height(4.dp)
+                            .width(if (selected) 16.dp else 4.dp)
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
@@ -1265,38 +1271,8 @@ fun SwipeableBigTiles(
                             },
                     )
                     if (index < 3) {
-                        Spacer(Modifier.width(if (isLandscape) 4.dp else 8.dp))
+                        Spacer(Modifier.width(5.dp))
                     }
-                }
-            }
-
-            if (!isLandscape) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Swipe for more insights",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp),
-                    )
                 }
             }
         }

@@ -18,6 +18,7 @@ package com.starception.submission.feature.course.navigation
 
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.MaterialTheme
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -25,6 +26,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.starception.submission.core.designsystem.animation.NiaTransitions
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.feature.course.CourseScreen
 import com.starception.submission.feature.course.CourseDetailScreen
 import com.starception.submission.feature.course.CourseProgressTracker
@@ -56,6 +58,11 @@ fun NavGraphBuilder.courseScreen(
     onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<CourseRoute> {
+        val coursePageTopColor = if (LocalDarkTheme.current) {
+            MaterialTheme.colorScheme.background
+        } else {
+            Color(0xFFF0F1F2)
+        }
         com.starception.submission.ui.TopLevelTopBarScaffold(
             titleRes = titleRes,
             onSearchClick = onSearchClick,
@@ -63,6 +70,7 @@ fun NavGraphBuilder.courseScreen(
             onSearchSubmit = onSearchSubmit,
             searchPillContainerColor = Color(0xFFE9E6D8),
             searchPillContentColor = Color(0xFF0A0808),
+            pageContainerColor = coursePageTopColor,
         ) {
             CourseScreen(
                 onSurahClick = onSurahClick,

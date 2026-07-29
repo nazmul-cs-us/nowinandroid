@@ -62,6 +62,9 @@ import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
@@ -123,16 +126,23 @@ fun HsvColorWheelDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
         contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0) },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
             Text(
                 text = "Theme palette",
                 style = MaterialTheme.typography.titleMedium,
@@ -268,6 +278,8 @@ fun HsvColorWheelDialog(
                 TextButton(onClick = { onConfirm(primary, secondary, tertiary) }) {
                     Text("Save")
                 }
+            }
+            }
             }
         }
     }

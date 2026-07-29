@@ -57,9 +57,9 @@ determines the on-device data path — for `demoDebug` it is:
 
 ---
 
-## 1. The seven postures and how much data you need
+## 1. The eight postures and how much data you need
 
-The model classifies 7 postures. The JSONL label strings (and the model's
+The model classifies 8 postures. The JSONL label strings (and the model's
 output order) are:
 
 | # | Label            | UI name       | What you do                              |
@@ -71,6 +71,7 @@ output order) are:
 | 4 | `JALSA`          | Sitting       | Sitting between the two sujud             |
 | 5 | `TASHAHHUD`      | Final Sitting | The longer seated tashahhud               |
 | 6 | `QIYAM_RISING`   | Rising Up     | The transition up to standing             |
+| 7 | `RISING_TO_QIYAM`| Rise to Next Rak‘ah | Rising after sujud/tashahhud to continue |
 
 **Targets and thresholds baked into the tooling:**
 
@@ -81,7 +82,7 @@ output order) are:
   training report (under-collected).
 - **< 20 windows in a file** → flagged as an `outlier_file` (too short to
   produce even one full sequence).
-- Transitions (`GOING_TO_SUJUD`, `QIYAM_RISING`) are the hardest classes —
+- Transitions (`GOING_TO_SUJUD`, `QIYAM_RISING`, `RISING_TO_QIYAM`) are the hardest classes —
   they are brief by nature, so they always need the most recordings.
 
 The **"Record next"** card at the top of the Salah Data Collection screen
@@ -117,15 +118,15 @@ Files: `salah_data_{yyyyMMdd_HHmmss}_{8charId}.jsonl`
 
 ### Mode B — Guided recording (TTS walks you through a full rak'ah)
 
-Best for: balanced data across all 7 classes in one go; no phone handling
+Best for: balanced data across all 8 classes in one go; no phone handling
 mid-session.
 
 1. Choose the hold duration per posture (10/15/20/30 s — 15 s default).
 2. Tap **Start Guided Recording**, put the phone in your pocket.
 3. TTS announces each posture; the sequence is a full rak'ah:
-   `QIYAM → RUKU → QIYAM_RISING → GOING_TO_SUJUD → SUJUD → JALSA → GOING_TO_SUJUD → SUJUD → TASHAHHUD`.
-   Static postures use your chosen duration. The two transition classes use a
-   focused 4 s capture; follow the "move now" cue and move smoothly for the
+   `QIYAM → RUKU → QIYAM_RISING → GOING_TO_SUJUD → SUJUD → JALSA → GOING_TO_SUJUD → SUJUD → TASHAHHUD → RISING_TO_QIYAM`.
+   Static postures use your chosen duration. The three transition classes use a
+   focused 5 s capture; follow the "move now" cue and move smoothly for the
    full interval.
 4. "Recording complete. You can take your phone out now." — **no trim is
    applied** (capture is paused before the completion message).
@@ -137,7 +138,7 @@ posture label.
 
 Guided files are named `salah_guided_{yyyyMMdd_HHmmss}_{8charId}.jsonl`.
 One complete guided recording contributes trainable 2-second sequences for
-all seven classes. Record **at least 3 complete guided sessions** before
+all eight classes. Record **at least 3 complete guided sessions** before
 training so every class has an independent session for the train, validation,
 and test splits. You still want 500 clean windows per class for a useful model.
 
@@ -312,7 +313,7 @@ python train_salah_detector.py --data_dir data/salah_training_data --output_dir 
   what the app's "Deployed model" card will tell you to collect next.
 - `metrics.confusion_matrix_test` — rows/cols in the label order from
   section 1; off-diagonal hotspots tell you which pairs confuse the model
-  (classically `JALSA` ↔ `TASHAHHUD` and the two transitions).
+  (classically `JALSA` ↔ `TASHAHHUD` and the movement classes).
 
 ---
 
@@ -485,4 +486,4 @@ app/src/main/assets/
 
 1D CNN (TFLite-friendly, no RNN): `Input(20,30) → [Conv1D(32,k3)+BN+Drop .3]
 → [Conv1D(64,k3)+BN+Drop .3] → [Conv1D(128,k3)+BN+Drop .3] → GAP →
-Dense(64) → Drop .4 → Dense(7, softmax)` — ~177 KB as TFLite.
+Dense(64) → Drop .4 → Dense(8, softmax)`.

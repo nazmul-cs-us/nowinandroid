@@ -131,6 +131,7 @@ import com.starception.submission.core.designsystem.component.NiaTopAppBar
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import com.starception.submission.navigation.NiaNavHost
 import com.starception.submission.feature.surah.navigation.navigateToSurah
 import com.starception.submission.navigation.navigateToMediaSourceDetail
@@ -329,7 +330,13 @@ internal fun NiaAppContent(
         // Portrait mode: content fills the screen and the navigation is a
         // floating pill bar (reference design) overlaid at the bottom, with
         // the circular voice-search button beside it.
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // Draw the shared main-page canvas at the app-shell level so it
+                // continues behind the floating navigation and gesture inset.
+                .background(mainPageBackgroundBrush()),
+        ) {
             NiaMainContent(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
@@ -379,7 +386,7 @@ private fun NiaFloatingBottomBar(
         Surface(
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 8.dp,
+            shadowElevation = 2.dp,
             modifier = sizeModifier,
         ) {
             val destinations = appState.topLevelDestinations
@@ -650,7 +657,7 @@ private fun VoiceAssistantButton(
         onClick = onClick,
         shape = CircleShape,
         color = container,
-        shadowElevation = 8.dp,
+        shadowElevation = 2.dp,
         modifier = Modifier
             .size(60.dp)
             .graphicsLayer {
@@ -756,7 +763,9 @@ private fun NiaMainContent(
         modifier = modifier.semantics {
             testTagsAsResourceId = true
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        // Top-level pages own their canvas. Keeping the shell transparent lets
+        // that canvas continue behind the floating nav and system gesture bar.
+        containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = {
@@ -862,6 +871,7 @@ private fun NiaMainContent(
             // still-true VM state, so the banner persists across the transition.
             isRefreshing = if (isOnHome) false else isRefreshing,
             onRefresh = { mainViewModel?.setSyncing(true) },
+            idleContainerColor = Color.Transparent,
             enabled = !isOnHome,
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,

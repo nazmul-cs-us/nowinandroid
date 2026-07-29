@@ -9,7 +9,7 @@ Complete guide for the on-device machine learning system that detects Islamic pr
 
 ## System Overview
 
-The system uses accelerometer and gyroscope data from a phone placed in the user's pocket to classify 7 prayer postures in real-time. The pipeline includes:
+The system uses accelerometer and gyroscope data from a phone placed in the user's pocket to classify 8 prayer postures in real-time. The pipeline includes:
 
 1. **Data Collection** - Record sensor data during prayer postures via the app
 2. **Training Pipeline** - Python scripts to train a 1D CNN model
@@ -27,6 +27,7 @@ The system uses accelerometer and gyroscope data from a phone placed in the user
 | JALSA | جلسة | Sitting between prostrations |
 | TASHAHHUD | تشهد | Final sitting position |
 | QIYAM_RISING | اعتدال | Rising back to standing (i'tidal after ruku) |
+| RISING_TO_QIYAM | نهوض للقيام | Rising after sujud or tashahhud into the next rak'ah |
 
 
 ---
@@ -50,11 +51,12 @@ Location: `app/src/main/kotlin/com/starception/submission/feature/salah/datacoll
 ### Guided Recording Contract
 - The countdown and spoken preparation are not written to the dataset.
 - Static capture begins after the user has moved into position and settled.
-- `QIYAM_RISING` and both `GOING_TO_SUJUD` movements use focused 4-second
+- All three movement classes use focused 5-second
   captures, starting on the spoken "move now" cue.
 - Every label segment is at least 20 windows (2 seconds), so it can produce a
   model input sequence.
-- One guided file contributes usable training sequences, but at least three
+- A complete guided file contributes usable training sequences for all eight
+  model classes, including `RISING_TO_QIYAM`, but at least three
   complete guided sessions are required to give every class an independent
   train, validation, and test session.
 - Pending `salah_live_*` files are skipped by the Python loader until the
@@ -178,8 +180,8 @@ Input: [batch, 20, 30]
   -> Conv1D(128, kernel=3, ReLU) + BatchNorm + Dropout(0.3)
   -> GlobalAveragePooling1D
   -> Dense(64, ReLU) + Dropout(0.4)
-  -> Dense(7, Softmax)
-Output: [batch, 7]
+  -> Dense(8, Softmax)
+Output: [batch, 8]
 ```
 
 ### Training Configuration

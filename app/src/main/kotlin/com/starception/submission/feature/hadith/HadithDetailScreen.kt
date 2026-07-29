@@ -109,6 +109,8 @@ import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.feature.course.CourseCompletionBadgeCompact
 import com.starception.submission.feature.course.CourseProgressTracker
@@ -2647,17 +2649,19 @@ private fun VoiceSelectionSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
         containerColor = Color.Transparent,
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
         tonalElevation = 0.dp,
         dragHandle = null,
     ) {
+        NiaBottomSheetTheme {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
             Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(16.dp),
+                color = NiaBottomSheetDefaults.containerColor(),
+                shape = NiaBottomSheetDefaults.FloatingShape,
                 tonalElevation = 0.dp,
             ) {
                 Column(
@@ -2779,6 +2783,7 @@ private fun VoiceSelectionSheet(
                     }
                 }
             }
+        }
         }
     }
 }
