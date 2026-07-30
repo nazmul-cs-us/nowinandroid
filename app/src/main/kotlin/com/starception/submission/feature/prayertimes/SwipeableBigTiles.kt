@@ -1,14 +1,14 @@
 /**
  * SWIPEABLE BIG TILES COMPONENT
  *
- * The four dashboard tiles of the Prayer Times screen, presented as a Material
- * hero carousel. The focused card gets the visual emphasis while the neighboring
- * cards collapse into rounded previews and expand as the user swipes.
+ * The four dashboard tiles of the Prayer Times screen, presented as a calm,
+ * full-width hero pager. The visual language is built around soft gradients,
+ * generous rounded corners and restrained page transitions.
  *
  * WHAT IT DOES:
  * - Renders Next Prayer, Smart Tracking, Daily Stats and Qibla Globe tiles
- * - Uses Material 3 carousel keylines, masking and single-item snapping
- * - Clickable page-indicator pills and tappable compact previews for navigation
+ * - Uses a single-item HorizontalPager so every feature gets the full canvas
+ * - Provides a compact page indicator in addition to swipe gestures
  *
  * WHERE IT'S USED:
  * - PrayerTimesScreen.kt: main prayer times screen, via SwipeableBigTiles()
@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -57,14 +58,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,10 +87,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
-import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -258,21 +255,6 @@ private fun predictionHeroBrush(): Brush {
         },
     )
 }
-
-@Composable
-private fun compactPreviewBrush(accentColor: Color): Brush {
-    val scheme = MaterialTheme.colorScheme
-    return Brush.linearGradient(
-        colors = listOf(
-            accentColor.copy(alpha = if (LocalDarkTheme.current) 0.72f else 0.84f)
-                .compositeOver(scheme.surface),
-            accentColor.copy(alpha = if (LocalDarkTheme.current) 0.48f else 0.64f)
-                .compositeOver(scheme.surfaceContainer),
-        ),
-    )
-}
-
-
 
 /**
  * Hilt entry point to access AudioDownloadHelper from non-Hilt composables.
@@ -1077,7 +1059,6 @@ fun SmartIndicator(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
     prayerTimes: DayPrayerTimes?,
@@ -1105,10 +1086,242 @@ fun SwipeableBigTiles(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
-    val carouselState = rememberCarouselState { 4 }
-    var currentTile by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(pageCount = { 4 })
+    val view = LocalView.current
+    var showGlobePopup by remember { mutableStateOf(false) }
+
+    val nextPrayer = getNextPrayer() ?: getCurrentPrayer()
+    val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName) ?: "Prayer time"
+    val nextPrayerTime = nextPrayer?.first?.let(getPrayerTimeDisplay).orEmpty()
+    val prayerTitle = if (nextPrayerTime.isNotBlank()) {
+        "Your next prayer is $nextPrayerName at $nextPrayerTime"
+    } else {
+        "Your next prayer is $nextPrayerName"
+    }
+    val (completedPrayers, totalPrayers) = getPrayerProgress()
+    val prayedCount = getPrayed().coerceAtLeast(completedPrayers)
+
+    Column(
+        modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = "Insights",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontSize = 20.sp,
+                lineHeight = 24.sp,
+                letterSpacing = (-0.25).sp,
+            ),
+            color = Color(0xFF292524),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 14.dp),
+        )
+
+        val stripModifier = if (isLandscape) {
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .height(280.dp)
+        }
+
+        BoxWithConstraints(modifier = stripModifier) {
+            val cardWidth = if (isLandscape) {
+                (maxWidth * 0.58f).coerceIn(220.dp, 280.dp)
+            } else {
+                (maxWidth * 0.61f).coerceIn(224.dp, 236.dp)
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                pageSize = PageSize.Fixed(cardWidth),
+                pageSpacing = 14.dp,
+                contentPadding = PaddingValues(end = 18.dp),
+                beyondViewportPageCount = 1,
+                modifier = Modifier
+                    .requiredWidth(maxWidth + 18.dp)
+                    .fillMaxHeight(),
+            ) { page ->
+                when (page) {
+                    0 -> InsightPreviewCard(
+                        label = "Next Prayer",
+                        title = prayerTitle,
+                        backgroundPainterRes = R.drawable.insight_prayer,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            onCompassClick()
+                        },
+                    )
+
+                    1 -> InsightPreviewCard(
+                        label = "Salah Recap",
+                        title = "$prayedCount of $totalPrayers prayers completed today",
+                        backgroundPainterRes = R.drawable.insight_salah,
+                    )
+
+                    2 -> InsightPreviewCard(
+                        label = "Noble Quran",
+                        title = "Continue your journey through the Noble Quran",
+                        backgroundPainterRes = R.drawable.insight_quran,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            onSurahClick(1)
+                        },
+                    )
+
+                    else -> InsightPreviewCard(
+                        label = "Qibla",
+                        title = "Find your direction toward the Kaaba",
+                        backgroundPainterRes = R.drawable.insight_qibla,
+                        onClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            showGlobePopup = true
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showGlobePopup) {
+        prayerTimes?.location?.let { locationData ->
+            GlobePopupScreen(
+                userLatitude = locationData.latitude,
+                userLongitude = locationData.longitude,
+                onDismiss = { showGlobePopup = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun InsightPreviewCard(
+    label: String,
+    title: String,
+    backgroundPainterRes: Int,
+    onClick: (() -> Unit)? = null,
+) {
+    val shape = RoundedCornerShape(22.dp)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .shadow(
+                elevation = 6.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = 0.12f),
+            )
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+        ),
+        shape = shape,
+        color = Color(0xFF635A56),
+        tonalElevation = 0.dp,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(backgroundPainterRes),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                0.48f to Color.Transparent,
+                                0.68f to Color.Black.copy(alpha = 0.10f),
+                                1f to Color.Black.copy(alpha = 0.68f),
+                            ),
+                        ),
+                    ),
+            )
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(14.dp),
+                shape = CircleShape,
+                color = Color(0xFFF1EFED).copy(alpha = 0.94f),
+                shadowElevation = 0.dp,
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        letterSpacing = 0.sp,
+                    ),
+                    color = Color(0xFF3C3735),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                    maxLines = 1,
+                )
+            }
+
+            Text(
+                text = title,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 17.dp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 15.sp,
+                    lineHeight = 17.5.sp,
+                    letterSpacing = (-0.2).sp,
+                ),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Suppress("UNUSED_PARAMETER")
+@Composable
+private fun FullWidthSwipeableBigTiles(
+    prayerTimes: DayPrayerTimes?,
+    currentTime: LocalTime,
+    locationService: EnhancedLocationService,
+    getNextPrayer: () -> Pair<String, LocalTime>?,
+    getCurrentPrayer: () -> Pair<String, LocalTime>?,
+    getPrayerStatus: (String) -> String,
+    getPrayerTimeDisplay: (String) -> String,
+    getTimeUntilNextPrayer: () -> String,
+    getCurrentDate: () -> String,
+    getSmartTitle: () -> String,
+    getSmartContent: () -> String,
+    getSmartFooter: () -> String,
+    getTimeSinceCurrentPrayer: () -> String,
+    getPrayerProgress: () -> Pair<Int, Int>,
+    getDailyStatsTitle: () -> String,
+    getDailyStatsMessage: () -> String,
+    getPrayed: () -> Int = { 0 },
+    getCurrentActivity: () -> String,
+    onCompassClick: () -> Unit,
+    timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+    isLandscape: Boolean = false,
+    onSurahClick: (Int) -> Unit = {},
+    onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    goToMosqueDurationMinutes: (String) -> Int = { 20 },
+) {
+    val pagerState = rememberPagerState(pageCount = { 4 })
+    val currentTile by remember { derivedStateOf { pagerState.currentPage } }
+    val settledTile by remember { derivedStateOf { pagerState.settledPage } }
     val globeLive by remember {
-        derivedStateOf { currentTile == 3 && !carouselState.isScrollInProgress }
+        derivedStateOf { settledTile == 3 && !pagerState.isScrollInProgress }
     }
     val coroutineScope = rememberCoroutineScope()
     val view = LocalView.current
@@ -1133,8 +1346,8 @@ fun SwipeableBigTiles(
         hasActivityPermission = granted
     }
 
-    LaunchedEffect(currentTile) {
-        val smartTileFocused = currentTile == 1
+    LaunchedEffect(settledTile) {
+        val smartTileFocused = settledTile == 1
         com.starception.submission.util.ActivityTracker.setSmartActivityTileInFocus(smartTileFocused)
         if (smartTileFocused) {
             if (!hasActivityPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1161,7 +1374,7 @@ fun SwipeableBigTiles(
             modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            val carouselModifier = if (isLandscape) {
+            val pagerModifier = if (isLandscape) {
                 Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -1171,67 +1384,75 @@ fun SwipeableBigTiles(
                     .height(253.dp)
             }
 
-            BoxWithConstraints(modifier = carouselModifier) {
-                val heroPreferredItemWidth = if (isLandscape) {
-                    (maxWidth - 64.dp).coerceAtMost(560.dp)
-                } else {
-                    (maxWidth - 64.dp).coerceAtLeast(240.dp)
-                }
-                HorizontalMultiBrowseCarousel(
-                    state = carouselState,
-                    preferredItemWidth = heroPreferredItemWidth,
-                    modifier = Modifier.fillMaxSize(),
-                    itemSpacing = 8.dp,
-                    minSmallItemWidth = 56.dp,
-                    maxSmallItemWidth = 56.dp,
-                    contentPadding = PaddingValues(vertical = 6.dp),
-                ) { page ->
-                val itemDrawInfo = carouselItemDrawInfo
+            HorizontalPager(
+                state = pagerState,
+                modifier = pagerModifier,
+                contentPadding = PaddingValues(vertical = 4.dp),
+                pageSpacing = 12.dp,
+                beyondViewportPageCount = 1,
+            ) { page ->
                 var itemInRoot by remember(page) { mutableStateOf(Offset.Zero) }
-                LaunchedEffect(page, itemDrawInfo, itemInRoot, carouselHostInRoot) {
-                    snapshotFlow {
-                        Triple(
-                            carouselState.currentItem,
-                            carouselState.isScrollInProgress,
-                            itemDrawInfo.maskRect,
+                var itemSize by remember(page) {
+                    mutableStateOf(androidx.compose.ui.unit.IntSize(0, 0))
+                }
+                val pageDistance by remember {
+                    derivedStateOf {
+                        kotlin.math.abs(
+                            (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
+                        ).coerceIn(0f, 1f)
+                    }
+                }
+
+                LaunchedEffect(
+                    page,
+                    settledTile,
+                    pagerState.isScrollInProgress,
+                    itemInRoot,
+                    itemSize,
+                    carouselHostInRoot,
+                ) {
+                    if (
+                        page == 3 &&
+                        settledTile == page &&
+                        !pagerState.isScrollInProgress &&
+                        itemSize.width > 0 &&
+                        itemSize.height > 0
+                    ) {
+                        val localItem = itemInRoot - carouselHostInRoot
+                        globeOverlayRect = Rect(
+                            left = localItem.x,
+                            top = localItem.y,
+                            right = localItem.x + itemSize.width,
+                            bottom = localItem.y + itemSize.height,
                         )
                     }
-                        .distinctUntilChanged()
-                        .collect { (focusedItem, isScrolling, mask) ->
-                            currentTile = focusedItem
-                            if (page == 3 && focusedItem == page && !isScrolling) {
-                                val localItem = itemInRoot - carouselHostInRoot
-                                globeOverlayRect = Rect(
-                                    left = localItem.x + mask.left,
-                                    top = localItem.y + mask.top,
-                                    right = localItem.x + mask.right,
-                                    bottom = localItem.y + mask.bottom,
-                                )
-                            }
-                        }
                 }
-                Surface(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .onGloballyPositioned { itemInRoot = it.positionInRoot() }
-                        .maskClip(cardShape)
-                        .clickable(enabled = page != currentTile) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            coroutineScope.launch {
-                                carouselState.animateScrollToItem(page)
+                        .graphicsLayer {
+                            val focus = 1f - pageDistance
+                            scaleX = lerp(0.985f, 1f, focus)
+                            scaleY = lerp(0.985f, 1f, focus)
+                            alpha = lerp(0.86f, 1f, focus)
+                        }
+                        .shadow(3.dp, cardShape, clip = false)
+                        .clip(cardShape)
+                        .onGloballyPositioned { coordinates ->
+                            if (page == 3) {
+                                itemInRoot = coordinates.positionInRoot()
+                                itemSize = coordinates.size
                             }
-                        },
-                    shape = cardShape,
-                    color = if (page == 3 && globeLive) {
-                        Color.Transparent
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
-                    },
-                    shadowElevation = 0.dp,
+                        }
+                        .background(
+                            if (page == 3 && globeLive) {
+                                Color.Transparent
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerLow
+                            },
+                        ),
                 ) {
-                    if (page != currentTile) {
-                        CompactHeroPreview(page = page)
-                    } else when (page) {
+                    when (page) {
                         0 -> NextPrayerTile(
                             prayerTimes = prayerTimes,
                             currentTime = currentTime,
@@ -1245,8 +1466,8 @@ fun SwipeableBigTiles(
                             onCompassClick = onCompassClick,
                             timeOffsets = timeOffsets,
                             isLandscape = isLandscape,
-                            isCarouselScrolling = carouselState.isScrollInProgress,
-                            isActiveTile = currentTile == 0,
+                            isCarouselScrolling = pagerState.isScrollInProgress,
+                            isActiveTile = settledTile == 0,
                             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
                         )
 
@@ -1273,8 +1494,8 @@ fun SwipeableBigTiles(
                             onSurahClickWithAyah = onSurahClickWithAyah,
                         )
 
-                        // A SurfaceView cannot safely travel inside the carousel's
-                        // transformed lazy item. The single live globe is hoisted into
+                        // A SurfaceView cannot safely travel inside a moving pager page.
+                        // The single live globe is hoisted into
                         // the fixed overlay below; this moving card is only its backdrop.
                         3 -> Box(
                             modifier = Modifier
@@ -1307,12 +1528,11 @@ fun SwipeableBigTiles(
                     }
                 }
             }
-            }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(14.dp),
+                    .height(if (isLandscape) 12.dp else 16.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1321,21 +1541,23 @@ fun SwipeableBigTiles(
                     Box(
                         modifier = Modifier
                             .height(5.dp)
-                            .width(if (selected) 18.dp else 5.dp)
+                            .width(if (selected) 20.dp else 5.dp)
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
                                 },
                             )
                             .clickable {
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                coroutineScope.launch { carouselState.animateScrollToItem(index) }
+                                if (index != currentTile) {
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                }
                             },
                     )
-                    if (index < 3) Spacer(Modifier.width(6.dp))
+                    if (index < 3) Spacer(modifier = Modifier.width(6.dp))
                 }
             }
 
@@ -1376,64 +1598,6 @@ fun SwipeableBigTiles(
                     onDismiss = { showGlobePopup = false },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CompactHeroPreview(page: Int) {
-    val scheme = MaterialTheme.colorScheme
-    val (accentColor, glyph, label) = when (page) {
-        0 -> Triple(scheme.primary, FlaticonIcons.SCHEDULE, "Prayer\nforecast")
-        1 -> Triple(scheme.secondary, FlaticonIcons.SALAH_TRAINING, "Salah\ntracking")
-        2 -> Triple(scheme.tertiary, FlaticonIcons.QURAN, "Noble\nQuran")
-        else -> Triple(scheme.inverseSurface, FlaticonIcons.TRAVEL, "Qibla\ndirection")
-    }
-    val iconTint = when (page) {
-        0 -> scheme.onPrimary
-        1 -> scheme.onSecondary
-        2 -> scheme.onTertiary
-        else -> scheme.inverseOnSurface
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(compactPreviewBrush(accentColor)),
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 24.dp, y = 24.dp)
-                .size(88.dp)
-                .background(iconTint.copy(alpha = 0.08f), CircleShape),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 5.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            ReferenceTileIcon(
-                glyph = glyph,
-                contentDescription = label.replace('\n', ' '),
-                accentColor = iconTint,
-                compact = true,
-                onDarkSurface = true,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.5.sp,
-                    lineHeight = 11.sp,
-                    letterSpacing = (-0.1).sp,
-                ),
-                color = iconTint,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-            )
         }
     }
 }
