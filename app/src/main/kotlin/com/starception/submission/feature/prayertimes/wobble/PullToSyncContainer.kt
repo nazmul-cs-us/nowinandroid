@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -118,6 +119,7 @@ fun PullToSyncContainer(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     idleContainerColor: Color = Color.Unspecified,
+    idleContainerBrush: Brush? = null,
     enabled: Boolean = true,
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
@@ -140,6 +142,11 @@ fun PullToSyncContainer(
         MaterialTheme.colorScheme.background
     } else {
         idleContainerColor
+    }
+    val idleBackgroundModifier = if (idleContainerBrush != null) {
+        Modifier.background(idleContainerBrush)
+    } else {
+        Modifier.background(resolvedIdleContainerColor)
     }
     val isDownloading = downloadProgress > 0f
     var prayerAlertDismissed by remember { mutableStateOf(false) }
@@ -342,7 +349,13 @@ fun PullToSyncContainer(
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 28f).dp.coerceAtMost(28.dp)
+    val cornerRadius = (wobbleIntensity * 40f).dp.coerceAtMost(36.dp)
+    // A spring can spend a few frames just above zero while a banner opens or
+    // closes. Painting the full accent color during those frames produces a
+    // stray colored line at the very top before any banner content is visible.
+    // Blend the reveal in only as it becomes substantial, keeping idle frames
+    // visually continuous with the destination canvas.
+    val revealColorAlpha = ((wobbleIntensity - 0.03f) / 0.12f).coerceIn(0f, 1f)
     val horizontalMargin = 0.dp
 
     // Two-tone pull-to-refresh background using theme colors (Fitbit-style)
@@ -373,24 +386,31 @@ fun PullToSyncContainer(
         pullModifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 
-    // Outer Box: sage only during active pull; during sync the sweep reveals it progressively
+    // Keep the container itself on the destination's normal canvas. The active
+    // pull color belongs only to the strip exposed above the displaced content.
+    // Painting the whole container with the pull color leaks through destinations
+    // such as Home that intentionally use a transparent content surface, making
+    // their entire background change while the horizontal sweep is visible.
     Box(
         modifier = modifier
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
-            .background(
-                when {
-                    rawWobbleIntensity > 0.01f -> fitbitBgColorLight
-                    isRefreshing || isDownloading -> fitbitBgColorLight
-                    mediaState.isVisible -> fitbitBgColorLight
-                    isPrayerAlert -> fitbitBgColorLight
-                    isSilentMode -> fitbitBgColorLight
-                    isIslamicEvent -> fitbitBgColorLight
-                    isMushafActive -> fitbitBgColorLight
-                    else -> resolvedIdleContainerColor
-                }
-            )
+            .then(idleBackgroundModifier)
     ) {
+        if (revealColorAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Extend beneath the clipped sheet just far enough for its
+                    // rounded top corners to expose the pull color. The opaque
+                    // destination canvas still prevents this from tinting the body.
+                    .height((contentOffsetY + cornerRadius).coerceAtLeast(1.dp))
+                    .graphicsLayer { alpha = revealColorAlpha }
+                    .background(fitbitBgColorLight)
+                    .align(Alignment.TopStart),
+            )
+        }
+
         // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
         // Shows during syncing, downloading, or media playback
         val showSweep = (isRefreshing || isDownloading || mediaState.isVisible || isPrayerAlert) && wobbleIntensity > 0.01f
@@ -408,9 +428,13 @@ fun PullToSyncContainer(
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fillProgress.coerceAtLeast(0.001f))
-                    .fillMaxHeight()
+                    // Progress belongs to the revealed sync/banner strip. Keeping
+                    // it out of the page body prevents a horizontal sweep from
+                    // flashing behind the entire Home screen during refresh.
+                    .height((contentOffsetY + cornerRadius).coerceAtLeast(1.dp))
+                    .graphicsLayer { alpha = revealColorAlpha }
                     .background(fitbitBgColor)
-                    .align(Alignment.CenterStart)
+                    .align(Alignment.TopStart)
             )
         }
 
@@ -443,7 +467,7 @@ fun PullToSyncContainer(
                         bottomEnd = 0.dp
                     )
                 )
-                .background(resolvedIdleContainerColor)
+                .then(idleBackgroundModifier)
         ) {
             // Main screen content
             content(syncState)

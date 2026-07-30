@@ -222,8 +222,8 @@ private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture
 
 // With the production stride of 3, five seconds yields at least 10 held-out sequences
 // from one complete session, matching the deployment quality gate for every movement class.
-private const val TRANSITION_DURATION = 5
-private const val FOCUSED_MOVEMENT_REPETITIONS = 5
+internal const val TRANSITION_DURATION = 5
+internal const val FOCUSED_MOVEMENT_REPETITIONS = 5
 private const val STATIC_SETTLE_MS = 1_500L
 private const val TAG = "GuidedRecording"
 
@@ -541,7 +541,13 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     }
 
     fun startGuidedRecording() {
-        guidedJob?.cancel()
+        // A fast double tap used to cancel the first coroutine and immediately
+        // launch the whole welcome/countdown flow again. Only IDLE may start a
+        // new guided session; completion/cancellation must be dismissed first.
+        if (guidedJob?.isActive == true || _uiState.value.guidedState != GuidedRecordingState.IDLE) {
+            Log.w(TAG, "Ignoring duplicate guided recording start")
+            return
+        }
         guidedJob = viewModelScope.launch {
             val startState = _uiState.value
             val duration = startState.guidedSelectedDuration
@@ -624,6 +630,18 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             for ((index, step) in steps.withIndex()) {
                 val posture = step.posture
                 val postureDuration = if (step.isTransition) TRANSITION_DURATION else duration
+                val isRepeatedFocusedMovement = isSpecific && focusedStep.isTransition
+                val takeNumber = index + 1
+                val preparationMessage = if (isRepeatedFocusedMovement) {
+                    if (index == 0) {
+                        "Take $takeNumber of ${steps.size}. ${step.instruction}"
+                    } else {
+                        "Prepare for take $takeNumber of ${steps.size}. Return to the same starting position. " +
+                            "Do not move until you hear move now."
+                    }
+                } else {
+                    step.instruction
+                }
 
                 // Preparation and movement into static postures are intentionally not
                 // captured. Otherwise instruction time and boundary motion would be
@@ -636,10 +654,10 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                         guidedPostureIndex = index,
                         guidedPostureDuration = postureDuration,
                         guidedPostureTimeRemaining = postureDuration,
-                        guidedMessage = step.instruction,
+                        guidedMessage = preparationMessage,
                     )
                 }
-                if (!speakAndWait(step.instruction)) {
+                if (!speakAndWait(preparationMessage)) {
                     failGuidedRecording("Voice instructions failed. Recording stopped before any uncertain labels were captured.")
                     return@launch
                 }
@@ -652,7 +670,11 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                         guidedPostureIndex = index,
                         guidedPostureDuration = postureDuration,
                         guidedPostureTimeRemaining = postureDuration,
-                        guidedMessage = step.recordingLabel,
+                        guidedMessage = if (isRepeatedFocusedMovement) {
+                            "${step.recordingLabel} · Take $takeNumber of ${steps.size}"
+                        } else {
+                            step.recordingLabel
+                        },
                         currentPosture = posture
                     )
                 }
@@ -677,6 +699,28 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     runGuidedCaptureTimer(postureDuration)
                     collectionService.pauseSampleCapture()
                 }
+
+                // Repeated movement takes stay in one file/session, but make the
+                // pause explicit so it never looks like the recorder finished and
+                // unexpectedly restarted. Capture remains paused throughout reset.
+                if (isRepeatedFocusedMovement && takeNumber < steps.size) {
+                    val resetMessage =
+                        "Take $takeNumber complete. Recording is paused. Return to the starting position " +
+                            "for take ${takeNumber + 1} of ${steps.size}."
+                    _uiState.update {
+                        it.copy(
+                            guidedState = GuidedRecordingState.POSTURE_TRANSITION,
+                            guidedPostureIndex = index,
+                            guidedPostureTimeRemaining = 0,
+                            guidedMessage = resetMessage,
+                        )
+                    }
+                    if (!speakAndWait(resetMessage)) {
+                        failGuidedRecording("Voice instructions stopped between movement takes. Completed takes remain saved.")
+                        return@launch
+                    }
+                    delay(1_000L)
+                }
             }
 
             // 5. COMPLETED
@@ -687,7 +731,12 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             _uiState.update {
                 it.copy(
                     guidedState = GuidedRecordingState.COMPLETED,
-                    guidedMessage = "Recording complete!",
+                    guidedMessage = when {
+                        isSpecific && focusedStep.isTransition ->
+                            "$FOCUSED_MOVEMENT_REPETITIONS movement takes complete and saved."
+                        isSpecific -> "${focusedStep.recordingLabel} recording complete and saved."
+                        else -> "Full guided prayer session complete and saved."
+                    },
                     isRecording = false,
                     totalSamples = afterCount,
                     postureCounts = collectionService.getSessionStats().first,

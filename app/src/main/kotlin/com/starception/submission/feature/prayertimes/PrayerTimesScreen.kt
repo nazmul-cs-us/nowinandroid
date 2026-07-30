@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import kotlin.math.sin
@@ -66,6 +67,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.res.stringResource
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
@@ -198,6 +200,17 @@ import java.time.Duration
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
+import androidx.compose.ui.graphics.lerp
+
+private val PrayerReferenceInk = Color(0xFF0A0808)
+private val PrayerReferenceCard = Color(0xFFFFFDF7)
+private val PrayerReferenceSlate = Color(0xFF5D6574)
+private val PrayerReferenceBlue = Color(0xFF4F779D)
+private val PrayerReferenceRust = Color(0xFF99593C)
+private val PrayerReferenceGold = Color(0xFFD8AB59)
 
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
@@ -961,13 +974,6 @@ fun PrayerTimesScreen(
             label = "expressiveTileScale"
         )
         
-        // Device-tilt parallax — shared sensor (one listener for all tiles). Each tile
-        // gets a slightly different depth so the grid reads as layered, not a flat sheet.
-        val tilt by com.starception.submission.feature.prayertimes.components.rememberParallaxTilt()
-        val tileDepth = 0.7f + 0.3f * ((kotlin.math.abs(prayerName.hashCode()) % 100) / 100f)
-        val parallaxMaxPx = with(LocalDensity.current) { 6.dp.toPx() } * tileDepth
-        val parallaxShift = Offset(tilt.x * parallaxMaxPx, tilt.y * parallaxMaxPx)
-
         // Debug logging
         android.util.Log.d("PrayerCard", "🔄 Rendering InteractivePrayerCard for $prayerName, isInEditMode=$isInEditMode, scale=$scale")
         
@@ -1158,28 +1164,42 @@ fun PrayerTimesScreen(
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
-                        translationX = parallaxShift.x
-                        translationY = parallaxShift.y
                     }
             ) {
-                // Card content inside SwipeToRevealCard with crisp border definition
                 val prayerStatus = PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)
+                val isDarkTheme = LocalDarkTheme.current
+                val accentColor = if (isDarkTheme) {
+                    when (prayerStatus) {
+                        "Current" -> MaterialTheme.colorScheme.tertiary
+                        "Next" -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.secondary
+                    }
+                } else {
+                    when (prayerStatus) {
+                        "Current" -> PrayerReferenceRust
+                        "Next" -> PrayerReferenceBlue
+                        else -> if (prayerName == "Sunrise") PrayerReferenceGold else PrayerReferenceSlate
+                    }
+                }
+                val tileColor = if (isDarkTheme) {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                } else {
+                    when (prayerStatus) {
+                        "Current" -> lerp(PrayerReferenceCard, PrayerReferenceRust, 0.12f)
+                        "Next" -> lerp(PrayerReferenceCard, PrayerReferenceBlue, 0.11f)
+                        else -> PrayerReferenceCard
+                    }
+                }
+                val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else PrayerReferenceInk
+                val supportingColor = if (isDarkTheme) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    PrayerReferenceSlate
+                }
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = when (prayerStatus) {
-                        "Current" -> MaterialTheme.colorScheme.tertiaryContainer
-                        "Next" -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    border = BorderStroke(
-                        1.dp,
-                        when (prayerStatus) {
-                            "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
-                            "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                        }
-                    ),
-                    tonalElevation = 2.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    color = tileColor,
+                    tonalElevation = 0.dp,
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(prayerName, currentOffset) {
@@ -1212,10 +1232,16 @@ fun PrayerTimesScreen(
                             )
                         }
                 ) {
-                    // Card content
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
+                            .drawBehind {
+                                drawCircle(
+                                    color = accentColor.copy(alpha = if (isDarkTheme) 0.08f else 0.065f),
+                                    radius = size.minDimension * 0.42f,
+                                    center = Offset(size.width * 0.96f, size.height * 0.98f),
+                                )
+                            }
                             .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1233,11 +1259,7 @@ fun PrayerTimesScreen(
                                 Text(
                                     text = getPrayerDisplayName(prayerName),
                                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                                    color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                        "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                        "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
+                                    color = titleColor,
                                     fontWeight = FontWeight.SemiBold,
                                     overflow = TextOverflow.Ellipsis,
                                     maxLines = 1,
@@ -1254,15 +1276,15 @@ fun PrayerTimesScreen(
                                         },
                                         modifier = Modifier.size(28.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = if (notificationEnabled) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
+                                        FlaticonIcon(
+                                            glyph = if (notificationEnabled) {
+                                                FlaticonIcons.NOTIFICATIONS_ACTIVE
+                                            } else {
+                                                FlaticonIcons.NOTIFICATIONS
+                                            },
                                             contentDescription = if (notificationEnabled) "Notifications enabled" else "Notifications disabled",
-                                            tint = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                                "Current" -> MaterialTheme.colorScheme.onTertiaryContainer
-                                                "Next" -> MaterialTheme.colorScheme.onPrimaryContainer
-                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                            }.copy(alpha = if (notificationEnabled) 1f else 0.5f),
-                                            modifier = Modifier.size(18.dp)
+                                            tint = accentColor.copy(alpha = if (notificationEnabled) 1f else 0.48f),
+                                            fontSize = 16.sp,
                                         )
                                     }
                                 }
@@ -1280,11 +1302,7 @@ fun PrayerTimesScreen(
                                     lineHeight = 22.sp,
                                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                                 ),
-                                color = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
-                                    "Next" -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                                },
+                                color = supportingColor,
                                 fontWeight = FontWeight.Normal,
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1
@@ -1325,11 +1343,7 @@ fun PrayerTimesScreen(
                                 verticalAlignment = Alignment.Bottom,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val baseColor = when (PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)) {
-                                    "Current" -> MaterialTheme.colorScheme.tertiary
-                                    "Next" -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                }
+                                val baseColor = accentColor
 
                                 // Left side: Time + AM/PM grouped together
                                 Row(
@@ -1500,6 +1514,7 @@ fun PrayerTimesScreen(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
                 idleContainerColor = Color.Transparent,
+                idleContainerBrush = mainPageBackgroundBrush(),
                 downloadProgress = downloadProgress,
                 downloadLabel = downloadLabel,
                 mediaState = mediaState,

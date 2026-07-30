@@ -277,6 +277,7 @@ fun SalahDataCollectionScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Workflow order: recommendation → choose → record → review.
+                item { CollectionReadinessCard(uiState) }
                 item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
                 // Quick guide when no data and not recording
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
@@ -508,6 +509,32 @@ private fun GuidedRecordingCard(
 ) {
     val guidedState = uiState.guidedState
     val hapticFeedback = LocalHapticFeedback.current
+    val guidedPosture = if (guidedState == GuidedRecordingState.IDLE) {
+        uiState.currentPosture
+    } else {
+        uiState.guidedCurrentPosture ?: uiState.currentPosture
+    }
+    val isFocusedMovementSession = uiState.guidedSpecificOnly && guidedPosture in setOf(
+        SalahPosture.QIYAM_RISING,
+        SalahPosture.GOING_TO_SUJUD,
+        SalahPosture.RISING_TO_QIYAM,
+    )
+    val selectedStoredWindows = uiState.globalPostureCounts[uiState.currentPosture.name] ?: 0
+    val selectedEligibleSessions = eligibleSessionCount(uiState, uiState.currentPosture)
+    val remainingWindows = (POSTURE_TARGET_WINDOWS - selectedStoredWindows).coerceAtLeast(0)
+    val remainingSplitSessions = (MIN_INDEPENDENT_SESSIONS - selectedEligibleSessions).coerceAtLeast(0)
+    val expectedWindowsPerGuidedSession = if (isFocusedMovementSession) {
+        TRANSITION_DURATION * WINDOWS_PER_SECOND * FOCUSED_MOVEMENT_REPETITIONS
+    } else {
+        uiState.guidedSelectedDuration * WINDOWS_PER_SECOND
+    }
+    val sessionsForWindowTarget = if (remainingWindows == 0) {
+        0
+    } else {
+        (remainingWindows + expectedWindowsPerGuidedSession - 1) / expectedWindowsPerGuidedSession
+    }
+    val recommendedSessions = maxOf(remainingSplitSessions, sessionsForWindowTarget)
+    val hasRecommendedCoverage = recommendedSessions == 0
 
     // Hide when manual recording is active (non-guided)
     if ((uiState.isRecording || uiState.isCountingDown) && guidedState == GuidedRecordingState.IDLE) {
@@ -633,11 +660,7 @@ private fun GuidedRecordingCard(
                         }
                     }
 
-                    val selectedIsMovement = uiState.currentPosture in setOf(
-                        SalahPosture.QIYAM_RISING,
-                        SalahPosture.GOING_TO_SUJUD,
-                        SalahPosture.RISING_TO_QIYAM,
-                    )
+                    val selectedIsMovement = isFocusedMovementSession
                     if (uiState.guidedSpecificOnly) {
                         Surface(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -660,6 +683,39 @@ private fun GuidedRecordingCard(
                                 )
                                 Text(
                                     text = "Change this using the posture and movement choices above.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = if (hasRecommendedCoverage) {
+                                        "RECOMMENDED COVERAGE REACHED"
+                                    } else {
+                                        "RECOMMENDED NEXT"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.sp,
+                                )
+                                Text(
+                                    text = when {
+                                        hasRecommendedCoverage ->
+                                            "No additional captures required for baseline coverage"
+                                        selectedIsMovement -> {
+                                            val takes = recommendedSessions * FOCUSED_MOVEMENT_REPETITIONS
+                                            "Record $recommendedSessions more guided ${if (recommendedSessions == 1) "session" else "sessions"} ($takes takes)"
+                                        }
+                                        else ->
+                                            "Record $recommendedSessions more independent ${uiState.guidedSelectedDuration}s ${if (recommendedSessions == 1) "capture" else "captures"}"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                Text(
+                                    text = "$selectedStoredWindows of $POSTURE_TARGET_WINDOWS clean windows · " +
+                                        "$selectedEligibleSessions of $MIN_INDEPENDENT_SESSIONS independent sessions",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
                                 )
@@ -936,7 +992,11 @@ private fun GuidedRecordingCard(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "${uiState.guidedPostureIndex + 1} / ${uiState.guidedTotalPostures}",
+                                text = if (isFocusedMovementSession) {
+                                    "TAKE ${uiState.guidedPostureIndex + 1} OF ${uiState.guidedTotalPostures}"
+                                } else {
+                                    "STEP ${uiState.guidedPostureIndex + 1} OF ${uiState.guidedTotalPostures}"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
@@ -1011,6 +1071,26 @@ private fun GuidedRecordingCard(
                         label = "transition_alpha"
                     )
 
+                    if (isFocusedMovementSession && uiState.guidedTotalPostures > 1) {
+                        val completedTake = uiState.guidedPostureTimeRemaining == 0
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primary,
+                        ) {
+                            Text(
+                                text = if (completedTake) {
+                                    "TAKE ${uiState.guidedPostureIndex + 1} COMPLETE · NEXT ${uiState.guidedPostureIndex + 2} OF ${uiState.guidedTotalPostures}"
+                                } else {
+                                    "PREPARE TAKE ${uiState.guidedPostureIndex + 1} OF ${uiState.guidedTotalPostures}"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+
                     Text(
                         text = uiState.guidedMessage,
                         style = MaterialTheme.typography.titleMedium,
@@ -1046,6 +1126,12 @@ private fun GuidedRecordingCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = uiState.guidedMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
                     )
                     Text(
                         text = "${uiState.totalSamples} samples across ${uiState.postureCounts.size} postures",
@@ -1098,6 +1184,189 @@ private fun GuidedRecordingCard(
 // NEXT-UP GUIDANCE + DEPLOYED MODEL QUALITY
 // ═══════════════════════════════════════════════════════
 
+private fun eligibleSessionCount(
+    uiState: SalahDataCollectionUiState,
+    posture: SalahPosture,
+): Int = uiState.dataFiles.count { file ->
+    file.trainingIssue == null && (file.postureCounts[posture.name] ?: 0) > 0
+}
+
+/**
+ * A concise definition of "done" for collectors. Collection is ready only when
+ * every class has enough windows and independent files; model retraining remains
+ * a separate, quality-gated step after the recordings are exported.
+ */
+@Composable
+private fun CollectionReadinessCard(uiState: SalahDataCollectionUiState) {
+    val labels = SalahPosture.classificationLabels
+    val windowsReady = labels.count { posture ->
+        (uiState.globalPostureCounts[posture.name] ?: 0) >= POSTURE_TARGET_WINDOWS
+    }
+    val sessionsReady = labels.count { posture ->
+        eligibleSessionCount(uiState, posture) >= MIN_INDEPENDENT_SESSIONS
+    }
+    val labelsReady = labels.count { posture ->
+        (uiState.globalPostureCounts[posture.name] ?: 0) >= POSTURE_TARGET_WINDOWS &&
+            eligibleSessionCount(uiState, posture) >= MIN_INDEPENDENT_SESSIONS
+    }
+    val pendingReview = uiState.dataFiles.count { it.isPendingReview }
+    val progress by animateFloatAsState(
+        targetValue = labelsReady / labels.size.toFloat(),
+        animationSpec = NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_1),
+        label = "collectionReadiness",
+    )
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.SALAH_TRAINING,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        fontSize = 22.sp,
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Make prayer detection ready",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "$labelsReady of ${labels.size} posture labels ready",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(50)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                strokeCap = StrokeCap.Round,
+            )
+
+            CollectionChecklistRow(
+                isComplete = windowsReady == labels.size,
+                title = "Collect clean sensor coverage",
+                detail = "$windowsReady of ${labels.size} labels have $POSTURE_TARGET_WINDOWS windows",
+            )
+            CollectionChecklistRow(
+                isComplete = sessionsReady == labels.size,
+                title = "Keep recordings independent",
+                detail = "$sessionsReady of ${labels.size} labels appear in $MIN_INDEPENDENT_SESSIONS separate sessions",
+            )
+            CollectionChecklistRow(
+                isComplete = pendingReview == 0,
+                title = "Review uncertain recordings",
+                detail = if (pendingReview == 0) {
+                    "No live or legacy recordings are waiting for review"
+                } else {
+                    "$pendingReview ${if (pendingReview == 1) "recording needs" else "recordings need"} review"
+                },
+            )
+
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = if (labelsReady == labels.size && pendingReview == 0) {
+                        "Collection baseline complete. Next: merge all approved recordings, retrain with session-isolated splits, and deploy only if every quality gate passes."
+                    } else {
+                        "Next: follow the recommended posture below. Select it, open Guided Recording, and complete the shown number of captures."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollectionChecklistRow(
+    isComplete: Boolean,
+    title: String,
+    detail: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isComplete) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isComplete) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(15.dp),
+                )
+            } else {
+                Text(
+                    text = "•",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /**
  * Tells the collector exactly what to record next: the classification posture
  * furthest from the per-class target. Tapping pre-selects it in the recorder.
@@ -1107,16 +1376,38 @@ private fun NextUpCard(
     uiState: SalahDataCollectionUiState,
     onSelectPosture: (SalahPosture) -> Unit
 ) {
-    val target = 500
+    val target = POSTURE_TARGET_WINDOWS
     val ranked = SalahPosture.classificationLabels
-        .map { it to (uiState.globalPostureCounts[it.name] ?: 0) }
-        .sortedBy { it.second }
-    val (nextPosture, nextCount) = ranked.first()
-    if (nextCount >= target) return // dataset complete — nothing to push
+        .map { posture ->
+            Triple(
+                posture,
+                uiState.globalPostureCounts[posture.name] ?: 0,
+                eligibleSessionCount(uiState, posture),
+            )
+        }
+        .sortedBy { (_, windows, sessions) ->
+            minOf(
+                windows / target.toFloat(),
+                sessions / MIN_INDEPENDENT_SESSIONS.toFloat(),
+            )
+        }
+    val next = ranked.firstOrNull { (_, windows, sessions) ->
+        windows < target || sessions < MIN_INDEPENDENT_SESSIONS
+    } ?: return
+    val (nextPosture, nextCount, nextSessions) = next
 
-    val totalCollected = ranked.sumOf { it.second.coerceAtMost(target) }
-    val overallPct = (totalCollected * 100) / (target * ranked.size)
-    val weakest = ranked.take(3).filter { it.second < target }
+    val overallPct = (
+        ranked.sumOf { (_, windows, sessions) ->
+            minOf(
+                windows.coerceAtMost(target) / target.toFloat(),
+                sessions.coerceAtMost(MIN_INDEPENDENT_SESSIONS) /
+                    MIN_INDEPENDENT_SESSIONS.toFloat(),
+            ).toDouble()
+        } * 100 / ranked.size
+        ).toInt()
+    val weakest = ranked.take(3).filter { (_, windows, sessions) ->
+        windows < target || sessions < MIN_INDEPENDENT_SESSIONS
+    }
 
     Card(
         onClick = { onSelectPosture(nextPosture) },
@@ -1159,13 +1450,19 @@ private fun NextUpCard(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "$nextCount of $target windows · tap to select",
+                    text = "$nextCount of $target windows · $nextSessions of $MIN_INDEPENDENT_SESSIONS sessions",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = "Tap to select and see the exact capture recommendation",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                )
                 if (weakest.size > 1) {
                     Text(
-                        text = "Also thin: " + weakest.drop(1).joinToString(", ") { it.first.displayName },
+                        text = "Also incomplete: " + weakest.drop(1).joinToString(", ") { it.first.displayName },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )
@@ -2063,6 +2360,8 @@ private fun PostureChip(
 /** Dataset target per posture class, in 100ms windows — matches the training
  *  pipeline's expectation and the progress card at the top of the screen. */
 private const val POSTURE_TARGET_WINDOWS = 500
+private const val MIN_INDEPENDENT_SESSIONS = 3
+private const val WINDOWS_PER_SECOND = 10
 
 // ═══════════════════════════════════════════════════════
 // SESSION STATS

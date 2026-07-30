@@ -80,7 +80,6 @@ class PrayerNotificationService : Service() {
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var activityTransitionPendingIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
-    private var activityReceiver: ActivityTransitionReceiver? = null
     private var toneGenerator: ToneGenerator? = null
     private var timezoneReceiver: BroadcastReceiver? = null
 
@@ -97,8 +96,10 @@ class PrayerNotificationService : Service() {
         private const val NOTIFICATION_ID = 1001  // Single notification ID for both foreground service and live update
         private const val LIVE_UPDATE_NOTIFICATION_ID = 1001 // Same ID as foreground - replaces it with live update
         
-        // Activity recognition action
-        private const val ACTIVITY_TRANSITION_ACTION = "com.starception.submission.ACTIVITY_TRANSITION"
+        const val ACTION_ACTIVITY_TRANSITION =
+            "com.starception.submission.action.ACTIVITY_TRANSITION"
+        const val EXTRA_DETECTED_ACTIVITY = "detected_activity"
+        const val EXTRA_TRANSITION_TYPE = "transition_type"
         
         // Check if service is running in another process (NON-BLOCKING with timeout)
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
@@ -255,6 +256,7 @@ class PrayerNotificationService : Service() {
         Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId, isServiceRunning: $isServiceRunning")
 
         if (isServiceRunning) {
+            handleActivityTransitionIntent(intent)
             Log.w(TAG, "Service already running, ignoring duplicate start - startId: $startId")
             return START_STICKY
         }
@@ -273,6 +275,11 @@ class PrayerNotificationService : Service() {
 
             // Mark service as running IMMEDIATELY
             isServiceRunning = true
+
+            // A manifest activity-transition receiver can cold-start this service while
+            // the UI is absent. Apply that event only after startForeground(), keeping
+            // Android's foreground-service startup contract intact.
+            handleActivityTransitionIntent(intent)
             
             // Background initialization with ANR protection - dependencies should be available now
             serviceScope.launch(Dispatchers.IO) {
@@ -305,6 +312,26 @@ class PrayerNotificationService : Service() {
                 Log.e(TAG, "Emergency fallback failed: ${fallbackError.message}")
             }
             return START_STICKY
+        }
+    }
+
+    private fun handleActivityTransitionIntent(intent: Intent?) {
+        if (intent?.action != ACTION_ACTIVITY_TRANSITION) return
+
+        val detectedActivity = intent.getStringExtra(EXTRA_DETECTED_ACTIVITY) ?: return
+        val transitionType = intent.getIntExtra(EXTRA_TRANSITION_TYPE, -1)
+        val previousActivity = currentActivity
+        currentActivity = detectedActivity
+
+        Log.i(
+            TAG,
+            "🏃 Background activity transition: $previousActivity → $detectedActivity " +
+                "(${getTransitionString(transitionType)})",
+        )
+        ActivityTracker.updateActivity(detectedActivity)
+        serviceScope.launch {
+            runCatching { updatePrayerNotificationWithRealData() }
+                .onFailure { Log.e(TAG, "Failed to refresh live update after activity transition", it) }
         }
     }
     
@@ -1574,27 +1601,20 @@ class PrayerNotificationService : Service() {
                 }
             }
 
-            // Register receiver on main thread (required by Android)
-            withContext(Dispatchers.Main) {
-                try {
-                    activityReceiver = ActivityTransitionReceiver()
-                    val filter = IntentFilter(ACTIVITY_TRANSITION_ACTION)
-                    registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-                    Log.d(TAG, "✓ Activity transition receiver registered")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to register activity receiver: ${e.message}")
-                }
-            }
-
-            // Create pending intent for activity transitions
-            val intent = Intent(ACTIVITY_TRANSITION_ACTION).apply {
-                setPackage(packageName)
-            }
+            // Use an explicit manifest receiver so Play services can deliver a
+            // transition even when no Activity or service instance is alive.
+            val intent = Intent(this, DrivingActivityTransitionReceiver::class.java)
             activityTransitionPendingIntent = PendingIntent.getBroadcast(
                 this,
                 0,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // Play services fills ActivityTransitionResult into this intent.
+                        PendingIntent.FLAG_MUTABLE
+                    } else {
+                        0
+                    },
             )
             Log.d(TAG, "✓ Activity transition PendingIntent created")
 
@@ -1618,21 +1638,18 @@ class PrayerNotificationService : Service() {
             // Initialize tone generator for beep notifications
             toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
 
-            // Create receiver for activity transitions
-            activityReceiver = ActivityTransitionReceiver()
-            val filter = IntentFilter(ACTIVITY_TRANSITION_ACTION)
-            registerReceiver(activityReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-
             // Create pending intent for activity transitions
-            // Note: Using explicit intent with component name for Android 14+ compatibility
-            val intent = Intent(ACTIVITY_TRANSITION_ACTION).apply {
-                setPackage(packageName) // Make intent explicit for Android 14+ security requirements
-            }
+            val intent = Intent(this, DrivingActivityTransitionReceiver::class.java)
             activityTransitionPendingIntent = PendingIntent.getBroadcast(
                 this,
                 0,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_MUTABLE
+                    } else {
+                        0
+                    },
             )
 
             // Start activity recognition
@@ -1717,48 +1734,6 @@ class PrayerNotificationService : Service() {
      */
     fun getCurrentActivity(): String {
         return currentActivity
-    }
-    
-    /**
-     * Activity Transition Receiver
-     */
-    inner class ActivityTransitionReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (ActivityTransitionResult.hasResult(intent)) {
-                val result = ActivityTransitionResult.extractResult(intent)
-                result?.let { transitionResult ->
-                    for (event in transitionResult.transitionEvents) {
-                        val activityType = getActivityString(event.activityType)
-                        val transitionType = getTransitionString(event.transitionType)
-                        
-                        Log.d(TAG, "🏃 Activity Transition: $activityType - $transitionType")
-                        
-                        // Update current activity when entering a new activity
-                        if (event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
-                            val previousActivity = currentActivity
-                            currentActivity = activityType
-                            
-                            // Only notify if activity actually changed
-                            if (previousActivity != currentActivity) {
-                                // Update ActivityTracker for UI components
-                                ActivityTracker.updateActivity(currentActivity)
-
-                                // Play beep notification
-                                playActivityChangeBeep()
-
-                                Log.i(TAG, "🔄 Activity changed from $previousActivity to $currentActivity")
-
-                                // Activity is already shown in the main live update notification via:
-                                // 1. Large icon (activity icon in top-right corner)
-                                // 2. Emoji in shortCriticalText (e.g., "🚗 🕌 Go to Mosque")
-                                // No need for separate notification - it was causing duplicate notifications
-                                // showActivityChangeNotification(currentActivity) // REMOVED: Merged into main notification
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
     
     /**
@@ -1849,11 +1824,6 @@ class PrayerNotificationService : Service() {
                     .addOnFailureListener { e ->
                         Log.e(TAG, "Failed to remove activity transition updates: ${e.message}")
                     }
-            }
-            
-            activityReceiver?.let {
-                unregisterReceiver(it)
-                activityReceiver = null
             }
             
             toneGenerator?.release()

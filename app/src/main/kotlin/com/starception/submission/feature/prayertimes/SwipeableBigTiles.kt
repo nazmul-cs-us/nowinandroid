@@ -71,9 +71,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.VolumeUp
@@ -90,7 +87,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.*
@@ -137,8 +134,6 @@ import androidx.compose.foundation.Image
 import com.starception.submission.R
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material.icons.filled.BatchPrediction
-import androidx.compose.material.icons.filled.BubbleChart
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -148,6 +143,9 @@ import com.starception.submission.feature.prayertimes.components.CompassProgress
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import java.time.LocalTime
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -211,6 +209,12 @@ import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
 
+private val HomeReferenceInk = Color(0xFF0A0808)
+private val HomeReferenceCard = Color(0xFFFFFDF7)
+private val HomeReferenceSlate = Color(0xFF5D6574)
+private val HomeReferenceBlue = Color(0xFF4F779D)
+private val HomeReferenceRust = Color(0xFF99593C)
+private val HomeReferenceGold = Color(0xFFD8AB59)
 
 
 
@@ -1053,6 +1057,7 @@ fun SwipeableBigTiles(
     val coroutineScope = rememberCoroutineScope()
     val view = LocalView.current
     val context = LocalContext.current
+    val isDarkTheme = LocalDarkTheme.current
     val overlayDensity = LocalDensity.current
     var showGlobePopup by remember { mutableStateOf(false) }
     var carouselHostInRoot by remember { mutableStateOf(Offset.Zero) }
@@ -1091,7 +1096,7 @@ fun SwipeableBigTiles(
         }
     }
 
-    val cardShape = RoundedCornerShape(24.dp)
+    val cardShape = MaterialTheme.shapes.extraLarge
     Box(
         modifier = (if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .onGloballyPositioned { carouselHostInRoot = it.positionInRoot() },
@@ -1107,20 +1112,22 @@ fun SwipeableBigTiles(
             } else {
                 Modifier
                     .fillMaxWidth()
-                    .height(231.dp)
+                    .height(245.dp)
             }
 
             BoxWithConstraints(modifier = carouselModifier) {
-                val editorialCardWidth = if (isLandscape) {
-                    (maxWidth - 48.dp).coerceAtMost(560.dp)
+                val heroPreferredItemWidth = if (isLandscape) {
+                    (maxWidth - 64.dp).coerceAtMost(560.dp)
                 } else {
-                    (maxWidth - 32.dp).coerceAtLeast(280.dp)
+                    (maxWidth - 64.dp).coerceAtLeast(240.dp)
                 }
-                HorizontalUncontainedCarousel(
+                HorizontalMultiBrowseCarousel(
                     state = carouselState,
-                    itemWidth = editorialCardWidth,
+                    preferredItemWidth = heroPreferredItemWidth,
                     modifier = Modifier.fillMaxSize(),
-                    itemSpacing = 12.dp,
+                    itemSpacing = 8.dp,
+                    minSmallItemWidth = 56.dp,
+                    maxSmallItemWidth = 56.dp,
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) { page ->
                 val itemDrawInfo = carouselItemDrawInfo
@@ -1151,20 +1158,26 @@ fun SwipeableBigTiles(
                     modifier = Modifier
                         .fillMaxSize()
                         .onGloballyPositioned { itemInRoot = it.positionInRoot() }
-                        .maskClip(cardShape),
+                        .maskClip(cardShape)
+                        .clickable(enabled = page != currentTile) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            coroutineScope.launch {
+                                carouselState.animateScrollToItem(page)
+                            }
+                        },
                     shape = cardShape,
                     color = if (page == 3 && globeLive) {
                         Color.Transparent
+                    } else if (isDarkTheme) {
+                        MaterialTheme.colorScheme.surfaceContainerLow
                     } else {
-                        MaterialTheme.colorScheme.surface
+                        HomeReferenceCard
                     },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                    ),
                     shadowElevation = 0.dp,
                 ) {
-                    when (page) {
+                    if (page != currentTile) {
+                        CompactHeroPreview(page = page)
+                    } else when (page) {
                         0 -> NextPrayerTile(
                             prayerTimes = prayerTimes,
                             currentTime = currentTime,
@@ -1245,7 +1258,7 @@ fun SwipeableBigTiles(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = if (isLandscape) 2.dp else 3.dp),
+                    .height(14.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1253,28 +1266,25 @@ fun SwipeableBigTiles(
                     val selected = currentTile == index
                     Box(
                         modifier = Modifier
-                            .height(4.dp)
-                            .width(if (selected) 16.dp else 4.dp)
+                            .height(5.dp)
+                            .width(if (selected) 18.dp else 5.dp)
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
-                                    MaterialTheme.colorScheme.primary
+                                    if (isDarkTheme) MaterialTheme.colorScheme.primary else HomeReferenceBlue
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
                                 },
                             )
                             .clickable {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                coroutineScope.launch {
-                                    carouselState.animateScrollToItem(index)
-                                }
+                                coroutineScope.launch { carouselState.animateScrollToItem(index) }
                             },
                     )
-                    if (index < 3) {
-                        Spacer(Modifier.width(5.dp))
-                    }
+                    if (index < 3) Spacer(Modifier.width(6.dp))
                 }
             }
+
         }
 
         // Keep one fixed, warmed GL surface alive after the globe tile is first visited.
@@ -1313,6 +1323,63 @@ fun SwipeableBigTiles(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CompactHeroPreview(page: Int) {
+    val isDarkTheme = LocalDarkTheme.current
+    val (accentColor, glyph, label) = when (page) {
+        0 -> Triple(HomeReferenceBlue, FlaticonIcons.PRAYER_TIMES, "Prayer times")
+        1 -> Triple(HomeReferenceGold, FlaticonIcons.SALAH_TRAINING, "Salah tracking")
+        2 -> Triple(HomeReferenceRust, FlaticonIcons.QURAN, "The Noble Quran")
+        else -> Triple(HomeReferenceSlate, FlaticonIcons.TRAVEL, "Qibla direction")
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow
+                else HomeReferenceCard,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(accentColor, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            FlaticonIcon(
+                glyph = glyph,
+                contentDescription = label,
+                tint = Color.White,
+                fontSize = 17.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReferenceTileIcon(
+    glyph: String,
+    contentDescription: String,
+    accentColor: Color,
+    compact: Boolean = false,
+) {
+    Box(
+        modifier = Modifier
+            .size(if (compact) 30.dp else 36.dp)
+            .background(accentColor, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        FlaticonIcon(
+            glyph = glyph,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            fontSize = if (compact) 15.sp else 18.sp,
+        )
     }
 }
 
@@ -2109,6 +2176,8 @@ private fun NextPrayerTile(
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
     val view = LocalView.current
+    val isDarkTheme = LocalDarkTheme.current
+    val tileInk = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else HomeReferenceInk
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
     if (mainPrayer != null || prayerTimes != null) {
@@ -2119,8 +2188,8 @@ private fun NextPrayerTile(
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            tonalElevation = 4.dp
+            color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+            tonalElevation = 0.dp
         ) {
             // Shared compass interaction state
             var isPressed by remember { mutableStateOf(false) }
@@ -2149,9 +2218,9 @@ private fun NextPrayerTile(
                             // height into the tile padding, leaving the text column
                             // narrower (it wraps to more lines).
                             if (isLandscape) Modifier.fillMaxHeight(0.85f).aspectRatio(1f)
-                            else Modifier.requiredSize(176.dp)
+                            else Modifier.requiredSize(138.dp)
                         )
-                        .offset(x = if (isLandscape) 0.dp else 6.dp)
+                        .offset(x = if (isLandscape) 0.dp else 2.dp)
                 ) {
                     Box(
                         modifier = modifier
@@ -2296,16 +2365,16 @@ private fun NextPrayerTile(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.BatchPrediction,
+                        ReferenceTileIcon(
+                            glyph = FlaticonIcons.PRAYER_TIMES,
                             contentDescription = "Smart Prediction",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            accentColor = HomeReferenceBlue,
+                            compact = true,
                         )
                         Text(
                             text = "Smart Prediction",
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2339,16 +2408,15 @@ private fun NextPrayerTile(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.BatchPrediction,
+                        ReferenceTileIcon(
+                            glyph = FlaticonIcons.PRAYER_TIMES,
                             contentDescription = "Smart Prediction",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            accentColor = HomeReferenceBlue,
                         )
                         Text(
                             text = "Smart Prediction",
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2427,12 +2495,14 @@ private fun SmartInfoTile(
     // State for bubble popup
     var selectedPrayer by remember { mutableStateOf<com.starception.submission.feature.prayertimes.components.PrayerBubbleData?>(null) }
     val view = LocalView.current
+    val isDarkTheme = LocalDarkTheme.current
+    val tileInk = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else HomeReferenceInk
     // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 4.dp
+        color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -2446,16 +2516,16 @@ private fun SmartInfoTile(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 2.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.BubbleChart,
+                ReferenceTileIcon(
+                    glyph = FlaticonIcons.SALAH_TRAINING,
                     contentDescription = "Smart Tracking",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(if (isLandscape) 16.dp else 20.dp)
+                    accentColor = HomeReferenceGold,
+                    compact = isLandscape,
                 )
                 Text(
                     text = "Smart Tracking",
                     style = if (isLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = tileInk,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -2951,6 +3021,8 @@ private fun DailyStatsTile(
 ) {
     val view = LocalView.current
     val context = LocalContext.current
+    val isDarkTheme = LocalDarkTheme.current
+    val tileInk = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else HomeReferenceInk
     val audioDownloadHelper = remember {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -2984,8 +3056,8 @@ private fun DailyStatsTile(
     Surface(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        tonalElevation = 4.dp
+        color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+        tonalElevation = 0.dp
     ) {
         if (showSurahList) {
             // Search query state
@@ -3351,16 +3423,16 @@ private fun DailyStatsTile(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
+                        ReferenceTileIcon(
+                            glyph = FlaticonIcons.QURAN,
                             contentDescription = "Quran",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp)
+                            accentColor = HomeReferenceRust,
+                            compact = isLandscape,
                         )
                         Text(
                             text = "The Noble Quran",
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold
                         )
                     }
