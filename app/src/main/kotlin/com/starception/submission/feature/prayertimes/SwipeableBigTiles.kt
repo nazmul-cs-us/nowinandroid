@@ -114,6 +114,7 @@ import androidx.compose.ui.platform.LocalView
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -215,6 +216,61 @@ private val HomeReferenceSlate = Color(0xFF5D6574)
 private val HomeReferenceBlue = Color(0xFF4F779D)
 private val HomeReferenceRust = Color(0xFF99593C)
 private val HomeReferenceGold = Color(0xFFD8AB59)
+
+@Composable
+private fun referenceHeroBrush(accentColor: Color): Brush {
+    val scheme = MaterialTheme.colorScheme
+    return if (LocalDarkTheme.current) {
+        Brush.linearGradient(
+            colors = listOf(
+                scheme.background,
+                scheme.surfaceContainer,
+                accentColor.copy(alpha = 0.18f).compositeOver(scheme.surfaceContainer),
+            ),
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(
+                scheme.surfaceContainerLowest,
+                accentColor.copy(alpha = 0.08f).compositeOver(scheme.surfaceContainerLow),
+                accentColor.copy(alpha = 0.18f).compositeOver(scheme.surfaceContainer),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun predictionHeroBrush(): Brush {
+    val scheme = MaterialTheme.colorScheme
+    return Brush.linearGradient(
+        colors = if (LocalDarkTheme.current) {
+            listOf(
+                scheme.surfaceContainerLow,
+                scheme.surfaceContainerHigh,
+                scheme.primary.copy(alpha = 0.2f).compositeOver(scheme.surfaceContainerHigh),
+            )
+        } else {
+            listOf(
+                scheme.surfaceContainerLowest,
+                scheme.primary.copy(alpha = 0.08f).compositeOver(scheme.surfaceContainerLow),
+                scheme.primary.copy(alpha = 0.18f).compositeOver(scheme.surfaceContainer),
+            )
+        },
+    )
+}
+
+@Composable
+private fun compactPreviewBrush(accentColor: Color): Brush {
+    val scheme = MaterialTheme.colorScheme
+    return Brush.linearGradient(
+        colors = listOf(
+            accentColor.copy(alpha = if (LocalDarkTheme.current) 0.72f else 0.84f)
+                .compositeOver(scheme.surface),
+            accentColor.copy(alpha = if (LocalDarkTheme.current) 0.48f else 0.64f)
+                .compositeOver(scheme.surfaceContainer),
+        ),
+    )
+}
 
 
 
@@ -1096,7 +1152,7 @@ fun SwipeableBigTiles(
         }
     }
 
-    val cardShape = MaterialTheme.shapes.extraLarge
+    val cardShape = RoundedCornerShape(32.dp)
     Box(
         modifier = (if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .onGloballyPositioned { carouselHostInRoot = it.positionInRoot() },
@@ -1112,7 +1168,7 @@ fun SwipeableBigTiles(
             } else {
                 Modifier
                     .fillMaxWidth()
-                    .height(245.dp)
+                    .height(253.dp)
             }
 
             BoxWithConstraints(modifier = carouselModifier) {
@@ -1128,7 +1184,7 @@ fun SwipeableBigTiles(
                     itemSpacing = 8.dp,
                     minSmallItemWidth = 56.dp,
                     maxSmallItemWidth = 56.dp,
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    contentPadding = PaddingValues(vertical = 6.dp),
                 ) { page ->
                 val itemDrawInfo = carouselItemDrawInfo
                 var itemInRoot by remember(page) { mutableStateOf(Offset.Zero) }
@@ -1168,10 +1224,8 @@ fun SwipeableBigTiles(
                     shape = cardShape,
                     color = if (page == 3 && globeLive) {
                         Color.Transparent
-                    } else if (isDarkTheme) {
-                        MaterialTheme.colorScheme.surfaceContainerLow
                     } else {
-                        HomeReferenceCard
+                        MaterialTheme.colorScheme.surfaceContainerLow
                     },
                     shadowElevation = 0.dp,
                 ) {
@@ -1271,7 +1325,7 @@ fun SwipeableBigTiles(
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
-                                    if (isDarkTheme) MaterialTheme.colorScheme.primary else HomeReferenceBlue
+                                    MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
                                 },
@@ -1328,34 +1382,57 @@ fun SwipeableBigTiles(
 
 @Composable
 private fun CompactHeroPreview(page: Int) {
-    val isDarkTheme = LocalDarkTheme.current
+    val scheme = MaterialTheme.colorScheme
     val (accentColor, glyph, label) = when (page) {
-        0 -> Triple(HomeReferenceBlue, FlaticonIcons.PRAYER_TIMES, "Prayer times")
-        1 -> Triple(HomeReferenceGold, FlaticonIcons.SALAH_TRAINING, "Salah tracking")
-        2 -> Triple(HomeReferenceRust, FlaticonIcons.QURAN, "The Noble Quran")
-        else -> Triple(HomeReferenceSlate, FlaticonIcons.TRAVEL, "Qibla direction")
+        0 -> Triple(scheme.primary, FlaticonIcons.SCHEDULE, "Prayer\nforecast")
+        1 -> Triple(scheme.secondary, FlaticonIcons.SALAH_TRAINING, "Salah\ntracking")
+        2 -> Triple(scheme.tertiary, FlaticonIcons.QURAN, "Noble\nQuran")
+        else -> Triple(scheme.inverseSurface, FlaticonIcons.TRAVEL, "Qibla\ndirection")
+    }
+    val iconTint = when (page) {
+        0 -> scheme.onPrimary
+        1 -> scheme.onSecondary
+        2 -> scheme.onTertiary
+        else -> scheme.inverseOnSurface
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow
-                else HomeReferenceCard,
-            ),
-        contentAlignment = Alignment.Center,
+            .background(compactPreviewBrush(accentColor)),
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
-                .background(accentColor, CircleShape),
-            contentAlignment = Alignment.Center,
+                .align(Alignment.BottomEnd)
+                .offset(x = 24.dp, y = 24.dp)
+                .size(88.dp)
+                .background(iconTint.copy(alpha = 0.08f), CircleShape),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 5.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            FlaticonIcon(
+            ReferenceTileIcon(
                 glyph = glyph,
-                contentDescription = label,
-                tint = Color.White,
-                fontSize = 17.sp,
+                contentDescription = label.replace('\n', ' '),
+                accentColor = iconTint,
+                compact = true,
+                onDarkSurface = true,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.5.sp,
+                    lineHeight = 11.sp,
+                    letterSpacing = (-0.1).sp,
+                ),
+                color = iconTint,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
             )
         }
     }
@@ -1367,17 +1444,38 @@ private fun ReferenceTileIcon(
     contentDescription: String,
     accentColor: Color,
     compact: Boolean = false,
+    onDarkSurface: Boolean = false,
 ) {
+    val isDarkTheme = LocalDarkTheme.current
+    val iconShape = RoundedCornerShape(if (compact) 10.dp else 12.dp)
     Box(
         modifier = Modifier
             .size(if (compact) 30.dp else 36.dp)
-            .background(accentColor, CircleShape),
+            .background(
+                color = if (onDarkSurface) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                } else if (isDarkTheme) {
+                    accentColor.copy(alpha = 0.24f)
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+                },
+                shape = iconShape,
+            )
+            .border(
+                width = 1.dp,
+                color = if (onDarkSurface) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                } else {
+                    accentColor.copy(alpha = 0.26f)
+                },
+                shape = iconShape,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         FlaticonIcon(
             glyph = glyph,
             contentDescription = contentDescription,
-            tint = Color.White,
+            tint = if (onDarkSurface || isDarkTheme) Color.White else accentColor,
             fontSize = if (compact) 15.sp else 18.sp,
         )
     }
@@ -2177,7 +2275,7 @@ private fun NextPrayerTile(
 ) {
     val view = LocalView.current
     val isDarkTheme = LocalDarkTheme.current
-    val tileInk = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else HomeReferenceInk
+    val tileInk = MaterialTheme.colorScheme.onSurface
     val mainPrayer = getNextPrayer() ?: getCurrentPrayer()
     // Show prayer tile if we have prayer data, even if mainPrayer logic fails
     if (mainPrayer != null || prayerTimes != null) {
@@ -2186,9 +2284,14 @@ private fun NextPrayerTile(
         // and a mismatched corner against the 32dp outer card. Keep only the colored
         // fill + tonal elevation.
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = predictionHeroBrush(),
+                    shape = RoundedCornerShape(32.dp),
+                ),
             shape = RoundedCornerShape(32.dp),
-            color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+            color = Color.Transparent,
             tonalElevation = 0.dp
         ) {
             // Shared compass interaction state
@@ -2201,7 +2304,7 @@ private fun NextPrayerTile(
                 ),
                 label = "compassPressScale"
             )
-            val compassSizeFallback = if (isLandscape) 140.dp else 150.dp
+            val compassSizeFallback = if (isLandscape) 140.dp else 148.dp
 
             // Shared sync content
             val syncContent = remember(prayerTimes, currentTime, timeOffsets, goToMosqueDurationMinutes) {
@@ -2218,9 +2321,9 @@ private fun NextPrayerTile(
                             // height into the tile padding, leaving the text column
                             // narrower (it wraps to more lines).
                             if (isLandscape) Modifier.fillMaxHeight(0.85f).aspectRatio(1f)
-                            else Modifier.requiredSize(138.dp)
+                            else Modifier.requiredSize(148.dp)
                         )
-                        .offset(x = if (isLandscape) 0.dp else 2.dp)
+                        .offset(x = if (isLandscape) 0.dp else 12.dp)
                 ) {
                     Box(
                         modifier = modifier
@@ -2272,7 +2375,7 @@ private fun NextPrayerTile(
                         Text(
                             text = syncContent.title,
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = tileInk.copy(alpha = 0.68f),
                             fontWeight = FontWeight.Medium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -2283,31 +2386,36 @@ private fun NextPrayerTile(
                                 fontSize = 22.sp,
                                 letterSpacing = (-0.4).sp
                             ),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             lineHeight = 24.sp
                         )
                         if (syncContent.nextPrayerInfo.isNotEmpty()) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.0f),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier
-                                    .padding(top = if (isLandscape) 0.dp else 2.dp)
-                                    .aiTextGlow()
+                            Column(
+                                modifier = Modifier.padding(top = if (isLandscape) 2.dp else 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(1.dp),
                             ) {
                                 Text(
-                                    text = syncContent.nextPrayerInfo,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontSize = 15.sp,
-                                        letterSpacing = (-0.2).sp
+                                    text = "NEXT PRAYER",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.8.sp,
                                     ),
-                                    color = MaterialTheme.colorScheme.tertiary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = syncContent.nextPrayerInfo.substringAfter('•').trim(),
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontSize = 14.sp,
+                                        letterSpacing = 0.sp,
+                                    ),
+                                    color = tileInk.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(horizontal = 0.dp, vertical = if (isLandscape) 2.dp else 4.dp)
                                 )
                             }
                         }
@@ -2320,14 +2428,14 @@ private fun NextPrayerTile(
                         Text(
                             text = "Next Prayer: ${getPrayerDisplayName(prayerName)}",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = tileInk.copy(alpha = 0.72f),
                             fontWeight = FontWeight.Medium,
                             maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "$prayerStatus • $prayerTime",
                             style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, letterSpacing = (-0.4).sp),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp
                         )
@@ -2337,14 +2445,14 @@ private fun NextPrayerTile(
                         Text(
                             text = "Next Prayer: Fajr",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = tileInk.copy(alpha = 0.72f),
                             fontWeight = FontWeight.Medium,
                             maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Tomorrow • ${getPrayerTimeDisplay("Fajr")}",
                             style = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, letterSpacing = (-0.4).sp),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = tileInk,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp
                         )
@@ -2366,9 +2474,9 @@ private fun NextPrayerTile(
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         ReferenceTileIcon(
-                            glyph = FlaticonIcons.PRAYER_TIMES,
+                            glyph = FlaticonIcons.SCHEDULE,
                             contentDescription = "Smart Prediction",
-                            accentColor = HomeReferenceBlue,
+                            accentColor = MaterialTheme.colorScheme.primary,
                             compact = true,
                         )
                         Text(
@@ -2400,7 +2508,7 @@ private fun NextPrayerTile(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 16.dp, top = 16.dp, bottom = 16.dp),
+                        .padding(start = 20.dp, top = 18.dp, bottom = 18.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     // Header
@@ -2409,9 +2517,10 @@ private fun NextPrayerTile(
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         ReferenceTileIcon(
-                            glyph = FlaticonIcons.PRAYER_TIMES,
+                            glyph = FlaticonIcons.SCHEDULE,
                             contentDescription = "Smart Prediction",
-                            accentColor = HomeReferenceBlue,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            compact = true,
                         )
                         Text(
                             text = "Smart Prediction",
@@ -2425,7 +2534,7 @@ private fun NextPrayerTile(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(top = 4.dp, bottom = 4.dp),
+                            .padding(top = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2499,15 +2608,20 @@ private fun SmartInfoTile(
     val tileInk = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else HomeReferenceInk
     // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                    brush = referenceHeroBrush(MaterialTheme.colorScheme.secondary),
+                shape = RoundedCornerShape(32.dp),
+            ),
         shape = RoundedCornerShape(32.dp),
-        color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+        color = Color.Transparent,
         tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (isLandscape) 16.dp else 24.dp),
+                .padding(if (isLandscape) 16.dp else 18.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
             // Header: Icon + Title (matching Quran Player style)
@@ -2532,9 +2646,9 @@ private fun SmartInfoTile(
 
             Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                    .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = if (isLandscape) 8.dp else 20.dp, bottom = if (isLandscape) 4.dp else 8.dp),
+                    .padding(top = if (isLandscape) 8.dp else 12.dp, bottom = if (isLandscape) 4.dp else 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -3054,9 +3168,14 @@ private fun DailyStatsTile(
 
     // Match the deck's outer card: 32dp corners, no border (see NextPrayerTile).
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                    brush = referenceHeroBrush(MaterialTheme.colorScheme.tertiary),
+                shape = RoundedCornerShape(32.dp),
+            ),
         shape = RoundedCornerShape(32.dp),
-        color = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else HomeReferenceCard,
+        color = Color.Transparent,
         tonalElevation = 0.dp
     ) {
         if (showSurahList) {

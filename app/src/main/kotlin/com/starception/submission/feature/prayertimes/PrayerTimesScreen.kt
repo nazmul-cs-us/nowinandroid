@@ -1884,8 +1884,7 @@ fun PrayerTimesScreen(
                 // Instruction banner for prayer time adjustment
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp),
+                        .fillMaxWidth(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
                     ),
@@ -2011,9 +2010,8 @@ fun PrayerTimesScreen(
                 // First row: First 2 prayers from ordered list (most relevant)
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // First prayer tile
                     if (orderedPrayers.isNotEmpty()) {
@@ -2044,7 +2042,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                                .padding(vertical = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2086,7 +2084,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                                .padding(vertical = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2103,9 +2101,8 @@ fun PrayerTimesScreen(
                 // Second row: Remaining 2 prayers from ordered list
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Third prayer tile
                     if (orderedPrayers.size > 2) {
@@ -2136,7 +2133,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                                .padding(vertical = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2178,7 +2175,7 @@ fun PrayerTimesScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(tileHeight)
-                                .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                                .padding(vertical = 2.dp),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2226,7 +2223,6 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
                             .animateContentSize(
                                 animationSpec = spring(
                                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -2264,7 +2260,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                                    .padding(vertical = 2.dp)
                                     .graphicsLayer {
                                         // Material 3 expressive card entrance with bounce and scale
                                         translationY = (1f - fajrAnimProgress) * 24f
@@ -2313,7 +2309,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 2.dp)
+                                    .padding(vertical = 2.dp)
                                     .graphicsLayer {
                                         // Material 3 expressive card entrance with staggered timing
                                         translationY = (1f - sunriseAnimProgress) * 32f
@@ -2402,8 +2398,7 @@ fun PrayerTimesScreen(
                 // Location info using Material 3 Expressive Design - symmetric rounded shape
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     shadowElevation = 0.dp  // Removed to prevent navigation artifacts
