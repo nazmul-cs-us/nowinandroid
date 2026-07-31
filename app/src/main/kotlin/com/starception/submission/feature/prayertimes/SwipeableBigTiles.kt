@@ -49,7 +49,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -66,6 +65,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,12 +106,17 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
@@ -124,12 +130,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1082,6 +1091,7 @@ fun SwipeableBigTiles(
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
+    compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
@@ -1089,6 +1099,15 @@ fun SwipeableBigTiles(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val view = LocalView.current
     var showGlobePopup by remember { mutableStateOf(false) }
+    val pagerFlingBehavior = PagerDefaults.flingBehavior(
+        state = pagerState,
+        pagerSnapDistance = PagerSnapDistance.atMost(1),
+        snapAnimationSpec = tween(
+            durationMillis = 360,
+            easing = FastOutSlowInEasing,
+        ),
+        snapPositionalThreshold = 0.32f,
+    )
 
     val nextPrayer = getNextPrayer() ?: getCurrentPrayer()
     val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName) ?: "Prayer time"
@@ -1098,8 +1117,38 @@ fun SwipeableBigTiles(
     } else {
         "Your next prayer is $nextPrayerName"
     }
+    val prayerPrediction = remember(
+        prayerTimes,
+        currentTime,
+        timeOffsets,
+        goToMosqueDurationMinutes,
+    ) {
+        SmartContentUtils.getNotificationSyncContent(
+            prayerTimes = prayerTimes,
+            currentTime = currentTime,
+            timeOffsets = timeOffsets,
+            goToMosqueDurationMinutes = goToMosqueDurationMinutes,
+        )
+    }
     val (completedPrayers, totalPrayers) = getPrayerProgress()
     val prayedCount = getPrayed().coerceAtLeast(completedPrayers)
+    val compact = compactForExpandedPrayers && !isLandscape
+    val compactTransition = updateTransition(
+        targetState = compact,
+        label = "insightCompactTransition",
+    )
+    val compactProgress by compactTransition.animateFloat(
+        transitionSpec = {
+            tween(durationMillis = 520, easing = FastOutSlowInEasing)
+        },
+        label = "insightCompactProgress",
+    ) { isCompact ->
+        if (isCompact) 1f else 0f
+    }
+    val stripHeight = (300f - (130f * compactProgress)).dp
+    val headerFontSize = (20f - (4f * compactProgress)).sp
+    val headerLineHeight = (24f - (4f * compactProgress)).sp
+    val headerBottomPadding = (10f - (4f * compactProgress)).dp
 
     Column(
         modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
@@ -1107,13 +1156,13 @@ fun SwipeableBigTiles(
         Text(
             text = "Insights",
             style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = 20.sp,
-                lineHeight = 24.sp,
+                fontSize = headerFontSize,
+                lineHeight = headerLineHeight,
                 letterSpacing = (-0.25).sp,
             ),
             color = Color(0xFF292524),
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 14.dp),
+            modifier = Modifier.padding(bottom = headerBottomPadding),
         )
 
         val stripModifier = if (isLandscape) {
@@ -1123,31 +1172,43 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(stripHeight)
         }
 
         BoxWithConstraints(modifier = stripModifier) {
-            val cardWidth = if (isLandscape) {
+            val normalCardWidth = if (isLandscape) {
                 (maxWidth * 0.58f).coerceIn(220.dp, 280.dp)
             } else {
-                (maxWidth * 0.61f).coerceIn(224.dp, 236.dp)
+                (maxWidth * 0.64f).coerceIn(232.dp, 250.dp)
             }
+            val compactCardWidth = if (isLandscape) {
+                normalCardWidth
+            } else {
+                (maxWidth * 0.38f).coerceIn(138.dp, 152.dp)
+            }
+            val cardWidth = (
+                normalCardWidth.value +
+                    ((compactCardWidth.value - normalCardWidth.value) * compactProgress)
+                ).dp
+            val pageSpacing = (14f - (4f * compactProgress)).dp
 
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(cardWidth),
-                pageSpacing = 14.dp,
+                pageSpacing = pageSpacing,
                 contentPadding = PaddingValues(end = 18.dp),
-                beyondViewportPageCount = 1,
-                modifier = Modifier
-                    .requiredWidth(maxWidth + 18.dp)
-                    .fillMaxHeight(),
+                beyondViewportPageCount = 0,
+                flingBehavior = pagerFlingBehavior,
+                modifier = Modifier.fillMaxSize(),
             ) { page ->
                 when (page) {
                     0 -> InsightPreviewCard(
                         label = "Next Prayer",
-                        title = prayerTitle,
-                        backgroundPainterRes = R.drawable.insight_prayer,
+                        title = prayerPrediction?.title ?: prayerTitle,
+                        supportingText = prayerPrediction?.content,
+                        footerText = prayerPrediction?.nextPrayerInfo,
+                        backgroundPainterRes = R.drawable.insight_salah,
+                        compactProgress = compactProgress,
                         onClick = {
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             onCompassClick()
@@ -1157,13 +1218,15 @@ fun SwipeableBigTiles(
                     1 -> InsightPreviewCard(
                         label = "Salah Recap",
                         title = "$prayedCount of $totalPrayers prayers completed today",
-                        backgroundPainterRes = R.drawable.insight_salah,
+                        backgroundPainterRes = R.drawable.insight_prayer,
+                        compactProgress = compactProgress,
                     )
 
                     2 -> InsightPreviewCard(
                         label = "Noble Quran",
                         title = "Continue your journey through the Noble Quran",
                         backgroundPainterRes = R.drawable.insight_quran,
+                        compactProgress = compactProgress,
                         onClick = {
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             onSurahClick(1)
@@ -1174,6 +1237,7 @@ fun SwipeableBigTiles(
                         label = "Qibla",
                         title = "Find your direction toward the Kaaba",
                         backgroundPainterRes = R.drawable.insight_qibla,
+                        compactProgress = compactProgress,
                         onClick = {
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             showGlobePopup = true
@@ -1195,20 +1259,81 @@ fun SwipeableBigTiles(
     }
 }
 
+/**
+ * A continuous-corner rectangle similar to the softly squared silhouette in
+ * the reference. Its Bezier handles stay flatter near each edge than a normal
+ * quarter-circle, avoiding the pinched look of [RoundedCornerShape].
+ */
+private data class ContinuousCornerShape(
+    val cornerExtent: Dp,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val extent = with(density) { cornerExtent.toPx() }
+            .coerceIn(0f, minOf(size.width, size.height) / 2f)
+        if (extent == 0f) {
+            return Outline.Rectangle(Rect(0f, 0f, size.width, size.height))
+        }
+
+        // 0.32 keeps the curve close to the outer corner for longer than the
+        // 0.448 circular control point, producing a calm iOS-style squircle.
+        val innerControl = extent * 0.32f
+        val width = size.width
+        val height = size.height
+        val path = Path().apply {
+            moveTo(extent, 0f)
+            lineTo(width - extent, 0f)
+            cubicTo(
+                width - innerControl, 0f,
+                width, innerControl,
+                width, extent,
+            )
+            lineTo(width, height - extent)
+            cubicTo(
+                width, height - innerControl,
+                width - innerControl, height,
+                width - extent, height,
+            )
+            lineTo(extent, height)
+            cubicTo(
+                innerControl, height,
+                0f, height - innerControl,
+                0f, height - extent,
+            )
+            lineTo(0f, extent)
+            cubicTo(
+                0f, innerControl,
+                innerControl, 0f,
+                extent, 0f,
+            )
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
 @Composable
 private fun InsightPreviewCard(
     label: String,
     title: String,
     backgroundPainterRes: Int,
+    compactProgress: Float,
+    supportingText: String? = null,
+    footerText: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(22.dp)
-
+    val hasPrayerContext = !supportingText.isNullOrBlank() || !footerText.isNullOrBlank()
+    val cornerExtent = (26f - (8f * compactProgress)).dp
+    val shape = ContinuousCornerShape(cornerExtent)
+    val shadowElevation = (6f - (2f * compactProgress)).dp
     Surface(
         modifier = Modifier
             .fillMaxSize()
             .shadow(
-                elevation = 6.dp,
+                elevation = shadowElevation,
                 shape = shape,
                 clip = false,
                 ambientColor = Color.Black.copy(alpha = 0.08f),
@@ -1225,7 +1350,19 @@ private fun InsightPreviewCard(
         color = Color(0xFF635A56),
         tonalElevation = 0.dp,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val tagInset = (20f - (10f * compactProgress)).dp
+            val labelFontSize = (11f - (3f * compactProgress)).sp
+            val titleFontSize = (17f - (5f * compactProgress)).sp
+            val titleLineHeight = (22f - (8f * compactProgress)).sp
+            val titleHorizontalPadding = (22f - (10f * compactProgress)).dp
+            val titleBottomPadding = (26f - (12f * compactProgress)).dp
+            val contentSpacing = (7f - (4f * compactProgress)).dp
+            val supportingFontSize = (13f - (3f * compactProgress)).sp
+            val supportingLineHeight = (17f - (4f * compactProgress)).sp
+            val footerFontSize = (12f - (3f * compactProgress)).sp
+            val footerLineHeight = (16f - (4f * compactProgress)).sp
+
             Image(
                 painter = painterResource(backgroundPainterRes),
                 contentDescription = null,
@@ -1240,51 +1377,90 @@ private fun InsightPreviewCard(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0f to Color.Transparent,
-                                0.48f to Color.Transparent,
-                                0.68f to Color.Black.copy(alpha = 0.10f),
-                                1f to Color.Black.copy(alpha = 0.68f),
+                                (if (hasPrayerContext) 0.32f else 0.50f) to Color.Transparent,
+                                (if (hasPrayerContext) 0.56f else 0.72f) to
+                                    Color(0xFF241D19).copy(alpha = 0.12f),
+                                1f to Color(0xFF241D19).copy(
+                                    alpha = if (hasPrayerContext) 0.78f else 0.66f,
+                                ),
                             ),
                         ),
                     ),
             )
 
-            Surface(
+            NiaTopicTag(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(14.dp),
-                shape = CircleShape,
-                color = Color(0xFFF1EFED).copy(alpha = 0.94f),
-                shadowElevation = 0.dp,
+                    .padding(tagInset),
+                followed = false,
+                onClick = onClick ?: {},
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
+                        fontSize = labelFontSize,
                         letterSpacing = 0.sp,
                     ),
-                    color = Color(0xFF3C3735),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                    color = Color(0xFF332F2D),
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
             }
 
-            Text(
-                text = title,
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 17.dp),
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 15.sp,
-                    lineHeight = 17.5.sp,
-                    letterSpacing = (-0.2).sp,
-                ),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+                    .padding(
+                        start = titleHorizontalPadding,
+                        end = titleHorizontalPadding,
+                        bottom = titleBottomPadding,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(contentSpacing),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = titleFontSize,
+                        lineHeight = titleLineHeight,
+                        letterSpacing = (-0.2).sp,
+                    ),
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = if (hasPrayerContext) 2 else 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                supportingText?.takeIf { it.isNotBlank() }?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = supportingFontSize,
+                            lineHeight = supportingLineHeight,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.88f),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                footerText?.takeIf { it.isNotBlank() }?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = footerFontSize,
+                            lineHeight = footerLineHeight,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.78f),
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

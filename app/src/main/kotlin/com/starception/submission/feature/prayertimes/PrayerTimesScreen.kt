@@ -1826,8 +1826,27 @@ fun PrayerTimesScreen(
                     ),
                 verticalArrangement = Arrangement.Top
             ) {
-
-
+                var showAllPrayers by remember { mutableStateOf(false) }
+                val dashboardTransition = updateTransition(
+                    targetState = showAllPrayers,
+                    label = "prayerDashboardExpansion",
+                )
+                val tileHeight by dashboardTransition.animateDp(
+                    transitionSpec = {
+                        tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                    },
+                    label = "prayerTileHeight",
+                ) { expanded ->
+                    if (expanded) 122.dp else 116.dp
+                }
+                val buttonIconRotation by dashboardTransition.animateFloat(
+                    transitionSpec = {
+                        tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                    },
+                    label = "prayerToggleRotation",
+                ) { expanded ->
+                    if (expanded) 180f else 0f
+                }
                 
                 // Swipeable Big Tiles
                 Box(
@@ -1879,7 +1898,7 @@ fun PrayerTimesScreen(
                 }
 
                 // Spacer between swipeable tiles and adjust prayer times info card
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Instruction banner for prayer time adjustment
                 Card(
@@ -1893,7 +1912,7 @@ fun PrayerTimesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(10.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -1912,62 +1931,46 @@ fun PrayerTimesScreen(
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Text(
-                                text = "← Swipe left to adjust · Swipe right to reset →",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                            )
+                            AnimatedVisibility(
+                                visible = !showAllPrayers,
+                                enter = expandVertically(
+                                    animationSpec = tween(
+                                        durationMillis = 520,
+                                        easing = FastOutSlowInEasing,
+                                    ),
+                                    expandFrom = Alignment.Top,
+                                ) + fadeIn(
+                                    animationSpec = tween(
+                                        durationMillis = 240,
+                                        delayMillis = 140,
+                                    ),
+                                ),
+                                exit = shrinkVertically(
+                                    animationSpec = tween(
+                                        durationMillis = 520,
+                                        easing = FastOutSlowInEasing,
+                                    ),
+                                    shrinkTowards = Alignment.Top,
+                                ) + fadeOut(
+                                    animationSpec = tween(durationMillis = 180),
+                                ),
+                            ) {
+                                Text(
+                                    text = "← Swipe left to adjust · Swipe right to reset →",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
                 }
 
                 // Spacer between info card and prayer tiles (reduced from 8dp to 6dp)
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Expandable prayer layout - smart default view with expand option
-                var showAllPrayers by remember { mutableStateOf(false) }
-
-                // Material 3 expressive tile height animation with spring physics.
-                // Expanded tiles compress a bit further (was 120dp) so the third
-                // row + Show Less button land just above the floating nav pill
-                // without the page having to scroll.
-                val tileHeight by animateDpAsState(
-                    // Collapsed tiles are a touch shorter (was 140) so the whole
-                    // collapsed dashboard fits one screen with the location card
-                    // clearing the floating nav bar — no scrolling needed. Expanded
-                    // The visible card needs ~110dp inside its 2dp vertical margins:
-                    // any less and the name row + Arabic line + 24sp time clip the
-                    // digits, any more and the third row pushes "Show Less" into the
-                    // floating nav pill. 114 outer − 4 margin = 110 card.
-                    targetValue = if (showAllPrayers) 114.dp else 134.dp,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow,
-                        visibilityThreshold = 0.1.dp
-                    ),
-                    label = "expressiveTileHeight"
-                )
-                
-                // Staggered animation progress for choreographed card entrances
-                val fajrAnimProgress by animateFloatAsState(
-                    targetValue = if (showAllPrayers) 1f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium,
-                        visibilityThreshold = 0.01f
-                    ),
-                    label = "fajrCardAnimation"
-                )
-                
-                val sunriseAnimProgress by animateFloatAsState(
-                    targetValue = if (showAllPrayers) 1f else 0f,
-                    animationSpec = tween(
-                        durationMillis = 600,
-                        delayMillis = 80,
-                        easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
-                    ),
-                    label = "sunriseCardAnimation"
-                )
+                // The tile height participates in the shared dashboard
+                // transition above, keeping every moving element synchronized.
                 
                 // Get next 6 prayers in circular chronological order
                 // All 6 items (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) are included
@@ -2193,42 +2196,29 @@ fun PrayerTimesScreen(
                 AnimatedVisibility(
                     visible = showAllPrayers,
                     enter = expandVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow,
-                            visibilityThreshold = IntSize.VisibilityThreshold
+                        animationSpec = tween(
+                            durationMillis = 520,
+                            easing = FastOutSlowInEasing,
                         ),
-                        expandFrom = Alignment.Top
+                        expandFrom = Alignment.Top,
                     ) + fadeIn(
                         animationSpec = tween(
-                            durationMillis = 400,
-                            delayMillis = 50,
-                            easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f) // Material motion emphasis
-                        )
+                            durationMillis = 260,
+                            delayMillis = 100,
+                        ),
                     ),
                     exit = shrinkVertically(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        shrinkTowards = Alignment.Top
-                    ) + fadeOut(
                         animationSpec = tween(
-                            durationMillis = 250,
-                            easing = CubicBezierEasing(0.4f, 0.0f, 1.0f, 1.0f) // Material motion standard
-                        )
-                    )
+                            durationMillis = 520,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        shrinkTowards = Alignment.Top,
+                    ) + fadeOut(
+                        animationSpec = tween(durationMillis = 180),
+                    ),
                 ) {
-                    // Material 3 expressive choreographed card entrance
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Fifth prayer with staggered entrance animation
@@ -2260,14 +2250,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(vertical = 2.dp)
-                                    .graphicsLayer {
-                                        // Material 3 expressive card entrance with bounce and scale
-                                        translationY = (1f - fajrAnimProgress) * 24f
-                                        scaleX = 0.85f + (fajrAnimProgress * 0.15f)
-                                        scaleY = 0.85f + (fajrAnimProgress * 0.15f)
-                                        alpha = fajrAnimProgress
-                                    },
+                                    .padding(vertical = 2.dp),
                                 onShowPopup = { prayerName ->
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName
@@ -2309,14 +2292,7 @@ fun PrayerTimesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(tileHeight)
-                                    .padding(vertical = 2.dp)
-                                    .graphicsLayer {
-                                        // Material 3 expressive card entrance with staggered timing
-                                        translationY = (1f - sunriseAnimProgress) * 32f
-                                        scaleX = 0.82f + (sunriseAnimProgress * 0.18f)
-                                        scaleY = 0.82f + (sunriseAnimProgress * 0.18f)
-                                        alpha = sunriseAnimProgress
-                                    },
+                                    .padding(vertical = 2.dp),
                                 onShowPopup = { prayerName ->
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName
@@ -2331,35 +2307,11 @@ fun PrayerTimesScreen(
                     }
                 }
 
-                // Material 3 expressive toggle button with smooth icon rotation and scale
-                val buttonIconRotation by animateFloatAsState(
-                    targetValue = if (showAllPrayers) 180f else 0f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    ),
-                    label = "iconRotation"
-                )
-                
-                val buttonContentScale by animateFloatAsState(
-                    targetValue = if (showAllPrayers) 1.05f else 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessHigh
-                    ),
-                    label = "buttonScale"
-                )
-                
+                // The toggle rotates on the same timeline as the layout.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 0.dp)
-                        .animateContentSize(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        ),
+                        .padding(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 0.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     TextButton(
@@ -2369,11 +2321,7 @@ fun PrayerTimesScreen(
                         },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = buttonContentScale
-                            scaleY = buttonContentScale
-                        }
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Default.ExpandMore, // Always use ExpandMore, rotation handles the direction
