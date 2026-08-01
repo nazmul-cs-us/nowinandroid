@@ -1924,9 +1924,9 @@ fun PrayerTimesScreen(
                     }
 
                     PrayerHeaderAction(
-                        icon = Icons.Outlined.Tune,
-                        label = if (revealedPrayerCard != null) "Done" else "Edit times",
-                        tint = MaterialTheme.colorScheme.primary,
+                        icon = if (revealedPrayerCard != null) Icons.Filled.Check else Icons.Outlined.Tune,
+                        label = if (revealedPrayerCard != null) "Done" else "Tune schedule",
+                        active = revealedPrayerCard != null,
                         onClick = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (revealedPrayerCard != null) {
@@ -2658,35 +2658,74 @@ fun PrayerTimesScreen(
 private fun PrayerHeaderAction(
     icon: ImageVector,
     label: String,
-    tint: Color,
+    active: Boolean,
     onClick: () -> Unit,
 ) {
+    val containerColor = if (active) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.primaryContainer
+    }
+    val contentColor = if (active) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    }
+    val iconContainerColor = if (active) {
+        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val iconColor = MaterialTheme.colorScheme.onPrimary
+
     Surface(
         modifier = Modifier
-            .heightIn(min = 40.dp),
+            .heightIn(min = 44.dp),
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-        contentColor = tint,
+        shape = RoundedCornerShape(50),
+        color = containerColor,
+        contentColor = contentColor,
+        tonalElevation = if (active) 0.dp else 1.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(
+                start = 6.dp,
+                end = if (active) 14.dp else 8.dp,
+                top = 6.dp,
+                bottom = 6.dp,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(16.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(iconContainerColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = tint,
+                color = contentColor,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
+            if (!active) {
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = contentColor.copy(alpha = 0.72f),
+                    modifier = Modifier.size(15.dp),
+                )
+            }
         }
     }
 }
