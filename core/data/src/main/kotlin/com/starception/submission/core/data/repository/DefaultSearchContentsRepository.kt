@@ -87,8 +87,8 @@ internal class DefaultSearchContentsRepository @Inject constructor(
         val ftsQuery = "$searchQuery*"
 
         // Use paginated approach with first page only for Flow-based search
-        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery)
-        val topicIds = topicFtsDao.searchAllTopics(ftsQuery)
+        val newsResourceIds = newsResourceFtsDao.searchAllNewsResources(ftsQuery, searchQuery)
+        val topicIds = topicFtsDao.searchAllTopics(ftsQuery, searchQuery)
 
         val newsResourcesFlow = newsResourceIds
             .mapLatest { ids ->
@@ -140,11 +140,11 @@ internal class DefaultSearchContentsRepository @Inject constructor(
 
         // Fetch paginated IDs from FTS tables
         val newsResourceIds = newsResourceFtsDao
-            .searchNewsResourcesPaginated(ftsQuery, pageSize, offset)
+            .searchNewsResourcesPaginated(ftsQuery, searchQuery, pageSize, offset)
             .mapNotNull { it.toIntOrNull() }
 
         val topicIds = topicFtsDao
-            .searchTopicsPaginated(ftsQuery, pageSize, offset)
+            .searchTopicsPaginated(ftsQuery, searchQuery, pageSize, offset)
             .mapNotNull { it.toIntOrNull() }
 
         // Fetch actual data from content database

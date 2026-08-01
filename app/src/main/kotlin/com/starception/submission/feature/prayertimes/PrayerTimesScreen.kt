@@ -76,13 +76,13 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -97,6 +97,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.animation.core.*
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -106,6 +108,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntSize
 import android.util.Log
@@ -343,6 +348,14 @@ fun PrayerTimesScreen(
 
     // SHARED STATE - Track which prayer card has swipe actions revealed (iOS-style)
     var revealedPrayerCard by remember { mutableStateOf<String?>(null) }
+    var prayerTimeEditMode by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(prayerTimeEditMode) {
+        if (!prayerTimeEditMode) {
+            revealedPrayerCard = null
+            currentEditingTile = null
+        }
+    }
 
     // Track tile editing state changes
     LaunchedEffect(currentEditingTile) {
@@ -1119,6 +1132,7 @@ fun PrayerTimesScreen(
             com.starception.submission.feature.prayertimes.components.SwipeToRevealCard(
                 prayerName = prayerName,
                 currentOffset = currentOffset,
+                gesturesEnabled = prayerTimeEditMode,
                 isRevealed = isRevealed,
                 onRevealChange = { revealed ->
                     if (revealed) {
@@ -1203,7 +1217,8 @@ fun PrayerTimesScreen(
                     tonalElevation = 0.dp,
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(prayerName, currentOffset) {
+                        .pointerInput(prayerName, currentOffset, prayerTimeEditMode) {
+                            if (!prayerTimeEditMode) return@pointerInput
                             detectTapGestures(
                                 onDoubleTap = {
                                     android.util.Log.d("PrayerCard", "👆👆 DOUBLE TAP detected on $prayerName card!")
@@ -1684,12 +1699,15 @@ fun PrayerTimesScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = getLocationWithCountryCode(location, prayerTimes?.location),
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        lineHeight = 22.sp,
+                                    ),
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     textAlign = TextAlign.Start,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         }
@@ -1924,17 +1942,15 @@ fun PrayerTimesScreen(
                     }
 
                     PrayerHeaderAction(
-                        icon = if (revealedPrayerCard != null) Icons.Filled.Check else Icons.Outlined.Tune,
-                        label = if (revealedPrayerCard != null) "Done" else "Tune schedule",
-                        active = revealedPrayerCard != null,
+                        active = prayerTimeEditMode,
                         onClick = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            if (revealedPrayerCard != null) {
+                            if (prayerTimeEditMode) {
                                 revealedPrayerCard = null
+                                currentEditingTile = null
+                                prayerTimeEditMode = false
                             } else {
-                                revealedPrayerCard =
-                                    PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes)?.first
-                                        ?: PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)?.first
+                                prayerTimeEditMode = true
                             }
                         },
                     )
@@ -2365,18 +2381,20 @@ fun PrayerTimesScreen(
                             style = if (containsArabic && arabicFontFamily != null) {
                                 MaterialTheme.typography.bodyLarge.copy(
                                     fontFamily = arabicFontFamily,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                                    lineHeight = 22.sp,
                                 )
                             } else {
                                 MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 22.sp,
                                 )
                             },
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             textAlign = TextAlign.Start,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -2656,74 +2674,106 @@ fun PrayerTimesScreen(
 
 @Composable
 private fun PrayerHeaderAction(
-    icon: ImageVector,
-    label: String,
     active: Boolean,
     onClick: () -> Unit,
 ) {
-    val containerColor = if (active) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.primaryContainer
-    }
-    val contentColor = if (active) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    }
-    val iconContainerColor = if (active) {
-        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
+    val containerColor by animateColorAsState(
+        targetValue = if (active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        },
+        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        label = "prayerActionContainer",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (active) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        },
+        animationSpec = tween(durationMillis = 220),
+        label = "prayerActionContent",
+    )
     val iconColor = MaterialTheme.colorScheme.onPrimary
+    val actionWidth by animateDpAsState(
+        targetValue = if (active) 96.dp else 148.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "prayerActionWidth",
+    )
 
     Surface(
         modifier = Modifier
-            .heightIn(min = 44.dp),
+            .width(actionWidth)
+            .height(44.dp),
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = containerColor,
         contentColor = contentColor,
         tonalElevation = if (active) 0.dp else 1.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(
-                start = 6.dp,
-                end = if (active) 14.dp else 8.dp,
-                top = 6.dp,
-                bottom = 6.dp,
-            ),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(iconContainerColor),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(17.dp),
-                )
+        AnimatedContent(
+            targetState = active,
+            transitionSpec = {
+                if (targetState) {
+                    (
+                        fadeIn(tween(durationMillis = 180, delayMillis = 40)) +
+                            slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 5 }
+                        ).togetherWith(
+                        fadeOut(tween(durationMillis = 120)) +
+                            slideOutVertically(tween(170)) { -it / 5 },
+                    )
+                } else {
+                    (
+                        fadeIn(tween(durationMillis = 180, delayMillis = 40)) +
+                            slideInVertically(tween(220, easing = FastOutSlowInEasing)) { -it / 5 }
+                        ).togetherWith(
+                        fadeOut(tween(durationMillis = 120)) +
+                            slideOutVertically(tween(170)) { it / 5 },
+                    )
+                }
+            },
+            contentAlignment = Alignment.Center,
+            label = "prayerActionState",
+        ) { isActive ->
+            val stateIcon = if (isActive) Icons.Filled.Check else Icons.Outlined.Tune
+            val stateLabel = if (isActive) "Done" else "Tune schedule"
+            val iconContainerColor = if (isActive) {
+                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)
+            } else {
+                MaterialTheme.colorScheme.primary
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = contentColor,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-            if (!active) {
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = contentColor.copy(alpha = 0.72f),
-                    modifier = Modifier.size(15.dp),
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(iconContainerColor),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = stateIcon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+                Text(
+                    text = stateLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
                 )
             }
         }
@@ -2765,6 +2815,16 @@ private fun getLocationWithCountryCode(
     val city = locationData.city.takeIf { it.isNotEmpty() }
     val country = locationData.country.takeIf { it.isNotEmpty() }
     val countryCode = locationData.countryCode.takeIf { it.isNotEmpty() }
+
+    // Keep area, city, and country in a single stable line. The UI truncates
+    // the end with an ellipsis when the full value is wider than its card.
+    val detailedArea = area ?: subLocality
+    if (detailedArea != null) {
+        val placeLine = listOfNotNull(city, country ?: countryCode)
+            .distinct()
+            .joinToString(", ")
+        return if (placeLine.isNotEmpty()) "$detailedArea · $placeLine" else detailedArea
+    }
 
     // PRIORITY 1: Area + City + Country + Country Code (most detailed)
     if (area != null && city != null && country != null && countryCode != null) {

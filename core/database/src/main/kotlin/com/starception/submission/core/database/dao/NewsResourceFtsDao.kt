@@ -31,8 +31,17 @@ interface NewsResourceFtsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(newsResources: List<NewsResourceFtsEntity>)
 
-    @Query("SELECT newsResourceId FROM newsResourcesFts WHERE newsResourcesFts MATCH :query")
-    fun searchAllNewsResources(query: String): Flow<List<String>>
+    @Query("""
+        SELECT newsResourceId FROM newsResourcesFts
+        WHERE newsResourcesFts MATCH :query
+        ORDER BY CASE
+            WHEN lower(title) = lower(:rawQuery) THEN 0
+            WHEN lower(title) LIKE lower(:rawQuery) || '%' THEN 1
+            WHEN lower(title) LIKE '%' || lower(:rawQuery) || '%' THEN 2
+            ELSE 3
+        END, length(title), rowid
+    """)
+    fun searchAllNewsResources(query: String, rawQuery: String): Flow<List<String>>
 
     /**
      * Paginated search for news resources.
@@ -43,9 +52,20 @@ interface NewsResourceFtsDao {
     @Query("""
         SELECT newsResourceId FROM newsResourcesFts
         WHERE newsResourcesFts MATCH :query
+        ORDER BY CASE
+            WHEN lower(title) = lower(:rawQuery) THEN 0
+            WHEN lower(title) LIKE lower(:rawQuery) || '%' THEN 1
+            WHEN lower(title) LIKE '%' || lower(:rawQuery) || '%' THEN 2
+            ELSE 3
+        END, length(title), rowid
         LIMIT :limit OFFSET :offset
     """)
-    suspend fun searchNewsResourcesPaginated(query: String, limit: Int, offset: Int): List<String>
+    suspend fun searchNewsResourcesPaginated(
+        query: String,
+        rawQuery: String,
+        limit: Int,
+        offset: Int,
+    ): List<String>
 
     /**
      * Get total count of search results for a query.

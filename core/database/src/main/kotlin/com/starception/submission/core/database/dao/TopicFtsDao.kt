@@ -31,8 +31,17 @@ interface TopicFtsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(topics: List<TopicFtsEntity>)
 
-    @Query("SELECT topicId FROM topicsFts WHERE topicsFts MATCH :query")
-    fun searchAllTopics(query: String): Flow<List<String>>
+    @Query("""
+        SELECT topicId FROM topicsFts
+        WHERE topicsFts MATCH :query
+        ORDER BY CASE
+            WHEN lower(name) = lower(:rawQuery) THEN 0
+            WHEN lower(name) LIKE lower(:rawQuery) || '%' THEN 1
+            WHEN lower(name) LIKE '%' || lower(:rawQuery) || '%' THEN 2
+            ELSE 3
+        END, length(name), rowid
+    """)
+    fun searchAllTopics(query: String, rawQuery: String): Flow<List<String>>
 
     /**
      * Paginated search for topics.
@@ -43,9 +52,20 @@ interface TopicFtsDao {
     @Query("""
         SELECT topicId FROM topicsFts
         WHERE topicsFts MATCH :query
+        ORDER BY CASE
+            WHEN lower(name) = lower(:rawQuery) THEN 0
+            WHEN lower(name) LIKE lower(:rawQuery) || '%' THEN 1
+            WHEN lower(name) LIKE '%' || lower(:rawQuery) || '%' THEN 2
+            ELSE 3
+        END, length(name), rowid
         LIMIT :limit OFFSET :offset
     """)
-    suspend fun searchTopicsPaginated(query: String, limit: Int, offset: Int): List<String>
+    suspend fun searchTopicsPaginated(
+        query: String,
+        rawQuery: String,
+        limit: Int,
+        offset: Int,
+    ): List<String>
 
     /**
      * Get total count of search results for a query.

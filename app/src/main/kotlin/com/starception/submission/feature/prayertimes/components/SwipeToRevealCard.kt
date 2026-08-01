@@ -78,6 +78,7 @@ import androidx.compose.ui.draw.shadow
  *
  * @param prayerName The name of the prayer (e.g., "Fajr", "Dhuhr")
  * @param currentOffset The current time offset in minutes
+ * @param gesturesEnabled Whether adjustment gestures are currently unlocked
  * @param isRevealed Whether this card's actions are currently revealed
  * @param onRevealChange Callback when the reveal state changes
  * @param onOffsetChange Callback when the offset is changed via +/- buttons
@@ -88,6 +89,7 @@ import androidx.compose.ui.draw.shadow
 fun SwipeToRevealCard(
     prayerName: String,
     currentOffset: Int,
+    gesturesEnabled: Boolean = true,
     isRevealed: Boolean,
     onRevealChange: (Boolean) -> Unit,
     onOffsetChange: (Int) -> Unit,
@@ -119,8 +121,8 @@ fun SwipeToRevealCard(
     val peekOffset = remember { Animatable(0f) }
 
     // Trigger peek animation once on first render (only for first card to avoid overwhelming)
-    LaunchedEffect(prayerName) {
-        if (!hasShownPeek && prayerName == "Fajr") {
+    LaunchedEffect(prayerName, gesturesEnabled) {
+        if (gesturesEnabled && !hasShownPeek && prayerName == "Fajr") {
             delay(1000) // Wait for UI to settle
             hasShownPeek = true
             // Peek left to show +/- buttons hint
@@ -163,6 +165,14 @@ fun SwipeToRevealCard(
         if (!isRevealed) {
             swipeOffset = 0f
             revealedSide = null
+        }
+    }
+
+    LaunchedEffect(gesturesEnabled) {
+        if (!gesturesEnabled) {
+            swipeOffset = 0f
+            revealedSide = null
+            if (isRevealed) onRevealChange(false)
         }
     }
 
@@ -463,7 +473,8 @@ fun SwipeToRevealCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(prayerName, isRevealed) {
+                    .pointerInput(prayerName, isRevealed, gesturesEnabled) {
+                    if (!gesturesEnabled) return@pointerInput
                     detectHorizontalDragGestures(
                         onDragStart = {
                             Log.d("SwipeToReveal", "🖐️ Drag started on $prayerName | isRevealed=$currentIsRevealed | revealedSide=$currentRevealedSide")
@@ -564,7 +575,7 @@ fun SwipeToRevealCard(
 
             // DYNAMIC ROTATING CHEVRON - rotates based on swipe progress
             // Right edge chevron: starts as < (swipe left), rotates to > (swipe right to close) as user swipes
-            run {
+            if (gesturesEnabled) run {
                 // Calculate rotation based on swipe progress (0 to 180 degrees)
                 // animatedOffset goes from 0 to -adjustRevealedWidthPx when swiping left
                 val swipeProgress = (-animatedOffset / adjustRevealedWidthPx).coerceIn(0f, 1f)
@@ -611,7 +622,7 @@ fun SwipeToRevealCard(
             }
 
             // Left edge chevron for Reset (only when swiping right or revealed)
-            if ((swipeOffset > 0 && !isRevealed) || (isRevealed && revealedSide == "reset")) {
+            if (gesturesEnabled && ((swipeOffset > 0 && !isRevealed) || (isRevealed && revealedSide == "reset"))) {
                 val resetSwipeProgress = if (isRevealed && revealedSide == "reset") {
                     1f
                 } else {

@@ -55,6 +55,9 @@ class InMemorySearchService @Inject constructor(
                     items = surahs,
                     fields = listOf(
                         IndexedField("nameEn", weight = 10.0) { it.nameEnglish },
+                        IndexedField("aliases", weight = 9.5) {
+                            SURAH_SEARCH_ALIASES[it.number].orEmpty()
+                        },
                         IndexedField("nameTr", weight = 8.0) { it.nameTranslation },
                         IndexedField("nameAr", weight = 8.0) { it.nameArabic },
                         IndexedField("number", weight = 6.0) { it.number.toString() },
@@ -150,4 +153,31 @@ data class InMemorySearchResult(
     val quranicDuas: List<RankedHit<QuranicDuaEntity>> = emptyList(),
     val verses: List<RankedHit<SuggestedVerse>> = emptyList(),
     val chapters: List<RankedHit<ChapterWithCount>> = emptyList(),
+)
+
+/**
+ * Carefully scoped conventional spellings that cannot always be inferred from
+ * character distance alone. They are indexed like names, so exact canonical
+ * names still receive the strongest field weight.
+ */
+private val SURAH_SEARCH_ALIASES = mapOf(
+    1 to "fatiha fateha fatihah",
+    2 to "baqara baqarah bakara bakarah",
+    3 to "imran imraan",
+    17 to "isra bani israel",
+    18 to "kahf kehf",
+    19 to "maryam mariam",
+    20 to "taha ta-ha ta ha",
+    36 to "yasin yaseen ya-sin ya sin",
+    55 to "rahman rehman ar-rahman",
+    56 to "waqiah waqia waqiyah",
+    67 to "mulk al-mulk",
+    93 to "duha dhuha zoha",
+    94 to "sharh inshirah",
+    106 to "quraysh quraish kuraish koreish",
+    107 to "maun maoon al-maun",
+    108 to "kawthar kauthar kausar",
+    112 to "ikhlas iklas",
+    113 to "falaq falak",
+    114 to "nas naas",
 )
