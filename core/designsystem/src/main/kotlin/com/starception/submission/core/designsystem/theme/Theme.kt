@@ -98,15 +98,22 @@ val DarkDefaultColorScheme = darkColorScheme(
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = DarkPurpleGray10,
+    background = Color(0xFF120E10),
     onBackground = DarkPurpleGray90,
-    surface = DarkPurpleGray10,
+    surface = Color(0xFF171214),
     onSurface = DarkPurpleGray90,
-    surfaceVariant = PurpleGray30,
+    surfaceVariant = Color(0xFF2B2329),
     onSurfaceVariant = PurpleGray80,
     inverseSurface = DarkPurpleGray90,
     inverseOnSurface = DarkPurpleGray10,
     outline = PurpleGray60,
+    outlineVariant = Color(0xFF443A41),
+    surfaceContainerLowest = Color(0xFF0D0A0B),
+    surfaceContainerLow = Color(0xFF1B1518),
+    surfaceContainer = Color(0xFF211A1E),
+    surfaceContainerHigh = Color(0xFF282026),
+    surfaceContainerHighest = Color(0xFF30272D),
+    scrim = Color.Black,
 )
 
 /**
@@ -167,15 +174,22 @@ val DarkAndroidColorScheme = darkColorScheme(
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = DarkGreenGray10,
+    background = Color(0xFF0C100D),
     onBackground = DarkGreenGray90,
-    surface = DarkGreenGray10,
+    surface = Color(0xFF111612),
     onSurface = DarkGreenGray90,
-    surfaceVariant = GreenGray30,
+    surfaceVariant = Color(0xFF202A22),
     onSurfaceVariant = GreenGray80,
     inverseSurface = DarkGreenGray90,
     inverseOnSurface = DarkGreenGray10,
     outline = GreenGray60,
+    outlineVariant = Color(0xFF354138),
+    surfaceContainerLowest = Color(0xFF070B08),
+    surfaceContainerLow = Color(0xFF151D17),
+    surfaceContainer = Color(0xFF19231B),
+    surfaceContainerHigh = Color(0xFF1F2921),
+    surfaceContainerHighest = Color(0xFF273229),
+    scrim = Color.Black,
 )
 
 /**
@@ -239,20 +253,24 @@ val DarkCoastalColorScheme = darkColorScheme(
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = Color(0xFF0F1410),
-    onBackground = Color(0xFFE3E8E3),
-    surface = Color(0xFF0F1410),
-    onSurface = Color(0xFFE3E8E3),
-    surfaceVariant = Color(0xFF1A201B),
-    onSurfaceVariant = Color(0xFFB8C3AC),
-    inverseSurface = Color(0xFFE3E8E3),
-    inverseOnSurface = Color(0xFF0F1410),
-    outline = ForestGreen30,
-    surfaceContainerLowest = Color(0xFF080B09),
-    surfaceContainerLow = Color(0xFF111613),
-    surfaceContainer = Color(0xFF161B17),
-    surfaceContainerHigh = Color(0xFF1B201C),
-    surfaceContainerHighest = Color(0xFF222621),
+    // A deep green-black canvas keeps the Coastal identity without crushing
+    // cards and controls into one flat near-black layer.
+    background = Color(0xFF0A0F0C),
+    onBackground = Color(0xFFF0F5F0),
+    surface = Color(0xFF0F1612),
+    onSurface = Color(0xFFF0F5F0),
+    surfaceVariant = Color(0xFF202A23),
+    onSurfaceVariant = Color(0xFFC3CEC2),
+    inverseSurface = Color(0xFFE7ECE7),
+    inverseOnSurface = Color(0xFF111713),
+    outline = Color(0xFF7A887C),
+    outlineVariant = Color(0xFF354139),
+    surfaceContainerLowest = Color(0xFF070B08),
+    surfaceContainerLow = Color(0xFF151E18),
+    surfaceContainer = Color(0xFF19231C),
+    surfaceContainerHigh = Color(0xFF1E2921),
+    surfaceContainerHighest = Color(0xFF263329),
+    scrim = Color.Black,
 )
 
 /**
@@ -322,6 +340,13 @@ val DarkRoyalColorScheme = darkColorScheme(
     inverseSurface = Lapis90,
     inverseOnSurface = Lapis10,
     outline = WarmGold80,
+    outlineVariant = Color(0xFF3A424F),
+    surfaceContainerLowest = Color(0xFF080A0E),
+    surfaceContainerLow = Color(0xFF151922),
+    surfaceContainer = Color(0xFF1A1F29),
+    surfaceContainerHigh = Color(0xFF202733),
+    surfaceContainerHighest = Color(0xFF28313D),
+    scrim = Color.Black,
 )
 
 /** Royal gradient + background — light */
@@ -340,7 +365,7 @@ val LightAndroidGradientColors = GradientColors(container = DarkGreenGray95)
 /**
  * Dark Android gradient colors
  */
-val DarkAndroidGradientColors = GradientColors(container = Color.Black)
+val DarkAndroidGradientColors = GradientColors(container = Color(0xFF0C100D))
 
 /**
  * Light Android background theme
@@ -350,7 +375,7 @@ val LightAndroidBackgroundTheme = BackgroundTheme(color = DarkGreenGray95)
 /**
  * Dark Android background theme
  */
-val DarkAndroidBackgroundTheme = BackgroundTheme(color = Color.Black)
+val DarkAndroidBackgroundTheme = BackgroundTheme(color = Color(0xFF0C100D))
 
 /**
  * Light Elegant gradient colors
@@ -360,7 +385,7 @@ val LightCoastalGradientColors = GradientColors(container = Color(0xFFF8F9F7))
 /**
  * Dark Elegant gradient colors
  */
-val DarkCoastalGradientColors = GradientColors(container = Color(0xFF0F130E))
+val DarkCoastalGradientColors = GradientColors(container = Color(0xFF0A0F0C))
 
 /**
  * Light Elegant background theme
@@ -370,7 +395,7 @@ val LightCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFFFBFCF9))
 /**
  * Dark Elegant background theme
  */
-val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0F130E))
+val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0A0F0C))
 
 /**
  * Now in Android theme with support for multiple theme brands.
@@ -509,13 +534,22 @@ internal fun colorSchemeFromSeeds(
             onTertiary = hsl(tertiaryHue, 0.30f, 0.20f),
             tertiaryContainer = hsl(tertiaryHue, 0.30f, 0.30f),
             onTertiaryContainer = hsl(tertiaryHue, 0.30f, 0.90f),
-            background = hsl(primaryHue, 0.06f, 0.10f),
-            onBackground = hsl(primaryHue, 0.04f, 0.92f),
-            surface = hsl(primaryHue, 0.06f, 0.10f),
-            onSurface = hsl(primaryHue, 0.04f, 0.92f),
-            surfaceVariant = hsl(primaryHue, 0.08f, 0.20f),
-            onSurfaceVariant = hsl(primaryHue, 0.06f, 0.78f),
+            background = hsl(primaryHue, 0.06f, 0.065f),
+            onBackground = hsl(primaryHue, 0.04f, 0.94f),
+            surface = hsl(primaryHue, 0.06f, 0.09f),
+            onSurface = hsl(primaryHue, 0.04f, 0.94f),
+            surfaceVariant = hsl(primaryHue, 0.08f, 0.18f),
+            onSurfaceVariant = hsl(primaryHue, 0.06f, 0.80f),
+            inverseSurface = hsl(primaryHue, 0.04f, 0.90f),
+            inverseOnSurface = hsl(primaryHue, 0.06f, 0.12f),
             outline = hsl(primaryHue, 0.06f, 0.55f),
+            outlineVariant = hsl(primaryHue, 0.08f, 0.25f),
+            surfaceContainerLowest = hsl(primaryHue, 0.05f, 0.045f),
+            surfaceContainerLow = hsl(primaryHue, 0.07f, 0.12f),
+            surfaceContainer = hsl(primaryHue, 0.07f, 0.14f),
+            surfaceContainerHigh = hsl(primaryHue, 0.07f, 0.165f),
+            surfaceContainerHighest = hsl(primaryHue, 0.07f, 0.195f),
+            scrim = Color.Black,
         )
     } else {
         lightColorScheme(

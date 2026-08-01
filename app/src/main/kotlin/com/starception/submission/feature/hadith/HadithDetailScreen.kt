@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -62,20 +63,18 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -110,6 +109,7 @@ import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.feature.course.CourseCompletionBadgeCompact
@@ -279,7 +279,7 @@ fun HadithDetailScreen(
     var isTranslating by remember { mutableStateOf(false) }
     var selectedLanguage by remember { mutableStateOf(translationService.getSelectedLanguage()) }
     var selectedProvider by remember { mutableStateOf(translationService.getSelectedProvider()) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showTranslationSheet by remember { mutableStateOf(false) }
 
     // Available translations
     val availableTranslations = listOf("en", "ar", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur")
@@ -881,7 +881,7 @@ fun HadithDetailScreen(
                                 translatedElaboration = if (num == hadithNumber) translatedElaboration else null,
                                 isTranslating = if (num == hadithNumber) isTranslating else false,
                                 selectedLanguage = selectedLanguage,
-                                onLanguageClick = { showLanguageDialog = true },
+                                onLanguageClick = { showTranslationSheet = true },
                                 onMoreClick = { showVoiceSheet = true },
                                 isLandscape = isLandscape,
                                 isPlaying = if (num == hadithNumber) isPlaying else false,
@@ -896,122 +896,29 @@ fun HadithDetailScreen(
         }
     }
 
-    // Language selection dialog
-    if (showLanguageDialog) {
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text("Translation Settings") },
-            text = {
-                LazyColumn(
-                    modifier = Modifier.heightIn(max = 450.dp)
-                ) {
-                    // Provider section
-                    item {
-                        Text(
-                            text = "Translation Provider",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                    items(availableProviders) { (providerCode, providerName) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedProvider = providerCode
-                                    translationService.setSelectedProvider(providerCode)
-                                    // Clear cache to force re-translation with new provider
-                                    translationService.clearCache()
-                                    translatedText = null
-                                    translatedElaboration = null
-                                }
-                                .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = providerCode == selectedProvider,
-                                onClick = {
-                                    selectedProvider = providerCode
-                                    translationService.setSelectedProvider(providerCode)
-                                    translationService.clearCache()
-                                    translatedText = null
-                                    translatedElaboration = null
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = providerName,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-
-                    // Divider
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // Language section
-                    item {
-                        Text(
-                            text = "Target Language",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                    items(availableTranslations) { langCode ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (langCode != selectedLanguage) {
-                                        translationService.clearCache()
-                                        translatedText = null
-                                        translatedElaboration = null
-                                        selectedLanguage = langCode
-                                        translationService.setSelectedLanguage(langCode)
-                                    }
-                                    showLanguageDialog = false
-                                }
-                                .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = langCode == selectedLanguage,
-                                onClick = {
-                                    if (langCode != selectedLanguage) {
-                                        translationService.clearCache()
-                                        translatedText = null
-                                        translatedElaboration = null
-                                        selectedLanguage = langCode
-                                        translationService.setSelectedLanguage(langCode)
-                                    }
-                                    showLanguageDialog = false
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = getLanguageName(langCode),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+    if (showTranslationSheet) {
+        TranslationSettingsSheet(
+            selectedProvider = selectedProvider,
+            selectedLanguage = selectedLanguage,
+            availableProviders = availableProviders,
+            availableTranslations = availableTranslations,
+            onProviderSelected = { providerCode ->
+                selectedProvider = providerCode
+                translationService.setSelectedProvider(providerCode)
+                translationService.clearCache()
+                translatedText = null
+                translatedElaboration = null
+            },
+            onLanguageSelected = { languageCode ->
+                if (languageCode != selectedLanguage) {
+                    translationService.clearCache()
+                    translatedText = null
+                    translatedElaboration = null
+                    selectedLanguage = languageCode
+                    translationService.setSelectedLanguage(languageCode)
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text("Done")
-                }
-            }
+            onDismiss = { showTranslationSheet = false },
         )
     }
 
@@ -2648,22 +2555,15 @@ private fun VoiceSelectionSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
+        shape = NiaBottomSheetDefaults.FloatingShape,
         containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
         scrimColor = NiaBottomSheetDefaults.scrimColor(),
         tonalElevation = 0.dp,
         dragHandle = null,
     ) {
         NiaBottomSheetTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-        ) {
-            Surface(
-                color = NiaBottomSheetDefaults.containerColor(),
-                shape = NiaBottomSheetDefaults.FloatingShape,
-                tonalElevation = 0.dp,
-            ) {
+            NiaBottomSheetFrame {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2784,7 +2684,6 @@ private fun VoiceSelectionSheet(
                 }
             }
         }
-        }
     }
 }
 
@@ -2805,6 +2704,338 @@ private fun isTtsVoiceModelAvailable(context: android.content.Context, voice: Tt
         context.assets.open("tts/$modelFile").use { it.available() > 0 }
     } catch (e: Exception) {
         false
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TranslationSettingsSheet(
+    selectedProvider: String,
+    selectedLanguage: String,
+    availableProviders: List<Pair<String, String>>,
+    availableTranslations: List<String>,
+    onProviderSelected: (String) -> Unit,
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
+    ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 650.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = 12.dp,
+                        bottom = 20.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        CircleShape,
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Translation settings",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "Personalize how you read this hadith",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "TRANSLATION SERVICE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+
+                    items(
+                        items = availableProviders,
+                        key = { (providerCode, _) -> providerCode },
+                    ) { (providerCode, providerName) ->
+                        TranslationProviderCard(
+                            providerCode = providerCode,
+                            providerName = providerName,
+                            selected = providerCode == selectedProvider,
+                            onClick = { onProviderSelected(providerCode) },
+                        )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "TRANSLATE TO",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+
+                    items(
+                        items = availableTranslations.chunked(2),
+                        key = { languages -> languages.joinToString(separator = "-") },
+                    ) { languages ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            languages.forEach { languageCode ->
+                                TranslationLanguageCard(
+                                    languageCode = languageCode,
+                                    selected = languageCode == selectedLanguage,
+                                    onClick = { onLanguageSelected(languageCode) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (languages.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Your selection is saved automatically and refreshes the current translation.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(18.dp),
+                        ) {
+                            Text(
+                                text = "Done",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TranslationProviderCard(
+    providerCode: String,
+    providerName: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val title = when (providerCode) {
+        "auto" -> "Automatic"
+        else -> providerName
+    }
+    val description = when (providerCode) {
+        "auto" -> "Reverso first, with Google as fallback"
+        "google" -> "Reliable coverage across all available languages"
+        "reverso" -> "Natural phrasing when a translation is available"
+        else -> "Translation service"
+    }
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        border = if (selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+        } else {
+            null
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Translate,
+                    contentDescription = null,
+                    tint = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TranslationLanguageCard(
+    languageCode: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        border = if (selected) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f))
+        } else {
+            null
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = languageCode.uppercase(Locale.ROOT),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onSecondary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = getLanguageName(languageCode),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 

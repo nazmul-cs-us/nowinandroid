@@ -25,12 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 
 /**
- * Shared treatment for modal sheets. The light palette is adapted from Nixtio's
- * HR & Hiring Platform concept so sheets feel like warm, layered editorial cards
- * instead of unrelated Material surfaces. Dark mode keeps the selected app theme.
+ * Shared treatment for modal sheets. Colors come from the active app theme so
+ * sheets follow light/dark mode and the user's selected palette automatically.
  */
 object NiaBottomSheetDefaults {
     val FloatingShape = RoundedCornerShape(32.dp)
@@ -52,45 +50,16 @@ object NiaBottomSheetDefaults {
     val PanelMuted = Color(0xFFB8B7B3)
 
     @Composable
-    fun colorScheme(): ColorScheme {
-        val current = MaterialTheme.colorScheme
-        return current.copy(
-            primary = Gold,
-            onPrimary = Ink,
-            primaryContainer = WarmCard,
-            onPrimaryContainer = Ink,
-            secondary = Blue,
-            onSecondary = Color.White,
-            secondaryContainer = Color(0xFF3A4B5B),
-            onSecondaryContainer = PanelText,
-            tertiary = Rust,
-            onTertiary = Color.White,
-            tertiaryContainer = Color(0xFF583C33),
-            onTertiaryContainer = PanelText,
-            background = Panel,
-            onBackground = PanelText,
-            surface = Panel,
-            onSurface = PanelText,
-            surfaceVariant = PanelHigh,
-            onSurfaceVariant = PanelMuted,
-            outline = PanelMuted,
-            outlineVariant = PanelHighest,
-            surfaceContainerLowest = Color(0xFF252525),
-            surfaceContainerLow = PanelLow,
-            surfaceContainer = Panel,
-            surfaceContainerHigh = PanelHigh,
-            surfaceContainerHighest = PanelHighest,
-        )
-    }
+    fun colorScheme(): ColorScheme = MaterialTheme.colorScheme
 
     @Composable
-    fun containerColor(): Color = colorScheme().surface
+    fun containerColor(): Color = colorScheme().surfaceContainer
 
     @Composable
     fun contentColor(): Color = colorScheme().onSurface
 
     @Composable
-    fun scrimColor(): Color = Slate.copy(alpha = 0.62f)
+    fun scrimColor(): Color = colorScheme().scrim.copy(alpha = 0.48f)
 }
 
 /** Applies the sheet-specific palette to every component inside a modal sheet. */
@@ -105,9 +74,9 @@ fun NiaBottomSheetTheme(content: @Composable () -> Unit) {
 }
 
 /**
- * Floating charcoal sheet body used by the Nixtio reference. The transparent
- * Material modal only supplies motion and gestures; this surface supplies the
- * visible silhouette, including side and bottom breathing room.
+ * Floating sheet body. The transparent Material modal supplies motion and
+ * gestures; this theme-aware surface supplies the visible silhouette and the
+ * side/bottom breathing room.
  */
 @Composable
 fun NiaBottomSheetFrame(
@@ -119,8 +88,8 @@ fun NiaBottomSheetFrame(
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 8.dp),
         shape = NiaBottomSheetDefaults.FloatingShape,
-        color = NiaBottomSheetDefaults.Panel,
-        contentColor = NiaBottomSheetDefaults.PanelText,
+        color = NiaBottomSheetDefaults.containerColor(),
+        contentColor = NiaBottomSheetDefaults.contentColor(),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
         content = content,
@@ -136,11 +105,7 @@ fun NiaBottomSheetDragHandle(modifier: Modifier = Modifier) {
             .height(5.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(
-                if (LocalDarkTheme.current) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
-                } else {
-                    NiaBottomSheetDefaults.Slate.copy(alpha = 0.55f)
-                },
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
             ),
     )
 }

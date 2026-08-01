@@ -130,6 +130,7 @@ import com.starception.submission.core.designsystem.component.NiaNavigationSuite
 import com.starception.submission.core.designsystem.component.NiaTopAppBar
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.GradientColors
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import com.starception.submission.navigation.NiaNavHost
@@ -288,9 +289,14 @@ internal fun NiaAppContent(
     // Status bar visibility: show on parent tabs, hide on detail screens and Settings
     val view = LocalView.current
     val shouldHideStatusBar = appState.shouldHideStatusBar
-    DisposableEffect(shouldHideStatusBar) {
+    val isDarkTheme = LocalDarkTheme.current
+    DisposableEffect(shouldHideStatusBar, isDarkTheme) {
         val window = (view.context as? Activity)?.window ?: return@DisposableEffect onDispose {}
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        // The app theme can differ from the device theme, so edge-to-edge cannot
+        // rely on enableEdgeToEdge's one-time system setting for icon contrast.
+        insetsController.isAppearanceLightStatusBars = !isDarkTheme
+        insetsController.isAppearanceLightNavigationBars = !isDarkTheme
         if (shouldHideStatusBar) {
             // Detail screens and Settings: hide status bar (immersive)
             insetsController.hide(WindowInsetsCompat.Type.statusBars())

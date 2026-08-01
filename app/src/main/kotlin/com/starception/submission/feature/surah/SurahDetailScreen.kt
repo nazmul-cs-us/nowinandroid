@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.window.Dialog
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
@@ -2900,42 +2901,18 @@ private fun AlbumPlayerContent(
                 existingNotes = emptyList()
             },
             sheetState = sheetState,
+            shape = NiaBottomSheetDefaults.FloatingShape,
             containerColor = Color.Transparent,
+            contentColor = NiaBottomSheetDefaults.contentColor(),
             scrimColor = NiaBottomSheetDefaults.scrimColor(),
             tonalElevation = 0.dp,
-            dragHandle = null
+            dragHandle = null,
         ) {
             NiaBottomSheetTheme {
-            // Wrap everything in a Box with padding to create margins from screen edges
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
-            ) {
-                Surface(
-                    color = NiaBottomSheetDefaults.containerColor(),
-                    shape = NiaBottomSheetDefaults.FloatingShape,
-                    tonalElevation = 0.dp
-                ) {
+                NiaBottomSheetFrame {
                     Column(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        // Drag handle inside the surface
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .width(40.dp)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-
                         // Content with padding - switches between menu, notes, tafseer, wordstudy modes
                         Column(
                             modifier = Modifier
@@ -3206,7 +3183,6 @@ private fun AlbumPlayerContent(
                         }
                     }
                 }
-            }
             }
         }
 

@@ -1598,41 +1598,19 @@ private fun CourseProgressRow(
 @Composable
 private fun CourseEditorialHeader() {
     val isDarkTheme = LocalDarkTheme.current
-    val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onBackground else CourseInk
 
-    Row(
+    Text(
+        text = "Small lessons. Meaningful progress.",
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                text = "Courses",
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontSize = 43.sp,
-                    lineHeight = 47.sp,
-                    letterSpacing = (-0.8).sp,
-                ),
-                fontWeight = FontWeight.Normal,
-                color = titleColor,
-            )
-            Text(
-                text = "Small lessons. Meaningful progress.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isDarkTheme) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    CourseSlate
-                },
-            )
-        }
-
-    }
+            .padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 10.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (isDarkTheme) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            CourseSlate
+        },
+    )
 }
 
 @Composable

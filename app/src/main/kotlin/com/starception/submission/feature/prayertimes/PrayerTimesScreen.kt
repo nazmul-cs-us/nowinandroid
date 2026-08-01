@@ -82,6 +82,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1897,76 +1898,47 @@ fun PrayerTimesScreen(
                 )
                 }
 
-                // Spacer between swipeable tiles and adjust prayer times info card
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Instruction banner for prayer time adjustment
-                Card(
+                // Treat adjustment guidance as part of the prayer section
+                // header instead of a separate dashboard banner.
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(20.dp)
+                        Text(
+                            text = "Prayer times",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.SemiBold,
                         )
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "Adjust Prayer Times",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            AnimatedVisibility(
-                                visible = !showAllPrayers,
-                                enter = expandVertically(
-                                    animationSpec = tween(
-                                        durationMillis = 520,
-                                        easing = FastOutSlowInEasing,
-                                    ),
-                                    expandFrom = Alignment.Top,
-                                ) + fadeIn(
-                                    animationSpec = tween(
-                                        durationMillis = 240,
-                                        delayMillis = 140,
-                                    ),
-                                ),
-                                exit = shrinkVertically(
-                                    animationSpec = tween(
-                                        durationMillis = 520,
-                                        easing = FastOutSlowInEasing,
-                                    ),
-                                    shrinkTowards = Alignment.Top,
-                                ) + fadeOut(
-                                    animationSpec = tween(durationMillis = 180),
-                                ),
-                            ) {
-                                Text(
-                                    text = "← Swipe left to adjust · Swipe right to reset →",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                                )
-                            }
-                        }
+                        Text(
+                            text = "Today’s schedule",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                }
 
-                // Spacer between info card and prayer tiles (reduced from 8dp to 6dp)
-                Spacer(modifier = Modifier.height(4.dp))
+                    PrayerHeaderAction(
+                        icon = Icons.Outlined.Tune,
+                        label = if (revealedPrayerCard != null) "Done" else "Edit times",
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (revealedPrayerCard != null) {
+                                revealedPrayerCard = null
+                            } else {
+                                revealedPrayerCard =
+                                    PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes)?.first
+                                        ?: PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)?.first
+                            }
+                        },
+                    )
+                }
 
                 // Expandable prayer layout - smart default view with expand option
                 // The tile height participates in the shared dashboard
@@ -2682,6 +2654,43 @@ fun PrayerTimesScreen(
     } // Close outer Box
 }
 
+@Composable
+private fun PrayerHeaderAction(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .heightIn(min = 40.dp),
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        contentColor = tint,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = tint,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 /**
  * Helper function to get location text with smart priority based on available space
  *
@@ -2706,7 +2715,10 @@ private fun getLocationWithCountryCode(
         return locationString.ifBlank { "Loading location..." }
     }
 
-    val maxLength = 60  // Increased limit to fit full location with country name
+    // This label is rendered on one line beside the location icon. Keep the
+    // formatter honest about the available width so it chooses the compact
+    // area/city/country-code form before Compose has to add an ellipsis.
+    val maxLength = 35
 
     // Extract available fields
     val area = locationData.area.takeIf { it.isNotEmpty() }
@@ -2723,6 +2735,22 @@ private fun getLocationWithCountryCode(
             return format1
         }
         android.util.Log.d("LocationDisplay", "   ❌ P1 too long: $format1 (${format1.length} chars)")
+    }
+
+    // Keep the country visible when the detailed address is too long. This
+    // gives the location tile a useful, stable identity instead of reducing it
+    // to a city or two-letter country code.
+    if (city != null && country != null) {
+        val cityAndCountry = "$city, $country"
+        if (cityAndCountry.length <= maxLength) {
+            android.util.Log.i("LocationDisplay", "   ✅ City + country: '$cityAndCountry'")
+            return cityAndCountry
+        }
+    }
+
+    if (country != null) {
+        android.util.Log.i("LocationDisplay", "   ✅ Country: '$country'")
+        return country
     }
 
     // PRIORITY 2: Area + City + Country Code (without full country name)

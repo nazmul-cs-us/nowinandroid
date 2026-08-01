@@ -1130,8 +1130,24 @@ fun SwipeableBigTiles(
             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
         )
     }
-    val (completedPrayers, totalPrayers) = getPrayerProgress()
-    val prayedCount = getPrayed().coerceAtLeast(completedPrayers)
+    val (_, totalPrayers) = getPrayerProgress()
+    val prayedCount = getPrayed().coerceIn(0, totalPrayers)
+    val prayerRecap = remember(prayedCount, currentTime) {
+        listOf(
+            "Fajr" to "F",
+            "Dhuhr" to "D",
+            "Asr" to "A",
+            "Maghrib" to "M",
+            "Isha" to "I",
+        ).map { (name, initial) ->
+            PrayerRecapIndicator(
+                name = name,
+                initial = initial,
+                isPrayed = com.starception.submission.util.PrayerTracker
+                    .isPrayerMarkedToday(name),
+            )
+        }
+    }
     val compact = compactForExpandedPrayers && !isLandscape
     val compactTransition = updateTransition(
         targetState = compact,
@@ -1145,7 +1161,9 @@ fun SwipeableBigTiles(
     ) { isCompact ->
         if (isCompact) 1f else 0f
     }
-    val stripHeight = (300f - (130f * compactProgress)).dp
+    // Keep the portrait dashboard compact enough that the location card clears
+    // the floating navigation at rest. The compact state remains 170dp.
+    val stripHeight = (288f - (118f * compactProgress)).dp
     val headerFontSize = (20f - (4f * compactProgress)).sp
     val headerLineHeight = (24f - (4f * compactProgress)).sp
     val headerBottomPadding = (10f - (4f * compactProgress)).dp
@@ -1160,7 +1178,7 @@ fun SwipeableBigTiles(
                 lineHeight = headerLineHeight,
                 letterSpacing = (-0.25).sp,
             ),
-            color = Color(0xFF292524),
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = headerBottomPadding),
         )
@@ -1220,6 +1238,7 @@ fun SwipeableBigTiles(
                         title = "$prayedCount of $totalPrayers prayers completed today",
                         backgroundPainterRes = R.drawable.insight_prayer,
                         compactProgress = compactProgress,
+                        prayerRecap = prayerRecap,
                     )
 
                     2 -> InsightPreviewCard(
@@ -1258,6 +1277,12 @@ fun SwipeableBigTiles(
         }
     }
 }
+
+private data class PrayerRecapIndicator(
+    val name: String,
+    val initial: String,
+    val isPrayed: Boolean,
+)
 
 /**
  * A continuous-corner rectangle similar to the softly squared silhouette in
@@ -1323,9 +1348,12 @@ private fun InsightPreviewCard(
     compactProgress: Float,
     supportingText: String? = null,
     footerText: String? = null,
+    prayerRecap: List<PrayerRecapIndicator> = emptyList(),
     onClick: (() -> Unit)? = null,
 ) {
-    val hasPrayerContext = !supportingText.isNullOrBlank() || !footerText.isNullOrBlank()
+    val hasPrayerContext = !supportingText.isNullOrBlank() ||
+        !footerText.isNullOrBlank() ||
+        prayerRecap.isNotEmpty()
     val cornerExtent = (26f - (8f * compactProgress)).dp
     val shape = ContinuousCornerShape(cornerExtent)
     val shadowElevation = (6f - (2f * compactProgress)).dp
@@ -1339,6 +1367,10 @@ private fun InsightPreviewCard(
                 ambientColor = Color.Black.copy(alpha = 0.08f),
                 spotColor = Color.Black.copy(alpha = 0.12f),
             )
+            // The clickable indication belongs inside the same squircle as the
+            // image. Without this clip, a long press reveals a rectangular
+            // ripple around the rounded card.
+            .clip(shape)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(onClick = onClick)
@@ -1362,6 +1394,9 @@ private fun InsightPreviewCard(
             val supportingLineHeight = (17f - (4f * compactProgress)).sp
             val footerFontSize = (12f - (3f * compactProgress)).sp
             val footerLineHeight = (16f - (4f * compactProgress)).sp
+            val recapIndicatorSize = (24f - (7f * compactProgress)).dp
+            val recapIndicatorSpacing = (5f - (2f * compactProgress)).dp
+            val recapFontSize = (11f - (3f * compactProgress)).sp
 
             Image(
                 painter = painterResource(backgroundPainterRes),
@@ -1401,7 +1436,7 @@ private fun InsightPreviewCard(
                         fontSize = labelFontSize,
                         letterSpacing = 0.sp,
                     ),
-                    color = Color(0xFF332F2D),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
@@ -1418,6 +1453,56 @@ private fun InsightPreviewCard(
                     ),
                 verticalArrangement = Arrangement.spacedBy(contentSpacing),
             ) {
+                if (prayerRecap.isNotEmpty()) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(recapIndicatorSpacing),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        prayerRecap.forEach { prayer ->
+                            Box(
+                                modifier = Modifier
+                                    .size(recapIndicatorSize)
+                                    .background(
+                                        color = if (prayer.isPrayed) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            Color.Black.copy(alpha = 0.28f)
+                                        },
+                                        shape = CircleShape,
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (prayer.isPrayed) {
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                        } else {
+                                            Color.White.copy(alpha = 0.48f)
+                                        },
+                                        shape = CircleShape,
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = prayer.initial,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = recapFontSize,
+                                        lineHeight = recapFontSize,
+                                        platformStyle = PlatformTextStyle(
+                                            includeFontPadding = false,
+                                        ),
+                                    ),
+                                    color = if (prayer.isPrayed) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        Color.White.copy(alpha = 0.78f)
+                                    },
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(

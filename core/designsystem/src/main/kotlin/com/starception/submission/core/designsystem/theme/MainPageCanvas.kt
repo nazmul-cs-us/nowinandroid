@@ -28,7 +28,8 @@ fun mainPageBackgroundBrush(): Brush {
         colors = if (LocalDarkTheme.current) {
             listOf(
                 scheme.background,
-                scheme.surfaceContainer,
+                scheme.surface,
+                scheme.primary.copy(alpha = 0.05f).compositeOver(scheme.surface),
                 scheme.background,
             )
         } else {
