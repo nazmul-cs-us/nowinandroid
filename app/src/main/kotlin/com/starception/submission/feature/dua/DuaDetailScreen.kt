@@ -2,7 +2,6 @@ package com.starception.submission.feature.dua
 
 import android.content.Context
 import androidx.activity.BackEventCompat
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
@@ -23,16 +22,13 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.clickable
@@ -93,7 +89,6 @@ import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
@@ -130,6 +125,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -137,6 +133,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -149,11 +146,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.zIndex
@@ -197,6 +190,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import java.util.Locale
 import com.starception.submission.core.topicsdatabase.Topic
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
@@ -2349,143 +2345,47 @@ fun DuaDetailScreen(
                 }
             }
 
-            // Reading settings — bottom sheet with a live preview strip. No scrim:
-            // the dua text stays visible above the sheet, and the preview row
-            // re-renders the actual Arabic as the font and size change.
-            AnimatedVisibility(
-                visible = showFloatingToolbar,
-                enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
-                exit = fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)),
-                modifier = Modifier.zIndex(10f),
-            ) {
-                // Tap-outside-to-dismiss layer with a light dim, so the sheet reads
-                // as focused while the page behind stays visible for live preview.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.30f))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
-                        ) { showFloatingToolbar = false }
-                )
-            }
-            AnimatedVisibility(
-                visible = showFloatingToolbar,
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                ) + fadeIn(animationSpec = tween(200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-                ) + fadeOut(animationSpec = tween(180)),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .zIndex(10f),
-            ) {
+            // Reading settings uses the same floating, theme-aware modal frame as
+            // Course and Hadith sheets. The system modal owns motion, scrim, back,
+            // and swipe dismissal; the visible frame intentionally has no handle
+            // or close icon.
+            if (showFloatingToolbar) {
                 val haptics = LocalHapticFeedback.current
-                BackHandler { showFloatingToolbar = false }
                 // Which inline picker is expanded: "font", "language", or null.
                 var expandedSection by remember { mutableStateOf<String?>(null) }
-                // Sheet follows the finger while dragging the handle down; past a
-                // threshold the drag dismisses the sheet.
-                var sheetDragOffset by remember { mutableStateOf(0f) }
-                // The content Column is scrollable, so raw drag events never reach a
-                // parent gesture detector — the scroll gesture claims them. Instead we
-                // join the nested-scroll chain: downward drag the content can't consume
-                // pulls the sheet; release past the threshold dismisses it.
-                val sheetDismissConnection = remember {
-                    object : NestedScrollConnection {
-                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                            if (available.y < 0f && sheetDragOffset > 0f) {
-                                val consumed = kotlin.math.max(available.y, -sheetDragOffset)
-                                sheetDragOffset += consumed
-                                return Offset(0f, consumed)
-                            }
-                            return Offset.Zero
-                        }
-                        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                            // Sheet follows the finger for the whole drag; the dismiss
-                            // decision happens on release (onPreFling) so nothing pops
-                            // out from under the finger.
-                            if (available.y > 0f) {
-                                sheetDragOffset += available.y
-                                return Offset(0f, available.y)
-                            }
-                            return Offset.Zero
-                        }
-                        override suspend fun onPreFling(available: Velocity): Velocity {
-                            val offset = sheetDragOffset
-                            if (offset > 150f) {
-                                // Keep the offset — the exit animation continues the slide
-                                // from where the finger released instead of jumping back up.
-                                showFloatingToolbar = false
-                                return available
-                            }
-                            if (offset > 0f) {
-                                // Below threshold: settle back into place smoothly.
-                                androidx.compose.animation.core.animate(offset, 0f) { value, _ ->
-                                    sheetDragOffset = value
-                                }
-                                return available
-                            }
-                            return Velocity.Zero
-                        }
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .nestedScroll(sheetDismissConnection)
-                        .graphicsLayer { translationY = sheetDragOffset.coerceAtLeast(0f) }
-                        // Whole-sheet drag-to-dismiss. Runs after children in the Main
-                        // pass, so it only sees drags the inner scroll/slider didn't
-                        // consume — scrolling still scrolls; pulling down when the
-                        // content is at its top drags the sheet away.
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures(
-                                onVerticalDrag = { _, dragAmount ->
-                                    sheetDragOffset = (sheetDragOffset + dragAmount).coerceAtLeast(0f)
-                                },
-                                onDragEnd = {
-                                    // Keep the offset on dismiss so the exit animation
-                                    // continues from the finger's release point.
-                                    if (sheetDragOffset > 150f) showFloatingToolbar = false
-                                    else sheetDragOffset = 0f
-                                },
-                                onDragCancel = { sheetDragOffset = 0f },
-                            )
-                        },
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ModalBottomSheet(
+                    onDismissRequest = { showFloatingToolbar = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    shape = NiaBottomSheetDefaults.FloatingShape,
+                    containerColor = Color.Transparent,
+                    contentColor = NiaBottomSheetDefaults.contentColor(),
+                    scrimColor = NiaBottomSheetDefaults.scrimColor(),
                     tonalElevation = 0.dp,
-                    shadowElevation = 16.dp,
+                    dragHandle = null,
+                    contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(bottom = 8.dp)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        // Drag handle (whole sheet is draggable — see the Surface modifier).
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 6.dp)
-                                .height(26.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(
+                    NiaBottomSheetTheme {
+                        NiaBottomSheetFrame {
+                            Column(
                                 modifier = Modifier
-                                    .width(36.dp)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(MaterialTheme.colorScheme.outlineVariant)
-                            )
-                        }
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(top = 18.dp, bottom = 8.dp)
+                                    .verticalScroll(rememberScrollState()),
+                            ) {
+                                Text(
+                                    text = "Reading settings",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                                Text(
+                                    text = "Preview and tune your dua reading experience",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 3.dp),
+                                )
 
                         // Live preview — the actual dua text, directly on the sheet.
                         Text(
@@ -2751,6 +2651,8 @@ fun DuaDetailScreen(
                     }
                 }
             }
+        }
+    }
 
             // Fixed toolbar at top - background transitions from transparent to solid on scroll
             // Smooth transition based on toolbarCollapseProgress (0 = transparent, 1 = solid)

@@ -937,8 +937,8 @@ private const val SUGGESTION_STATE_TAG = "app_top_search_bar_suggestion_state"
  * of day), YESTERDAY recents, and THIS WEEK recents.
  *
  * When the user types: renders the ranked sections returned by the in-memory
- * service (surahs, Quranic duas, popular verses) plus SQL hits (ayahs, fortress
- * invocations, FTS topics + news). Sections are ordered by the highest-scoring
+ * service (surahs, Quranic duas, popular verses, Fortress invocations) plus SQL
+ * hits (ayahs, Fortress invocations, FTS topics + news). Sections are ordered by the highest-scoring
  * section first so the strongest match leads the list.
  */
 private fun renderSuggestions(
@@ -988,9 +988,14 @@ private fun renderSuggestions(
     val rankedSurahs = inMemoryResults.surahs.take(5)
     val rankedQuranicDuas = inMemoryResults.quranicDuas.take(5)
     val rankedVerses = inMemoryResults.verses.take(5)
+    val rankedFortressDuas = inMemoryResults.fortressDuas.take(8)
     // SQL hits (already capped and sorted at the DAO level)
     val cappedAyahs = ayahResults.take(8)
-    val cappedFortressDuas = fortressDuaResults.take(8)
+    // Ranked fuzzy hits lead, then exact SQL content hits fill the section.
+    // A dua can match both paths, so deduplicate by its stable database ID.
+    val cappedFortressDuas = (
+        rankedFortressDuas.map { it.item } + fortressDuaResults
+        ).distinctBy { it.id }.take(8)
     val ftsTopics = searchResults.topics.take(5)
     val ftsNews = searchResults.newsResources.take(8)
 
@@ -1115,7 +1120,10 @@ private fun renderSuggestions(
         sections.add(
             RenderableSection(
                 title = "Fortress of the Muslim",
-                score = SQL_FORTRESS_PRIOR + intentBoost(duaIntent),
+                score = maxOf(
+                    SQL_FORTRESS_PRIOR,
+                    rankedFortressDuas.firstOrNull()?.score ?: 0.0,
+                ) + intentBoost(duaIntent),
             ) {
                 cappedFortressDuas.forEach { dua ->
                     addFortressDuaItem(

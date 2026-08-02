@@ -17,10 +17,10 @@
 package com.starception.submission.ui
 
 import android.content.res.Configuration
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,8 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
@@ -75,8 +73,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.starception.submission.auth.AuthUiState
 import com.starception.submission.auth.AuthViewModel
@@ -84,9 +84,8 @@ import com.starception.submission.auth.ProfileSheet
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -104,13 +103,18 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -388,179 +392,194 @@ private fun NiaFloatingBottomBar(
     // bubble. [sizeModifier] carries the scope-specific main-axis sizing —
     // weight(1f) from the portrait Row, width(64.dp) from the landscape Column —
     // since weight() can only be resolved inside the calling Row/Column scope.
-    val pill = @Composable { sizeModifier: Modifier ->
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 2.dp,
-            modifier = sizeModifier,
-        ) {
-            val destinations = appState.topLevelDestinations
-            val selectedIndex = destinations.indexOfFirst { destination ->
-                currentDestination.isRouteInHierarchy(destination.baseRoute)
-            }
-            BoxWithConstraints(
-                modifier = if (vertical) {
-                    // Fixed height (56.dp per item + the 6.dp paddings) so the pill
-                    // wraps its items compactly; without it the inner fillMaxSize
-                    // Column stretches the pill to the full screen height and pushes
-                    // the voice button off-screen.
-                    Modifier
-                        .width(64.dp)
-                        .height((destinations.size * 56 + 12).dp)
-                        .padding(vertical = 6.dp)
+    // Keep the pill's composable identity stable while the destination changes.
+    // Recreating this capturing lambda resets the indicator animation at its new target,
+    // which looks like a jump instead of a travelling liquid mass.
+    val latestCurrentDestination = rememberUpdatedState(currentDestination)
+    val latestUnreadDestinations = rememberUpdatedState(unreadDestinations)
+    val pill = remember(appState, vertical) {
+        @Composable { sizeModifier: Modifier ->
+            val darkTheme = LocalDarkTheme.current
+            val colorScheme = MaterialTheme.colorScheme
+            val navBarHeight = 64.dp
+            val capsuleGap = 4.dp
+            Surface(
+                shape = RoundedCornerShape(navBarHeight / 2),
+                color = if (darkTheme) {
+                    colorScheme.surfaceContainer
                 } else {
-                    Modifier.height(64.dp).padding(horizontal = 6.dp)
+                    colorScheme.surfaceContainerHighest
                 },
+                shadowElevation = 4.dp,
+                modifier = sizeModifier,
             ) {
-                // Size of a single item cell along the main axis, and the
-                // bubble's target position for the selected tab.
-                val itemExtent = if (vertical) {
-                    maxHeight / destinations.size
-                } else {
-                    maxWidth / destinations.size
-                }
-                val bubbleTarget = itemExtent * selectedIndex.coerceAtLeast(0)
-                // Fluid (gooey/metaball) selection: two bubbles race to the
-                // selected tab — a fast leader and a lazy follower — and the
-                // blur + alpha-threshold RenderEffect merges them into one
-                // stretching droplet that pinches off and snaps together.
-                val leaderPos by animateDpAsState(
-                    targetValue = bubbleTarget,
-                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 1400f),
-                    label = "navBubbleLeader",
-                )
-                val followerPos by animateDpAsState(
-                    targetValue = bubbleTarget,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f),
-                    label = "navBubbleFollower",
-                )
-                val bubbleAlpha by animateFloatAsState(
-                    // Hidden when no top-level tab is selected (detail screens).
-                    targetValue = if (selectedIndex >= 0) 1f else 0f,
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
-                    label = "navBubbleAlpha",
-                )
-                val bubbleColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                // Blur then steeply re-threshold the layer's alpha (a*50 - 5000
-                // in 0..255 space) — the classic gooey-effect chain. API 31+.
-                val gooEffect = remember {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        android.graphics.RenderEffect.createChainEffect(
-                            android.graphics.RenderEffect.createColorFilterEffect(
-                                android.graphics.ColorMatrixColorFilter(
-                                    android.graphics.ColorMatrix(
-                                        floatArrayOf(
-                                            1f, 0f, 0f, 0f, 0f,
-                                            0f, 1f, 0f, 0f, 0f,
-                                            0f, 0f, 1f, 0f, 0f,
-                                            0f, 0f, 0f, 50f, -5000f,
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            android.graphics.RenderEffect.createBlurEffect(
-                                60f, 60f, android.graphics.Shader.TileMode.DECAL,
-                            ),
-                        ).asComposeRenderEffect()
-                    } else {
-                        null
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer {
-                            renderEffect = gooEffect
-                            alpha = bubbleAlpha
-                        },
-                ) {
-                    // Each bubble spans one item cell; it slides along the main
-                    // axis (Y in landscape, X in portrait) toward the selection.
-                    val bubbleModifier = @Composable { pos: Dp ->
-                        if (vertical) {
-                            Modifier
-                                .align(Alignment.TopCenter)
-                                .offset(y = pos)
-                                .height(itemExtent)
-                                .width(50.dp)
-                        } else {
-                            Modifier
-                                .align(Alignment.CenterStart)
-                                .offset(x = pos)
-                                .width(itemExtent)
-                                .height(50.dp)
-                        }
-                    }
-                    Box(
-                        modifier = bubbleModifier(leaderPos)
-                            .clip(RoundedCornerShape(50))
-                            .background(bubbleColor),
-                    )
-                    Box(
-                        modifier = bubbleModifier(followerPos)
-                            .clip(RoundedCornerShape(50))
-                            .background(bubbleColor),
-                    )
-                }
-
-                // A single destination cell (icon + label). Weighted along the
-                // main axis of its parent so all cells share the pill evenly.
-                val itemCell = @Composable { destination: TopLevelDestination, weight: Modifier ->
-                    val hasUnread = unreadDestinations.contains(destination)
-                    val selected = currentDestination
+                val destinations = appState.topLevelDestinations
+                val selectedIndex = destinations.indexOfFirst { destination ->
+                    latestCurrentDestination.value
                         .isRouteInHierarchy(destination.baseRoute)
-                    val contentTint by animateColorAsState(
-                        targetValue = if (selected) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        animationSpec = tween(250, easing = FastOutSlowInEasing),
-                        label = "navItemTint",
-                    )
-                    Column(
-                        modifier = weight
-                            .clip(RoundedCornerShape(50))
-                            .clickable { appState.navigateToTopLevelDestination(destination) }
-                            .padding(vertical = 9.dp)
-                            .testTag("NiaNavItem")
-                            .then(if (hasUnread) Modifier.notificationDot() else Modifier),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                            contentDescription = null,
-                            tint = contentTint,
-                            modifier = Modifier.size(22.dp),
-                        )
-                        Text(
-                            text = stringResource(destination.iconTextId),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = contentTint,
-                        )
-                    }
                 }
+                BoxWithConstraints(
+                    modifier = if (vertical) {
+                        // Fixed height (56.dp per item + the 6.dp paddings) so the pill
+                        // wraps its items compactly; without it the inner fillMaxSize
+                        // Column stretches the pill to the full screen height and pushes
+                        // the voice button off-screen.
+                        Modifier
+                            .width(64.dp)
+                            .height((destinations.size * 56 + 12).dp)
+                            .padding(vertical = 6.dp)
+                    } else {
+                        Modifier.height(navBarHeight)
+                    },
+                ) {
+                    // Size of a single item cell along the main axis, and the
+                    // bubble's target position for the selected tab.
+                    val horizontalContentInset = 12.dp
+                    val itemExtent = if (vertical) {
+                        maxHeight / destinations.size
+                    } else {
+                        (maxWidth - horizontalContentInset * 2) / destinations.size
+                    }
+                    // Extend the active shape beyond its icon cell while keeping
+                    // the first and last capsules inset from the bar's outer edge.
+                    val bubbleMainSize = if (vertical) {
+                        48.dp
+                    } else {
+                        itemExtent + (horizontalContentInset - capsuleGap) * 2
+                    }
+                    val bubbleTarget = if (vertical) {
+                        itemExtent * selectedIndex.coerceAtLeast(0) +
+                            (itemExtent - bubbleMainSize) / 2
+                    } else {
+                        horizontalContentInset +
+                            itemExtent * selectedIndex.coerceAtLeast(0) +
+                            (itemExtent - bubbleMainSize) / 2
+                    }
 
-                if (vertical) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        destinations.forEach { destination ->
-                            itemCell(destination, Modifier.weight(1f))
+                    // Match the reference motion: the edge facing the destination
+                    // moves first, then the opposite edge follows. Height and corner
+                    // radius never change, so the indicator remains one clean capsule.
+                    val density = LocalDensity.current
+                    val targetPx = with(density) { bubbleTarget.toPx() }
+                    val leadingPosition = remember { Animatable(targetPx) }
+                    val trailingPosition = remember { Animatable(targetPx) }
+                    LaunchedEffect(targetPx, selectedIndex) {
+                        if (selectedIndex < 0 || abs(targetPx - leadingPosition.value) < 0.5f) {
+                            return@LaunchedEffect
+                        }
+                        coroutineScope {
+                            launch {
+                                leadingPosition.animateTo(
+                                    targetValue = targetPx,
+                                    animationSpec = tween(
+                                        durationMillis = 280,
+                                        easing = FastOutSlowInEasing,
+                                    ),
+                                )
+                            }
+                            launch {
+                                delay(85)
+                                trailingPosition.animateTo(
+                                    targetValue = targetPx,
+                                    animationSpec = tween(
+                                        durationMillis = 280,
+                                        easing = FastOutSlowInEasing,
+                                    ),
+                                )
+                            }
                         }
                     }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically,
+                    val bubbleAlpha by animateFloatAsState(
+                        // Hidden when no top-level tab is selected (detail screens).
+                        targetValue = if (selectedIndex >= 0) 1f else 0f,
+                        animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        label = "navBubbleAlpha",
+                    )
+                    val bubbleColor = if (darkTheme) {
+                        colorScheme.surfaceBright
+                    } else {
+                        Color.White
+                    }
+                    Canvas(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer { alpha = bubbleAlpha },
                     ) {
-                        destinations.forEach { destination ->
-                            itemCell(destination, Modifier.weight(1f))
+                        val mainSize = bubbleMainSize.toPx()
+                        val crossSize = if (vertical) {
+                            50.dp.toPx()
+                        } else {
+                            (navBarHeight - capsuleGap * 2).toPx()
+                        }
+                        if (vertical) {
+                            val halfCross = crossSize / 2f
+                            val top = minOf(leadingPosition.value, trailingPosition.value)
+                            val bottom = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
+                            drawRoundRect(
+                                color = bubbleColor,
+                                topLeft = Offset(size.width / 2f - halfCross, top),
+                                size = Size(crossSize, bottom - top),
+                                cornerRadius = CornerRadius(halfCross, halfCross),
+                            )
+                        } else {
+                            val halfCross = crossSize / 2f
+                            val left = minOf(leadingPosition.value, trailingPosition.value)
+                            val right = maxOf(leadingPosition.value, trailingPosition.value) + mainSize
+                            drawRoundRect(
+                                color = bubbleColor,
+                                topLeft = Offset(left, size.height / 2f - halfCross),
+                                size = Size(right - left, crossSize),
+                                cornerRadius = CornerRadius(halfCross, halfCross),
+                            )
+                        }
+                    }
+
+                    // Match the reference's icon-only cells. Destination names remain
+                    // available to accessibility through each icon's description.
+                    val itemCell = @Composable { destination: TopLevelDestination, weight: Modifier ->
+                        val hasUnread = latestUnreadDestinations.value.contains(destination)
+                        val interactionSource = remember(destination) { MutableInteractionSource() }
+                        val contentTint = MaterialTheme.colorScheme.onSurface
+                        Box(
+                            modifier = weight
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(50))
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                ) { appState.navigateToTopLevelDestination(destination) }
+                                .testTag("NiaNavItem")
+                                .then(if (hasUnread) Modifier.notificationDot() else Modifier),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = destination.unselectedIcon,
+                                contentDescription = stringResource(destination.iconTextId),
+                                tint = contentTint,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+
+                    if (vertical) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            destinations.forEach { destination ->
+                                itemCell(destination, Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = horizontalContentInset),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            destinations.forEach { destination ->
+                                itemCell(destination, Modifier.weight(1f))
+                            }
                         }
                     }
                 }
