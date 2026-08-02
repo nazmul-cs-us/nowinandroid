@@ -282,7 +282,7 @@ fun UnifiedSettingsScreen(
                     SettingsSection(
                         title = "Prayer Times",
                         subtitle = "Calculation method & location",
-                iconGlyph = FlaticonIcons.PRAYER_TIMES,
+                        iconGlyph = FlaticonIcons.SCHEDULE,
                         isExpanded = expandedSections.contains("prayer"),
                         onToggleExpanded = { viewModel.toggleSection("prayer") }
                     ) {

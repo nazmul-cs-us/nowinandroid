@@ -1620,7 +1620,6 @@ private fun CourseLearningOverview(
     availableCourseCount: Int,
     onBrowseCourses: () -> Unit,
 ) {
-    val isDarkTheme = LocalDarkTheme.current
     val completedLessons = courses.sumOf { course -> courseProgress[course.id] ?: 0 }
     val totalLessons = courses.sumOf { it.totalLessons }
     val progress = if (totalLessons > 0) {
@@ -1628,14 +1627,10 @@ private fun CourseLearningOverview(
     } else {
         0f
     }
-    val cardColor = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerHigh else CourseInk
-    val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else Color.White
-    val secondaryColor = if (isDarkTheme) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        Color.White.copy(alpha = 0.66f)
-    }
-    val accentColor = if (isDarkTheme) MaterialTheme.colorScheme.primary else CourseGold
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val titleColor = MaterialTheme.colorScheme.onSurface
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val accentColor = MaterialTheme.colorScheme.primary
     val barHeights = listOf(14, 19, 25, 20, 31, 37, 29, 43, 34, 49, 39, 54)
 
     Surface(
@@ -1663,11 +1658,7 @@ private fun CourseLearningOverview(
                         modifier = Modifier
                             .size(46.dp)
                             .background(
-                                if (isDarkTheme) {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    Color.White.copy(alpha = 0.12f)
-                                },
+                                MaterialTheme.colorScheme.primaryContainer,
                                 CircleShape,
                             ),
                         contentAlignment = Alignment.Center,
@@ -1675,7 +1666,7 @@ private fun CourseLearningOverview(
                         FlaticonIcon(
                             glyph = FlaticonIcons.TRENDING_UP,
                             contentDescription = null,
-                            tint = if (isDarkTheme) MaterialTheme.colorScheme.onPrimaryContainer else accentColor,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontSize = 21.sp,
                         )
                     }
@@ -1700,13 +1691,13 @@ private fun CourseLearningOverview(
 
                 Surface(
                     shape = CircleShape,
-                    color = if (isDarkTheme) MaterialTheme.colorScheme.primaryContainer else CourseWarmCard,
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.ArrowForward,
                             contentDescription = "Browse all courses",
-                            tint = if (isDarkTheme) MaterialTheme.colorScheme.onPrimaryContainer else CourseInk,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -1736,18 +1727,14 @@ private fun CourseLearningOverview(
 
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = if (isDarkTheme) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color.White.copy(alpha = 0.12f)
-                    },
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Text(
                         text = if (courses.isEmpty()) "$availableCourseCount available" else "${courses.size} active",
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = titleColor,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
             }
@@ -1769,9 +1756,8 @@ private fun CourseLearningOverview(
                             .clip(RoundedCornerShape(999.dp))
                             .background(
                                 when {
-                                    isDarkTheme && reached -> MaterialTheme.colorScheme.primary
                                     reached -> accentColor
-                                    else -> Color.White.copy(alpha = 0.13f)
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
                                 },
                             ),
                     )
