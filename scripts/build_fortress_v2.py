@@ -46,15 +46,25 @@ def load_waf():
     return out
 
 
-def fetch(url, encoding="cp1252"):
-    # islamawareness.net serves the Fortress pages as Windows-1252 (cp1252) and declares no
-    # charset. They contain cp1252 "smart punctuation" — 0x92 ' , 0x93/0x94 " " , 0x96/0x97 – — ,
-    # 0x85 … — which are INVALID UTF-8. Decoding as UTF-8 with errors="replace" turned every one
-    # of those into U+FFFD (�), corrupting titles/translations. So default to cp1252 here.
-    # The wafaaelmaandy JSON is genuine UTF-8 (Arabic), so its caller passes encoding="utf-8".
+def fetch(url, encoding=None):
+    # islamawareness.net declares no charset and is MIXED-encoding: 125 of the 132 Fortress
+    # pages are genuine UTF-8 (Arabic), while 7 are Windows-1252 carrying "smart punctuation"
+    # — 0x92 ' , 0x93/0x94 " " , 0x96/0x97 – — , 0x85 … — which is invalid UTF-8.
+    # Neither codec alone works: decoding everything as UTF-8 with errors="replace" turns the
+    # cp1252 punctuation into U+FFFD (�) and corrupts titles/translations, while decoding
+    # everything as cp1252 raises on the UTF-8 pages (byte 0x8f is undefined in cp1252) and
+    # silently drops those chapters. So sniff: valid UTF-8 wins, otherwise fall back to cp1252
+    # (a single-byte codec, so it cannot fail on the remaining pages). Callers that already
+    # know the encoding — e.g. the wafaaelmaandy JSON — can pass it explicitly.
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read().decode(encoding)
+        raw = r.read()
+    if encoding:
+        return raw.decode(encoding)
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252")
 
 
 def parse_index():
