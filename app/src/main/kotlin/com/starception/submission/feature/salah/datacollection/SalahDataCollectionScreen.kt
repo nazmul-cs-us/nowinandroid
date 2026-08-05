@@ -130,6 +130,15 @@ fun SalahDataCollectionScreen(
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var showDeleteFileDialog by remember { mutableStateOf<String?>(null) }
     var showVisualization by remember { mutableStateOf(false) }
+    var isVizFullscreen by remember { mutableStateOf(false) }
+
+    // Load one recording and open it fullscreen, so the result is visible immediately
+    // rather than landing in a collapsed card further up the list.
+    val visualizeFile: (String) -> Unit = { fileName ->
+        viewModel.loadSamplesForFile(fileName)
+        showVisualization = true
+        isVizFullscreen = true
+    }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -244,6 +253,9 @@ fun SalahDataCollectionScreen(
                                 if (it) viewModel.loadAllSamples()
                             },
                             onVizStateChange = { viewModel.updateVizState(it) },
+                            isFullscreen = isVizFullscreen,
+                            onFullscreenChange = { isVizFullscreen = it },
+                            sourceFileName = uiState.vizSourceFile,
                             onAnalyzePredictions = { viewModel.analyzeVizPredictions() },
                             onPlaybackTick = viewModel::onVizPlaybackTick
                         )
@@ -264,7 +276,8 @@ fun SalahDataCollectionScreen(
                             onDelete = { showDeleteFileDialog = file.name },
                             quality = fileQuality[file.name],
                             onAnalyze = { viewModel.analyzeFileQuality(file) },
-                            onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) }
+                            onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) },
+                            onVisualize = { visualizeFile(file.name) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -315,6 +328,9 @@ fun SalahDataCollectionScreen(
                             if (it) viewModel.loadAllSamples()
                         },
                         onVizStateChange = { viewModel.updateVizState(it) },
+                        isFullscreen = isVizFullscreen,
+                        onFullscreenChange = { isVizFullscreen = it },
+                        sourceFileName = uiState.vizSourceFile,
                         onAnalyzePredictions = { viewModel.analyzeVizPredictions() },
                         onPlaybackTick = viewModel::onVizPlaybackTick
                     )
@@ -327,7 +343,8 @@ fun SalahDataCollectionScreen(
                         onDelete = { showDeleteFileDialog = file.name },
                         quality = fileQuality[file.name],
                         onAnalyze = { viewModel.analyzeFileQuality(file) },
-                        onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) }
+                        onReview = { onNavigateToReview(viewModel.filePathFor(file.name)) },
+                        onVisualize = { visualizeFile(file.name) }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -3055,7 +3072,8 @@ private fun SwipeToDismissFileItem(
     onDelete: () -> Unit,
     quality: FileQuality? = null,
     onAnalyze: () -> Unit = {},
-    onReview: () -> Unit = {}
+    onReview: () -> Unit = {},
+    onVisualize: () -> Unit = {}
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -3101,7 +3119,14 @@ private fun SwipeToDismissFileItem(
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true
     ) {
-        DataFileItem(file = file, onDelete = onDelete, quality = quality, onAnalyze = onAnalyze, onReview = onReview)
+        DataFileItem(
+            file = file,
+            onDelete = onDelete,
+            quality = quality,
+            onAnalyze = onAnalyze,
+            onReview = onReview,
+            onVisualize = onVisualize,
+        )
     }
 }
 
@@ -3112,7 +3137,8 @@ private fun DataFileItem(
     onDelete: () -> Unit,
     quality: FileQuality? = null,
     onAnalyze: () -> Unit = {},
-    onReview: () -> Unit = {}
+    onReview: () -> Unit = {},
+    onVisualize: () -> Unit = {}
 ) {
     // Map posture names to short display names
     val postureDisplayNames = mapOf(
@@ -3262,6 +3288,22 @@ private fun DataFileItem(
                 }
             }
 
+            // Load just this recording into the 3D view. Empty files have no poses to
+            // play back, so the action would open an empty scene.
+            if (file.totalSamples > 0) {
+                IconButton(
+                    onClick = onVisualize,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.POSTURE_TRAINING,
+                        contentDescription = "Visualize this recording in 3D",
+                        tint = MaterialTheme.colorScheme.primary,
+                        fontSize = 15.sp,
+                    )
+                }
+            }
+
             // Delete button
             IconButton(
                 onClick = onDelete,
@@ -3289,10 +3331,14 @@ private fun Visualization3DCard(
     showVisualization: Boolean,
     onToggleVisualization: (Boolean) -> Unit,
     onVizStateChange: (VisualizationState) -> Unit,
+    // Hoisted so tapping a recording in the file list can open it straight into the
+    // fullscreen view instead of quietly loading it into a card that is scrolled away.
+    isFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    sourceFileName: String? = null,
     onAnalyzePredictions: () -> Unit = {},
     onPlaybackTick: ((Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit)? = null
 ) {
-    var isFullscreen by remember { mutableStateOf(false) }
     val shadowElevation by animateFloatAsState(
         targetValue = if (showVisualization) 5f else 2f,
         label = "shadowElevation"
@@ -3348,9 +3394,15 @@ private fun Visualization3DCard(
                         )
                         if (allSamples.isNotEmpty()) {
                             Text(
-                                text = "${allSamples.size} samples loaded",
+                                // Naming the source matters: combining every recording
+                                // sorts unrelated sessions into one timeline, so playback
+                                // of "all files" is not a real prayer.
+                                text = sourceFileName?.let { "${allSamples.size} samples · $it" }
+                                    ?: "${allSamples.size} samples · all recordings combined",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -3487,7 +3539,7 @@ private fun Visualization3DCard(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(bottom = 138.dp),
-                                    onFullscreenChange = { isFullscreen = it },
+                                    onFullscreenChange = onFullscreenChange,
                                 )
 
                                 if (
@@ -3548,7 +3600,7 @@ private fun Visualization3DCard(
         (allSamples.isNotEmpty() || vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE)
     ) {
         Dialog(
-            onDismissRequest = { isFullscreen = false },
+            onDismissRequest = { onFullscreenChange(false) },
             properties = DialogProperties(
                 usePlatformDefaultWidth = false,
                 decorFitsSystemWindows = false,
@@ -3566,7 +3618,7 @@ private fun Visualization3DCard(
                     onPlaybackTick = onPlaybackTick,
                     modifier = Modifier.fillMaxSize(),
                     isFullscreen = true,
-                    onFullscreenChange = { isFullscreen = it },
+                    onFullscreenChange = onFullscreenChange,
                 )
 
                 if (

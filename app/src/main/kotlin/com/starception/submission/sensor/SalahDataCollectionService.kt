@@ -255,6 +255,11 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             trimFileEnd(outputFile!!, trimLastMs)
         }
 
+        // Name the file for what it actually holds, after trimming. Deriving the
+        // descriptor from the finished file rather than from the requested mode means an
+        // aborted guided run is labelled `partial<n>` instead of claiming to be complete.
+        outputFile = outputFile?.let(SalahRecordingName::renameToDescriptive)
+
         Log.i(TAG, "🕌 Salah data collection stopped")
         Log.i(TAG, "   Total samples: $totalSamplesWritten")
         Log.i(TAG, "   File: ${outputFile?.absolutePath}")

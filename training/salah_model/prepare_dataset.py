@@ -37,12 +37,59 @@ QUARANTINE = {
 LEGACY_MANUAL_DIR = "archive_march_2026"
 
 
+MODE_PREFIXES = ("salah_reviewed_", "salah_guided_", "salah_live_", "salah_data_")
+
+POSTURE_SLUGS = {
+    "QIYAM": "qiyam",
+    "RUKU": "ruku",
+    "GOING_TO_SUJUD": "going2sujud",
+    "SUJUD": "sujud",
+    "JALSA": "jalsa",
+    "TASHAHHUD": "tashahhud",
+    "QIYAM_RISING": "qiyamrising",
+    "RISING_TO_QIYAM": "rising2qiyam",
+}
+
+
 def looks_like_manual(rows: list[dict]) -> bool:
     """A manual recording is one posture, one session, held continuously."""
     return (
         len({r.get("posture") for r in rows}) == 1
         and len({r.get("session_id") for r in rows}) == 1
     )
+
+
+def descriptive_name(name: str, rows: list[dict]) -> str:
+    """Filename that states what the recording holds.
+
+    Mirrors SalahRecordingName.kt on the app side so a file keeps one name whether it
+    was written by the phone or consolidated here. The descriptor goes after the mode
+    prefix, which keeps the `startswith` provenance gates in feature_engineering.py
+    working untouched.
+    """
+    prefix = next((p for p in MODE_PREFIXES if name.startswith(p)), None)
+    if prefix is None:
+        return name
+    rest = name[len(prefix):]
+    # A descriptor, when present, sits before the 8-digit date stamp.
+    tail = rest if rest[:8].isdigit() else rest.split("_", 1)[1]
+
+    # Live labels come from the model, so describing them would dress a guess up as truth.
+    if prefix == "salah_live_":
+        return prefix + tail
+
+    postures = {r.get("posture") for r in rows} - {None}
+    if not rows:
+        descriptor = "empty"
+    elif len(postures) == 1:
+        descriptor = POSTURE_SLUGS.get(next(iter(postures)), "unknown")
+    elif prefix == "salah_reviewed_" and rows[0].get("target_rakah_count") is not None:
+        descriptor = f"{rows[0]['target_rakah_count']}rakah"
+    elif len(postures) == len(POSTURE_SLUGS):
+        descriptor = "full"
+    else:
+        descriptor = f"partial{len(postures)}"
+    return f"{prefix}{descriptor}_{tail}"
 
 
 def main(dry_run: bool) -> None:
@@ -80,25 +127,26 @@ def main(dry_run: bool) -> None:
             skipped.append((path, "no collection_mode and not a single-posture manual take"))
             continue
 
-        kept.append((path, len(rows), note))
+        out_name = descriptive_name(path.name, rows)
+        kept.append((path, out_name, len(rows), note))
         if not dry_run:
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             if rows[0].get("label_source") == "manual_selection":
-                (OUTPUT_DIR / path.name).write_text(
+                (OUTPUT_DIR / out_name).write_text(
                     "".join(json.dumps(r) + "\n" for r in rows)
                 )
             else:
-                shutil.copy2(path, OUTPUT_DIR / path.name)
+                shutil.copy2(path, OUTPUT_DIR / out_name)
 
     print(f"{'Would keep' if dry_run else 'Kept'} {len(kept)} files:")
-    for path, count, note in kept:
-        print(f"  {path.name:52s} {count:5d} rows  [{note}]")
+    for _, out_name, count, note in kept:
+        print(f"  {out_name:56s} {count:5d} rows  [{note}]")
     print(f"\nExcluded {len(skipped)} files:")
     for path, reason in skipped:
         print(f"  {path.relative_to(DATA_ROOT)}\n      -> {reason}")
 
     sessions_per_class: dict[str, set] = {}
-    for path, _, _ in kept:
+    for path, _, _, _ in kept:
         for line in path.read_text().splitlines():
             if not line.strip():
                 continue

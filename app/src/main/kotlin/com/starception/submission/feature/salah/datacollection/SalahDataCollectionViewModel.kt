@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetManifest
+import com.starception.submission.feature.salah.visualization.PosePlaybackSource
 import com.starception.submission.feature.salah.visualization.VisualizationMode
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.feature.salah.visualization.VizPrediction
@@ -54,6 +55,8 @@ data class SalahDataCollectionUiState(
     val trimmedSamples: Int = 0,
     val globalPostureCounts: Map<String, Int> = emptyMap(),
     val globalTotalSamples: Int = 0,
+    /** Recording currently loaded into the 3D view; null means every file combined. */
+    val vizSourceFile: String? = null,
     // Guided recording state
     val guidedState: GuidedRecordingState = GuidedRecordingState.IDLE,
     val guidedCurrentPosture: SalahPosture? = null,
@@ -856,10 +859,26 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     // 3D Visualization methods
 
-    fun loadAllSamples() {
+    fun loadAllSamples() = loadSamplesInto(sourceFile = null) { collectionService.listDataFiles() }
+
+    /**
+     * Load a single recording into the 3D view.
+     *
+     * Visualising one file is the useful case: [loadAllSamples] concatenates every
+     * recording and sorts by timestamp, which interleaves unrelated sessions into a
+     * sequence that never happened and makes playback meaningless.
+     */
+    fun loadSamplesForFile(fileName: String) = loadSamplesInto(sourceFile = fileName) {
+        listOf(java.io.File(collectionService.getDataDirectory(), fileName)).filter { it.exists() }
+    }
+
+    private fun loadSamplesInto(
+        sourceFile: String?,
+        files: () -> List<java.io.File>,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             val samples = mutableListOf<SalahDataSample>()
-            collectionService.listDataFiles().forEach { file ->
+            files().forEach { file ->
                 file.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         if (line.isNotBlank()) {
@@ -872,10 +891,14 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
             val sorted = samples.sortedBy { it.timestamp }
             _allSamples.value = sorted
+            _uiState.update { it.copy(vizSourceFile = sourceFile) }
             // Data changed — previous model analysis and PCA projection are stale.
             _vizState.update {
                 it.copy(
                     totalSamples = sorted.size,
+                    playbackIndex = 0,
+                    isPlaying = false,
+                    posePlaybackSource = PosePlaybackSource.RECORDED,
                     predictions = null,
                     flaggedIndices = emptySet(),
                     pcaPositions = null,
