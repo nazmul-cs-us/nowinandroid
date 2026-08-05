@@ -5793,6 +5793,40 @@ private fun Int.toArabicIndic(): String = this.toString().map { c ->
     }
 }.joinToString("")
 
+/**
+ * Ayah number rendered inside the Mushaf ayah-ending ornament
+ * ([R.drawable.ayah_ornament_frame]) with the Arabic-Indic number stamped in
+ * its hollow center — the same marker shown at each verse end in continuous
+ * (Mushaf) reading, reused here so the ayah list matches the page view. Both
+ * the frame and the digits use [tint]; the Mushaf uses colorScheme.primary.
+ */
+@Composable
+private fun AyahOrnamentMarker(
+    ayahNumber: Int,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.primary,
+) {
+    val arabicDigits = ayahNumber.toArabicIndic()
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ayah_ornament_frame),
+            contentDescription = null,
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
+            modifier = Modifier.fillMaxSize(),
+        )
+        Text(
+            text = arabicDigits,
+            color = tint,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (arabicDigits.length >= 3) 10.sp else 13.sp,
+            lineHeight = 13.sp,
+        )
+    }
+}
+
 @Composable
 private fun AyahTrackItem(
     ayah: Ayah,
@@ -5871,26 +5905,14 @@ private fun AyahTrackItem(
                     )
                 }
             } else {
-                // Show circular badge with number for non-favourited ayahs
-                // Stack note indicator on top-right if ayah has notes
+                // Ayah number stamped inside the Mushaf ayah-ending ornament
+                // (same marker as continuous reading). Note indicator stacks
+                // on the top-right when the ayah has a note.
                 Box {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                    AyahOrnamentMarker(
+                        ayahNumber = ayah.numberInSurah,
                         modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Text(
-                                text = ayah.numberInSurah.toString(),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
+                    )
                     // Note indicator badge
                     if (hasNote) {
                         Surface(
