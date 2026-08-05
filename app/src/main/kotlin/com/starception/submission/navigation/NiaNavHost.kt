@@ -167,20 +167,7 @@ fun NiaNavHost(
                 }
             }
         },
-        onFortressDuaClick = { dua ->
-            // Pass title in the "{Chapter}: Dua N" format the pager's title-match
-            // fallback recognises — otherwise the screen would treat dua.position
-            // as a Quranic-Dua page index and open the wrong invocation.
-            val chapter = dua.chapterTitle.ifBlank { "Dua" }
-            navController.navigateToDuaDetail(
-                title = "$chapter: Dua ${dua.position}",
-                content = dua.translation ?: dua.transliteration ?: "",
-                quranReference = null,
-                duaNumber = dua.position,
-                newsResourceId = "",
-                topicId = "",
-            )
-        },
+        onFortressDuaClick = navController::navigateToFortressDua,
         onQuranicDuaClick = { dua ->
             navController.navigateToDuaDetail(
                 title = "Dua ${dua.duaNumber}: ${dua.title}",
@@ -395,6 +382,7 @@ fun NiaNavHost(
             onSettingsClick = onTopAppBarActionClick,
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
+            onFortressDuaClick = navController::navigateToFortressDua,
             onMediaSourceClick = { source -> navController.navigateToMediaSourceDetail(source) },
             downloadProgress = homeDownloadProgress,
             downloadLabel = homeDownloadLabel,
@@ -495,6 +483,23 @@ fun NiaNavHost(
         )
     }
     }
+}
+
+/** Opens the exact Fortress invocation in the Dua pager. */
+private fun androidx.navigation.NavController.navigateToFortressDua(
+    dua: com.starception.submission.core.duadatabase.Dua,
+) {
+    // The pager recognises the "{Chapter}: Dua N" title and resolves the
+    // database invocation independently of its position in Quranic Duas.
+    val chapter = dua.chapterTitle.ifBlank { "Dua" }
+    navigateToDuaDetail(
+        title = "$chapter: Dua ${dua.position}",
+        content = dua.translation ?: dua.transliteration ?: "",
+        quranReference = null,
+        duaNumber = dua.position,
+        newsResourceId = "",
+        topicId = "",
+    )
 }
 
 /**

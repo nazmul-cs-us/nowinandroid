@@ -252,7 +252,7 @@ private fun PreRecordingContent(
                         contentAlignment = Alignment.Center
                     ) {
                         FlaticonIcon(
-                            glyph = FlaticonIcons.SALAH_TRAINING,
+                            glyph = FlaticonIcons.DEVELOPER,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             fontSize = 18.sp,
@@ -325,7 +325,7 @@ private fun PrayerLengthSelector(
                     contentAlignment = Alignment.Center,
                 ) {
                     FlaticonIcon(
-                        glyph = FlaticonIcons.PRAYER_TIMES,
+                        glyph = FlaticonIcons.POSTURE_TRAINING,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         fontSize = 18.sp,
@@ -528,7 +528,7 @@ private fun RecordingContent(
                         contentAlignment = Alignment.Center
                     ) {
                         FlaticonIcon(
-                            glyph = FlaticonIcons.SALAH_TRAINING,
+                            glyph = FlaticonIcons.QUICK_ACTION,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             fontSize = 18.sp,
@@ -784,7 +784,7 @@ private fun PostRecordingContent(
                         contentAlignment = Alignment.Center
                     ) {
                         FlaticonIcon(
-                            glyph = FlaticonIcons.SALAH_TRAINING,
+                            glyph = FlaticonIcons.COMPLETED,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             fontSize = 20.sp,

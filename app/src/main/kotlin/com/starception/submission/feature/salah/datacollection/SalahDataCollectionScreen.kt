@@ -19,6 +19,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -43,18 +44,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.AlertDialog
@@ -150,7 +139,7 @@ fun SalahDataCollectionScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Salah Data Collection",
+                            text = "Salah Training",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -162,9 +151,15 @@ fun SalahDataCollectionScreen(
                             )
                         } else if (uiState.isRecording) {
                             Text(
-                                text = "Recording - ${uiState.sessionId}",
+                                text = "Recording ${uiState.currentPosture.displayName}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text(
+                                text = "Build reliable prayer detection",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -178,10 +173,11 @@ fun SalahDataCollectionScreen(
                         color = MaterialTheme.colorScheme.surfaceContainerHighest
                     ) {
                         IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.ARROW_BACK,
                                 contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 20.sp,
                             )
                         }
                     }
@@ -189,10 +185,11 @@ fun SalahDataCollectionScreen(
                 actions = {
                     if (uiState.dataFiles.isNotEmpty()) {
                         IconButton(onClick = { showDeleteAllDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteSweep,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.DELETE,
                                 contentDescription = "Delete all data",
-                                tint = MaterialTheme.colorScheme.error
+                                tint = MaterialTheme.colorScheme.error,
+                                fontSize = 21.sp,
                             )
                         }
                     }
@@ -215,10 +212,15 @@ fun SalahDataCollectionScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = FloatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Keep the collection action together; model diagnostics come later.
-                    item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
-                    item { PostureSelector(uiState, viewModel) }
+                    // Readiness and the primary capture action stay above diagnostics.
+                    item {
+                        CollectionReadinessCard(
+                            uiState = uiState,
+                            onSelectPosture = { viewModel.setPosture(it) },
+                        )
+                    }
                     item { RecordingHero(uiState, viewModel) }
+                    item { PostureSelector(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
                         item { CaptureQualityCard(uiState) }
@@ -276,15 +278,19 @@ fun SalahDataCollectionScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Workflow order: recommendation → choose → record → review.
-                item { CollectionReadinessCard(uiState) }
-                item { NextUpCard(uiState, onSelectPosture = { viewModel.setPosture(it) }) }
-                // Quick guide when no data and not recording
+                // Workflow order: readiness → capture → fine-tune posture → review.
+                item {
+                    CollectionReadinessCard(
+                        uiState = uiState,
+                        onSelectPosture = { viewModel.setPosture(it) },
+                    )
+                }
+                item { RecordingHero(uiState, viewModel) }
+                item { PostureSelector(uiState, viewModel) }
+                // Keep onboarding available without placing it before the primary action.
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
                 }
-                item { PostureSelector(uiState, viewModel) }
-                item { RecordingHero(uiState, viewModel) }
                 // Capture quality feedback during recording
                 if (uiState.isRecording && uiState.lastSample != null) {
                     item { CaptureQualityCard(uiState) }
@@ -334,11 +340,11 @@ fun SalahDataCollectionScreen(
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
             icon = {
-                Icon(
-                    imageVector = Icons.Default.DeleteSweep,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.DELETE,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
+                    fontSize = 28.sp,
                 )
             },
             title = { Text("Delete All Data?", fontWeight = FontWeight.Bold) },
@@ -372,11 +378,11 @@ fun SalahDataCollectionScreen(
         AlertDialog(
             onDismissRequest = { showDeleteFileDialog = null },
             icon = {
-                Icon(
-                    imageVector = Icons.Default.Delete,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.DELETE,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(28.dp)
+                    fontSize = 26.sp,
                 )
             },
             title = { Text("Delete File?", fontWeight = FontWeight.Bold) },
@@ -465,7 +471,7 @@ private fun LivePrayerRecordingCard(onNavigateToLiveRecording: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 FlaticonIcon(
-                    glyph = FlaticonIcons.PRAYER_TIMES,
+                    glyph = FlaticonIcons.POSTURE_TRAINING,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     fontSize = 22.sp,
@@ -593,7 +599,7 @@ private fun GuidedRecordingCard(
                             contentAlignment = Alignment.Center
                         ) {
                             FlaticonIcon(
-                                glyph = FlaticonIcons.SALAH_TRAINING,
+                                glyph = FlaticonIcons.VOICE,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 fontSize = 22.sp,
@@ -835,7 +841,11 @@ private fun GuidedRecordingCard(
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    FlaticonIcon(
+                                        glyph = FlaticonIcons.DOWNLOAD,
+                                        contentDescription = null,
+                                        fontSize = 17.sp,
+                                    )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = if (uiState.ttsDownloadError != null) "Retry Download (~175 MB)" else "Download Voice Engine",
@@ -1053,7 +1063,11 @@ private fun GuidedRecordingCard(
                         onClick = { viewModel.cancelGuidedRecording() },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.STOP,
+                            contentDescription = null,
+                            fontSize = 17.sp,
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Cancel Guided Recording")
                     }
@@ -1197,7 +1211,10 @@ private fun eligibleSessionCount(
  * a separate, quality-gated step after the recordings are exported.
  */
 @Composable
-private fun CollectionReadinessCard(uiState: SalahDataCollectionUiState) {
+private fun CollectionReadinessCard(
+    uiState: SalahDataCollectionUiState,
+    onSelectPosture: (SalahPosture) -> Unit,
+) {
     val labels = SalahPosture.classificationLabels
     val windowsReady = labels.count { posture ->
         (uiState.globalPostureCounts[posture.name] ?: 0) >= POSTURE_TARGET_WINDOWS
@@ -1210,33 +1227,63 @@ private fun CollectionReadinessCard(uiState: SalahDataCollectionUiState) {
             eligibleSessionCount(uiState, posture) >= MIN_INDEPENDENT_SESSIONS
     }
     val pendingReview = uiState.dataFiles.count { it.isPendingReview }
+    val ranked = labels
+        .map { posture ->
+            Triple(
+                posture,
+                uiState.globalPostureCounts[posture.name] ?: 0,
+                eligibleSessionCount(uiState, posture),
+            )
+        }
+        .sortedBy { (_, windows, sessions) ->
+            minOf(
+                windows / POSTURE_TARGET_WINDOWS.toFloat(),
+                sessions / MIN_INDEPENDENT_SESSIONS.toFloat(),
+            )
+        }
+    val recommended = ranked.firstOrNull { (_, windows, sessions) ->
+        windows < POSTURE_TARGET_WINDOWS || sessions < MIN_INDEPENDENT_SESSIONS
+    }
+    val readiness = ranked.sumOf { (_, windows, sessions) ->
+        minOf(
+            windows.coerceAtMost(POSTURE_TARGET_WINDOWS) / POSTURE_TARGET_WINDOWS.toFloat(),
+            sessions.coerceAtMost(MIN_INDEPENDENT_SESSIONS) /
+                MIN_INDEPENDENT_SESSIONS.toFloat(),
+        ).toDouble()
+    }.toFloat() / labels.size
     val progress by animateFloatAsState(
-        targetValue = labelsReady / labels.size.toFloat(),
+        targetValue = readiness,
         animationSpec = NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_1),
         label = "collectionReadiness",
     )
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        ),
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(46.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
                     FlaticonIcon(
-                        glyph = FlaticonIcons.SALAH_TRAINING,
+                        glyph = FlaticonIcons.TRENDING_UP,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         fontSize = 22.sp,
@@ -1245,22 +1292,28 @@ private fun CollectionReadinessCard(uiState: SalahDataCollectionUiState) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Make prayer detection ready",
+                        text = "Training readiness",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "$labelsReady of ${labels.size} posture labels ready",
+                        text = "$labelsReady of ${labels.size} postures ready for training",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
             }
 
             LinearProgressIndicator(
@@ -1274,231 +1327,166 @@ private fun CollectionReadinessCard(uiState: SalahDataCollectionUiState) {
                 strokeCap = StrokeCap.Round,
             )
 
-            CollectionChecklistRow(
-                isComplete = windowsReady == labels.size,
-                title = "Collect clean sensor coverage",
-                detail = "$windowsReady of ${labels.size} labels have $POSTURE_TARGET_WINDOWS windows",
-            )
-            CollectionChecklistRow(
-                isComplete = sessionsReady == labels.size,
-                title = "Keep recordings independent",
-                detail = "$sessionsReady of ${labels.size} labels appear in $MIN_INDEPENDENT_SESSIONS separate sessions",
-            )
-            CollectionChecklistRow(
-                isComplete = pendingReview == 0,
-                title = "Review uncertain recordings",
-                detail = if (pendingReview == 0) {
-                    "No live or legacy recordings are waiting for review"
-                } else {
-                    "$pendingReview ${if (pendingReview == 1) "recording needs" else "recordings need"} review"
-                },
-            )
-
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(14.dp),
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = if (labelsReady == labels.size && pendingReview == 0) {
-                        "Collection baseline complete. Next: merge all approved recordings, retrain with session-isolated splits, and deploy only if every quality gate passes."
-                    } else {
-                        "Next: follow the recommended posture below. Select it, open Guided Recording, and complete the shown number of captures."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    lineHeight = 17.sp,
-                    modifier = Modifier.padding(12.dp),
+                TrainingReadinessMetric(
+                    value = "$windowsReady/${labels.size}",
+                    label = "Coverage",
+                    modifier = Modifier.weight(1f),
+                )
+                TrainingReadinessMetric(
+                    value = "$sessionsReady/${labels.size}",
+                    label = "Sessions",
+                    modifier = Modifier.weight(1f),
+                )
+                TrainingReadinessMetric(
+                    value = "$pendingReview",
+                    label = "To review",
+                    modifier = Modifier.weight(1f),
+                    needsAttention = pendingReview > 0,
                 )
             }
-        }
-    }
-}
 
-@Composable
-private fun CollectionChecklistRow(
-    isComplete: Boolean,
-    title: String,
-    detail: String,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isComplete) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (isComplete) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(15.dp),
-                )
-            } else {
-                Text(
-                    text = "•",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
- * Tells the collector exactly what to record next: the classification posture
- * furthest from the per-class target. Tapping pre-selects it in the recorder.
- */
-@Composable
-private fun NextUpCard(
-    uiState: SalahDataCollectionUiState,
-    onSelectPosture: (SalahPosture) -> Unit
-) {
-    val target = POSTURE_TARGET_WINDOWS
-    val ranked = SalahPosture.classificationLabels
-        .map { posture ->
-            Triple(
-                posture,
-                uiState.globalPostureCounts[posture.name] ?: 0,
-                eligibleSessionCount(uiState, posture),
-            )
-        }
-        .sortedBy { (_, windows, sessions) ->
-            minOf(
-                windows / target.toFloat(),
-                sessions / MIN_INDEPENDENT_SESSIONS.toFloat(),
-            )
-        }
-    val next = ranked.firstOrNull { (_, windows, sessions) ->
-        windows < target || sessions < MIN_INDEPENDENT_SESSIONS
-    } ?: return
-    val (nextPosture, nextCount, nextSessions) = next
-
-    val overallPct = (
-        ranked.sumOf { (_, windows, sessions) ->
-            minOf(
-                windows.coerceAtMost(target) / target.toFloat(),
-                sessions.coerceAtMost(MIN_INDEPENDENT_SESSIONS) /
-                    MIN_INDEPENDENT_SESSIONS.toFloat(),
-            ).toDouble()
-        } * 100 / ranked.size
-        ).toInt()
-    val weakest = ranked.take(3).filter { (_, windows, sessions) ->
-        windows < target || sessions < MIN_INDEPENDENT_SESSIONS
-    }
-
-    Card(
-        onClick = { onSelectPosture(nextPosture) },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-        ),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "RECOMMENDED NEXT",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = nextPosture.displayName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (nextPosture.arabicName.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = nextPosture.arabicName,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            if (recommended != null) {
+                val (posture, windows, sessions) = recommended
+                Surface(
+                    onClick = { onSelectPosture(posture) },
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "NEXT CAPTURE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = posture.displayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                if (posture.arabicName.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = posture.arabicName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            .copy(alpha = 0.72f),
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "${(POSTURE_TARGET_WINDOWS - windows).coerceAtLeast(0)} windows · " +
+                                    "${(MIN_INDEPENDENT_SESSIONS - sessions).coerceAtLeast(0)} sessions still needed",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+                            )
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Select ${posture.displayName}",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "$nextCount of $target windows · $nextSessions of $MIN_INDEPENDENT_SESSIONS sessions",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Tap to select and see the exact capture recommendation",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                )
-                if (weakest.size > 1) {
-                    Text(
-                        text = "Also incomplete: " + weakest.drop(1).joinToString(", ") { it.first.displayName },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                    )
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.VERIFIED,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            fontSize = 22.sp,
+                        )
+                        Column {
+                            Text(
+                                text = "Collection baseline ready",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                text = "Review approved recordings before retraining the model.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+                            )
+                        }
+                    }
                 }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            // Dataset completion ring — overall progress toward target across all classes.
-            val animatedPct by animateFloatAsState(
-                targetValue = overallPct / 100f,
-                animationSpec = NiaMotion.emphasizedTween(NiaMotion.Duration.LONG_1),
-                label = "datasetRing"
+        }
+    }
+}
+
+@Composable
+private fun TrainingReadinessMetric(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    needsAttention: Boolean = false,
+) {
+    Surface(
+        modifier = modifier,
+        color = if (needsAttention) {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (needsAttention) {
+                    MaterialTheme.colorScheme.onErrorContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             )
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp)) {
-                CircularProgressIndicator(
-                    progress = { animatedPct },
-                    modifier = Modifier.size(84.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    strokeWidth = 7.dp,
-                    strokeCap = StrokeCap.Round
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "$overallPct%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "dataset",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (needsAttention) {
+                    MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.76f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+            )
         }
     }
 }
@@ -1523,11 +1511,15 @@ private fun DeployedModelCard(info: DeployedModelInfo) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Memory,
+                FlaticonIcon(
+                    glyph = if (info.isDeploymentReady) {
+                        FlaticonIcons.VERIFIED
+                    } else {
+                        FlaticonIcons.DEVELOPER
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    fontSize = 19.sp,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -1606,11 +1598,11 @@ private fun QuickGuide() {
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.INFO,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        fontSize = 21.sp,
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -1626,13 +1618,14 @@ private fun QuickGuide() {
                     animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4),
                     label = "guideChevron"
                 )
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.ANGLE_DOWN,
                     contentDescription = if (expanded) "Collapse" else "Expand",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(20.dp)
-                        .graphicsLayer { rotationZ = chevron }
+                        .graphicsLayer { rotationZ = chevron },
+                    fontSize = 18.sp,
                 )
             }
             androidx.compose.animation.AnimatedVisibility(
@@ -1739,15 +1732,19 @@ private fun RecordingHero(
             containerColor = when {
                 uiState.isCountingDown -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 uiState.isRecording -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-                else -> MaterialTheme.colorScheme.surface
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
-        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+        ),
+        shape = RoundedCornerShape(28.dp),
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
                 elevation = shadowElevation,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(28.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
             )
@@ -1776,15 +1773,15 @@ private fun RecordingHero(
                     modifier = Modifier.size(36.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "2",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = if (uiState.isRecording) {
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.MICROPHONE,
+                            contentDescription = null,
+                            tint = if (uiState.isRecording) {
                                 MaterialTheme.colorScheme.onErrorContainer
                             } else {
                                 MaterialTheme.colorScheme.onPrimaryContainer
                             },
+                            fontSize = 17.sp,
                         )
                     }
                 }
@@ -1936,7 +1933,7 @@ private fun RecordingHero(
                 }
             }
 
-            // Record / Stop Button — app-wide outlined style.
+            // Record / Stop Button — shared app-wide button style.
             val heroHaptics = LocalHapticFeedback.current
             if (uiState.isRecording) {
                 NiaOutlinedButton(
@@ -1946,11 +1943,21 @@ private fun RecordingHero(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(56.dp),
                 ) {
-                    Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(24.dp))
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.STOP,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        fontSize = 21.sp,
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Stop Recording", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Stop Recording",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             } else {
                 NiaOutlinedButton(
@@ -1960,9 +1967,13 @@ private fun RecordingHero(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(56.dp),
                 ) {
-                    Icon(Icons.Default.FiberManualRecord, contentDescription = null, modifier = Modifier.size(20.dp))
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.MICROPHONE,
+                        contentDescription = null,
+                        fontSize = 19.sp,
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Start Recording", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
@@ -2044,15 +2055,15 @@ private fun PostureSelector(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.FiberManualRecord,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.POSTURE_TRAINING,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            fontSize = 18.sp,
                         )
                     }
                     Text(
-                        text = "1 · Choose a posture",
+                        text = "Choose posture",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -2346,11 +2357,11 @@ private fun PostureChip(
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.CHECK,
                     contentDescription = "Target reached",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(11.dp)
+                    fontSize = 10.sp,
                 )
             }
         }
@@ -2411,11 +2422,11 @@ private fun SessionStats(uiState: SalahDataCollectionUiState) {
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.FiberManualRecord,
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.MICROPHONE,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            fontSize = 15.sp,
                         )
                     }
                     Text(
@@ -2571,11 +2582,11 @@ private fun SensorPreview(uiState: SalahDataCollectionUiState) {
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.FiberManualRecord,
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.QUICK_ACTION,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(16.dp)
+                                fontSize = 15.sp,
                             )
                         }
                         Text(
@@ -2722,8 +2733,8 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                                 MaterialTheme.colorScheme.surfaceContainerHighest
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.ExpandMore,
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.ANGLE_DOWN,
                                     contentDescription = if (isTrainingExpanded) "Collapse" else "Expand",
                                     tint = if (isTrainingExpanded)
                                         MaterialTheme.colorScheme.primary
@@ -2731,7 +2742,8 @@ private fun TrainingProgress(uiState: SalahDataCollectionUiState) {
                                         MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
                                         .size(20.dp)
-                                        .rotate(rotationAngle)
+                                        .rotate(rotationAngle),
+                                    fontSize = 17.sp,
                                 )
                             }
                         }
@@ -2908,11 +2920,11 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.Description,
+            FlaticonIcon(
+                glyph = FlaticonIcons.STORAGE,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                fontSize = 17.sp,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -2946,11 +2958,11 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.STORAGE,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(28.dp)
+                    fontSize = 26.sp,
                 )
                 Text(
                     text = "No recordings yet",
@@ -2978,16 +2990,17 @@ private fun DataFilesHeader(uiState: SalahDataCollectionUiState) {
 private fun FileQualityBadge(quality: FileQuality?, onAnalyze: () -> Unit) {
     when {
         quality == null -> Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            modifier = Modifier.clickable(onClick = onAnalyze)
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier
+                .size(24.dp)
+                .clickable(onClick = onAnalyze),
         ) {
-            Text(
-                text = "check",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            FlaticonIcon(
+                glyph = FlaticonIcons.QUICK_ACTION,
+                contentDescription = "Analyze recording quality",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontSize = 11.sp,
             )
         }
 
@@ -3004,18 +3017,33 @@ private fun FileQualityBadge(quality: FileQuality?, onAnalyze: () -> Unit) {
                 else -> MaterialTheme.colorScheme.error
             }
             Surface(
-                shape = RoundedCornerShape(6.dp),
+                shape = RoundedCornerShape(999.dp),
                 color = color.copy(alpha = 0.15f),
-                modifier = Modifier.clickable(onClick = onAnalyze)
+                modifier = Modifier.clickable(onClick = onAnalyze),
             ) {
-                Text(
-                    text = if (quality.flaggedCount > 0) "$pct% \u00b7 ${quality.flaggedCount}!" else "$pct%",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    FlaticonIcon(
+                        glyph = if (pct >= 85 && quality.flaggedCount == 0) {
+                            FlaticonIcons.VERIFIED
+                        } else {
+                            FlaticonIcons.WARNING
+                        },
+                        contentDescription = null,
+                        tint = color,
+                        fontSize = 9.sp,
+                    )
+                    Text(
+                        text = "$pct%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                    )
+                }
             }
         }
     }
@@ -3061,10 +3089,11 @@ private fun SwipeToDismissFileItem(
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.Delete,
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.DELETE,
                         contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.onErrorContainer
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 20.sp,
                     )
                 }
             }
@@ -3132,11 +3161,11 @@ private fun DataFileItem(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.STORAGE,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    fontSize = 17.sp,
                 )
             }
 
@@ -3238,11 +3267,11 @@ private fun DataFileItem(
                 onClick = onDelete,
                 modifier = Modifier.size(36.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.DELETE,
                     contentDescription = "Delete file",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp)
+                    fontSize = 15.sp,
                 )
             }
         }
@@ -3300,15 +3329,8 @@ private fun Visualization3DCard(
                     Box(
                         modifier = Modifier
                             .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -3320,7 +3342,7 @@ private fun Visualization3DCard(
                     }
                     Column {
                         Text(
-                            text = "3 · Review in 3D",
+                            text = "Review in 3D",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -3662,15 +3684,19 @@ private fun CaptureQualityCard(uiState: SalahDataCollectionUiState) {
                     .border(2.5.dp, statusColor.copy(alpha = 0.5f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = when (overallQuality) {
-                        CaptureQuality.GREAT -> "\u2714"  // checkmark
-                        CaptureQuality.OK -> "~"
-                        CaptureQuality.BAD -> "!"
+                FlaticonIcon(
+                    glyph = when (overallQuality) {
+                        CaptureQuality.GREAT -> FlaticonIcons.VERIFIED
+                        CaptureQuality.OK -> FlaticonIcons.INFO
+                        CaptureQuality.BAD -> FlaticonIcons.WARNING
                     },
+                    contentDescription = when (overallQuality) {
+                        CaptureQuality.GREAT -> "Capture quality is great"
+                        CaptureQuality.OK -> "Capture quality needs attention"
+                        CaptureQuality.BAD -> "Capture quality is poor"
+                    },
+                    tint = statusColor,
                     fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = statusColor
                 )
             }
 

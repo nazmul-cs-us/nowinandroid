@@ -57,6 +57,7 @@ object FlaticonIcons {
     const val REMOVE = "\uf94b"
     const val DARK_THEME = "\uf972"
     const val PRAYER_TIMES = "\uf978"
+    const val POSTURE_TRAINING = "\ueb97"
     const val APPEARANCE = "\uf9ed"
     const val PAUSE = "\ufa0c"
     const val SALAH_TRAINING = "\ufd5f"

@@ -378,8 +378,8 @@ fun UnifiedSettingsScreen(
                 item {
                     SettingsSection(
                         title = "Salah Training",
-                        subtitle = "ML posture detection training",
-                iconGlyph = FlaticonIcons.SALAH_TRAINING,
+                        subtitle = "Improve on-device posture detection",
+                        iconGlyph = FlaticonIcons.POSTURE_TRAINING,
                         isExpanded = expandedSections.contains("salah"),
                         onToggleExpanded = { viewModel.toggleSection("salah") }
                     ) {
@@ -650,7 +650,7 @@ private fun SalahTrainingSection(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = "Collect sensor data to train the salah posture detection model. Record your prayer movements to improve ML accuracy.",
+            text = "Build a more reliable on-device prayer model with guided posture recordings and clear quality checks.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -663,13 +663,13 @@ private fun SalahTrainingSection(
                 .height(56.dp)
         ) {
             FlaticonIcon(
-                glyph = FlaticonIcons.SALAH_TRAINING,
+                glyph = FlaticonIcons.DEVELOPER,
                 contentDescription = null,
                 fontSize = 22.sp,
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "Start Data Collection",
+                text = "Open Training Lab",
                 style = MaterialTheme.typography.labelLarge
             )
         }

@@ -316,6 +316,7 @@ fun PrayerTimesScreen(
     onSettingsClick: () -> Unit = {},
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
     // Full media-source router for the mini-bar title tap (surah/hadith/dua);
     // when null, falls back to the legacy surah-only behavior.
     onMediaSourceClick: ((com.starception.submission.media.MediaSource) -> Unit)? = null,
@@ -331,6 +332,30 @@ fun PrayerTimesScreen(
     onSetSyncing: (Boolean) -> Unit = {},
 ) {
     val screenContext = LocalContext.current
+    val contextualDuasByChapter by produceState(
+        initialValue = emptyMap<Int, List<com.starception.submission.core.duadatabase.Dua>>(),
+        key1 = screenContext.applicationContext,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val entryPoint = EntryPointAccessors.fromApplication(
+                    screenContext.applicationContext,
+                    PrayerTimeCalculatorEntryPoint::class.java,
+                )
+                val repository = entryPoint.duaRepository()
+                buildMap {
+                    CONTEXTUAL_DUA_CHAPTER_IDS.forEach { chapterId ->
+                        repository.getDuasByChapter(chapterId)
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { put(chapterId, it) }
+                    }
+                }
+            }.getOrElse { error ->
+                Log.w("PrayerTimesScreen", "Unable to load contextual Fortress duas", error)
+                emptyMap()
+            }
+        }
+    }
     
     // COMPREHENSIVE UI LOGGING SYSTEM
     LaunchedEffect(Unit) {
@@ -1672,6 +1697,8 @@ fun PrayerTimesScreen(
                                 isLandscape = true,
                                 onSurahClick = onSurahClick,
                                 onSurahClickWithAyah = onSurahClickWithAyah,
+                                onFortressDuaClick = onFortressDuaClick,
+                                fortressDuasByChapter = contextualDuasByChapter,
                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                             )
                         }
@@ -1912,6 +1939,8 @@ fun PrayerTimesScreen(
                     timeOffsets = storedOffsets,
                     onSurahClick = onSurahClick,
                     onSurahClickWithAyah = onSurahClickWithAyah,
+                    onFortressDuaClick = onFortressDuaClick,
+                    fortressDuasByChapter = contextualDuasByChapter,
                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                 )
                 }

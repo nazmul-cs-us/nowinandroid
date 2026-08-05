@@ -138,6 +138,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
+import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
@@ -155,12 +156,13 @@ import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import java.time.LocalTime
 import java.time.LocalDate
+import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.GregorianCalendar
-import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sqrt
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
@@ -215,6 +217,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.AyahNoteEntity
+import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 
 private val HomeReferenceInk = Color(0xFF0A0808)
 private val HomeReferenceCard = Color(0xFFFFFDF7)
@@ -1094,20 +1097,48 @@ fun SwipeableBigTiles(
     compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
+    onFortressDuaClick: (Dua) -> Unit = {},
+    fortressDuasByChapter: Map<Int, List<Dua>> = emptyMap(),
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
 ) {
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    val insightPageCount = 5
+    val middleLoopStart = insightPageCount
+    val pagerState = rememberPagerState(
+        initialPage = middleLoopStart,
+        pageCount = { insightPageCount * 3 },
+    )
     val view = LocalView.current
     var showGlobePopup by remember { mutableStateOf(false) }
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
         pagerSnapDistance = PagerSnapDistance.atMost(1),
-        snapAnimationSpec = tween(
-            durationMillis = 360,
-            easing = FastOutSlowInEasing,
+        snapAnimationSpec = spring(
+            dampingRatio = 0.88f,
+            stiffness = 420f,
         ),
-        snapPositionalThreshold = 0.32f,
+        snapPositionalThreshold = 0.24f,
     )
+    var lastSettledPage by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pagerState.settledPage) {
+        val settledLogicalPage = pagerState.settledPage % insightPageCount
+        if (settledLogicalPage != lastSettledPage) {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            lastSettledPage = settledLogicalPage
+        }
+
+        // Keep one complete copy of the carousel available on either side.
+        // The duplicate pages make the first and last cards connect naturally;
+        // recentering on identical content is visually imperceptible.
+        when {
+            pagerState.settledPage < middleLoopStart -> {
+                pagerState.scrollToPage(pagerState.settledPage + insightPageCount)
+            }
+
+            pagerState.settledPage >= middleLoopStart + insightPageCount -> {
+                pagerState.scrollToPage(pagerState.settledPage - insightPageCount)
+            }
+        }
+    }
 
     val nextPrayer = getNextPrayer() ?: getCurrentPrayer()
     val nextPrayerName = nextPrayer?.first?.let(::getPrayerDisplayName) ?: "Prayer time"
@@ -1148,6 +1179,28 @@ fun SwipeableBigTiles(
             )
         }
     }
+    val prayersRemaining = (totalPrayers - prayedCount).coerceAtLeast(0)
+    val nextUnmarkedPrayer = prayerRecap.firstOrNull { !it.isPrayed }?.name
+    val today = LocalDate.now()
+    val dailySurah = remember(today) {
+        if (today.dayOfWeek == DayOfWeek.FRIDAY) {
+            QuranData.surahs.first { it.number == 18 }
+        } else {
+            QuranData.surahs[(today.dayOfYear - 1) % QuranData.surahs.size]
+        }
+    }
+    val aiRecommendation = remember(today, currentTime.hour, fortressDuasByChapter) {
+        buildContextualInsightRecommendation(
+            date = today,
+            time = currentTime,
+            fortressDuasByChapter = fortressDuasByChapter,
+        )
+    }
+    val qiblaBearing = remember(prayerTimes?.location) {
+        prayerTimes?.location?.let { location ->
+            calculateQiblaDirection(location.latitude, location.longitude).roundToInt()
+        }
+    }
     val compact = compactForExpandedPrayers && !isLandscape
     val compactTransition = updateTransition(
         targetState = compact,
@@ -1171,17 +1224,59 @@ fun SwipeableBigTiles(
     Column(
         modifier = if (isLandscape) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = "Insights",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = headerFontSize,
-                lineHeight = headerLineHeight,
-                letterSpacing = (-0.25).sp,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = headerBottomPadding),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = headerBottomPadding),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Insights",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = headerFontSize,
+                    lineHeight = headerLineHeight,
+                    letterSpacing = (-0.25).sp,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(insightPageCount) { index ->
+                    val selected = pagerState.currentPage % insightPageCount == index
+                    val indicatorWidth by animateDpAsState(
+                        targetValue = if (selected) 18.dp else 6.dp,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                        label = "insightIndicatorWidth",
+                    )
+                    val indicatorAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.24f,
+                        animationSpec = tween(180, easing = FastOutSlowInEasing),
+                        label = "insightIndicatorAlpha",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(indicatorWidth)
+                            .height(6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                            .alpha(indicatorAlpha),
+                    )
+                }
+            }
+        }
 
         val stripModifier = if (isLandscape) {
             Modifier
@@ -1219,49 +1314,105 @@ fun SwipeableBigTiles(
                 flingBehavior = pagerFlingBehavior,
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
-                when (page) {
-                    0 -> InsightPreviewCard(
-                        label = "Next Prayer",
-                        title = prayerPrediction?.title ?: prayerTitle,
-                        supportingText = prayerPrediction?.content,
-                        footerText = prayerPrediction?.nextPrayerInfo,
-                        backgroundPainterRes = R.drawable.insight_salah,
-                        compactProgress = compactProgress,
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            onCompassClick()
+                val logicalPage = page % insightPageCount
+                val pageOffset = kotlin.math.abs(
+                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
+                ).coerceIn(0f, 1f)
+                val focus = 1f - pageOffset
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val cardScale = lerp(0.97f, 1f, focus)
+                            scaleX = cardScale
+                            scaleY = cardScale
+                            alpha = lerp(0.9f, 1f, focus)
                         },
-                    )
+                ) {
+                    when (logicalPage) {
+                        0 -> InsightPreviewCard(
+                            label = "Prayer now",
+                            title = prayerPrediction?.title ?: prayerTitle,
+                            supportingText = prayerPrediction?.content
+                                ?: getTimeUntilNextPrayer().takeIf { it.isNotBlank() },
+                            footerText = prayerPrediction?.nextPrayerInfo
+                                ?: listOf(nextPrayerName, nextPrayerTime)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" · "),
+                            backgroundPainterRes = R.drawable.insight_salah,
+                            compactProgress = compactProgress,
+                            actionDescription = "Open prayer compass",
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                onCompassClick()
+                            },
+                        )
 
-                    1 -> InsightPreviewCard(
-                        label = "Salah Recap",
-                        title = "$prayedCount of $totalPrayers prayers completed today",
-                        backgroundPainterRes = R.drawable.insight_prayer,
-                        compactProgress = compactProgress,
-                        prayerRecap = prayerRecap,
-                    )
+                        1 -> InsightPreviewCard(
+                            label = "Today's salah",
+                            title = "$prayedCount of $totalPrayers complete",
+                            supportingText = when {
+                                prayersRemaining == 0 -> "All prayers marked for today"
+                                nextUnmarkedPrayer != null -> "$prayersRemaining remaining · Next $nextUnmarkedPrayer"
+                                else -> "$prayersRemaining remaining"
+                            },
+                            footerText = "Completed prayers stay highlighted",
+                            backgroundPainterRes = R.drawable.insight_prayer,
+                            compactProgress = compactProgress,
+                            prayerRecap = prayerRecap,
+                        )
 
-                    2 -> InsightPreviewCard(
-                        label = "Noble Quran",
-                        title = "Continue your journey through the Noble Quran",
-                        backgroundPainterRes = R.drawable.insight_quran,
-                        compactProgress = compactProgress,
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            onSurahClick(1)
-                        },
-                    )
+                        2 -> InsightPreviewCard(
+                            label = "Today's reading",
+                            title = dailySurah.nameEnglish,
+                            supportingText = dailySurah.nameArabic,
+                            footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
+                            backgroundPainterRes = R.drawable.insight_quran,
+                            compactProgress = compactProgress,
+                            actionDescription = "Open ${dailySurah.nameEnglish}",
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                onSurahClick(dailySurah.number)
+                            },
+                        )
 
-                    else -> InsightPreviewCard(
-                        label = "Qibla",
-                        title = "Find your direction toward the Kaaba",
-                        backgroundPainterRes = R.drawable.insight_qibla,
-                        compactProgress = compactProgress,
-                        onClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            showGlobePopup = true
-                        },
-                    )
+                        3 -> InsightPreviewCard(
+                            label = "Qibla",
+                            title = qiblaBearing?.let { "$it° toward Makkah" }
+                                ?: "Direction to Makkah",
+                            supportingText = qiblaBearing?.let(::qiblaCardinalDirection),
+                            footerText = "Open the live compass and 3D globe",
+                            backgroundPainterRes = R.drawable.insight_qibla,
+                            compactProgress = compactProgress,
+                            actionDescription = "Open Qibla compass",
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                showGlobePopup = true
+                            },
+                        )
+
+                        else -> InsightPreviewCard(
+                            label = "AI suggested",
+                            title = aiRecommendation.title,
+                            supportingText = aiRecommendation.supportingText,
+                            footerText = aiRecommendation.footerText,
+                            backgroundPainterRes = R.drawable.insight_suggestion,
+                            compactProgress = compactProgress,
+                            actionDescription = aiRecommendation.actionDescription,
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                when (val target = aiRecommendation.target) {
+                                    is ContextualRecommendationTarget.Surah -> {
+                                        onSurahClick(target.number)
+                                    }
+
+                                    is ContextualRecommendationTarget.FortressDua -> {
+                                        onFortressDuaClick(target.dua)
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -1349,6 +1500,7 @@ private fun InsightPreviewCard(
     supportingText: String? = null,
     footerText: String? = null,
     prayerRecap: List<PrayerRecapIndicator> = emptyList(),
+    actionDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val hasPrayerContext = !supportingText.isNullOrBlank() ||
@@ -1440,6 +1592,27 @@ private fun InsightPreviewCard(
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
+            }
+
+            if (onClick != null && compactProgress < 0.5f) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(tagInset)
+                        .size(34.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.34f),
+                    shadowElevation = 0.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = actionDescription,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
             }
 
             Column(
@@ -1548,6 +1721,16 @@ private fun InsightPreviewCard(
             }
         }
     }
+}
+
+private fun qiblaCardinalDirection(bearing: Int): String {
+    val directions = listOf(
+        "North", "Northeast", "East", "Southeast",
+        "South", "Southwest", "West", "Northwest",
+    )
+    val normalized = ((bearing % 360) + 360) % 360
+    val index = ((normalized + 22.5) / 45.0).toInt() % directions.size
+    return "${directions[index]} from your location"
 }
 
 @Suppress("UNUSED_PARAMETER")

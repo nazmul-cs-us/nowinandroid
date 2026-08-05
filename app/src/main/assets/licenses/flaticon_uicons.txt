@@ -1,7 +1,7 @@
 Flaticon UIcons attribution
 
-The Settings category icons use the Rounded Regular UIcons 3.3.1 family.
-The Salah data collection entry uses the non-human target glyph.
+The Settings and Salah Training icons use the Rounded Regular UIcons family.
+Salah Training and posture workflows use Flaticon's machine-learning glyph.
 
 UIcons by Flaticon
 https://www.flaticon.com/uicons
