@@ -4915,12 +4915,25 @@ private fun computeInkMarkerGeometries(
             // between the two words, so that run IS the inter-word gap. Picking
             // the globally widest run instead can select white space beyond the
             // NEXT word (marker 52 of Al-A'raf landed on top of it that way).
+            // A run can only host the medallion if it is at least as wide as the
+            // ornament, so width gates candidacy BEFORE overlap ranks it. Without
+            // that gate a hairline stroke splitting the true gap lets a sliver win
+            // on overlap alone: Ar-Rahman marker 3 centred a 98px medallion in a
+            // 34px fragment — an 11px swash tip had cut the real 394px gap in two,
+            // and the fragment sat dead-centre in the slot so it out-scored it —
+            // planting the ornament on top of the final noon of ٱلْإِنسَٰنَ.
+            // Fitting runs are ranked by slot overlap exactly as before; only when
+            // NO run fits do we fall back to the original overlap-only choice, so
+            // lines whose gap is genuinely narrower than the ornament (Al-A'raf
+            // 49/52, Al-Muddaththir 43) keep their tuned placement untouched.
             val slotL = (rect.left * scale).toInt()
             val slotR = (rect.right * scale).toInt()
+            val minFitW = w * scale
             var bestGapL = -1
             var bestGapR = -1
             var bestOverlap = -1
             var bestWidth = -1
+            var bestFits = false
             var runStart = -1
             var x = winL
             while (x <= winR + 1) {
@@ -4930,7 +4943,14 @@ private fun computeInkMarkerGeometries(
                     val runEnd = x
                     val overlap = (minOf(runEnd, slotR) - maxOf(runStart, slotL)).coerceAtLeast(0)
                     val width = runEnd - runStart
-                    if (overlap > bestOverlap || (overlap == bestOverlap && width > bestWidth)) {
+                    val fits = width >= minFitW
+                    val better = when {
+                        fits != bestFits -> fits
+                        overlap != bestOverlap -> overlap > bestOverlap
+                        else -> width > bestWidth
+                    }
+                    if (better) {
+                        bestFits = fits
                         bestOverlap = overlap
                         bestWidth = width
                         bestGapL = runStart
