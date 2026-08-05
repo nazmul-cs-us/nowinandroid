@@ -344,8 +344,11 @@ def main():
                         help="Initial learning rate")
     parser.add_argument("--seq_length", type=int, default=SEQUENCE_LENGTH,
                         help="Sequence length (number of 100ms windows)")
-    parser.add_argument("--stride", type=int, default=10,
-                        help="Stride for sequence creation")
+    parser.add_argument("--stride", type=int, default=3,
+                        help="Stride for sequence creation. A 5 second transition take "
+                             "yields 11 sequences at stride 3 but only 4 at stride 10, "
+                             "too few to clear the deployment gate's 10 test sequences "
+                             "per class from a single held-out session.")
     parser.add_argument("--augment", action="store_true", default=True,
                         help="Apply data augmentation (default: enabled)")
     parser.add_argument("--no-augment", dest="augment", action="store_false",

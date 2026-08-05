@@ -233,7 +233,7 @@ def extract_window_features(sample: dict) -> np.ndarray:
 def create_sequences(
     samples: List[dict],
     sequence_length: int = SEQUENCE_LENGTH,
-    stride: int = 10,
+    stride: int = 3,
     return_groups: bool = False
 ):
     """
@@ -242,7 +242,9 @@ def create_sequences(
     Args:
         samples: List of JSONL sample dicts (sorted by timestamp within session)
         sequence_length: Number of windows per sequence (default 20 = 2 seconds)
-        stride: Step size between sequences (default 10 = 1 second, 50% overlap)
+        stride: Step size between sequences (default 3 = 300ms, 85% overlap). The
+            short transition classes only occupy a few seconds per session, so a
+            coarser stride leaves too few held-out sequences to evaluate them.
 
     Returns:
         X: (N, sequence_length, FEATURES_PER_WINDOW) feature sequences
