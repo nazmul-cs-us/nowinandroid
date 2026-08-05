@@ -4755,15 +4755,22 @@ private const val MARKER_INK_SCAN_SCALE = 0.5f
 private val MUSHAF_SEL_RADIUS = 16.dp
 /** Vertical trim on the block's outer edges only (see the path build). */
 private val MUSHAF_SEL_VINSET = 5.dp
-/** Kept under the page's side margin (~50px): a wider blur pushes the halo off
- *  the edge of the page, which reads as the selection bleeding off-screen. */
-private val MUSHAF_SEL_BLUR = 12.dp
-// Kept deliberately low: the scheme's `primary` is a dark navy here, so anything
-// above ~0.25 stops reading as light on the cream page and turns into a solid
-// blue-grey block sitting on top of the text.
-private const val MUSHAF_SEL_HALO_ALPHA = 0.20f
-private const val MUSHAF_SEL_FILL_ALPHA = 0.05f
-private const val MUSHAF_SEL_EDGE_ALPHA = 0.14f
+/** Horizontal overshoot past the line's own box. Without it the blur's falloff
+ *  starts ON the text: justified lines run nearly edge to edge, so the first and
+ *  last glyphs of a line sat at ~60% of the glow's plateau and read as excluded
+ *  (Al-Kahf 1's opening alef). Pushing the shape out moves the fade into the
+ *  page margin, where it belongs. Stays well under the marker gap so it does not
+ *  wash back over the ornament. */
+private val MUSHAF_SEL_HPAD = 16.dp
+/** Stacked blur passes, widest first: (blur radius, alpha). The wide faint pass
+ *  carries the long falloff and the tighter one gives the shape presence; the sum
+ *  vanishes toward its border rather than ending at a ring. Alphas stay low —
+ *  `primary` is a dark navy here, so much above ~0.25 total stops reading as
+ *  light on the cream page and becomes a solid block over the text. */
+private val MUSHAF_SEL_GLOW_LAYERS = listOf(
+    14.dp to 0.09f,
+    6.dp to 0.16f,
+)
 
 /**
  * Union of these rects as one rounded path. Line boxes are contiguous, so the
@@ -5107,6 +5114,11 @@ private fun MushafPageWithFrame(
     onAyahLongPress: (Int) -> Unit,
     ayahRanges: List<Pair<Int, IntRange>>,
     highlightedAyahNumber: Int? = null,
+    /** Double-tap on an ayah — reveals its translation. */
+    onAyahDoubleTap: (Int) -> Unit = {},
+    /** Ayah whose translation is currently revealed, and the text to show. */
+    revealedAyah: Int? = null,
+    revealedTranslation: String? = null,
     inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> = emptyMap(),
     /** Precomputed ink-accurate marker geometry for THIS page (null while pending). */
     inkGeometries: List<MarkerGeometry>? = null,
@@ -5158,6 +5170,15 @@ private fun MushafPageWithFrame(
         androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null)
     }
 
+    // Which ayah sits under a touch point. Reads pageLayout.value at call time,
+    // so it stays correct as the layout settles.
+    val ayahAt: (androidx.compose.ui.geometry.Offset) -> Int? = { pos ->
+        pageLayout.value?.let { laid ->
+            val off = laid.getOffsetForPosition(pos)
+            ayahRanges.firstOrNull { off in it.second }?.first
+        }
+    }
+
     // Selection silhouette, rebuilt only when the layout or the selected ayah
     // changes. Shared by the blurred halo pass and the crisp core pass so both
     // trace exactly the same shape.
@@ -5172,11 +5193,12 @@ private fun MushafPageWithFrame(
         // would open gaps between lines and break the union into separate blobs,
         // so interior edges stay contiguous.
         val vInset = with(selDensity) { MUSHAF_SEL_VINSET.toPx() }
+        val hPad = with(selDensity) { MUSHAF_SEL_HPAD.toPx() }
         val tightened = rects.mapIndexed { i, r ->
             androidx.compose.ui.geometry.Rect(
-                r.left,
+                r.left - hPad,
                 if (i == 0) r.top + vInset else r.top,
-                r.right,
+                r.right + hPad,
                 if (i == rects.lastIndex) r.bottom - vInset else r.bottom,
             )
         }
@@ -5255,22 +5277,34 @@ private fun MushafPageWithFrame(
             // laid on top. Geometry is per-line rounded rects (rangeLineRects),
             // NOT getPathForRange — a blurred square path just looks like a smear.
             //
-            // Halo: the silhouette blurred in its own layer, so the light bleeds
-            // outward past the text block. Needs API 31+; below that this layer
-            // renders unblurred and the core pass still marks the selection.
+            // Halo only — no crisp pass. A single blurred fill still ends at a
+            // defined ring, and an unblurred fill/stroke under it drew a visible
+            // rounded rectangle. Stacking a wide faint layer under a tighter
+            // stronger one spreads the falloff over a longer distance, so the
+            // light simply vanishes toward its border instead of having an edge.
+            // Needs API 31+; below that the layers render unblurred and stack
+            // into a plain tinted plate, which is a fine degradation.
             if (selPath != null) {
-                androidx.compose.foundation.Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            start = horizontalPadding,
-                            end = horizontalPadding,
-                            top = topPadding + bismillahHeightDp,
-                            bottom = bottomPadding
-                        )
-                        .blur(MUSHAF_SEL_BLUR)
-                ) {
-                    drawPath(selPath, color = glowColor.copy(alpha = MUSHAF_SEL_HALO_ALPHA))
+                MUSHAF_SEL_GLOW_LAYERS.forEach { (radius, layerAlpha) ->
+                    androidx.compose.foundation.Canvas(
+                        // Deliberately NOT horizontally padded like the text/marker
+                        // canvases: a blur is clipped to its layer, so padding this
+                        // one cut the falloff dead at the text-area boundary — a
+                        // fresh hard edge ~30px inside the page. Spanning the full
+                        // width and translating the path instead keeps the geometry
+                        // aligned while giving the blur the margin to fade into.
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                top = topPadding + bismillahHeightDp,
+                                bottom = bottomPadding
+                            )
+                            .blur(radius)
+                    ) {
+                        translate(left = horizontalPadding.toPx()) {
+                            drawPath(selPath, color = glowColor.copy(alpha = layerAlpha))
+                        }
+                    }
                 }
             }
 
@@ -5290,17 +5324,6 @@ private fun MushafPageWithFrame(
                         bottom = bottomPadding
                     )
             ) {
-                // Core: a soft fill plus a hairline edge, unblurred, so the shape
-                // keeps a readable silhouette inside the halo instead of dissolving.
-                if (selPath != null) {
-                    drawPath(selPath, color = glowColor.copy(alpha = MUSHAF_SEL_FILL_ALPHA))
-                    drawPath(
-                        selPath,
-                        color = glowColor.copy(alpha = MUSHAF_SEL_EDGE_ALPHA),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
-                    )
-                }
-
                 val geoms = inkGeometries ?: return@Canvas
                 if (markerAlpha <= 0.01f) return@Canvas
                 for (g in geoms) {
@@ -5349,13 +5372,17 @@ private fun MushafPageWithFrame(
                         top = topPadding + bismillahHeightDp,
                         bottom = bottomPadding
                     )
-                    .pointerInput(ayahRanges) {
+                    .pointerInput(ayahRanges, pageLayout) {
                         detectTapGestures(
-                            onLongPress = {
-                                if (ayahRanges.isNotEmpty()) {
-                                    onAyahLongPress(ayahRanges.first().first)
-                                }
-                            }
+                            onDoubleTap = { pos -> ayahAt(pos)?.let(onAyahDoubleTap) },
+                            // Fall back to the page's first ayah only when the point
+                            // maps nowhere. This USED to be unconditional — the old
+                            // handler ignored the offset entirely, so a long-press
+                            // anywhere on the page selected the first ayah on it.
+                            onLongPress = { pos ->
+                                (ayahAt(pos) ?: ayahRanges.firstOrNull()?.first)
+                                    ?.let(onAyahLongPress)
+                            },
                         )
                     }
             )
@@ -5388,6 +5415,57 @@ private fun MushafPageWithFrame(
                 }
             }
 
+            // Translation reveal, anchored under the double-tapped ayah's last
+            // line. An OVERLAY, not inline text: the page is pre-paginated with
+            // fixed line breaks, so injecting the translation into the flow would
+            // reflow the page and change where every later ayah falls.
+            val revealBottomPx = remember(revealedAyah, ayahRanges, pageLayout.value) {
+                val target = revealedAyah ?: return@remember null
+                val r = ayahRanges.firstOrNull { it.first == target }?.second
+                    ?: return@remember null
+                val laid = pageLayout.value ?: return@remember null
+                val s = r.first.coerceIn(0, pageText.length)
+                val e = r.last.coerceIn(s, pageText.length)
+                if (e <= s) return@remember null
+                laid.rangeLineRects(s, e).lastOrNull()?.bottom
+            }
+            val revealShown = revealBottomPx != null && !revealedTranslation.isNullOrBlank()
+            val revealAnim by animateFloatAsState(
+                targetValue = if (revealShown) 1f else 0f,
+                animationSpec = tween(220),
+                label = "translationReveal",
+            )
+            if (revealAnim > 0.01f && revealBottomPx != null) {
+                val anchorPx = with(LocalDensity.current) {
+                    (topPadding + bismillahHeightDp).toPx() + revealBottomPx + 6.dp.toPx()
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset { androidx.compose.ui.unit.IntOffset(0, anchorPx.toInt()) }
+                        .padding(horizontal = horizontalPadding)
+                        .graphicsLayer {
+                            alpha = revealAnim
+                            // rises the last few px as it fades in
+                            translationY = (1f - revealAnim) * 20f
+                        }
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+                        shape = RoundedCornerShape(14.dp),
+                        tonalElevation = 2.dp,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = revealedTranslation.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -5639,6 +5717,16 @@ private fun MushafPagerView(
             ranges.add(ayah.numberInSurah to (startPos until pos))
         }
         ranges
+    }
+
+    // Double-tap reveal. `ayah.text` arrives as arabic + "\n\n" + translation from
+    // the translation-aware loader, so part 1 is the translation; ayahs whose
+    // translation is missing simply have nothing to reveal.
+    var revealedAyah by remember(ayahs) { mutableStateOf<Int?>(null) }
+    val translationByAyah = remember(ayahs) {
+        ayahs.associate { a ->
+            a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
+        }
     }
 
     Column(
@@ -5965,6 +6053,12 @@ private fun MushafPagerView(
                     onAyahLongPress = onAyahLongPress,
                     ayahRanges = page.ayahRanges,
                     highlightedAyahNumber = highlightedAyahNumber,
+                    onAyahDoubleTap = { n ->
+                        // Double-tap the revealed ayah again to dismiss.
+                        revealedAyah = if (revealedAyah == n) null else n
+                    },
+                    revealedAyah = revealedAyah,
+                    revealedTranslation = revealedAyah?.let { translationByAyah[it] },
                     modifier = Modifier.fillMaxSize()
                 )
             }
