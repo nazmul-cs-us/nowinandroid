@@ -80,6 +80,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -4729,13 +4730,16 @@ private const val MARKER_HEIGHT_EM = 1.2f
 private const val MARKER_ORNAMENT_FILL = 0.92f
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
 private const val MARKER_ASPECT = 1332f / 1418f
-/** Gap reserved in the text flow on each side of the ornament. This IS the
- *  breathing room the user sees: the drawing pass centers the ornament in its
- *  reserved slot (which Compose already positions correctly in the justified
- *  RTL flow), so these gaps directly determine the symmetric spacing between
- *  the ornament and its neighbouring words — no per-letter ink measurement. */
-private const val MARKER_GAP_BEFORE_EM = 0.55f
-private const val MARKER_GAP_AFTER_EM = 0.55f
+/** Gap reserved in the text flow on each side of the ornament. This sets how
+ *  much ink-free room the slot contributes; the drawing pass then CENTRES the
+ *  ornament in the true ink gap (see computeInkMarkerGeometries), so the space
+ *  the eye sees is (ink-free width - ornament width) / 2 — the reserved gap
+ *  plus whatever justification stretches into it. Shrink these to tighten the
+ *  ornament against its neighbouring words; a justified line redistributes part
+ *  of the reclaimed width across its other spaces, so the on-screen gap drops
+ *  by somewhat less than the amount removed here. */
+private const val MARKER_GAP_BEFORE_EM = 0.30f
+private const val MARKER_GAP_AFTER_EM = 0.30f
 /** Visual gap between the ornament and the MEASURED ink edge of the ayah's
  *  last word. Placement is ink-accurate (see computeInkMarkerGeometries): the
  *  page text is rendered once to an offscreen bitmap and the true glyph edges
@@ -4744,6 +4748,53 @@ private const val MARKER_GAP_AFTER_EM = 0.55f
 private const val MARKER_INK_GAP_EM = 0.3f
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
+
+// Selected-ayah treatment: ONE continuous rounded ribbon (the per-line boxes
+// unioned, so multi-line selections read as a single shape instead of stacked
+// rectangles) with a blurred halo behind a crisp core.
+private val MUSHAF_SEL_RADIUS = 16.dp
+/** Vertical trim on the block's outer edges only (see the path build). */
+private val MUSHAF_SEL_VINSET = 5.dp
+/** Kept under the page's side margin (~50px): a wider blur pushes the halo off
+ *  the edge of the page, which reads as the selection bleeding off-screen. */
+private val MUSHAF_SEL_BLUR = 12.dp
+// Kept deliberately low: the scheme's `primary` is a dark navy here, so anything
+// above ~0.25 stops reading as light on the cream page and turns into a solid
+// blue-grey block sitting on top of the text.
+private const val MUSHAF_SEL_HALO_ALPHA = 0.20f
+private const val MUSHAF_SEL_FILL_ALPHA = 0.05f
+private const val MUSHAF_SEL_EDGE_ALPHA = 0.14f
+
+/**
+ * Union of these rects as one rounded path. Line boxes are contiguous, so the
+ * seams between them dissolve and only the outer silhouette stays rounded —
+ * which is what makes a multi-line selection look like a deliberate shape
+ * rather than a stack of blurred boxes.
+ */
+private fun List<androidx.compose.ui.geometry.Rect>.toRoundedUnionPath(
+    radiusPx: Float,
+): androidx.compose.ui.graphics.Path {
+    var acc = androidx.compose.ui.graphics.Path()
+    var first = true
+    for (r in this) {
+        val piece = androidx.compose.ui.graphics.Path().apply {
+            addRoundRect(
+                androidx.compose.ui.geometry.RoundRect(
+                    r, androidx.compose.ui.geometry.CornerRadius(radiusPx, radiusPx),
+                ),
+            )
+        }
+        if (first) {
+            acc = piece
+            first = false
+        } else {
+            val merged = androidx.compose.ui.graphics.Path()
+            merged.op(acc, piece, androidx.compose.ui.graphics.PathOperation.Union)
+            acc = merged
+        }
+    }
+    return acc
+}
 
 /** Inline-content tag for the invisible line filler appended to non-final page
  *  slices. Android never justifies a paragraph's last line, so a sliced page's
@@ -4777,6 +4828,34 @@ private const val MARKER_SLOT_WIDTH_EM =
  *  final base letter for overhang compensation. */
 private val MARKER_TRAILING_INVISIBLES =
     charArrayOf('‏', '‎', '​', '﻿', '⁠')
+
+/**
+ * Per-line rectangles covering [start, end) — one clean box per visual line.
+ * `getPathForRange` returns the same coverage as an opaque Path whose sub-rects
+ * can't be reached, so it can only be drawn square; going through the line
+ * metrics instead lets the selection be rounded and inset per line. min/max on
+ * the two horizontal positions keeps it correct in RTL.
+ */
+private fun androidx.compose.ui.text.TextLayoutResult.rangeLineRects(
+    start: Int,
+    end: Int,
+): List<androidx.compose.ui.geometry.Rect> {
+    if (end <= start) return emptyList()
+    val firstLine = getLineForOffset(start)
+    val lastLine = getLineForOffset((end - 1).coerceAtLeast(start))
+    val out = mutableListOf<androidx.compose.ui.geometry.Rect>()
+    for (line in firstLine..lastLine) {
+        val ls = maxOf(start, getLineStart(line))
+        val le = minOf(end, getLineEnd(line, visibleEnd = true))
+        if (le <= ls) continue
+        val x1 = getHorizontalPosition(ls, usePrimaryDirection = true)
+        val x2 = getHorizontalPosition(le, usePrimaryDirection = true)
+        out += androidx.compose.ui.geometry.Rect(
+            minOf(x1, x2), getLineTop(line), maxOf(x1, x2), getLineBottom(line),
+        )
+    }
+    return out
+}
 
 private data class MarkerGeometry(
     val digits: String,
@@ -4890,8 +4969,13 @@ private fun computeInkMarkerGeometries(
             layout.getLineForOffset(nextCharIdx) == markerLine
 
         val lineLeft = layout.getLineLeft(markerLine)
+        val lineRight = layout.getLineRight(markerLine)
         val slotCenter = (rect.left + rect.right) / 2f
         val window = 2f * emPx
+        // Line extent in scan-bitmap columns — the outward ink walks stop here so
+        // a marker can never drift into a neighbouring line's margin.
+        val lineLeftPx = (lineLeft * scale).toInt().coerceAtLeast(0)
+        val lineRightPx = (lineRight * scale).toInt().coerceAtMost(pixels.width - 1)
 
         val centerX: Float
         if (nextOnSameLine) {
@@ -4961,7 +5045,18 @@ private fun computeInkMarkerGeometries(
                 x++
             }
             centerX = if (bestGapL >= 0) {
-                ((bestGapL + bestGapR) / 2f) / scale
+                // The scan window is derived from the slot and the next word's
+                // layout position, so it can CLIP the chosen run; centring in a
+                // clipped run biases the medallion toward the clipped side —
+                // Ar-Rahman 55:3 ended up 69px from its own verse but 228px from
+                // the next word. Walk both edges out to the real ink (bounded by
+                // the line's own extent) and centre in the TRUE gap, so the space
+                // reads even on both sides. Runs already bounded by ink don't move.
+                var trueL = bestGapL
+                while (trueL - 1 >= lineLeftPx && !columnHasInk(trueL - 1, bandTop, bandBottom)) trueL--
+                var trueR = bestGapR
+                while (trueR + 1 <= lineRightPx && !columnHasInk(trueR + 1, bandTop, bandBottom)) trueR++
+                ((trueL + trueR) / 2f) / scale
             } else {
                 slotCenter // window solid with ink — degenerate; keep the slot center
             }
@@ -4975,10 +5070,15 @@ private fun computeInkMarkerGeometries(
                 if (columnHasInk(x, bandTop, bandBottom)) { rightInk = x / scale; break }
                 x++
             }
-            centerX = maxOf(
-                rightInk - MARKER_INK_GAP_EM * emPx - w / 2f,
-                lineLeft + w / 2f,
-            )
+            // No text follows on this line, so the space after the ornament is
+            // free — sense both sides and centre between the line's end and the
+            // verse's ink edge rather than hugging at a fixed gap. Hugging gave
+            // line-end markers ~0.3em of breathing room while mid-line ones sit
+            // at 0.6-1.5em, which read as cramped against the verse. Still never
+            // closer than MARKER_INK_GAP_EM, and never outside the line.
+            centerX = ((lineLeft + rightInk) / 2f)
+                .coerceAtMost(rightInk - MARKER_INK_GAP_EM * emPx - w / 2f)
+                .coerceAtLeast(lineLeft + w / 2f)
         }
         result.add(
             MarkerGeometry(
@@ -5014,26 +5114,73 @@ private fun MushafPageWithFrame(
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val highlightBg = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+    val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = MaterialTheme.colorScheme.primary
 
     // Rosette is now part of the masterString text flow (U+06DD + digits
     // styled with Amiri Quran). No inline content needed here.
 
-    // Overlay a background tint over the highlighted ayah's char range. The
-    // range is page-local (already remapped in MushafPagerView's paginator),
-    // so we can apply SpanStyle directly without re-mapping.
-    val renderedText = remember(pageText, highlightedAyahNumber, ayahRanges, highlightBg) {
-        val target = highlightedAyahNumber ?: return@remember pageText
-        val range = ayahRanges.firstOrNull { it.first == target }?.second
-            ?: return@remember pageText
-        androidx.compose.ui.text.AnnotatedString.Builder(pageText).apply {
-            addStyle(
-                style = androidx.compose.ui.text.SpanStyle(background = highlightBg),
-                start = range.first,
-                end = (range.last + 1).coerceAtMost(pageText.length),
+    // The selected ayah is drawn as a GLOW behind the text (pass-1 canvas below)
+    // instead of a flat SpanStyle background. The range is page-local (already
+    // remapped by MushafPagerView's paginator), so it needs no re-mapping.
+    //
+    // It deliberately ends ON the ayah's trailing space — that is what makes a
+    // long-press anywhere in the ayah hit it — but justification stretches
+    // exactly that space, so we stop one char short. Including it dragged the
+    // old flat highlight across the whole justified gap and made the NEXT
+    // ayah's first word read as selected (Al-Kahf 1 tinted قَيِّمًا, which
+    // opens ayah 2), with the marker placeholder punching a white hole in it.
+    val highlightRange = remember(highlightedAyahNumber, ayahRanges, pageText) {
+        val target = highlightedAyahNumber ?: return@remember null
+        val r = ayahRanges.firstOrNull { it.first == target }?.second ?: return@remember null
+        val start = r.first.coerceIn(0, pageText.length)
+        // Each ayah is laid out as: arabic + WORD JOINER + marker digits + space.
+        // Stop at the word joiner so the selection wraps the VERSE only — the
+        // digits are the ornament's reserved slot, and including them made the
+        // glow swallow the medallion. Falling back to r.last (the trailing
+        // space) still excludes that space, which justification stretches.
+        val wj = pageText.text.lastIndexOf('⁠', r.last.coerceAtMost(pageText.length - 1))
+        var end = (if (wj > start) wj else r.last).coerceIn(start, pageText.length)
+        // Back up over the RLM / waqf padding that trails the last word. Their
+        // layout positions sit AFTER the justified space, so leaving them in
+        // stretched the shape ~170px past the final glyph.
+        while (end > start &&
+            (pageText.text[end - 1].isWhitespace() ||
+                pageText.text[end - 1] in MARKER_TRAILING_INVISIBLES)
+        ) {
+            end--
+        }
+        if (end > start) start to end else null
+    }
+    // Captured page layout — turns that char range into a path for the glow.
+    // Null until the first layout pass, so the glow appears one frame late.
+    val pageLayout = remember(pageText) {
+        androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null)
+    }
+
+    // Selection silhouette, rebuilt only when the layout or the selected ayah
+    // changes. Shared by the blurred halo pass and the crisp core pass so both
+    // trace exactly the same shape.
+    val selDensity = LocalDensity.current
+    val selPath = remember(pageLayout.value, highlightRange) {
+        val laid = pageLayout.value ?: return@remember null
+        val hr = highlightRange ?: return@remember null
+        val rects = laid.rangeLineRects(hr.first, hr.second)
+        if (rects.isEmpty()) return@remember null
+        // Trim only the OUTER edges of the block. Line boxes carry the full 1.45x
+        // leading, so an untrimmed ribbon looks bloated — but insetting every rect
+        // would open gaps between lines and break the union into separate blobs,
+        // so interior edges stay contiguous.
+        val vInset = with(selDensity) { MUSHAF_SEL_VINSET.toPx() }
+        val tightened = rects.mapIndexed { i, r ->
+            androidx.compose.ui.geometry.Rect(
+                r.left,
+                if (i == 0) r.top + vInset else r.top,
+                r.right,
+                if (i == rects.lastIndex) r.bottom - vInset else r.bottom,
             )
-        }.toAnnotatedString()
+        }
+        tightened.toRoundedUnionPath(with(selDensity) { MUSHAF_SEL_RADIUS.toPx() })
     }
 
     val statusBarHeight = with(LocalDensity.current) {
@@ -5103,6 +5250,30 @@ private fun MushafPageWithFrame(
                 }
             }
 
+            // Selected ayah, drawn behind the ornament canvas and the Text so it
+            // reads as the page lighting up under the words rather than a tint
+            // laid on top. Geometry is per-line rounded rects (rangeLineRects),
+            // NOT getPathForRange — a blurred square path just looks like a smear.
+            //
+            // Halo: the silhouette blurred in its own layer, so the light bleeds
+            // outward past the text block. Needs API 31+; below that this layer
+            // renders unblurred and the core pass still marks the selection.
+            if (selPath != null) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topPadding + bismillahHeightDp,
+                            bottom = bottomPadding
+                        )
+                        .blur(MUSHAF_SEL_BLUR)
+                ) {
+                    drawPath(selPath, color = glowColor.copy(alpha = MUSHAF_SEL_HALO_ALPHA))
+                }
+            }
+
             // Markers are drawn in two passes around the Text:
             //   1) BEFORE it (this Canvas): the ornament vector — overhanging final
             //      swashes render on top of its flourishes, printed-mushaf style.
@@ -5119,6 +5290,17 @@ private fun MushafPageWithFrame(
                         bottom = bottomPadding
                     )
             ) {
+                // Core: a soft fill plus a hairline edge, unblurred, so the shape
+                // keeps a readable silhouette inside the halo instead of dissolving.
+                if (selPath != null) {
+                    drawPath(selPath, color = glowColor.copy(alpha = MUSHAF_SEL_FILL_ALPHA))
+                    drawPath(
+                        selPath,
+                        color = glowColor.copy(alpha = MUSHAF_SEL_EDGE_ALPHA),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
+                    )
+                }
+
                 val geoms = inkGeometries ?: return@Canvas
                 if (markerAlpha <= 0.01f) return@Canvas
                 for (g in geoms) {
@@ -5136,7 +5318,8 @@ private fun MushafPageWithFrame(
 
 
             Text(
-                text = renderedText,
+                text = pageText,
+                onTextLayout = { pageLayout.value = it },
                 inlineContent = inlineContent,
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
