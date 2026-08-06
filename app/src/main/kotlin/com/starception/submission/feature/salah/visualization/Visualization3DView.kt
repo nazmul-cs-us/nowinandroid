@@ -1414,7 +1414,10 @@ private fun SceneScope.BeadedSegment(
 private fun skeletonPose(posture: SalahPosture, xOffset: Float): SkeletonPose {
     fun p(x: Float, y: Float, z: Float) = Position(x + xOffset, y, z)
     val joints = when (posture) {
-        SalahPosture.QIYAM, SalahPosture.RISING_TO_QIYAM -> mapOf(
+        // NOT_PRAYING has no prayer pose to draw; a neutral upright figure is the honest
+        // stand-in (most negatives are walking, standing or sitting). It stays
+        // distinguishable from QIYAM by its desaturated colour, see postureColor.
+        SalahPosture.QIYAM, SalahPosture.RISING_TO_QIYAM, SalahPosture.NOT_PRAYING -> mapOf(
             Joint.HEAD to p(0f, 1.78f, 0f), Joint.NECK to p(0f, 1.57f, 0f),
             Joint.LEFT_SHOULDER to p(-0.19f, 1.49f, 0f), Joint.RIGHT_SHOULDER to p(0.19f, 1.49f, 0f),
             Joint.LEFT_ELBOW to p(-0.25f, 1.22f, -0.03f), Joint.RIGHT_ELBOW to p(0.25f, 1.22f, -0.03f),
@@ -1542,6 +1545,9 @@ private fun postureColor(posture: SalahPosture): Color = when (posture) {
     SalahPosture.SUJUD -> Color(0xFF72ED7D)
     SalahPosture.JALSA -> Color(0xFFAD8CFF)
     SalahPosture.TASHAHHUD -> Color(0xFFFF704D)
+    // Deliberately desaturated: negatives are the backdrop the prayer postures sit
+    // against, and should not compete with them for attention in the scatter plot.
+    SalahPosture.NOT_PRAYING -> Color(0xFF9AA5B1)
 }
 
 private fun standardDeviation(values: List<Float>): Float {

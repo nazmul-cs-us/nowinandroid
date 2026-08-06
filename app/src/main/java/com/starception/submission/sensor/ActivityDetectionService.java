@@ -176,6 +176,20 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private SalahSequenceValidator salahSequenceValidator;
     private boolean salahDetectionEnabled = false; // Disabled - ML model not accurate enough yet
     private static final int SALAH_WINDOW_SIZE = 5; // 5 samples per 100ms window (matching training)
+    /**
+     * Minimum spacing between samples fed to the salah model, so a window always spans the
+     * ~100ms it does in training.
+     *
+     * SENSOR_DELAY_US is only a hint and the delivered rate rises when another listener
+     * registers the same sensor faster — opening the training screen does exactly that.
+     * Assembling a window from a fixed sample *count* then produced a 50ms window at
+     * inference against 100ms windows in training: the same movement at twice the speed,
+     * varying with whatever else happened to be listening. 18ms rather than 20ms so
+     * ordinary delivery jitter is not mistaken for an extra sample.
+     */
+    private static final long MIN_SALAH_SAMPLE_INTERVAL_NS = 18_000_000L;
+    private long lastSalahAccelSampleNs = 0L;
+    private long lastSalahGyroSampleNs = 0L;
     private final List<float[]> salahAccelWindow = new ArrayList<>(); // [x,y,z] per sample
     private final List<float[]> salahGyroWindow = new ArrayList<>();  // [x,y,z] per sample
     private SalahPosture currentSalahPosture = null;
@@ -597,8 +611,8 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         closeSalahLogFile();
 
         // Clean up salah detection
-        synchronized (salahAccelWindow) { salahAccelWindow.clear(); }
-        synchronized (salahGyroWindow) { salahGyroWindow.clear(); }
+        synchronized (salahAccelWindow) { salahAccelWindow.clear(); lastSalahAccelSampleNs = 0L; }
+        synchronized (salahGyroWindow) { salahGyroWindow.clear(); lastSalahGyroSampleNs = 0L; }
         isPrayerActive = false;
         currentSalahPosture = null;
         currentSalahConfidence = 0f;
@@ -1480,12 +1494,18 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
             switch (event.sensor.getType()) {
                 case Sensor.TYPE_ACCELEROMETER:
                     synchronized (salahAccelWindow) {
-                        salahAccelWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                        if (acceptSalahSample(event.timestamp, lastSalahAccelSampleNs)) {
+                            lastSalahAccelSampleNs = event.timestamp;
+                            salahAccelWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                        }
                     }
                     break;
                 case Sensor.TYPE_GYROSCOPE:
                     synchronized (salahGyroWindow) {
-                        salahGyroWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                        if (acceptSalahSample(event.timestamp, lastSalahGyroSampleNs)) {
+                            lastSalahGyroSampleNs = event.timestamp;
+                            salahGyroWindow.add(new float[]{event.values[0], event.values[1], event.values[2]});
+                        }
                     }
                     break;
             }
@@ -1896,6 +1916,19 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      * Process a complete 100ms sensor window through the salah ML model.
      * Called from onSensorChanged when both accel and gyro buffers have 5+ samples.
      */
+    /**
+     * Whether a sensor event is far enough from the last one fed to the salah model.
+     * Mirrors SalahDataCollectionService.shouldAcceptSample so inference and training see
+     * windows of the same duration. See {@link #MIN_SALAH_SAMPLE_INTERVAL_NS}.
+     */
+    private boolean acceptSalahSample(long eventTimestampNs, long lastAcceptedNs) {
+        if (lastAcceptedNs == 0L) return true;
+        long elapsed = eventTimestampNs - lastAcceptedNs;
+        // Some devices restart event timestamps (e.g. across a suspend); never stall.
+        if (elapsed < 0L) return true;
+        return elapsed >= MIN_SALAH_SAMPLE_INTERVAL_NS;
+    }
+
     private void processSalahWindow() {
         float[] ax, ay, az, gx, gy, gz;
 
@@ -2154,6 +2187,10 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      */
     public void setSalahDetectionEnabled(boolean enabled) {
         this.salahDetectionEnabled = enabled && salahDetectionEngine != null;
+        // Start the next window from a clean slate; a timestamp left over from a previous
+        // enable would otherwise gate the first sample against a stale reference.
+        synchronized (salahAccelWindow) { lastSalahAccelSampleNs = 0L; }
+        synchronized (salahGyroWindow) { lastSalahGyroSampleNs = 0L; }
         if (!enabled) {
             // Restore DND if disabling salah detection during active prayer
             disablePrayerDnd();

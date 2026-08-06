@@ -55,6 +55,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -574,6 +575,7 @@ private fun GuidedRecordingCard(
     // session stays visually distinct.
     val cardColor = when (guidedState) {
         GuidedRecordingState.IDLE -> MaterialTheme.colorScheme.surface
+        GuidedRecordingState.PREPARING,
         GuidedRecordingState.WELCOME, GuidedRecordingState.COUNTDOWN -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         GuidedRecordingState.RECORDING_POSTURE -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
         GuidedRecordingState.POSTURE_TRANSITION -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
@@ -891,6 +893,48 @@ private fun GuidedRecordingCard(
                             if (uiState.guidedSpecificOnly) "Guide This Selection" else "Start Full Guided Recording",
                             fontWeight = FontWeight.Bold,
                         )
+                    }
+                }
+
+                GuidedRecordingState.PREPARING -> {
+                    val total = uiState.guidedPrepareTotal
+                    val done = uiState.guidedPrepareDone
+                    Text(
+                        text = "Preparing Voice",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (total > 0) {
+                        LinearProgressIndicator(
+                            progress = { done.toFloat() / total },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                        Text(
+                            text = "$done of $total instructions ready",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                    }
+                    Text(
+                        text = "Generating every instruction now so the session never pauses while you hold a posture.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    NiaOutlinedButton(
+                        onClick = { viewModel.cancelGuidedRecording() }
+                    ) {
+                        Text("Cancel")
                     }
                 }
 
@@ -2208,6 +2252,10 @@ private fun postureRecordingGuidance(posture: SalahPosture): String = when (post
         "Static posture: sit upright between the two prostrations and remain still."
     SalahPosture.TASHAHHUD ->
         "Static posture: hold the final seated tashahhud position and remain still."
+    SalahPosture.NOT_PRAYING ->
+        "Negative example: carry the phone in your pocket and do anything that is NOT prayer — " +
+            "walk, sit, use stairs, drive, or leave it on a desk. Record one activity per take " +
+            "so a confusion can be traced back to it. Never include any prayer posture."
 }
 
 @Composable
@@ -3828,6 +3876,10 @@ private fun isPostureOrientationOk(posture: SalahPosture, pitch: Float, roll: Fl
         SalahPosture.TASHAHHUD -> abs(pitch) < 45f
         SalahPosture.QIYAM_RISING -> true  // movement expected
         SalahPosture.RISING_TO_QIYAM -> true  // movement expected
+        // Negatives are deliberately unconstrained — any orientation is valid, that is
+        // the point of the class. Flagging one as "wrong" would train the user to filter
+        // out exactly the variety the model needs.
+        SalahPosture.NOT_PRAYING -> true
     }
 }
 

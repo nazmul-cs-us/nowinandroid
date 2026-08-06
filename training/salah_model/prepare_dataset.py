@@ -24,10 +24,16 @@ OUTPUT_DIR = DATA_ROOT / "train_ready"
 # Live recordings are labelled by the model under evaluation. They only become
 # ground truth after the in-app Review & Label pass rewrites them as
 # salah_reviewed_*. Anything still carrying live-origin labels stays out.
-QUARANTINE = {
-    "salah_live_20260720_181503_1d6b7f63.jsonl":
+#
+# Keyed by session id, not filename. Recordings get renamed — SalahRecordingName.kt
+# inserts a contents descriptor, turning salah_data_20260721_174405_e035130b.jsonl into
+# salah_data_partial6_20260721_174405_e035130b.jsonl — and a filename key silently stops
+# matching, letting poisoned data back into training. The session id is written into every
+# row and never changes.
+QUARANTINE_SESSIONS = {
+    "1d6b7f63":
         "live labels, never reviewed in-app (the file the shipped model was trained on)",
-    "salah_data_20260721_174405_e035130b.jsonl":
+    "e035130b":
         "live labels under a manual filename: 51 posture segments, several under 0.5s",
 }
 
@@ -35,6 +41,13 @@ QUARANTINE = {
 # holds exactly one posture chosen by hand before recording started, which is
 # what manual mode means, so the provenance is reconstructed rather than invented.
 LEGACY_MANUAL_DIR = "archive_march_2026"
+
+# The recorder emits one window per 100ms. A window is only kept if it sits at least this
+# far after the previous kept one: below the 100ms nominal period so ordinary jitter (the
+# observed median is 101ms) is never thinned, and far enough above the 51ms of the
+# over-sampled session that its extra windows are dropped. See decimate_to_window_period.
+TARGET_WINDOW_PERIOD_MS = 100
+MIN_WINDOW_GAP_MS = 90
 
 
 MODE_PREFIXES = ("salah_reviewed_", "salah_guided_", "salah_live_", "salah_data_")
@@ -48,6 +61,7 @@ POSTURE_SLUGS = {
     "TASHAHHUD": "tashahhud",
     "QIYAM_RISING": "qiyamrising",
     "RISING_TO_QIYAM": "rising2qiyam",
+    "NOT_PRAYING": "notpraying",
 }
 
 
@@ -92,6 +106,37 @@ def descriptive_name(name: str, rows: list[dict]) -> str:
     return f"{prefix}{descriptor}_{tail}"
 
 
+def decimate_to_window_period(rows: list[dict]) -> tuple[list[dict], int]:
+    """Thin a recording down to one window per [TARGET_WINDOW_PERIOD_MS].
+
+    `SalahDataCollectionService` builds a window from a fixed *count* of samples, so when
+    the framework delivered sensor events faster than the requested 50Hz the window period
+    halved: one session was recorded at ~51ms per window while every other is at ~101ms.
+    A sequence of 20 windows then spans 1s in that session and 2s everywhere else, which
+    is the same posture at two different time scales — exactly what a temporal model must
+    not see. The recorder now pins the rate, but recordings made before that fix still
+    need thinning here.
+
+    Windows are kept greedily by timestamp, so the pauses a guided session leaves between
+    postures are preserved rather than counted as spacing. Recordings already at the
+    target period keep every window.
+
+    Returns the kept rows and how many were dropped.
+    """
+    ordered = sorted(rows, key=lambda r: r.get("timestamp", 0))
+    kept: list[dict] = []
+    last_ts: float | None = None
+    for row in ordered:
+        ts = row.get("timestamp")
+        if ts is None:
+            kept.append(row)
+            continue
+        if last_ts is None or (ts - last_ts) >= MIN_WINDOW_GAP_MS:
+            kept.append(row)
+            last_ts = ts
+    return kept, len(ordered) - len(kept)
+
+
 def main(dry_run: bool) -> None:
     sources = sorted(p for p in DATA_ROOT.rglob("*.jsonl") if OUTPUT_DIR not in p.parents)
 
@@ -106,13 +151,19 @@ def main(dry_run: bool) -> None:
             continue
         seen[digest] = path
 
-        if path.name in QUARANTINE:
-            skipped.append((path, QUARANTINE[path.name]))
-            continue
-
         rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
         if not rows:
             skipped.append((path, "empty file"))
+            continue
+
+        # Checked against the ids actually present in the file, so a renamed copy of a
+        # quarantined recording is still caught.
+        quarantined = {
+            row.get("session_id") for row in rows
+        } & QUARANTINE_SESSIONS.keys()
+        if quarantined:
+            session = sorted(quarantined)[0]
+            skipped.append((path, f"{QUARANTINE_SESSIONS[session]} [session {session}]"))
             continue
 
         if rows[0].get("collection_mode") is not None:
@@ -127,11 +178,17 @@ def main(dry_run: bool) -> None:
             skipped.append((path, "no collection_mode and not a single-posture manual take"))
             continue
 
+        rows, dropped = decimate_to_window_period(rows)
+        if dropped:
+            note += f", thinned to {TARGET_WINDOW_PERIOD_MS}ms windows (-{dropped})"
+
         out_name = descriptive_name(path.name, rows)
         kept.append((path, out_name, len(rows), note))
         if not dry_run:
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            if rows[0].get("label_source") == "manual_selection":
+            # Copying only stays correct while the rows are untouched; a rewritten
+            # provenance or a thinned recording has to be written out.
+            if rows[0].get("label_source") == "manual_selection" or dropped:
                 (OUTPUT_DIR / out_name).write_text(
                     "".join(json.dumps(r) + "\n" for r in rows)
                 )

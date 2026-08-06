@@ -78,19 +78,33 @@ fun NiaNavHost(
     val navController = appState.navController
     val context = LocalContext.current
     val quranRepository = remember { QuranRepository(context) }
-    val homeDownloadProgress = if (mainViewModel != null) {
+    // Home renders its own PullToSyncContainer instead of the app-level one, so it needs
+    // the same fallback to AppTaskProgressBus — otherwise a long non-download task
+    // (e.g. preparing guided voice) loses its banner the moment the user opens Home.
+    val homeTaskProgress by com.starception.submission.ui.AppTaskProgressBus.state
+        .collectAsStateWithLifecycle()
+    // Collected unconditionally: gating a collectAsState on a flag that flips at runtime
+    // tears down and re-subscribes the collector every time it changes.
+    val homeIsDownloading = if (mainViewModel != null) {
         val isDownloading by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
+        isDownloading
+    } else {
+        false
+    }
+    val homeCdnProgress = if (mainViewModel != null) {
         val downloadProgress by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
-        if (isDownloading) downloadProgress else 0f
+        downloadProgress
     } else {
         0f
     }
-    val homeDownloadLabel = if (mainViewModel != null) {
+    val homeCdnLabel = if (mainViewModel != null) {
         val label by mainViewModel.contentDownloadLabel.collectAsStateWithLifecycle()
         label
     } else {
         ""
     }
+    val homeDownloadProgress = if (homeIsDownloading) homeCdnProgress else homeTaskProgress?.progress ?: 0f
+    val homeDownloadLabel = if (homeIsDownloading) homeCdnLabel else homeTaskProgress?.label.orEmpty()
     val homeMediaState = if (mainViewModel != null) {
         val state by mainViewModel.globalMedia.controllerState.collectAsStateWithLifecycle()
         state
@@ -492,6 +506,14 @@ private fun androidx.navigation.NavController.navigateToFortressDua(
     // The pager recognises the "{Chapter}: Dua N" title and resolves the
     // database invocation independently of its position in Quranic Duas.
     val chapter = dua.chapterTitle.ifBlank { "Dua" }
+    // A blank chapterTitle still produces a "Dua: Dua N" string that looks like a Fortress
+    // title to the pager but matches no row, so it silently lands on a Quranic dua of the
+    // same number. Log the inputs so that case is identifiable rather than invisible.
+    android.util.Log.d(
+        "FortressNav",
+        "chapterId=${dua.chapterId} chapterTitle='${dua.chapterTitle}' position=${dua.position} " +
+            "-> title='$chapter: Dua ${dua.position}'",
+    )
     navigateToDuaDetail(
         title = "$chapter: Dua ${dua.position}",
         content = dua.translation ?: dua.transliteration ?: "",

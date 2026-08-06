@@ -45,6 +45,7 @@ object SalahRecordingName {
         SalahPosture.TASHAHHUD to "tashahhud",
         SalahPosture.QIYAM_RISING to "qiyamrising",
         SalahPosture.RISING_TO_QIYAM to "rising2qiyam",
+        SalahPosture.NOT_PRAYING to "notpraying",
     )
 
     /** What a recording holds, read back from the file rather than from what was intended. */
@@ -57,9 +58,13 @@ object SalahRecordingName {
     /**
      * Descriptor for a recording, or null when the name should stay as it is.
      *
-     * `full` means every model class is present, which is what a complete guided run
+     * `full` means every prayer posture is present, which is what a complete guided run
      * produces. `partial6` means a run was stopped early or predates a class being added,
      * and is the honest label for a session that cannot stand alone in a split.
+     *
+     * Measured against [SalahPosture.prayerPostures], not the model's full label set: a
+     * prayer recording should never be demoted to `partial8` for lacking the NOT_PRAYING
+     * class, which by definition it cannot contain.
      */
     private fun descriptorFor(prefix: String, contents: Contents): String? {
         // Live labels are the model's own output. Describing them would dress up a guess
@@ -74,10 +79,11 @@ object SalahRecordingName {
             contents.targetRakahCount?.let { return "${it}rakah" }
         }
 
-        return if (contents.postures.size == SalahPosture.classificationLabels.size) {
+        val prayerPosturesPresent = contents.postures.count { it.isPrayerPosture }
+        return if (prayerPosturesPresent == SalahPosture.prayerPostures.size) {
             "full"
         } else {
-            "partial${contents.postures.size}"
+            "partial$prayerPosturesPresent"
         }
     }
 

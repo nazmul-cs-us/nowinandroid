@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
 from feature_engineering import (
     load_jsonl_files, create_sequences, normalize_features,
@@ -110,6 +110,84 @@ def build_model(
     return model
 
 
+def evaluate_leave_one_session_out(args, X, y, groups):
+    """Score the pipeline by holding out one whole recording at a time.
+
+    The single random session split is dominated by luck at this dataset size: with only
+    three sessions for some classes, one draw can put a class's only distinct instance in
+    test and score it 0.00, which makes consecutive runs incomparable. Rotating the
+    hold-out over every multi-posture session reports the same quantity with far less
+    variance, so a real change can be told apart from a lucky draw.
+
+    Single-posture recordings are skipped as hold-outs — scoring a model on a session that
+    only contains SUJUD measures nothing useful — but they still train.
+    """
+    session_ids = session_ids_from_groups(groups)
+    candidates = [
+        s for s in np.unique(session_ids)
+        if len(np.unique(y[session_ids == s])) >= 2
+    ]
+    if not candidates:
+        print("No multi-posture session available to hold out.")
+        return
+
+    print("=" * 60)
+    print(f"Leave-one-session-out evaluation over {len(candidates)} multi-posture sessions")
+    print("=" * 60)
+
+    per_session = []
+    for held in candidates:
+        test_mask = session_ids == held
+        X_tr, y_tr = X[~test_mask], y[~test_mask]
+        X_te, y_te = X[test_mask], y[test_mask]
+        if len(np.unique(y_tr)) < 2:
+            continue
+
+        X_tr, y_tr = balance_classes(X_tr, y_tr, strategy="oversample")
+        if args.augment:
+            X_tr, y_tr = augment_dataset(
+                X_tr, y_tr,
+                augmentation_factor=args.augment_factor,
+                include_original=True,
+            )
+        X_tr, X_te, _, _ = normalize_features(X_tr, X_te)
+
+        model = build_model(
+            seq_length=args.seq_length,
+            n_features=FEATURES_PER_WINDOW,
+            n_classes=NUM_CLASSES,
+        )
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=args.lr),
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy'],
+        )
+        model.fit(
+            X_tr, y_tr,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            verbose=0,
+            callbacks=[keras.callbacks.EarlyStopping(
+                monitor='loss', patience=8, restore_best_weights=True
+            )],
+        )
+        pred = model.predict(X_te, verbose=0).argmax(axis=1)
+        acc = float((pred == y_te).mean())
+        # Macro F1 matters more than accuracy here: the transition classes are rare, so a
+        # model that ignores them entirely can still post a respectable accuracy.
+        macro_f1 = float(f1_score(y_te, pred, average='macro', zero_division=0))
+        per_session.append((held, acc, macro_f1, int(test_mask.sum())))
+        print(f"  hold out {held:>12s}  acc={acc:.3f}  macroF1={macro_f1:.3f}  n={test_mask.sum()}")
+
+    if not per_session:
+        return
+    total = sum(n for _, _, _, n in per_session)
+    weighted_acc = sum(a * n for _, a, _, n in per_session) / total
+    mean_f1 = sum(f for _, _, f, _ in per_session) / len(per_session)
+    print(f"\n  weighted accuracy = {weighted_acc:.3f}   mean macro-F1 = {mean_f1:.3f}")
+    print("  (compare runs on these two numbers, not on a single random split)")
+
+
 def train(args):
     print("=" * 60)
     print("Salah Posture Detection - Model Training")
@@ -140,6 +218,13 @@ def train(args):
     # A leakage-safe split needs each output class in at least three independent
     # recording sessions. Keeping a whole session in one partition prevents the
     # the same continuous recording conditions leaking into test results.
+    # Diagnostics run before the readiness gate on purpose: leave-one-session-out is how
+    # you watch a class climb toward the bar, so it has to keep working while the dataset
+    # is still short of it. It exports nothing, so it cannot ship an unready model.
+    if args.loso:
+        evaluate_leave_one_session_out(args, X, y, groups)
+        return
+
     sequence_session_ids = session_ids_from_groups(groups)
     sessions_per_class = {
         posture_name: len(np.unique(sequence_session_ids[y == class_index]))
@@ -349,6 +434,10 @@ def main():
                              "yields 11 sequences at stride 3 but only 4 at stride 10, "
                              "too few to clear the deployment gate's 10 test sequences "
                              "per class from a single held-out session.")
+    parser.add_argument("--loso", action="store_true",
+                        help="Evaluate by leave-one-session-out instead of a single random "
+                             "session split, and skip export. Use this to compare runs: the "
+                             "single split is dominated by draw luck at this dataset size.")
     parser.add_argument("--augment", action="store_true", default=True,
                         help="Apply data augmentation (default: enabled)")
     parser.add_argument("--no-augment", dest="augment", action="store_false",

@@ -17,10 +17,23 @@ from typing import List, Tuple, Dict, Optional
 
 
 # Posture labels matching the Android enum
+# Must stay byte-identical to SalahPosture.classificationLabels, in the same order:
+# SalahDetectionEngine refuses to load a model whose labels are not a prefix of that list,
+# so the index of an existing class can never change. Append only.
+#
+# NOT_PRAYING is the negative class — walking, sitting, driving, stairs, phone on a desk.
+# Without it the model must assign every window to some prayer posture, so ordinary
+# movement is reported as prayer. It is one broad class on purpose: the app only needs
+# prayer vs not-prayer. Record one activity per take so a specific negative can still be
+# isolated by session id.
 POSTURE_LABELS = [
     "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD",
-    "QIYAM_RISING", "RISING_TO_QIYAM",
+    "QIYAM_RISING", "RISING_TO_QIYAM", "NOT_PRAYING",
 ]
+
+# The eight that make up a prayer. Rak'ah counting and "is this a complete session"
+# questions are about these, never about the negative class.
+PRAYER_POSTURE_LABELS = POSTURE_LABELS[:8]
 POSTURE_TO_INDEX = {p: i for i, p in enumerate(POSTURE_LABELS)}
 NUM_CLASSES = len(POSTURE_LABELS)
 
@@ -357,23 +370,36 @@ def assign_sessions_to_splits(
 
     required_labels = set(range(NUM_CLASSES))
     rng = np.random.default_rng(random_state)
-    for _ in range(5000):
-        shuffled = unique_sessions.copy()
-        rng.shuffle(shuffled)
-        test_sessions = set(shuffled[:test_count])
-        val_sessions = set(shuffled[test_count:test_count + val_count])
-        train_sessions = set(shuffled[test_count + val_count:])
 
-        split_sessions = (train_sessions, val_sessions, test_sessions)
-        if all(
-            set(y[np.isin(session_ids, list(selected))]) == required_labels
-            for selected in split_sessions
-        ):
-            return split_sessions
+    # How many sessions a partition needs is a property of the data, not of the ratios.
+    # A prayer recording never contains NOT_PRAYING and a negative take never contains a
+    # posture, so no single session holds every label and a one-session test partition can
+    # never satisfy the requirement below. Rather than fail, grow the held-out partitions
+    # until they can cover every class, keeping train the majority.
+    max_holdout = max(1, (len(unique_sessions) - 1) // 2)
+    while test_count <= max_holdout and val_count <= max_holdout:
+        for _ in range(5000):
+            shuffled = unique_sessions.copy()
+            rng.shuffle(shuffled)
+            test_sessions = set(shuffled[:test_count])
+            val_sessions = set(shuffled[test_count:test_count + val_count])
+            train_sessions = set(shuffled[test_count + val_count:])
+            if not train_sessions:
+                break
+
+            split_sessions = (train_sessions, val_sessions, test_sessions)
+            if all(
+                set(y[np.isin(session_ids, list(selected))]) == required_labels
+                for selected in split_sessions
+            ):
+                return split_sessions
+        test_count += 1
+        val_count += 1
 
     raise ValueError(
         "Could not create session-isolated splits containing every posture; "
-        "collect more complete guided sessions"
+        "collect more complete guided sessions (and, for NOT_PRAYING, more negative takes: "
+        "every partition needs at least one)"
     )
 
 

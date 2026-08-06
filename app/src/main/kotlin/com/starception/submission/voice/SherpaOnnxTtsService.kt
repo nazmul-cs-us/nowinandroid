@@ -779,6 +779,74 @@ class SherpaOnnxTtsService @Inject constructor(
     }
 
     /**
+     * Generate and cache every line of a scripted session before it starts.
+     *
+     * Kokoro needs seconds per sentence. Generating on demand puts that wait *inside* the
+     * session — in guided salah recording the user stands holding a posture while the next
+     * instruction is still being synthesised. Preparing up front moves all of that cost to
+     * a single wait the user can sit through.
+     *
+     * Results go to the in-memory cache only: [MAX_CACHE_FILES] would prune a session's
+     * worth of lines off disk anyway. Play them with [speakCachedOrGenerate] passing
+     * `retainCache = true`, then hand the same list to [releaseCachedTexts] when done.
+     *
+     * Individual lines that fail to synthesise are skipped rather than fatal — they simply
+     * fall back to on-demand generation at play time.
+     *
+     * @return false only if the engine itself could not be initialised.
+     */
+    suspend fun prepareTexts(
+        texts: List<String>,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): Boolean {
+        if (!isInitialized && !initialize()) {
+            Log.e(TAG, "Cannot prepare texts: TTS failed to initialize")
+            return false
+        }
+        val pending = texts
+            .filter { it.isNotBlank() }
+            .distinct()
+            .filterNot { audioCache.containsKey(it.hashCode()) }
+
+        onProgress(0, pending.size)
+        Log.i(TAG, "🎬 Preparing ${pending.size} voice lines up front")
+
+        withContext(Dispatchers.IO) {
+            for ((index, text) in pending.withIndex()) {
+                val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
+                val samples = mutableListOf<Float>()
+                var sampleRate = tts?.sampleRate() ?: 22050
+                for ((i, sentence) in sentences.withIndex()) {
+                    ttsMutex.withLock {
+                        val audio = generateSentence(sentence, DEFAULT_SPEAKER_ID, DEFAULT_SPEED, i + 1, sentences.size)
+                        if (audio != null && audio.samples.isNotEmpty()) {
+                            samples.addAll(audio.samples.toList())
+                            sampleRate = audio.sampleRate
+                        }
+                    }
+                }
+                if (samples.isNotEmpty()) {
+                    audioCache[text.hashCode()] = CachedAudio(samples.toFloatArray(), sampleRate)
+                } else {
+                    Log.w(TAG, "Prepared line produced no audio, will retry on demand: \"${text.take(40)}\"")
+                }
+                onProgress(index + 1, pending.size)
+            }
+        }
+        Log.i(TAG, "✅ Voice preparation complete (${audioCache.size} entries cached)")
+        return true
+    }
+
+    /**
+     * Drop prepared lines from the in-memory cache once a scripted session is over.
+     * Counterpart to [prepareTexts]; a session's audio is tens of megabytes of floats.
+     */
+    fun releaseCachedTexts(texts: List<String>) {
+        texts.distinct().forEach { audioCache.remove(it.hashCode()) }
+        Log.i(TAG, "🧹 Released prepared voice lines (${audioCache.size} entries remain)")
+    }
+
+    /**
      * Check if audio for given text is pre-generated and cached (memory or disk).
      */
     fun isCached(text: String): Boolean {
@@ -871,12 +939,18 @@ class SherpaOnnxTtsService @Inject constructor(
      * Play pre-generated audio if cached, otherwise generate and play normally.
      * Checks both memory and disk cache.
      */
+    /**
+     * @param retainCache keep the entry cached after playing. Needed when the same line is
+     *   spoken more than once in a session (a guided prayer script repeats sujud and the
+     *   lowering cue); the default evict-after-play is right for one-shot audio like hadith.
+     */
     suspend fun speakCachedOrGenerate(
         text: String,
         speakerId: Int = DEFAULT_SPEAKER_ID,
         speed: Float = DEFAULT_SPEED,
         onComplete: (() -> Unit)? = null,
         onPlaybackStart: (() -> Unit)? = null,
+        retainCache: Boolean = false,
     ): Boolean {
         val textHash = text.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
@@ -907,7 +981,7 @@ class SherpaOnnxTtsService @Inject constructor(
             Log.i(TAG, "🎯 Playing from cache (${cached.samples.size} samples, hash=$textHash)")
             // DON'T remove from memory cache - keep for potential replay
             // But DO delete the disk file to allow new hadith caching
-            deleteDiskCache(textHash)
+            if (!retainCache) deleteDiskCache(textHash)
             try {
                 isSpeakingNow = true
                 onPlaybackStart?.invoke()
@@ -920,7 +994,7 @@ class SherpaOnnxTtsService @Inject constructor(
             } finally {
                 isSpeakingNow = false
             }
-            audioCache.remove(textHash) // Remove from memory after playing
+            if (!retainCache) audioCache.remove(textHash) // Remove from memory after playing
             onComplete?.invoke()
             return true
         }

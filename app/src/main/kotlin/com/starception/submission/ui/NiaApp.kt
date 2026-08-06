@@ -818,13 +818,25 @@ private fun NiaMainContent(
             val p by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
             p
         } else 0f
+        // Non-download long tasks (e.g. synthesising a guided session's voice lines)
+        // share the same banner, but a real CDN download always wins.
+        val appTaskProgress by AppTaskProgressBus.state.collectAsStateWithLifecycle()
         // Suppress on HOME — PrayerTimesScreen has its own PullToSyncContainer that shows it.
-        val downloadProgress = if (!isOnHome && isDownloadingRaw) rawDownloadProgress else 0f
-        val downloadLabel = if (mainViewModel != null) {
+        val downloadProgress = when {
+            isOnHome -> 0f
+            isDownloadingRaw -> rawDownloadProgress
+            else -> appTaskProgress?.progress ?: 0f
+        }
+        val vmDownloadLabel = if (mainViewModel != null) {
             val label by mainViewModel.contentDownloadLabel.collectAsStateWithLifecycle()
             label
         } else {
             ""
+        }
+        val downloadLabel = if (!isDownloadingRaw && appTaskProgress != null) {
+            appTaskProgress?.label.orEmpty()
+        } else {
+            vmDownloadLabel
         }
         // Refresh state is hoisted to MainActivityViewModel so the sync banner
         // persists when navigating between Home and other tabs mid-sync.

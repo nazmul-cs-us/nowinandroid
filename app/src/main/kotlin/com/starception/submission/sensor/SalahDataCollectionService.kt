@@ -42,6 +42,13 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         private const val TAG = "SalahDataCollection"
         private const val SENSOR_DELAY_US = 20_000 // 50Hz = 20ms between samples
         private const val WINDOW_SIZE = 5 // 5 samples per 100ms window at 50Hz
+
+        /**
+         * Minimum spacing between samples kept for a window, enforcing the 50Hz that
+         * [SENSOR_DELAY_US] only requests. 18ms rather than 20ms so ordinary delivery
+         * jitter does not drop a legitimate sample. See [shouldAcceptSample].
+         */
+        private const val MIN_SAMPLE_INTERVAL_NS = 18_000_000L
         private const val DATA_DIR_NAME = "salah_training_data"
         private const val MAX_PRAYER_DURATION_MS = 30 * 60 * 1000L // 30 minutes
 
@@ -101,6 +108,11 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     private val gyroYBuffer = mutableListOf<Float>()
     private val gyroZBuffer = mutableListOf<Float>()
     private val gyroTimestamps = mutableListOf<Long>() // nanoseconds from event.timestamp
+
+    // Timestamp of the last sample actually accepted into each buffer, used to hold the
+    // effective rate at 50Hz regardless of how fast the framework delivers events.
+    private var lastAccelSampleNs = 0L
+    private var lastGyroSampleNs = 0L
 
     // Boot-time reference for converting sensor nanoseconds to wall clock
     private var sensorBootTimeNs = 0L
@@ -342,6 +354,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             Sensor.TYPE_ACCELEROMETER -> {
                 synchronized(accelXBuffer) {
                     if (!isRecording || !isSampleCaptureEnabled) return
+                    if (!shouldAcceptSample(event.timestamp, lastAccelSampleNs)) return
+                    lastAccelSampleNs = event.timestamp
                     accelXBuffer.add(event.values[0])
                     accelYBuffer.add(event.values[1])
                     accelZBuffer.add(event.values[2])
@@ -351,6 +365,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             Sensor.TYPE_GYROSCOPE -> {
                 synchronized(gyroXBuffer) {
                     if (!isRecording || !isSampleCaptureEnabled) return
+                    if (!shouldAcceptSample(event.timestamp, lastGyroSampleNs)) return
+                    lastGyroSampleNs = event.timestamp
                     gyroXBuffer.add(event.values[0])
                     gyroYBuffer.add(event.values[1])
                     gyroZBuffer.add(event.values[2])
@@ -370,6 +386,27 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         }
     }
 
+    /**
+     * Decide whether a sensor event is far enough from the last accepted one to keep.
+     *
+     * [SENSOR_DELAY_US] is only a hint to the framework: the delivered rate can be higher,
+     * and another listener registering the same sensor at a faster rate raises it for
+     * everyone. When that happened, the five-sample window filled in ~50ms instead of
+     * ~100ms, so one session was recorded at double the window rate of every other — the
+     * same posture spanning half as much wall-clock time per sequence. Dropping the extra
+     * events pins the effective rate at 50Hz no matter what the framework delivers.
+     *
+     * A 10% tolerance keeps normal delivery jitter around the 20ms target from being
+     * mistaken for an extra sample.
+     */
+    private fun shouldAcceptSample(eventTimestampNs: Long, lastAcceptedNs: Long): Boolean {
+        if (lastAcceptedNs == 0L) return true
+        val elapsed = eventTimestampNs - lastAcceptedNs
+        // Some devices restart event timestamps (e.g. across a suspend); never stall.
+        if (elapsed < 0L) return true
+        return elapsed >= MIN_SAMPLE_INTERVAL_NS
+    }
+
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun clearSensorBuffers() {
@@ -383,6 +420,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                 gyroYBuffer.clear()
                 gyroZBuffer.clear()
                 gyroTimestamps.clear()
+                // A cleared buffer starts a fresh window, so the next sample of each
+                // sensor must be accepted regardless of when the last one arrived.
+                lastAccelSampleNs = 0L
+                lastGyroSampleNs = 0L
             }
         }
     }

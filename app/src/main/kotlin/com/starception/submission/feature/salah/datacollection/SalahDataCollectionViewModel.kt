@@ -6,6 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetManifest
+import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.ui.AppTaskProgressBus
 import com.starception.submission.feature.salah.visualization.PosePlaybackSource
 import com.starception.submission.feature.salah.visualization.VisualizationMode
 import com.starception.submission.feature.salah.visualization.VisualizationState
@@ -33,6 +35,8 @@ import org.json.JSONObject
 
 enum class GuidedRecordingState {
     IDLE,
+    /** Synthesising every spoken line before the session, so it never stalls mid-posture. */
+    PREPARING,
     WELCOME,
     COUNTDOWN,
     RECORDING_POSTURE,
@@ -67,6 +71,8 @@ data class SalahDataCollectionUiState(
     val guidedSelectedDuration: Int = 15,
     val guidedSpecificOnly: Boolean = true,
     val guidedMessage: String = "",
+    val guidedPrepareDone: Int = 0,
+    val guidedPrepareTotal: Int = 0,
     // TTS download state
     val isTtsAvailable: Boolean = false,
     val isTtsDownloading: Boolean = false,
@@ -221,6 +227,15 @@ private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture
         recordingLabel = "Rise to Next Rak‘ah",
         movementCue = "Move now. Rise naturally into the next rak‘ah and stop fully upright.",
     )
+    // A negative is defined by the absence of prayer, so there is nothing to instruct and
+    // no fixed hold to time. Guiding it would also bias the recording toward whatever the
+    // voice suggested, when the value of this class is precisely its variety — it is
+    // collected with plain (unguided) recording instead.
+    SalahPosture.NOT_PRAYING -> GuidedStep(
+        posture, isTransition = false,
+        instruction = "Negative examples are not guided. Use Start Recording and go about " +
+            "any activity that is not prayer.",
+    )
 }
 
 // With the production stride of 3, five seconds yields at least 10 held-out sequences
@@ -229,6 +244,27 @@ internal const val TRANSITION_DURATION = 5
 internal const val FOCUSED_MOVEMENT_REPETITIONS = 5
 private const val STATIC_SETTLE_MS = 1_500L
 private const val TAG = "GuidedRecording"
+
+/**
+ * Spoken form of a countdown number.
+ *
+ * Kokoro returns zero samples for a digit-only string ("5"), which [speakAndWait] reports
+ * as a voice failure and which used to abort the whole guided session at the countdown.
+ * Words always phonemize, so the count is spoken as words.
+ */
+private fun countdownWord(seconds: Int): String = when (seconds) {
+    1 -> "One."
+    2 -> "Two."
+    3 -> "Three."
+    4 -> "Four."
+    5 -> "Five."
+    6 -> "Six."
+    7 -> "Seven."
+    8 -> "Eight."
+    9 -> "Nine."
+    10 -> "Ten."
+    else -> "$seconds."
+}
 
 class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -266,6 +302,10 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     private var countdownJob: Job? = null
     private var guidedJob: Job? = null
+    private var refreshJob: Job? = null
+
+    /** Voice lines prepared for the running guided session, released when it ends. */
+    private var guidedVoiceLines: List<String> = emptyList()
 
     // Lazy TTS service and download manager via Hilt EntryPoint
     private var ttsService: SherpaOnnxTtsService? = null
@@ -314,6 +354,28 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     // TTS DOWNLOAD MANAGEMENT
     // ═══════════════════════════════════════════════════════
 
+    /** The voice the user picked in TTS settings — the one guided recording will speak with. */
+    private fun selectedTtsVoice(): TtsVoice {
+        val prefs = getApplication<Application>()
+            .getSharedPreferences("tts_settings", android.content.Context.MODE_PRIVATE)
+        val name = prefs.getString("selected_voice", null) ?: return TtsVoice.KOKORO_EN
+        return try {
+            TtsVoice.valueOf(name)
+        } catch (e: IllegalArgumentException) {
+            TtsVoice.KOKORO_EN
+        }
+    }
+
+    /**
+     * CDN categories that must be present for [selectedTtsVoice] to speak.
+     * Kokoro additionally needs the espeak-ng data directory for phonemisation;
+     * VITS-VCTK ships its own lexicon and needs nothing extra.
+     */
+    private fun selectedVoiceCategories(): List<String> = when (selectedTtsVoice()) {
+        TtsVoice.KOKORO_EN -> listOf("model_tts_kokoro", "model_tts_espeak")
+        TtsVoice.VITS_VCTK -> listOf("model_tts_vits")
+    }
+
     fun checkTtsAvailability() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -324,10 +386,13 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     _uiState.update { it.copy(isTtsAvailable = false) }
                     return@launch
                 }
-                val kokoroReady = dm.isCategoryComplete("model_tts_kokoro", manifest)
-                val espeakReady = dm.isCategoryComplete("model_tts_espeak", manifest)
-                val available = kokoroReady && espeakReady
-                Log.i(TAG, "TTS availability: kokoro=$kokoroReady, espeak=$espeakReady, available=$available")
+                // Gate on the voice that will actually speak, not a hardcoded one:
+                // selecting VCTK while only Kokoro was downloaded used to leave the
+                // start button enabled and fail at the first instruction.
+                val categories = selectedVoiceCategories()
+                val readiness = categories.associateWith { dm.isCategoryComplete(it, manifest) }
+                val available = readiness.values.all { it }
+                Log.i(TAG, "TTS availability for ${selectedTtsVoice().displayName}: $readiness")
                 _uiState.update { it.copy(isTtsAvailable = available, ttsDownloadError = null) }
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking TTS availability", e)
@@ -349,8 +414,9 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     return@launch
                 }
 
-                // Download espeak first (smaller, ~18MB), then kokoro (~158MB)
-                val categories = listOf("model_tts_espeak", "model_tts_kokoro")
+                // Fetch whatever the selected voice needs. Kokoro's list is ordered
+                // espeak (~18MB) before the model (~158MB) so the small one lands first.
+                val categories = selectedVoiceCategories().sortedBy { it != "model_tts_espeak" }
                 val totalCategories = categories.size
                 var completedCategories = 0
 
@@ -494,41 +560,53 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         refreshFileList()
     }
 
+    /**
+     * Rebuild the recording list off the main thread.
+     *
+     * Every entry costs three full JSON passes over the file (posture counts, training
+     * issue, then the global tally), so the cost grows with the dataset. Run inline on the
+     * caller's thread this ANR'd on the guided Cancel button once enough sessions existed.
+     * Callers only need the state flows to catch up, never a synchronous result.
+     */
     private fun refreshFileList() {
-        val files = collectionService.listDataFiles().map { file ->
-            val counts = collectionService.getFilePostureCounts(file.name)
-            val trainingIssue = collectionService.getFileTrainingIssue(file.name)
-            DataFileInfo(
-                name = file.name,
-                sizeKb = file.length() / 1024,
-                lastModified = file.lastModified(),
-                postureCounts = counts,
-                totalSamples = counts.values.sum(),
-                isPendingReview = trainingIssue != null &&
-                    trainingIssue != "Invalid data · excluded" &&
-                    trainingIssue != "Empty · excluded",
-                trainingIssue = trainingIssue,
-            )
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            val files = collectionService.listDataFiles().map { file ->
+                val counts = collectionService.getFilePostureCounts(file.name)
+                val trainingIssue = collectionService.getFileTrainingIssue(file.name)
+                DataFileInfo(
+                    name = file.name,
+                    sizeKb = file.length() / 1024,
+                    lastModified = file.lastModified(),
+                    postureCounts = counts,
+                    totalSamples = counts.values.sum(),
+                    isPendingReview = trainingIssue != null &&
+                        trainingIssue != "Invalid data · excluded" &&
+                        trainingIssue != "Empty · excluded",
+                    trainingIssue = trainingIssue,
+                )
+            }
+            val (globalCounts, globalTotal) = collectionService.getGlobalPostureCounts()
+            val totalSizeKb = collectionService.getTotalDataSizeKb()
+            _uiState.update { state ->
+                state.copy(
+                    dataFiles = files,
+                    totalDataSizeKb = totalSizeKb,
+                    globalPostureCounts = globalCounts,
+                    globalTotalSamples = globalTotal
+                )
+            }
+            // Restore cached quality results for the listed files (mtime-keyed).
+            val cached = mutableMapOf<String, FileQuality>()
+            for (file in files) {
+                val raw = qualityPrefs.getString("${'$'}{file.name}:${'$'}{file.lastModified}", null) ?: continue
+                val parts = raw.split(",")
+                val agreement = parts.getOrNull(0)?.toFloatOrNull() ?: continue
+                val flagged = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                cached[file.name] = FileQuality(agreement, flagged)
+            }
+            _fileQuality.value = cached
         }
-        val (globalCounts, globalTotal) = collectionService.getGlobalPostureCounts()
-        _uiState.update { state ->
-            state.copy(
-                dataFiles = files,
-                totalDataSizeKb = collectionService.getTotalDataSizeKb(),
-                globalPostureCounts = globalCounts,
-                globalTotalSamples = globalTotal
-            )
-        }
-        // Restore cached quality results for the listed files (mtime-keyed).
-        val cached = mutableMapOf<String, FileQuality>()
-        for (file in files) {
-            val raw = qualityPrefs.getString("${'$'}{file.name}:${'$'}{file.lastModified}", null) ?: continue
-            val parts = raw.split(",")
-            val agreement = parts.getOrNull(0)?.toFloatOrNull() ?: continue
-            val flagged = parts.getOrNull(1)?.toIntOrNull() ?: 0
-            cached[file.name] = FileQuality(agreement, flagged)
-        }
-        _fileQuality.value = cached
     }
 
     // ═══════════════════════════════════════════════════════
@@ -567,19 +645,36 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             }
             Log.i(TAG, "Starting guided recording (specific=$isSpecific, steps=${steps.size}, duration=$duration)")
 
-            // 1. WELCOME
-            _uiState.update {
-                it.copy(
-                    guidedState = GuidedRecordingState.WELCOME,
-                    guidedMessage = "Turn up the media volume, place the phone securely in one trouser pocket, and leave it there for the whole session.",
-                    guidedPostureIndex = 0,
-                    guidedTotalPostures = steps.size,
-                    trimmedSamples = 0,
-                    totalSamples = 0,
-                    postureCounts = emptyMap(),
-                )
+            // Every spoken line is built once, here. The preparation pass below and the
+            // session itself must use byte-identical strings — the audio cache is keyed on
+            // the text, so any drift silently turns into a mid-posture generation stall.
+            val isRepeatedFocusedMovement = isSpecific && focusedStep.isTransition
+            val preparationMessages = steps.mapIndexed { index, step ->
+                val takeNumber = index + 1
+                if (isRepeatedFocusedMovement) {
+                    if (index == 0) {
+                        "Take $takeNumber of ${steps.size}. ${step.instruction}"
+                    } else {
+                        "Prepare for take $takeNumber of ${steps.size}. Return to the same starting position. " +
+                            "Do not move until you hear move now."
+                    }
+                } else {
+                    step.instruction
+                }
             }
-            val welcomeSpoken = speakAndWait(
+            val resetMessages = steps.indices.map { index ->
+                val takeNumber = index + 1
+                if (isRepeatedFocusedMovement && takeNumber < steps.size) {
+                    "Take $takeNumber complete. Recording is paused. Return to the starting position " +
+                        "for take ${takeNumber + 1} of ${steps.size}."
+                } else {
+                    null
+                }
+            }
+            val countdownMessages = (COUNTDOWN_SECONDS downTo 1).map { countdownWord(it) }
+            val completionMessage =
+                "Recording complete. The session was saved. You may take your phone out now."
+            val welcomeMessage =
                 (if (isSpecific) "Focused guided recording is starting. " else "Guided prayer recording is starting. ") +
                     "Turn up the media volume. " +
                     "Place the phone fully inside one trouser pocket, in the position you normally carry it. " +
@@ -593,7 +688,58 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                         "After bowing, rise fully upright and wait for a separate instruction before lowering into prostration. ") +
                     "Follow only the voice instructions. Move immediately when an instruction begins with: now. " +
                     "If an instruction says: do not move yet, wait for the separate cue: move now."
-            )
+
+            val allVoiceLines = buildList {
+                add(welcomeMessage)
+                addAll(countdownMessages)
+                addAll(preparationMessages)
+                steps.forEach { step -> step.movementCue?.let { add(it) } }
+                addAll(resetMessages.filterNotNull())
+                add(completionMessage)
+            }
+            guidedVoiceLines = allVoiceLines
+
+            // 0. PREPARE. Synthesise the whole script before anything is recorded, so no
+            // instruction is generated while the user is already holding a posture.
+            _uiState.update {
+                it.copy(
+                    guidedState = GuidedRecordingState.PREPARING,
+                    guidedMessage = "Preparing voice instructions…",
+                    guidedPrepareDone = 0,
+                    guidedPrepareTotal = 0,
+                    guidedPostureIndex = 0,
+                    guidedTotalPostures = steps.size,
+                    trimmedSamples = 0,
+                    totalSamples = 0,
+                    postureCounts = emptyMap(),
+                )
+            }
+            val prepared = try {
+                getTtsService().prepareTexts(allVoiceLines) { done, total ->
+                    _uiState.update { it.copy(guidedPrepareDone = done, guidedPrepareTotal = total) }
+                    // Mirror into the app-wide banner so the wait is still visible
+                    // if the user navigates away from the training screen.
+                    AppTaskProgressBus.update("Preparing guided voice", done, total)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Voice preparation failed: ${e.message}")
+                false
+            } finally {
+                AppTaskProgressBus.clear()
+            }
+            if (!prepared) {
+                failGuidedRecording("Voice engine could not start. No training recording was saved.")
+                return@launch
+            }
+
+            // 1. WELCOME
+            _uiState.update {
+                it.copy(
+                    guidedState = GuidedRecordingState.WELCOME,
+                    guidedMessage = "Turn up the media volume, place the phone securely in one trouser pocket, and leave it there for the whole session.",
+                )
+            }
+            val welcomeSpoken = speakAndWait(welcomeMessage)
             if (!welcomeSpoken) {
                 failGuidedRecording("Voice instructions could not play. No training recording was saved.")
                 return@launch
@@ -605,9 +751,11 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             _uiState.update { it.copy(guidedState = GuidedRecordingState.COUNTDOWN, guidedMessage = "Starting in...") }
             for (remaining in COUNTDOWN_SECONDS downTo 1) {
                 _uiState.update { it.copy(countdownSeconds = remaining) }
-                if (!speakAndWait(remaining.toString())) {
-                    failGuidedRecording("Voice instructions stopped before recording began. No training recording was saved.")
-                    return@launch
+                // A silent count is cosmetic: the number is on screen, nothing is being
+                // recorded yet, and the welcome message already proved the engine works.
+                // Only the instruction cues that label data are worth aborting for.
+                if (!speakAndWait(countdownWord(remaining))) {
+                    Log.w(TAG, "Countdown number $remaining did not play; continuing")
                 }
                 delay(250L)
             }
@@ -633,18 +781,8 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             for ((index, step) in steps.withIndex()) {
                 val posture = step.posture
                 val postureDuration = if (step.isTransition) TRANSITION_DURATION else duration
-                val isRepeatedFocusedMovement = isSpecific && focusedStep.isTransition
                 val takeNumber = index + 1
-                val preparationMessage = if (isRepeatedFocusedMovement) {
-                    if (index == 0) {
-                        "Take $takeNumber of ${steps.size}. ${step.instruction}"
-                    } else {
-                        "Prepare for take $takeNumber of ${steps.size}. Return to the same starting position. " +
-                            "Do not move until you hear move now."
-                    }
-                } else {
-                    step.instruction
-                }
+                val preparationMessage = preparationMessages[index]
 
                 // Preparation and movement into static postures are intentionally not
                 // captured. Otherwise instruction time and boundary motion would be
@@ -706,10 +844,8 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 // Repeated movement takes stay in one file/session, but make the
                 // pause explicit so it never looks like the recorder finished and
                 // unexpectedly restarted. Capture remains paused throughout reset.
-                if (isRepeatedFocusedMovement && takeNumber < steps.size) {
-                    val resetMessage =
-                        "Take $takeNumber complete. Recording is paused. Return to the starting position " +
-                            "for take ${takeNumber + 1} of ${steps.size}."
+                val resetMessage = resetMessages[index]
+                if (resetMessage != null) {
                     _uiState.update {
                         it.copy(
                             guidedState = GuidedRecordingState.POSTURE_TRANSITION,
@@ -747,8 +883,24 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 )
             }
 
-            speakAndWait("Recording complete. The session was saved. You may take your phone out now.")
+            speakAndWait(completionMessage)
+            releaseGuidedVoice()
             refreshFileList()
+        }
+    }
+
+    /** Free the session's prepared audio; it is tens of megabytes of float samples. */
+    private fun releaseGuidedVoice() {
+        // Cancelling mid-preparation kills the coroutine before its `finally`, so the
+        // banner has to be cleared here too or it stays on screen after the session ends.
+        AppTaskProgressBus.clear()
+        val lines = guidedVoiceLines
+        guidedVoiceLines = emptyList()
+        if (lines.isEmpty()) return
+        try {
+            ttsService?.releaseCachedTexts(lines)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not release prepared voice lines: ${e.message}")
         }
     }
 
@@ -802,6 +954,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         Log.i(TAG, "Guided recording cancelled")
         guidedJob?.cancel()
         guidedJob = null
+        releaseGuidedVoice()
 
         // Stop TTS
         try {
@@ -829,6 +982,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     }
 
     private fun failGuidedRecording(message: String) {
+        releaseGuidedVoice()
         if (collectionService.isRecording()) {
             // Capture is paused before every instruction, so anything already written
             // has a known label. Never begin or retain the failed step as ground truth.
@@ -846,12 +1000,23 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         refreshFileList()
     }
 
+    /**
+     * Speak a guided line, preferring audio already synthesised by the preparation pass.
+     *
+     * `retainCache` keeps the entry so repeated lines (sujud and the lowering cue each
+     * occur twice in a full session) play instantly the second time too. Anything not
+     * prepared still falls back to on-demand generation rather than failing.
+     */
     private suspend fun speakAndWait(
         text: String,
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean = try {
             val tts = getTtsService()
-            tts.speak(text = text, onPlaybackStart = onPlaybackStart)
+            tts.speakCachedOrGenerate(
+                text = text,
+                onPlaybackStart = onPlaybackStart,
+                retainCache = true,
+            )
         } catch (e: Exception) {
             Log.w(TAG, "TTS speak failed: ${e.message}")
             false

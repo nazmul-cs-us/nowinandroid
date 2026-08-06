@@ -12,6 +12,17 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
+ * The database for a translation has not been downloaded and is not bundled in the APK.
+ *
+ * Distinct from a genuine failure so callers can offer the download rather than reporting
+ * an error — "not here yet" and "broken" need different UI.
+ */
+class QuranDatabaseUnavailableException(
+    val translationCode: String,
+    val cdnKey: String,
+) : Exception("Quran database for '$translationCode' is not available ($cdnKey)")
+
+/**
  * Helper class to manage multiple Quran translation databases
  * Supports loading Arabic (quran.db) and all translations
  */
@@ -49,14 +60,35 @@ object QuranTranslationHelper {
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
 
             try {
+                val instanceName = "quran_${translationCode}_instance"
+                val dbFile = assetRepository?.getDatabaseFile(cdnKey)
+
+                // Refuse to build a database with nothing to fill it from. Room would
+                // happily create an empty file with the right schema, and because it only
+                // copies the prepopulated source at creation time, that empty file becomes
+                // permanent — which is how the Arabic text disappeared. Failing here keeps
+                // the broken state from being written at all and lets callers offer the
+                // download instead of rendering a blank page.
+                if (dbFile == null && !bundledAssetExists(context, dbAssetPath)) {
+                    throw QuranDatabaseUnavailableException(translationCode, cdnKey)
+                }
+
+                // Room only copies the prepopulated file when it creates the database. An
+                // instance opened once before its source was downloadable is left as an
+                // empty shell with the right schema and no rows, and Room never retries —
+                // every query then returns nothing and the surah renders blank. Discard
+                // such a shell so the copy happens again now that a source exists.
+                if (dbFile != null) {
+                    discardEmptyInstance(context, instanceName)
+                }
+
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranDatabase::class.java,
-                    "quran_${translationCode}_instance"
+                    instanceName
                 )
 
                 // Try CDN/extracted file first, fall back to bundled asset
-                val dbFile = assetRepository?.getDatabaseFile(cdnKey)
                 if (dbFile != null) {
                     builder.createFromFile(dbFile)
                 } else {
@@ -82,6 +114,55 @@ object QuranTranslationHelper {
             }
     }
     
+    /** True when the APK actually ships this asset — most Quran databases are CDN-only. */
+    private fun bundledAssetExists(context: Context, assetPath: String): Boolean = try {
+        context.applicationContext.assets.open(assetPath).close()
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * Delete an existing instance that carries the schema but no content.
+     *
+     * Emptiness is judged by the `surahs` table only. `favourite_ayahs` and `ayah_notes`
+     * live in the same file, so a rebuild drops any bookmarks or notes attached to a
+     * database that never had scripture in it — an accepted trade, since without the text
+     * the surah cannot be read at all and those rows reference ayahs that are not there.
+     * A populated database is never touched.
+     *
+     * Checked with a plain SQLite open rather than through Room: opening it through Room
+     * is what locks in the empty copy in the first place.
+     */
+    private fun discardEmptyInstance(context: Context, instanceName: String) {
+        val dbPath = context.applicationContext.getDatabasePath(instanceName)
+        if (!dbPath.exists()) return
+
+        val isEmpty = try {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            ).use { db ->
+                db.rawQuery("SELECT COUNT(*) FROM surahs", null).use { cursor ->
+                    cursor.moveToFirst() && cursor.getInt(0) == 0
+                }
+            }
+        } catch (e: Exception) {
+            // No surahs table, corrupt header, unreadable — all mean unusable, so rebuild.
+            Log.w(TAG, "Could not read $instanceName, treating as empty: ${e.message}")
+            true
+        }
+
+        if (!isEmpty) return
+
+        Log.w(TAG, "🩹 $instanceName has no rows; deleting so it is repopulated from source")
+        // -wal and -shm must go too, or SQLite replays them over the fresh copy.
+        listOf(dbPath, File("${dbPath.path}-wal"), File("${dbPath.path}-shm")).forEach { file ->
+            if (file.exists() && !file.delete()) {
+                Log.w(TAG, "Could not delete ${file.name}")
+            }
+        }
+    }
+
     /**
      * Clear database cache (useful for testing or memory management)
      */
@@ -322,6 +403,11 @@ class QuranTranslationRepository(
             val surah = quranDao.getSurahById(surahId)
             val surahNumber = surah?.number ?: 0
             quranDao.getAyahsBySurahOnce(surahId).map { it.toAyah(surahNumber) }
+        } catch (e: QuranDatabaseUnavailableException) {
+            // Must not become an empty list: "not downloaded" is a state the screen can
+            // act on by offering the download, whereas an empty list is indistinguishable
+            // from a surah with no verses and renders as a silent blank page.
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayahs for Surah $surahId", e)
             emptyList()

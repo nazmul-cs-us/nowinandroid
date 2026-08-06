@@ -229,11 +229,17 @@ class SalahDetectionEngine(context: Context) : Closeable {
         val posture = modelPostures[bestIndex]
         val threshold = POSTURE_CONFIDENCE_THRESHOLDS[posture] ?: DEFAULT_CONFIDENCE
 
-        // Debug: log raw ML output vs smoothed output for diagnosis
-        val labels = modelPostures
-        val rawStr = rawProbabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
-        val smoothStr = probabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
-        Log.d(TAG, "RAW[$rawStr] EMA[$smoothStr] best=${posture.displayName} conf=%.3f thr=%.2f ${if (bestProb < threshold) "REJECTED" else "ACCEPTED"}".format(bestProb, threshold))
+        // Debug: log raw ML output vs smoothed output for diagnosis.
+        // Classification runs continuously at ~5 Hz, so building these strings
+        // unconditionally allocated enough to OOM the app during a long session.
+        // Off by default; enable with:
+        //   adb shell setprop log.tag.SalahDetectionEngine DEBUG
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            val labels = modelPostures
+            val rawStr = rawProbabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
+            val smoothStr = probabilities.mapIndexed { i, p -> "${labels.getOrElse(i){"?"}}: %.2f".format(p) }.joinToString(" | ")
+            Log.d(TAG, "RAW[$rawStr] EMA[$smoothStr] best=${posture.displayName} conf=%.3f thr=%.2f ${if (bestProb < threshold) "REJECTED" else "ACCEPTED"}".format(bestProb, threshold))
+        }
 
         if (bestProb < threshold) return null
 

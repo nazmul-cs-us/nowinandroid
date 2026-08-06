@@ -18,6 +18,15 @@ def augment_rotation(X: np.ndarray, max_angle_deg: float = 15.0) -> np.ndarray:
     Apply random 3D rotation to accelerometer and gyroscope data.
     Simulates the phone being at slightly different angles in the pocket.
 
+    NOT used by default — see [augment_dataset]. The intent (pocket placement varies) is
+    real, but the method is wrong for this task: the classes are themselves orientations
+    relative to gravity, so rotating a labelled window can move it onto another class's
+    signature. Measured cost is large and consistent, and it grows with the angle
+    (leave-one-session-out accuracy 0.31 at 0deg, 0.26 at 15deg, 0.18 at 45deg, 0.11 at
+    180deg — same trend when rotating raw signals before feature extraction rather than
+    these aggregates). Placement invariance needs calibration into a body frame, not
+    randomisation.
+
     Args:
         X: (N, seq_len, 30) feature array
         max_angle_deg: Maximum rotation angle in degrees
@@ -162,7 +171,8 @@ def augment_dataset(
     X: np.ndarray,
     y: np.ndarray,
     augmentation_factor: int = 4,
-    include_original: bool = True
+    include_original: bool = True,
+    include_rotation: bool = False
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Apply multiple augmentations to create an expanded dataset.
@@ -172,6 +182,8 @@ def augment_dataset(
         y: (N,) labels
         augmentation_factor: How many augmented copies per original
         include_original: Whether to include original data in output
+        include_rotation: Opt back into rotation augmentation. Off by default because it
+            hurts these orientation-defined classes; see the note in the body.
 
     Returns:
         X_aug: Augmented feature array
@@ -184,9 +196,19 @@ def augment_dataset(
         X_list.append(X)
         y_list.append(y)
 
+    # Rotation is excluded by default: a salah posture IS an orientation relative to
+    # gravity, so rotating a window can turn QIYAM into SUJUD's signature while keeping
+    # the old label — it manufactures label noise rather than useful variety.
+    # Measured on leave-one-session-out over data/train_ready (mean accuracy across the
+    # three multi-posture sessions): with rotation 0.425, without it 0.620, and every
+    # individual held-out session improved. See augment_rotation's own docstring.
+    strategies = ['time_warp', 'noise', 'scaling']
+    if include_rotation:
+        strategies = ['rotation'] + strategies
+
     for _ in range(augmentation_factor):
         # Randomly select augmentation strategy
-        aug_type = np.random.choice(['rotation', 'time_warp', 'noise', 'scaling'])
+        aug_type = np.random.choice(strategies)
 
         if aug_type == 'rotation':
             X_aug = augment_rotation(X, max_angle_deg=np.random.uniform(5, 20))

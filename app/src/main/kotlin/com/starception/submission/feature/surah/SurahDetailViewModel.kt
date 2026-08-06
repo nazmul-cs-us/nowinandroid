@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.Surah
+import com.starception.submission.core.qurandatabase.QuranDatabaseUnavailableException
 import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
 import com.starception.submission.core.topicsdatabase.Topic
@@ -216,6 +217,27 @@ class SurahDetailViewModel @Inject constructor(
                     repository.getAyahsBySurahOnce(surah.id)
                 }
 
+                // The Arabic text is the base of every layout, translated or not, and it
+                // comes from a different database than the selected translation. Checking
+                // only the translation above let an empty Arabic database through and the
+                // page rendered with a header and no verses. No surah has zero ayahs, so
+                // an empty result here always means missing data, not an empty surah.
+                if (rawAyahs.isEmpty()) {
+                    val missingCode = if (translationCode != "ar") "ar" else translationCode
+                    android.util.Log.e(
+                        "SurahDetail",
+                        "❌ No ayahs for surah $surahNumber from '$missingCode' database — treating as missing data",
+                    )
+                    val translationName = QuranTranslationHelper.getTranslationName(missingCode)
+                    _uiState.value = SurahDetailUiState.NeedsDownload(
+                        category = if (missingCode == "ar") "quran_core" else "quran_translation",
+                        resourceName = "$translationName Quran Text",
+                        description = "The $translationName Quran database is missing its verses. " +
+                            "Download it to read this surah.",
+                    )
+                    return@launch
+                }
+
                 // Check if first ayah has Bismillah (only for surahs 2-8, 10-114)
                 val shouldShowBismillah = if (surahNumber != 1 && surahNumber != 9 && rawAyahs.isNotEmpty()) {
                     hasBismillah(rawAyahs.first().text)
@@ -272,6 +294,16 @@ class SurahDetailViewModel @Inject constructor(
 
                 android.util.Log.d("SurahDetail", "✅ Loaded ${ayahs.size} Ayahs from $translationCode")
                 _uiState.value = SurahDetailUiState.Success(surah, ayahs)
+            } catch (e: QuranDatabaseUnavailableException) {
+                // Never built, because there was nothing to build it from. That is a
+                // download prompt, not an error message.
+                android.util.Log.w("SurahDetail", "📥 Database unavailable for '${e.translationCode}'")
+                val translationName = QuranTranslationHelper.getTranslationName(e.translationCode)
+                _uiState.value = SurahDetailUiState.NeedsDownload(
+                    category = if (e.translationCode == "ar") "quran_core" else "quran_translation",
+                    resourceName = "$translationName Quran Text",
+                    description = "The $translationName Quran database has not been downloaded yet.",
+                )
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
                 e.printStackTrace()

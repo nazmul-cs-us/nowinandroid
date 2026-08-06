@@ -65,6 +65,14 @@ class TrainingContractTest(unittest.TestCase):
                     self.assertIsNone(validate_training_sample(sample))
                     samples.append(sample)
                     timestamp += 100
+            # A guided run only ever contains prayer. NOT_PRAYING has to come from its own
+            # takes, so the split needs separate negative sessions to reach every class —
+            # asserting otherwise would demand a guided run contain something it cannot.
+            for _ in range(25):
+                sample = make_sample(f"negative-{session_number}", "NOT_PRAYING", timestamp)
+                self.assertIsNone(validate_training_sample(sample))
+                samples.append(sample)
+                timestamp += 100
 
         X, y, groups = create_sequences(samples, return_groups=True)
 

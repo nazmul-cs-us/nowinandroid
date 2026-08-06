@@ -960,26 +960,11 @@ fun DuaDetailScreen(
     // Topics state for displaying in header
     var topics by remember { mutableStateOf<List<Topic>>(emptyList()) }
 
-    // Load topics when newsResourceId changes
-    LaunchedEffect(initialNewsResourceId) {
-        if (initialNewsResourceId.isNotEmpty()) {
-            val newsId = initialNewsResourceId.toIntOrNull()
-            if (newsId != null) {
-                try {
-                    val newsDao = NewsDatabase.getInstance(context).newsDao()
-                    val topicIds = newsDao.getTopicIdsForNews(newsId)
-                    if (topicIds.isNotEmpty()) {
-                        val topicsDao = TopicsDatabase.getInstance(context).topicsDao()
-                        val topicEntities = topicsDao.getTopicsByIds(topicIds)
-                        topics = topicEntities.map { it.toTopic() }
-                        android.util.Log.d("DuaDetailScreen", "📚 Loaded ${topics.size} topics for dua")
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("DuaDetailScreen", "❌ Error loading topics: ${e.message}")
-                }
-            }
-        }
-    }
+    // Topics are loaded further down, keyed on the dua actually shown rather than on the
+    // route's newsResourceId: navigateToDuaDetail synthesises that id as (127 + duaNumber)
+    // whenever a caller does not supply one, which for a Fortress dua is some unrelated
+    // Quranic dua's id — and tagged the page "QURANIC DUAS" while displaying a Fortress
+    // invocation. Keying on the visible dua also keeps the tag correct while paging.
 
     // Dialog states
     var showTranslationDialog by remember { mutableStateOf(false) }
@@ -1109,9 +1094,47 @@ fun DuaDetailScreen(
             val indexByNumber = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
             val targetIndex = indexByTitle ?: indexById ?: indexByNumber
                 ?: targetPageIndex.coerceIn(0, duasList.size - 1)
+            // A Fortress request that resolves by number instead of title has landed on
+            // whichever dua shares that number — in practice a Quranic one, because those
+            // sort first. Record which rule won so a wrong page is traceable.
+            android.util.Log.d(
+                "DuaResolve",
+                "title='$title' fortress=$isFortressTitle byTitle=$indexByTitle byId=$indexById " +
+                    "byNumber=$indexByNumber -> index=$targetIndex ('${duasList.getOrNull(targetIndex)?.title}')",
+            )
             if (pagerState.currentPage != targetIndex) {
                 pagerState.scrollToPage(targetIndex)
             }
+        }
+    }
+
+    // Tag the page with the topics of the dua on screen. The id comes from the list entry
+    // itself, so it is the real news id for both Quranic and Fortress duas.
+    val visibleDuaId = duasList.getOrNull(pagerState.currentPage)?.id
+    LaunchedEffect(visibleDuaId) {
+        val newsId = visibleDuaId?.toIntOrNull()
+        if (newsId == null) {
+            topics = emptyList()
+            return@LaunchedEffect
+        }
+        try {
+            val newsDao = NewsDatabase.getInstance(context).newsDao()
+            val topicIds = newsDao.getTopicIdsForNews(newsId)
+            // Clear rather than keep the previous dua's tags when this one has none.
+            topics = if (topicIds.isEmpty()) {
+                emptyList()
+            } else {
+                TopicsDatabase.getInstance(context).topicsDao()
+                    .getTopicsByIds(topicIds)
+                    .map { it.toTopic() }
+            }
+            android.util.Log.d(
+                "DuaDetailScreen",
+                "📚 Topics for news $newsId ('${duasList.getOrNull(pagerState.currentPage)?.title}'): " +
+                    topics.joinToString { it.name },
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("DuaDetailScreen", "❌ Error loading topics: ${e.message}")
         }
     }
 
