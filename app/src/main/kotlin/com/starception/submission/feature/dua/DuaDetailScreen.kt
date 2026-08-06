@@ -961,10 +961,8 @@ fun DuaDetailScreen(
     var topics by remember { mutableStateOf<List<Topic>>(emptyList()) }
 
     // Topics are loaded further down, keyed on the dua actually shown rather than on the
-    // route's newsResourceId: navigateToDuaDetail synthesises that id as (127 + duaNumber)
-    // whenever a caller does not supply one, which for a Fortress dua is some unrelated
-    // Quranic dua's id — and tagged the page "QURANIC DUAS" while displaying a Fortress
-    // invocation. Keying on the visible dua also keeps the tag correct while paging.
+    // route's newsResourceId, which is empty for any caller that has no real news id.
+    // Keying on the visible dua also keeps the tag correct while paging.
 
     // Dialog states
     var showTranslationDialog by remember { mutableStateOf(false) }
@@ -1032,9 +1030,9 @@ fun DuaDetailScreen(
             ?: 1
     }
 
-    // Fortress search routes pass title = "{Chapter}: Dua N" — that exact match
-    // beats id-match because navigateToDuaDetail auto-fills newsResourceId from
-    // duaNumber (=Fortress position), which collides with real Quranic Dua ids.
+    // Fortress routes pass title = "{Chapter}: Dua N" and no news id, so this exact match
+    // is what selects the right page. It is tried before id-match because a Fortress
+    // position and a Quranic dua id occupy the same small number range.
     val isFortressTitle = title.contains(": Dua ")
 
     // Find page index by news resource ID first (works for fortress_of_the_muslim duas)
@@ -1079,6 +1077,12 @@ fun DuaDetailScreen(
         }
     }
 
+    // The pager is constructed before duasList arrives, so its initial page is a guess from
+    // the dua number. Until the real index has been applied, the "current" dua is whatever
+    // that guess landed on — reading a tag or bookmark from it shows another dua's data for
+    // a frame or two. Gate anything derived from the visible page on this.
+    var initialPageResolved by remember(title, duasList) { mutableStateOf(false) }
+
     // Also scroll when duas load (in case index needs adjustment based on ID or duaNumber field)
     LaunchedEffect(duasList, initialNewsResourceId, title) {
         if (duasList.isNotEmpty()) {
@@ -1105,12 +1109,17 @@ fun DuaDetailScreen(
             if (pagerState.currentPage != targetIndex) {
                 pagerState.scrollToPage(targetIndex)
             }
+            initialPageResolved = true
         }
     }
 
     // Tag the page with the topics of the dua on screen. The id comes from the list entry
     // itself, so it is the real news id for both Quranic and Fortress duas.
-    val visibleDuaId = duasList.getOrNull(pagerState.currentPage)?.id
+    val visibleDuaId = if (initialPageResolved) {
+        duasList.getOrNull(pagerState.currentPage)?.id
+    } else {
+        null
+    }
     LaunchedEffect(visibleDuaId) {
         val newsId = visibleDuaId?.toIntOrNull()
         if (newsId == null) {
@@ -1181,10 +1190,13 @@ fun DuaDetailScreen(
         isBookmarked = isNiaBookmarked(currentNewsResourceId)
     }
 
-    // Also update when the screen first loads with the initial ID
-    LaunchedEffect(initialNewsResourceId) {
-        if (initialNewsResourceId.isNotEmpty()) {
-            isBookmarked = isNiaBookmarked(initialNewsResourceId)
+    // Keyed on the dua being shown, not the route's id: a route reached without a news id
+    // resolves by title, so the visible dua is the only reliable source of one. Falls back
+    // to the route id for callers that did pass a real one.
+    LaunchedEffect(visibleDuaId, initialNewsResourceId) {
+        val id = visibleDuaId ?: initialNewsResourceId
+        if (id.isNotEmpty()) {
+            isBookmarked = isNiaBookmarked(id)
         }
     }
 

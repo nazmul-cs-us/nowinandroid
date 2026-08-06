@@ -47,8 +47,15 @@ fun NavController.navigateToDuaDetail(
     val encodedContent = URLEncoder.encode(content, "UTF-8")
     val encodedTitle = URLEncoder.encode(title, "UTF-8")
     val encodedRef = quranReference?.let { URLEncoder.encode(it, "UTF-8") }
-    // Calculate newsResourceId if not provided (dua 1 = 128, dua 2 = 129, etc.)
-    val resourceId = newsResourceId.ifEmpty { (127 + duaNumber).toString() }
+    // Deliberately left empty when the caller has no news id, rather than derived from
+    // duaNumber. The old `127 + duaNumber` guess encoded an id layout that no longer
+    // exists — for Quranic Dua 1 it yields 128, which is "Quranic Dua 28: In You we trust",
+    // and for a Fortress dua it lands on an unrelated Quranic one entirely (Quranic ids are
+    // 101–140, Fortress 1001–10083). Downstream that fabricated id drove page selection,
+    // the topic tag and the bookmark toggle, all pointing at the wrong resource. An empty
+    // value is honest: the screen skips id-matching and resolves by title or dua number,
+    // and reads the real id off the dua it is showing.
+    val resourceId = newsResourceId
     navigate(
         route = DuaDetailRoute(
             title = encodedTitle,
@@ -83,8 +90,10 @@ fun NavGraphBuilder.duaDetailScreen(
         val decodedTitle = URLDecoder.decode(route.title, "UTF-8")
         val decodedContent = URLDecoder.decode(route.content, "UTF-8")
         val decodedRef = route.quranReference?.let { URLDecoder.decode(it, "UTF-8") }
-        // Calculate newsResourceId if not in route (dua 1 = 128, dua 2 = 129, etc.)
-        val newsResourceId = route.newsResourceId.ifEmpty { (127 + route.duaNumber).toString() }
+        // Passed through as-is, empty included — see navigateToDuaDetail. This mirrored the
+        // same `127 + duaNumber` guess, so fixing only the sending side changed nothing:
+        // the route arrived empty and was re-fabricated here.
+        val newsResourceId = route.newsResourceId
 
         DuaDetailScreen(
             title = decodedTitle,

@@ -83,6 +83,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -5114,11 +5119,8 @@ private fun MushafPageWithFrame(
     onAyahLongPress: (Int) -> Unit,
     ayahRanges: List<Pair<Int, IntRange>>,
     highlightedAyahNumber: Int? = null,
-    /** Double-tap on an ayah — reveals its translation. */
+    /** Double-tap on an ayah — toggles its translation inline in the page text. */
     onAyahDoubleTap: (Int) -> Unit = {},
-    /** Ayah whose translation is currently revealed, and the text to show. */
-    revealedAyah: Int? = null,
-    revealedTranslation: String? = null,
     inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> = emptyMap(),
     /** Precomputed ink-accurate marker geometry for THIS page (null while pending). */
     inkGeometries: List<MarkerGeometry>? = null,
@@ -5340,6 +5342,7 @@ private fun MushafPageWithFrame(
             }
 
 
+
             Text(
                 text = pageText,
                 onTextLayout = { pageLayout.value = it },
@@ -5415,57 +5418,6 @@ private fun MushafPageWithFrame(
                 }
             }
 
-            // Translation reveal, anchored under the double-tapped ayah's last
-            // line. An OVERLAY, not inline text: the page is pre-paginated with
-            // fixed line breaks, so injecting the translation into the flow would
-            // reflow the page and change where every later ayah falls.
-            val revealBottomPx = remember(revealedAyah, ayahRanges, pageLayout.value) {
-                val target = revealedAyah ?: return@remember null
-                val r = ayahRanges.firstOrNull { it.first == target }?.second
-                    ?: return@remember null
-                val laid = pageLayout.value ?: return@remember null
-                val s = r.first.coerceIn(0, pageText.length)
-                val e = r.last.coerceIn(s, pageText.length)
-                if (e <= s) return@remember null
-                laid.rangeLineRects(s, e).lastOrNull()?.bottom
-            }
-            val revealShown = revealBottomPx != null && !revealedTranslation.isNullOrBlank()
-            val revealAnim by animateFloatAsState(
-                targetValue = if (revealShown) 1f else 0f,
-                animationSpec = tween(220),
-                label = "translationReveal",
-            )
-            if (revealAnim > 0.01f && revealBottomPx != null) {
-                val anchorPx = with(LocalDensity.current) {
-                    (topPadding + bismillahHeightDp).toPx() + revealBottomPx + 6.dp.toPx()
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset { androidx.compose.ui.unit.IntOffset(0, anchorPx.toInt()) }
-                        .padding(horizontal = horizontalPadding)
-                        .graphicsLayer {
-                            alpha = revealAnim
-                            // rises the last few px as it fades in
-                            translationY = (1f - revealAnim) * 20f
-                        }
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
-                        shape = RoundedCornerShape(14.dp),
-                        tonalElevation = 2.dp,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = revealedTranslation.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Start,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -5568,7 +5520,41 @@ private fun MushafPagerView(
             )
         }
 
-    val markerData = remember(ayahs, showTajweed, tajweedAnnotations, committedFontSize, translationCode) {
+    // Double-tap reveal. `ayah.text` arrives as arabic + "\n\n" + translation from the
+    // translation-aware loader, so part 1 is the translation; ayahs whose translation is
+    // missing have nothing to reveal. Declared before the master string because the
+    // translation is now part of that string rather than drawn over it.
+    var revealedAyah by remember(ayahs) { mutableStateOf<Int?>(null) }
+    val translationByAyah = remember(ayahs) {
+        ayahs.associate { a ->
+            a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
+        }
+    }
+    /** Translation actually inlined this pass — blank ones must not alter the layout. */
+    val inlinedAyah: Int? = revealedAyah?.takeIf { !translationByAyah[it].isNullOrBlank() }
+    val inlinedText: String = inlinedAyah?.let { translationByAyah[it] }.orEmpty()
+
+    val translationSpanStyle = SpanStyle(
+        // Deliberately smaller and lighter than the script it explains, so the eye still
+        // reads the page as Quran with a gloss rather than two competing texts.
+        fontSize = (committedFontSize * 0.42f).sp,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.1.sp,
+    )
+    val translationParagraphStyle = ParagraphStyle(
+        // Its own paragraph: forces the break after the ayah, and carries its own
+        // direction so a Bengali or English gloss is not right-aligned by the page's RTL.
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content,
+        textAlign = TextAlign.Start,
+        lineHeight = (committedFontSize * 0.42f * 1.55f).sp,
+    )
+
+    val markerData = remember(
+        ayahs, showTajweed, tajweedAnnotations, committedFontSize, translationCode,
+        inlinedAyah, inlinedText,
+    ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
         val built = buildAnnotatedString {
             ayahs.forEach { ayah ->
@@ -5600,6 +5586,15 @@ private fun MushafPagerView(
                     )
                 )
                 append(' ')
+
+                // The revealed translation lives IN the text, right after this ayah's
+                // marker, so the following ayah genuinely starts below it. Any change here
+                // must be mirrored in ayahCharRanges, which recreates this arithmetic.
+                if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
+                    withStyle(translationParagraphStyle) {
+                        withStyle(translationSpanStyle) { append(inlinedText) }
+                    }
+                }
             }
         }
         built to placeholderRanges
@@ -5706,7 +5701,10 @@ private fun MushafPagerView(
     }
     */
 
-    val ayahCharRanges = remember(ayahs, translationCode) {
+    // Mirrors the master string's character arithmetic exactly — these ranges drive page
+    // slicing, tap hit-testing and highlighting, so any text added there must be counted
+    // here or every ayah after it maps to the wrong characters.
+    val ayahCharRanges = remember(ayahs, translationCode, inlinedAyah, inlinedText) {
         val ranges = mutableListOf<Pair<Int, IntRange>>()
         var pos = 0
         ayahs.forEach { ayah ->
@@ -5714,20 +5712,16 @@ private fun MushafPagerView(
             val startPos = pos
             // arabicText + word-joiner + inline marker (alt text = digits) + " "
             pos += arabicText.length + 1 + markerDigitsFor(ayah.numberInSurah).length + 1
+            // The inlined translation belongs to this ayah's range: a tap anywhere on the
+            // gloss should dismiss the ayah that opened it.
+            if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
+                pos += inlinedText.length
+            }
             ranges.add(ayah.numberInSurah to (startPos until pos))
         }
         ranges
     }
 
-    // Double-tap reveal. `ayah.text` arrives as arabic + "\n\n" + translation from
-    // the translation-aware loader, so part 1 is the translation; ayahs whose
-    // translation is missing simply have nothing to reveal.
-    var revealedAyah by remember(ayahs) { mutableStateOf<Int?>(null) }
-    val translationByAyah = remember(ayahs) {
-        ayahs.associate { a ->
-            a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
-        }
-    }
 
     Column(
         modifier = modifier.background(surfaceColor)
@@ -6057,8 +6051,6 @@ private fun MushafPagerView(
                         // Double-tap the revealed ayah again to dismiss.
                         revealedAyah = if (revealedAyah == n) null else n
                     },
-                    revealedAyah = revealedAyah,
-                    revealedTranslation = revealedAyah?.let { translationByAyah[it] },
                     modifier = Modifier.fillMaxSize()
                 )
             }
