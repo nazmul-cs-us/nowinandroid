@@ -4755,58 +4755,31 @@ private const val MARKER_INK_GAP_EM = 0.3f
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
-// Selected-ayah treatment: ONE continuous rounded ribbon (the per-line boxes
-// unioned, so multi-line selections read as a single shape instead of stacked
-// rectangles) with a blurred halo behind a crisp core.
-private val MUSHAF_SEL_RADIUS = 16.dp
-/** Vertical trim on the block's outer edges only (see the path build). */
-private val MUSHAF_SEL_VINSET = 5.dp
-/** Horizontal overshoot past the line's own box. Without it the blur's falloff
- *  starts ON the text: justified lines run nearly edge to edge, so the first and
- *  last glyphs of a line sat at ~60% of the glow's plateau and read as excluded
- *  (Al-Kahf 1's opening alef). Pushing the shape out moves the fade into the
- *  page margin, where it belongs. Stays well under the marker gap so it does not
- *  wash back over the ornament. */
-private val MUSHAF_SEL_HPAD = 16.dp
-/** Stacked blur passes, widest first: (blur radius, alpha). The wide faint pass
- *  carries the long falloff and the tighter one gives the shape presence; the sum
- *  vanishes toward its border rather than ending at a ring. Alphas stay low —
- *  `primary` is a dark navy here, so much above ~0.25 total stops reading as
- *  light on the cream page and becomes a solid block over the text. */
-private val MUSHAF_SEL_GLOW_LAYERS = listOf(
-    14.dp to 0.09f,
-    6.dp to 0.16f,
-)
+// Selected-ayah treatment: one softly blurred capsule per VISUAL line. Word-sized
+// ovals looked uneven on justified Arabic because the stretched spaces separated
+// them into unrelated blobs. Line capsules keep the cloud continuous and make
+// both RTL ends receive the same rounded falloff.
+private val MUSHAF_CLOUD_LINE_HPAD = 8.dp
+private val MUSHAF_CLOUD_LINE_VINSET = 5.dp
+private val MUSHAF_CLOUD_LINE_RADIUS = 22.dp
 
 /**
- * Union of these rects as one rounded path. Line boxes are contiguous, so the
- * seams between them dissolve and only the outer silhouette stays rounded —
- * which is what makes a multi-line selection look like a deliberate shape
- * rather than a stack of blurred boxes.
+ * Adds every line capsule to one path and lets the blur merge their contours.
+ * This deliberately avoids PathOperation.Union: boolean union occasionally
+ * dropped a narrow RTL extension, visually leaving an edge word unhighlighted.
  */
-private fun List<androidx.compose.ui.geometry.Rect>.toRoundedUnionPath(
+private fun List<androidx.compose.ui.geometry.Rect>.toCloudPath(
     radiusPx: Float,
-): androidx.compose.ui.graphics.Path {
-    var acc = androidx.compose.ui.graphics.Path()
-    var first = true
-    for (r in this) {
-        val piece = androidx.compose.ui.graphics.Path().apply {
+): androidx.compose.ui.graphics.Path = androidx.compose.ui.graphics.Path().apply {
+    for (r in this@toCloudPath) {
+        if (r.width > 0f && r.height > 0f) {
             addRoundRect(
                 androidx.compose.ui.geometry.RoundRect(
                     r, androidx.compose.ui.geometry.CornerRadius(radiusPx, radiusPx),
                 ),
             )
         }
-        if (first) {
-            acc = piece
-            first = false
-        } else {
-            val merged = androidx.compose.ui.graphics.Path()
-            merged.op(acc, piece, androidx.compose.ui.graphics.PathOperation.Union)
-            acc = merged
-        }
     }
-    return acc
 }
 
 /** Inline-content tag for the invisible line filler appended to non-final page
@@ -4870,8 +4843,14 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeLineRects(
     val out = mutableListOf<androidx.compose.ui.geometry.Rect>()
     val rawText = layoutInput.text.text
     for (line in firstLine..lastLine) {
-        val ls = maxOf(start, getLineStart(line))
-        val le = minOf(end, getLineEnd(line, visibleEnd = true))
+        val lineStart = getLineStart(line)
+        // On justified RTL text Compose's "visible" end can stop before the
+        // final shaped cluster (the leftmost word on screen). Use the complete
+        // logical line and explicitly ignore whitespace/control characters
+        // below, otherwise the cloud visibly ends one word too early.
+        val lineVisibleEnd = getLineEnd(line, visibleEnd = false)
+        val ls = maxOf(start, lineStart)
+        val le = minOf(end, lineVisibleEnd)
         if (le <= ls) continue
 
         // Cursor positions at the two logical endpoints are not sufficient for
@@ -4889,6 +4868,16 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeLineRects(
             if (box.width <= 0f || box.height <= 0f) continue
             left = minOf(left, box.left)
             right = maxOf(right, box.right)
+        }
+
+        // The shaped range path is the safety net for Arabic ligature clusters:
+        // some logical characters have zero-width boxes even though their joined
+        // ink is visible. Its bounds recover short edge words such as "مِن"
+        // without expanding every fully-selected line into a page-wide rectangle.
+        val shapedBounds = getPathForRange(ls, le).getBounds()
+        if (shapedBounds.width > 0f && shapedBounds.height > 0f) {
+            left = minOf(left, shapedBounds.left)
+            right = maxOf(right, shapedBounds.right)
         }
 
         // A range containing only a combining/control glyph is rare, but retain
@@ -5245,32 +5234,33 @@ private fun MushafPageWithFrame(
         }
     }
 
-    // Selection silhouette, rebuilt only when the layout or the selected ayah
-    // changes. Shared by the blurred halo pass and the crisp core pass so both
-    // trace exactly the same shape.
+    // Selection cloud, rebuilt only when the layout or selected ayah changes.
+    // The shaped range bounds include Arabic ligatures at both RTL ends; one
+    // capsule per visual line makes the treatment stable regardless of how much
+    // justification stretched the spaces between individual words.
     val selDensity = LocalDensity.current
-    val selPath = remember(pageLayout.value, highlightRange) {
+    val selCloud = remember(pageLayout.value, highlightRange) {
         val laid = pageLayout.value ?: return@remember null
         val hr = highlightRange ?: return@remember null
-        val rects = laid.rangeLineRects(hr.first, hr.second)
-        if (rects.isEmpty()) return@remember null
-        // Trim only the OUTER edges of the block. Line boxes carry the full 1.45x
-        // leading, so an untrimmed ribbon looks bloated — but insetting every rect
-        // would open gaps between lines and break the union into separate blobs,
-        // so interior edges stay contiguous.
-        val vInset = with(selDensity) { MUSHAF_SEL_VINSET.toPx() }
-        val hPad = with(selDensity) { MUSHAF_SEL_HPAD.toPx() }
-        val seamOverlap = with(selDensity) { 1.5.dp.toPx() }
-        val tightened = rects.mapIndexed { i, r ->
+        val lineRects = laid.rangeLineRects(hr.first, hr.second)
+        if (lineRects.isEmpty()) return@remember null
+        val verticalInset = with(selDensity) { MUSHAF_CLOUD_LINE_VINSET.toPx() }
+        val horizontalPad = with(selDensity) { MUSHAF_CLOUD_LINE_HPAD.toPx() }
+        val capsules = lineRects.map { r ->
             androidx.compose.ui.geometry.Rect(
-                r.left - hPad,
-                if (i == 0) r.top + vInset else r.top - seamOverlap,
-                r.right + hPad,
-                if (i == rects.lastIndex) r.bottom - vInset else r.bottom + seamOverlap,
+                r.left - horizontalPad,
+                r.top + verticalInset,
+                r.right + horizontalPad,
+                r.bottom - verticalInset,
             )
         }
-        tightened.toRoundedUnionPath(with(selDensity) { MUSHAF_SEL_RADIUS.toPx() })
+        capsules.toCloudPath(with(selDensity) { MUSHAF_CLOUD_LINE_RADIUS.toPx() })
     }
+    val selCloudAlpha by animateFloatAsState(
+        targetValue = if (selCloud == null) 0f else 1f,
+        animationSpec = NiaMotion.enterTween(NiaMotion.Duration.MEDIUM_3),
+        label = "mushafSelectionCloud",
+    )
 
     val statusBarHeight = with(LocalDensity.current) {
         val cutout = WindowInsets.displayCutout.getTop(this)
@@ -5342,37 +5332,32 @@ private fun MushafPageWithFrame(
                 }
             }
 
-            // Selected ayah, drawn behind the ornament canvas and the Text so it
-            // reads as the page lighting up under the words rather than a tint
-            // laid on top. Geometry is per-line rounded rects (rangeLineRects),
-            // NOT getPathForRange — a blurred square path just looks like a smear.
-            //
-            // Halo only — no crisp pass. A single blurred fill still ends at a
-            // defined ring, and an unblurred fill/stroke under it drew a visible
-            // rounded rectangle. Stacking a wide faint layer under a tighter
-            // stronger one spreads the falloff over a longer distance, so the
-            // light simply vanishes toward its border instead of having an edge.
-            // Needs API 31+; below that the layers render unblurred and stack
-            // into a plain tinted plate, which is a fine degradation.
-            if (selPath != null) {
-                MUSHAF_SEL_GLOW_LAYERS.forEach { (radius, layerAlpha) ->
+            // Selected ayah, drawn as a cloud behind the ornament and Text. Three
+            // restrained blur layers soften the per-line capsules without making
+            // isolated dark blobs. Unbounded blur is important here: otherwise a
+            // line ending at a Canvas edge loses its rounded cloud falloff.
+            if (selCloud != null && selCloudAlpha > 0.001f) {
+                listOf(
+                    12.dp to 0.025f,
+                    6.dp to 0.040f,
+                    2.dp to 0.050f,
+                ).forEach { (radius, layerAlpha) ->
                     androidx.compose.foundation.Canvas(
-                        // Deliberately NOT horizontally padded like the text/marker
-                        // canvases: a blur is clipped to its layer, so padding this
-                        // one cut the falloff dead at the text-area boundary — a
-                        // fresh hard edge ~30px inside the page. Spanning the full
-                        // width and translating the path instead keeps the geometry
-                        // aligned while giving the blur the margin to fade into.
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(
-                                top = topPadding + bismillahHeightDp,
-                                bottom = bottomPadding
+                            .blur(
+                                radius,
+                                edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded,
                             )
-                            .blur(radius)
                     ) {
-                        translate(left = horizontalPadding.toPx()) {
-                            drawPath(selPath, color = glowColor.copy(alpha = layerAlpha))
+                        translate(
+                            left = horizontalPadding.toPx(),
+                            top = (topPadding + bismillahHeightDp).toPx(),
+                        ) {
+                            drawPath(
+                                selCloud,
+                                color = glowColor.copy(alpha = layerAlpha * selCloudAlpha),
+                            )
                         }
                     }
                 }
@@ -5723,18 +5708,18 @@ private fun MushafPagerView(
     val translationSpanStyle = SpanStyle(
         // Deliberately smaller and lighter than the script it explains, so the eye still
         // reads the page as Quran with a gloss rather than two competing texts.
-        fontSize = (committedFontSize * 0.42f).sp,
+        fontSize = (committedFontSize * 0.48f).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.1.sp,
     )
     val translationParagraphStyle = ParagraphStyle(
-        // Its own paragraph: forces the break after the ayah, and carries its own
-        // direction so a Bengali or English gloss is not right-aligned by the page's RTL.
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,
         textAlign = TextAlign.Start,
-        lineHeight = (committedFontSize * 0.42f * 1.55f).sp,
+        // Independent compact leading; without this the smaller translation
+        // inherited the Quran paragraph's 1.45x Arabic line cadence.
+        lineHeight = (committedFontSize * 0.48f * 1.38f).sp,
     )
     val translationSeparatorSpanStyle = SpanStyle(
         fontSize = (committedFontSize * 0.12f).sp,
@@ -5797,26 +5782,24 @@ private fun MushafPagerView(
                 )
                 append(' ')
 
-                // The revealed translation lives IN the text, right after this ayah's
-                // marker. Newlines give it a true paragraph between this ayah and the
-                // next; the annotation is retained (and clipped correctly) when the
-                // paginator slices the master string into pages.
+                // The revealed translation lives IN the text immediately after this
+                // ayah's marker. It starts on the marker's remaining line space rather
+                // than wasting the rest of that line, then wraps naturally. Unicode
+                // isolate controls preserve Bengali/English reading order inside the
+                // surrounding RTL Quran paragraph.
                 if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
-                    // Include the compact separators in the block annotation so
-                    // pagination moves the complete reveal as one unit. The mask
-                    // ignores their whitespace glyphs, while StaticLayout uses the
-                    // explicit tiny paragraph metrics instead of an Arabic-height
-                    // blank line.
+                    // Include the trailing compact separator in the block annotation
+                    // so pagination moves the reveal as one unit with the Arabic line
+                    // that owns its marker.
                     pushStringAnnotation(
                         tag = MUSHAF_TRANSLATION_TAG,
                         annotation = ayah.numberInSurah.toString(),
                     )
-                    withStyle(translationSeparatorParagraphStyle) {
-                        withStyle(translationSeparatorSpanStyle) { append('\u2028') }
-                    }
                     withStyle(translationParagraphStyle) {
                         withStyle(translationSpanStyle) {
+                            append('\u2066') // LEFT-TO-RIGHT ISOLATE
                             append(inlinedText)
+                            append('\u2069') // POP DIRECTIONAL ISOLATE
                         }
                     }
                     withStyle(translationSeparatorParagraphStyle) {
@@ -6088,18 +6071,10 @@ private fun MushafPagerView(
                     )
                 }
 
-                // Translation annotations are atomic page blocks. If a gloss would
-                // start near the bottom and continue on the following page, end the
-                // current page before it and let the complete block begin next. A
-                // translation taller than a whole page is the only case that may
-                // still split, because no legal page boundary can contain it.
-                val translationLineBlocks = masterString
-                    .getStringAnnotations(MUSHAF_TRANSLATION_TAG, 0, masterString.length)
-                    .mapNotNull { annotation ->
-                        if (annotation.end <= annotation.start) return@mapNotNull null
-                        fullLayout.getLineForOffset(annotation.start) to
-                            fullLayout.getLineForOffset(annotation.end - 1)
-                    }
+                // Inline translations deliberately flow across page boundaries.
+                // Treating the entire gloss as an atomic block moved a long
+                // translation to the following page and left most of the tapped
+                // page empty, even though many measured lines still fitted.
                 val arabicLineBlocks = masterString
                     .getStringAnnotations(MUSHAF_ARABIC_AYAH_TAG, 0, masterString.length)
                     .filter { it.item == inlinedAyah?.toString() }
@@ -6116,30 +6091,18 @@ private fun MushafPagerView(
                 while (currentLine < fullLayout.lineCount) {
                     val pageHeightPx = if (pageNum == 1) firstPageHeightPx else fullPageHeightPx
                     var linesOnPage = 0
-                    var accumulatedHeight = 0f
 
                     for (line in currentLine until fullLayout.lineCount) {
                         val lineTop = fullLayout.getLineTop(line) - fullLayout.getLineTop(currentLine)
                         val lineBottom = fullLayout.getLineBottom(line) - fullLayout.getLineTop(currentLine)
                         if (lineBottom > pageHeightPx && linesOnPage > 0) break
                         linesOnPage++
-                        accumulatedHeight = lineBottom
                     }
 
                     if (linesOnPage == 0) linesOnPage = 1
 
                     val startCharIndex = fullLayout.getLineStart(currentLine)
                     var endLine = currentLine + linesOnPage - 1
-
-                    val splitTranslation = translationLineBlocks.firstOrNull { (blockStart, blockEnd) ->
-                        blockStart in (currentLine + 1)..endLine && blockEnd > endLine
-                    }
-                    if (splitTranslation != null) {
-                        // Leave the gloss for the next page. blockStart is strictly
-                        // after currentLine, so this always leaves at least one line.
-                        linesOnPage = splitTranslation.first - currentLine
-                        endLine = currentLine + linesOnPage - 1
-                    }
 
                     // Do not leave a single final Arabic line (often only one
                     // word plus its medallion) alone at the top of the next page.
