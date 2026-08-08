@@ -32,6 +32,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
@@ -4815,6 +4816,17 @@ private fun List<androidx.compose.ui.geometry.Rect>.toRoundedUnionPath(
  *  zero-ink line, and thereby keeps the real last content line justified. */
 private const val MUSHAF_LINE_FILLER_TAG = "mushafLineFiller"
 
+/** Annotation around the inline translation. Besides keeping its character
+ * range exact after page slicing, this lets the page draw a reveal mask over
+ * only the translation without rebuilding/re-measuring the Quran text on every
+ * animation frame. */
+private const val MUSHAF_TRANSLATION_TAG = "mushafTranslation"
+
+/** Exact Arabic-script range for one ayah. Page-local copies of this annotation
+ * are the sole source of highlight geometry, so a translation continuation can
+ * never be mistaken for Arabic belonging to the selected ayah. */
+private const val MUSHAF_ARABIC_AYAH_TAG = "mushafArabicAyah"
+
 /** Filler width as a fraction of the page line width. It must NOT fit in any
  *  line's leftover space (so it wraps, keeping the content line justified) but
  *  MUST fit on a line of its own (an over-wide placeholder cannot wrap at all
@@ -4856,14 +4868,40 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeLineRects(
     val firstLine = getLineForOffset(start)
     val lastLine = getLineForOffset((end - 1).coerceAtLeast(start))
     val out = mutableListOf<androidx.compose.ui.geometry.Rect>()
+    val rawText = layoutInput.text.text
     for (line in firstLine..lastLine) {
         val ls = maxOf(start, getLineStart(line))
         val le = minOf(end, getLineEnd(line, visibleEnd = true))
         if (le <= ls) continue
-        val x1 = getHorizontalPosition(ls, usePrimaryDirection = true)
-        val x2 = getHorizontalPosition(le, usePrimaryDirection = true)
+
+        // Cursor positions at the two logical endpoints are not sufficient for
+        // justified RTL text: at a bidi/inline-content boundary both cursors can
+        // resolve to the same visual side and collapse an otherwise valid line.
+        // Union the actual glyph boxes instead. Spaces between the first and last
+        // glyph remain inside the resulting band, while paragraph separators and
+        // formatting controls cannot inflate it across the page.
+        var left = Float.POSITIVE_INFINITY
+        var right = Float.NEGATIVE_INFINITY
+        for (offset in ls until le) {
+            val char = rawText.getOrNull(offset) ?: continue
+            if (char.isWhitespace() || char in MARKER_TRAILING_INVISIBLES) continue
+            val box = getBoundingBox(offset)
+            if (box.width <= 0f || box.height <= 0f) continue
+            left = minOf(left, box.left)
+            right = maxOf(right, box.right)
+        }
+
+        // A range containing only a combining/control glyph is rare, but retain
+        // the cursor-based fallback so it still receives a visible selection.
+        if (!left.isFinite() || !right.isFinite() || right <= left) {
+            val x1 = getHorizontalPosition(ls, usePrimaryDirection = true)
+            val x2 = getHorizontalPosition(le, usePrimaryDirection = true)
+            left = minOf(x1, x2)
+            right = maxOf(x1, x2)
+        }
+        if (right <= left) continue
         out += androidx.compose.ui.geometry.Rect(
-            minOf(x1, x2), getLineTop(line), maxOf(x1, x2), getLineBottom(line),
+            left, getLineTop(line), right, getLineBottom(line),
         )
     }
     return out
@@ -4898,6 +4936,7 @@ private fun computeInkMarkerGeometries(
     maxWidthPx: Int,
     density: androidx.compose.ui.unit.Density,
     emPx: Float,
+    isActive: () -> Boolean = { true },
 ): List<MarkerGeometry> {
     val markerAnnotations = pageText
         .getStringAnnotations("androidx.compose.foundation.text.inlineContent", 0, pageText.length)
@@ -4930,26 +4969,30 @@ private fun computeInkMarkerGeometries(
     val bmpW = (layout.size.width * scale).toInt().coerceAtLeast(1)
     val bmpH = (layout.size.height * scale).toInt().coerceAtLeast(1)
     val bitmap = androidx.compose.ui.graphics.ImageBitmap(bmpW, bmpH)
-    val canvas = androidx.compose.ui.graphics.Canvas(bitmap)
-    canvas.save()
-    canvas.scale(scale, scale)
-    androidx.compose.ui.text.TextPainter.paint(canvas, layout)
-    canvas.restore()
-    val pixels = bitmap.toPixelMap()
+    try {
+        if (!isActive()) throw kotlinx.coroutines.CancellationException()
+        val canvas = androidx.compose.ui.graphics.Canvas(bitmap)
+        canvas.save()
+        canvas.scale(scale, scale)
+        androidx.compose.ui.text.TextPainter.paint(canvas, layout)
+        canvas.restore()
+        val pixels = bitmap.toPixelMap()
 
-    fun columnHasInk(x: Int, top: Int, bottom: Int): Boolean {
-        if (x < 0 || x >= pixels.width) return false
-        // Require a couple of ink rows so anti-aliasing specks and hairline
-        // swash tips don't register as a word's edge.
-        var inkRows = 0
-        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(pixels.height)) {
-            if (pixels[x, y].alpha > 0.15f && ++inkRows >= 2) return true
+        fun columnHasInk(x: Int, top: Int, bottom: Int): Boolean {
+            if (!isActive()) throw kotlinx.coroutines.CancellationException()
+            if (x < 0 || x >= pixels.width) return false
+            // Require a couple of ink rows so anti-aliasing specks and hairline
+            // swash tips don't register as a word's edge.
+            var inkRows = 0
+            for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(pixels.height)) {
+                if (pixels[x, y].alpha > 0.15f && ++inkRows >= 2) return true
+            }
+            return false
         }
-        return false
-    }
 
-    val result = mutableListOf<MarkerGeometry>()
-    layout.placeholderRects.forEachIndexed { i, rect ->
+        val result = mutableListOf<MarkerGeometry>()
+        layout.placeholderRects.forEachIndexed { i, rect ->
+            if (!isActive()) throw kotlinx.coroutines.CancellationException()
         if (rect == null) return@forEachIndexed
         val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
         if (annotation.item == MUSHAF_LINE_FILLER_TAG) return@forEachIndexed
@@ -5103,8 +5146,16 @@ private fun computeInkMarkerGeometries(
                 h = h,
             ),
         )
+        }
+        return result
+    } finally {
+        // ImageBitmap owns an Android Bitmap allocation. Waiting for finalization
+        // retained roughly one page-sized scan buffer per turn; moving quickly
+        // through a long surah could therefore hit the 256 MB app heap before GC
+        // reclaimed them. Geometry is plain floats now, so release the scan surface
+        // deterministically even when a newer page cancels this scan.
+        bitmap.asAndroidBitmap().recycle()
     }
-    return result
 }
 
 // ---------------------------------------------------------------------------
@@ -5121,9 +5172,18 @@ private fun MushafPageWithFrame(
     highlightedAyahNumber: Int? = null,
     /** Double-tap on an ayah — toggles its translation inline in the page text. */
     onAyahDoubleTap: (Int) -> Unit = {},
+    /** Short out-and-back horizontal scrub over one ayah — same action as double-tap. */
+    onAyahRub: (Int) -> Unit = {},
+    /**
+     * True only for the page the reader is on. Lazy pagers may keep neighbouring
+     * pages composed for prefetch, so off-pages install no pointer input and can
+     * never answer a gesture intended for the visible page.
+     */
+    interactive: Boolean = true,
     inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> = emptyMap(),
     /** Precomputed ink-accurate marker geometry for THIS page (null while pending). */
     inkGeometries: List<MarkerGeometry>? = null,
+    ornamentPainter: androidx.compose.ui.graphics.painter.Painter,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -5135,41 +5195,45 @@ private fun MushafPageWithFrame(
     // styled with Amiri Quran). No inline content needed here.
 
     // The selected ayah is drawn as a GLOW behind the text (pass-1 canvas below)
-    // instead of a flat SpanStyle background. The range is page-local (already
-    // remapped by MushafPagerView's paginator), so it needs no re-mapping.
-    //
-    // It deliberately ends ON the ayah's trailing space — that is what makes a
-    // long-press anywhere in the ayah hit it — but justification stretches
-    // exactly that space, so we stop one char short. Including it dragged the
-    // old flat highlight across the whole justified gap and made the NEXT
-    // ayah's first word read as selected (Al-Kahf 1 tinted قَيِّمًا, which
-    // opens ayah 2), with the marker placeholder punching a white hole in it.
-    val highlightRange = remember(highlightedAyahNumber, ayahRanges, pageText) {
+    // instead of a flat SpanStyle background. Highlight ONLY the Arabic annotation:
+    // the broader hit-test range intentionally includes the marker and revealed
+    // translation, and using it here caused continuation pages to glow behind the
+    // translation or borrow a neighbouring ayah's marker as their endpoint.
+    val highlightRange = remember(highlightedAyahNumber, pageText) {
         val target = highlightedAyahNumber ?: return@remember null
-        val r = ayahRanges.firstOrNull { it.first == target }?.second ?: return@remember null
-        val start = r.first.coerceIn(0, pageText.length)
-        // Each ayah is laid out as: arabic + WORD JOINER + marker digits + space.
-        // Stop at the word joiner so the selection wraps the VERSE only — the
-        // digits are the ornament's reserved slot, and including them made the
-        // glow swallow the medallion. Falling back to r.last (the trailing
-        // space) still excludes that space, which justification stretches.
-        val wj = pageText.text.lastIndexOf('⁠', r.last.coerceAtMost(pageText.length - 1))
-        var end = (if (wj > start) wj else r.last).coerceIn(start, pageText.length)
-        // Back up over the RLM / waqf padding that trails the last word. Their
-        // layout positions sit AFTER the justified space, so leaving them in
-        // stretched the shape ~170px past the final glyph.
-        while (end > start &&
-            (pageText.text[end - 1].isWhitespace() ||
-                pageText.text[end - 1] in MARKER_TRAILING_INVISIBLES)
-        ) {
-            end--
-        }
-        if (end > start) start to end else null
+        pageText.getStringAnnotations(MUSHAF_ARABIC_AYAH_TAG, 0, pageText.length)
+            .firstOrNull { it.item == target.toString() }
+            ?.let { it.start to it.end }
     }
     // Captured page layout — turns that char range into a path for the glow.
     // Null until the first layout pass, so the glow appears one frame late.
     val pageLayout = remember(pageText) {
         androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null)
+    }
+
+    // A colour mask fades away over only the newly inserted translation. This
+    // gives the gloss a calm reveal while keeping the AnnotatedString stable for
+    // the entire animation; animating its SpanStyle would re-paginate the full
+    // surah on every frame and quickly churn native StaticLayout allocations.
+    val translationAnnotation = remember(pageText) {
+        pageText.getStringAnnotations(MUSHAF_TRANSLATION_TAG, 0, pageText.length).firstOrNull()
+    }
+    val translationReveal = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(translationAnnotation?.item, pageText.text) {
+        if (translationAnnotation == null) {
+            translationReveal.snapTo(1f)
+        } else {
+            translationReveal.snapTo(0f)
+            translationReveal.animateTo(
+                targetValue = 1f,
+                animationSpec = NiaMotion.enterTween(NiaMotion.Duration.MEDIUM_3),
+            )
+        }
+    }
+    val translationRevealRects = remember(pageLayout.value, translationAnnotation) {
+        val laid = pageLayout.value ?: return@remember emptyList()
+        val annotation = translationAnnotation ?: return@remember emptyList()
+        laid.rangeLineRects(annotation.start, annotation.end)
     }
 
     // Which ayah sits under a touch point. Reads pageLayout.value at call time,
@@ -5196,12 +5260,13 @@ private fun MushafPageWithFrame(
         // so interior edges stay contiguous.
         val vInset = with(selDensity) { MUSHAF_SEL_VINSET.toPx() }
         val hPad = with(selDensity) { MUSHAF_SEL_HPAD.toPx() }
+        val seamOverlap = with(selDensity) { 1.5.dp.toPx() }
         val tightened = rects.mapIndexed { i, r ->
             androidx.compose.ui.geometry.Rect(
                 r.left - hPad,
-                if (i == 0) r.top + vInset else r.top,
+                if (i == 0) r.top + vInset else r.top - seamOverlap,
                 r.right + hPad,
-                if (i == rects.lastIndex) r.bottom - vInset else r.bottom,
+                if (i == rects.lastIndex) r.bottom - vInset else r.bottom + seamOverlap,
             )
         }
         tightened.toRoundedUnionPath(with(selDensity) { MUSHAF_SEL_RADIUS.toPx() })
@@ -5227,8 +5292,6 @@ private fun MushafPageWithFrame(
     // rects the layout produced, so overhanging swashes render on top of the
     // ornament's flourishes (printed-mushaf behaviour) instead of colliding.
 
-    val ornamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
-        image = ImageVector.vectorResource(R.drawable.ayah_ornament_frame))
     // Inline marker annotations in layout order — alt text carries the
     // localized digits, and the char range locates each marker in the page
     // text so the drawing pass can find the neighbouring words.
@@ -5244,9 +5307,14 @@ private fun MushafPageWithFrame(
         label = "markerFade"
     )
 
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = surfaceColor
+    // Deliberately a Box painted with the surface colour rather than a Surface.
+    // Surface installs a `pointerInput {}` whose only job is to stop touches
+    // reaching whatever is behind it. A Box draws the same background without
+    // adding an unnecessary input target on prefetched pages (see [interactive]).
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(surfaceColor)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (showBismillah) {
@@ -5375,20 +5443,114 @@ private fun MushafPageWithFrame(
                         top = topPadding + bismillahHeightDp,
                         bottom = bottomPadding
                     )
-                    .pointerInput(ayahRanges, pageLayout) {
-                        detectTapGestures(
-                            onDoubleTap = { pos -> ayahAt(pos)?.let(onAyahDoubleTap) },
-                            // Fall back to the page's first ayah only when the point
-                            // maps nowhere. This USED to be unconditional — the old
-                            // handler ignored the offset entirely, so a long-press
-                            // anywhere on the page selected the first ayah on it.
-                            onLongPress = { pos ->
-                                (ayahAt(pos) ?: ayahRanges.firstOrNull()?.first)
-                                    ?.let(onAyahLongPress)
-                            },
+                    // Attached only on the live page — an off-page detector is still
+                    // a hit-test target, and the topmost one wins, so leaving it on
+                    // every page let the curled-away previous page resolve the tap
+                    // against ITS text (double-tapping 18:28 revealed 18:24).
+                    .then(
+                        if (interactive) {
+                            Modifier
+                                // Observe at the Initial pass because the pager also watches
+                                // horizontal movement. A rub is deliberately an out-and-back
+                                // motion, so its signed distance cancels and cannot turn a page.
+                                .pointerInput(ayahRanges, pageText, onAyahRub) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(
+                                            requireUnconsumed = false,
+                                            pass = PointerEventPass.Initial,
+                                        )
+                                        val touchedAyah = ayahAt(down.position)
+                                            ?: return@awaitEachGesture
+                                        val minimumLeg = 24.dp.toPx()
+                                        val minimumTravel = 56.dp.toPx()
+                                        var legDirection = 0
+                                        var legDistance = 0f
+                                        var reversed = false
+                                        var horizontalTravel = 0f
+                                        var verticalTravel = 0f
+                                        var fired = false
+
+                                        do {
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull { it.id == down.id }
+                                                ?: break
+                                            val delta = change.position - change.previousPosition
+                                            horizontalTravel += kotlin.math.abs(delta.x)
+                                            verticalTravel += kotlin.math.abs(delta.y)
+
+                                            if (kotlin.math.abs(delta.x) > kotlin.math.abs(delta.y) * 1.15f) {
+                                                val direction = if (delta.x >= 0f) 1 else -1
+                                                when {
+                                                    legDirection == 0 -> {
+                                                        legDirection = direction
+                                                        legDistance = kotlin.math.abs(delta.x)
+                                                    }
+                                                    direction == legDirection -> {
+                                                        legDistance += kotlin.math.abs(delta.x)
+                                                    }
+                                                    legDistance >= minimumLeg -> {
+                                                        // A real reversal after a deliberate first
+                                                        // stroke; tiny direction jitter is ignored.
+                                                        reversed = true
+                                                        legDirection = direction
+                                                        legDistance = kotlin.math.abs(delta.x)
+                                                    }
+                                                }
+                                            }
+
+                                            val stillOnAyah = ayahAt(change.position) == touchedAyah
+                                            if (!fired && reversed && legDistance >= minimumLeg &&
+                                                horizontalTravel >= minimumTravel &&
+                                                verticalTravel < horizontalTravel * 0.65f && stillOnAyah
+                                            ) {
+                                                fired = true
+                                                onAyahRub(touchedAyah)
+                                            }
+                                        } while (event.changes.any { it.pressed })
+                                    }
+                                }
+                                .pointerInput(ayahRanges, pageText, onAyahDoubleTap, onAyahLongPress) {
+                                    detectTapGestures(
+                                        onDoubleTap = { pos -> ayahAt(pos)?.let(onAyahDoubleTap) },
+                                        // Fall back to the page's first ayah only when the point
+                                        // maps nowhere. This USED to be unconditional — the old
+                                        // handler ignored the offset entirely, so a long-press
+                                        // anywhere on the page selected the first ayah on it.
+                                        onLongPress = { pos ->
+                                            (ayahAt(pos) ?: ayahRanges.firstOrNull()?.first)
+                                                ?.let(onAyahLongPress)
+                                        },
+                                    )
+                                }
+                        } else {
+                            Modifier
+                        }
+                    )
+            )
+
+            // Reveal the inserted gloss without changing the text being measured.
+            // The mask shares the Text's exact content bounds, and its annotated
+            // range survives AnnotatedString.subSequence when an ayah crosses pages.
+            if (translationAnnotation != null && translationReveal.value < 0.999f) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topPadding + bismillahHeightDp,
+                            bottom = bottomPadding,
+                        ),
+                ) {
+                    translationRevealRects.forEach { rect ->
+                        drawRect(
+                            color = surfaceColor.copy(alpha = 1f - translationReveal.value),
+                            topLeft = rect.topLeft,
+                            size = rect.size,
                         )
                     }
-            )
+                }
+            }
 
             // Pass 2: digits + shield above the text (see comment on pass 1).
             androidx.compose.foundation.Canvas(
@@ -5427,7 +5589,6 @@ private fun MushafPageWithFrame(
 // Builds one master AnnotatedString, measures lines, splits at line boundaries.
 // Ayahs flow naturally across pages like a real printed Quran.
 // ---------------------------------------------------------------------------
-@OptIn(eu.wewox.pagecurl.ExperimentalPageCurlApi::class)
 @Composable
 private fun MushafPagerView(
     ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
@@ -5458,7 +5619,16 @@ private fun MushafPagerView(
 
     val markerColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val state = eu.wewox.pagecurl.page.rememberPageCurlState(initialPage)
+    // PageCurl composes/records every page in the surah. On a 95-page
+    // Al-Baqarah layout that retained ~290 MB of GPU layers on a Pixel 9 Pro,
+    // and rapid turns pushed the process into blocking GC and eventually OOM.
+    // Foundation's pager is lazy: only the current page and its immediate
+    // neighbours exist, while our existing gesture layer still owns navigation.
+    var pagerPageCount by remember { androidx.compose.runtime.mutableIntStateOf(1) }
+    val state = rememberPagerState(
+        initialPage = initialPage.coerceAtLeast(0),
+        pageCount = { pagerPageCount },
+    )
 
     // Pinch streams a new font size every frame; re-measuring the whole surah at
     // that rate janks the gesture and dumps the reader onto a different page.
@@ -5468,16 +5638,32 @@ private fun MushafPagerView(
     // the top of the page being read.
     var committedFontSize by remember { mutableStateOf(arabicFontSize) }
     var pendingAnchorAyah by remember { mutableStateOf(0) }
-    val textMeasurer = rememberTextMeasurer()
+    // Per-page measures (marker ink geometry) — small layouts, worth caching.
+    val textMeasurer = rememberTextMeasurer(cacheSize = 3)
+    // The paginator measures the WHOLE surah in one layout: ~300 lines of Arabic,
+    // each backed by a native StaticLayout. Every revealed translation produces a
+    // new master string and therefore a new one of these, and the default 8-entry
+    // cache kept all of them alive — native heap ran to ~180MB and the process was
+    // killed after enough double-taps. Two entries is exactly what the toggle needs
+    // (gloss on / gloss off) and bounds what we hold.
+    val pageMeasurer = rememberTextMeasurer(cacheSize = 2)
     val density = LocalDensity.current
 
     // Wire physical volume keys to Mushaf page navigation while this composable
     // is on screen. Activity.onKeyDown checks MushafKeyBus.handle{Next,Prev}().
     val mushafScope = rememberCoroutineScope()
-    DisposableEffect(state) {
+    DisposableEffect(state, pagerPageCount) {
         MushafKeyBus.bind(
-            next = { mushafScope.launch { state.next() } },
-            prev = { mushafScope.launch { state.prev() } },
+            next = {
+                mushafScope.launch {
+                    state.animateScrollToPage((state.currentPage + 1).coerceAtMost(pagerPageCount - 1))
+                }
+            },
+            prev = {
+                mushafScope.launch {
+                    state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                }
+            },
         )
         onDispose { MushafKeyBus.unbind() }
     }
@@ -5550,15 +5736,38 @@ private fun MushafPagerView(
         textAlign = TextAlign.Start,
         lineHeight = (committedFontSize * 0.42f * 1.55f).sp,
     )
+    val translationSeparatorSpanStyle = SpanStyle(
+        fontSize = (committedFontSize * 0.12f).sp,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+    )
+    val translationSeparatorParagraphStyle = ParagraphStyle(
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content,
+        textAlign = TextAlign.Start,
+        // A line separator is still a visual line in StaticLayout. Give that
+        // line deliberately compact metrics instead of inheriting the Quran
+        // paragraph's 1.45x leading, which left a conspicuous blank Arabic line
+        // between the ayah marker and its much smaller translation.
+        lineHeight = (committedFontSize * 0.12f).sp,
+    )
 
     val markerData = remember(
         ayahs, showTajweed, tajweedAnnotations, committedFontSize, translationCode,
         inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
+        val builtRanges = mutableListOf<Pair<Int, IntRange>>()
         val built = buildAnnotatedString {
             ayahs.forEach { ayah ->
+                // Real offset in the string being built, recorded instead of recomputed.
+                // The old ranges re-derived positions arithmetically from arabicText, which
+                // disagreed with the text whenever an append changed its length (Tajweed's
+                // applyWithOverlap does), so every later ayah drifted and a tap resolved early.
+                val ayahStart = length
                 val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+                pushStringAnnotation(
+                    tag = MUSHAF_ARABIC_AYAH_TAG,
+                    annotation = ayah.numberInSurah.toString(),
+                )
                 if (showTajweed) {
                     val annotations = tajweedAnnotations[ayah.numberInSurah]
                     if (annotations != null && annotations.isNotEmpty()) {
@@ -5574,6 +5783,7 @@ private fun MushafPagerView(
                 } else {
                     append(arabicText)
                 }
+                pop()
                 val digits = markerDigitsFor(ayah.numberInSurah)
                 // U+2060 WORD JOINER: forbids a line break between the ayah's
                 // last word and its marker.
@@ -5588,16 +5798,38 @@ private fun MushafPagerView(
                 append(' ')
 
                 // The revealed translation lives IN the text, right after this ayah's
-                // marker, so the following ayah genuinely starts below it. Any change here
-                // must be mirrored in ayahCharRanges, which recreates this arithmetic.
+                // marker. Newlines give it a true paragraph between this ayah and the
+                // next; the annotation is retained (and clipped correctly) when the
+                // paginator slices the master string into pages.
                 if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
-                    withStyle(translationParagraphStyle) {
-                        withStyle(translationSpanStyle) { append(inlinedText) }
+                    // Include the compact separators in the block annotation so
+                    // pagination moves the complete reveal as one unit. The mask
+                    // ignores their whitespace glyphs, while StaticLayout uses the
+                    // explicit tiny paragraph metrics instead of an Arabic-height
+                    // blank line.
+                    pushStringAnnotation(
+                        tag = MUSHAF_TRANSLATION_TAG,
+                        annotation = ayah.numberInSurah.toString(),
+                    )
+                    withStyle(translationSeparatorParagraphStyle) {
+                        withStyle(translationSeparatorSpanStyle) { append('\u2028') }
                     }
+                    withStyle(translationParagraphStyle) {
+                        withStyle(translationSpanStyle) {
+                            append(inlinedText)
+                        }
+                    }
+                    withStyle(translationSeparatorParagraphStyle) {
+                        withStyle(translationSeparatorSpanStyle) { append('\u2028') }
+                    }
+                    pop()
                 }
+                // Closed after the gloss so a tap on the translation dismisses the ayah
+                // that opened it.
+                builtRanges.add(ayah.numberInSurah to (ayahStart until length))
             }
         }
-        built to placeholderRanges
+        Triple(built, placeholderRanges, builtRanges.toList())
     }
     val masterString = markerData.first
     val markerPlaceholders = markerData.second
@@ -5701,26 +5933,9 @@ private fun MushafPagerView(
     }
     */
 
-    // Mirrors the master string's character arithmetic exactly — these ranges drive page
-    // slicing, tap hit-testing and highlighting, so any text added there must be counted
-    // here or every ayah after it maps to the wrong characters.
-    val ayahCharRanges = remember(ayahs, translationCode, inlinedAyah, inlinedText) {
-        val ranges = mutableListOf<Pair<Int, IntRange>>()
-        var pos = 0
-        ayahs.forEach { ayah ->
-            val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
-            val startPos = pos
-            // arabicText + word-joiner + inline marker (alt text = digits) + " "
-            pos += arabicText.length + 1 + markerDigitsFor(ayah.numberInSurah).length + 1
-            // The inlined translation belongs to this ayah's range: a tap anywhere on the
-            // gloss should dismiss the ayah that opened it.
-            if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
-                pos += inlinedText.length
-            }
-            ranges.add(ayah.numberInSurah to (startPos until pos))
-        }
-        ranges
-    }
+    // Taken straight from the master string's construction, so the ranges that drive page
+    // slicing, tap hit-testing and highlighting cannot disagree with the text they index.
+    val ayahCharRanges = markerData.third
 
 
     Column(
@@ -5780,9 +5995,15 @@ private fun MushafPagerView(
                         if (directionDecided && !isVerticalScroll) {
                             val swipeThreshold = size.width * 0.15f
                             if (horizontalDragTotal < -swipeThreshold) {
-                                scope.launch { state.next() }
+                                scope.launch {
+                                    state.animateScrollToPage(
+                                        (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
+                                    )
+                                }
                             } else if (horizontalDragTotal > swipeThreshold) {
-                                scope.launch { state.prev() }
+                                scope.launch {
+                                    state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                                }
                             }
                         } else if (directionDecided && isVerticalScroll) {
                             // Only fire swipe-up → next page when the parent
@@ -5794,7 +6015,11 @@ private fun MushafPagerView(
                             val parentExhausted = parentScrollState?.canScrollForward == false
                             val upThreshold = size.height * 0.25f
                             if (parentExhausted && verticalDragTotal < -upThreshold) {
-                                scope.launch { state.next() }
+                                scope.launch {
+                                    state.animateScrollToPage(
+                                        (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
+                                    )
+                                }
                             }
                             // Downward swipes never turn the page.
                         }
@@ -5847,7 +6072,7 @@ private fun MushafPagerView(
                     )
                 }
 
-                val fullLayout = textMeasurer.measure(
+                val fullLayout = pageMeasurer.measure(
                     text = masterString,
                     style = measureStyle,
                     constraints = androidx.compose.ui.unit.Constraints(
@@ -5862,6 +6087,27 @@ private fun MushafPagerView(
                         PaginatedPage(masterString, 1, showBismillah, ayahCharRanges)
                     )
                 }
+
+                // Translation annotations are atomic page blocks. If a gloss would
+                // start near the bottom and continue on the following page, end the
+                // current page before it and let the complete block begin next. A
+                // translation taller than a whole page is the only case that may
+                // still split, because no legal page boundary can contain it.
+                val translationLineBlocks = masterString
+                    .getStringAnnotations(MUSHAF_TRANSLATION_TAG, 0, masterString.length)
+                    .mapNotNull { annotation ->
+                        if (annotation.end <= annotation.start) return@mapNotNull null
+                        fullLayout.getLineForOffset(annotation.start) to
+                            fullLayout.getLineForOffset(annotation.end - 1)
+                    }
+                val arabicLineBlocks = masterString
+                    .getStringAnnotations(MUSHAF_ARABIC_AYAH_TAG, 0, masterString.length)
+                    .filter { it.item == inlinedAyah?.toString() }
+                    .mapNotNull { annotation ->
+                        if (annotation.end <= annotation.start) return@mapNotNull null
+                        fullLayout.getLineForOffset(annotation.start) to
+                            fullLayout.getLineForOffset(annotation.end - 1)
+                    }
 
                 val pages = mutableListOf<PaginatedPage>()
                 var currentLine = 0
@@ -5883,7 +6129,30 @@ private fun MushafPagerView(
                     if (linesOnPage == 0) linesOnPage = 1
 
                     val startCharIndex = fullLayout.getLineStart(currentLine)
-                    val endLine = currentLine + linesOnPage - 1
+                    var endLine = currentLine + linesOnPage - 1
+
+                    val splitTranslation = translationLineBlocks.firstOrNull { (blockStart, blockEnd) ->
+                        blockStart in (currentLine + 1)..endLine && blockEnd > endLine
+                    }
+                    if (splitTranslation != null) {
+                        // Leave the gloss for the next page. blockStart is strictly
+                        // after currentLine, so this always leaves at least one line.
+                        linesOnPage = splitTranslation.first - currentLine
+                        endLine = currentLine + linesOnPage - 1
+                    }
+
+                    // Do not leave a single final Arabic line (often only one
+                    // word plus its medallion) alone at the top of the next page.
+                    // Pull one more line forward with it. Besides reading more
+                    // naturally, this keeps a selected ayah's terminal highlight
+                    // from looking like a detached or missed fragment.
+                    val oneLineWidow = arabicLineBlocks.firstOrNull { (blockStart, blockEnd) ->
+                        blockStart <= endLine && blockEnd == endLine + 1 && linesOnPage > 1
+                    }
+                    if (oneLineWidow != null) {
+                        linesOnPage--
+                        endLine--
+                    }
                     val endCharIndex = if (endLine >= fullLayout.lineCount - 1) {
                         masterString.length
                     } else {
@@ -5924,23 +6193,40 @@ private fun MushafPagerView(
                 pages
             }
 
-            LaunchedEffect(state.current, paginatedPages.size) {
-                onPageChange(state.current, paginatedPages.size)
+            LaunchedEffect(paginatedPages.size) {
+                pagerPageCount = paginatedPages.size.coerceAtLeast(1)
+                if (paginatedPages.isNotEmpty() && state.currentPage > paginatedPages.lastIndex) {
+                    state.scrollToPage(paginatedPages.lastIndex)
+                }
+            }
+
+            LaunchedEffect(state.currentPage, paginatedPages.size) {
+                onPageChange(state.currentPage, paginatedPages.size)
             }
 
             // Publish current Mushaf page to PullToSyncContainer's mini-bar.
             // Cleared on dispose so leaving Mushaf mode hides the strip.
-            DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
+            DisposableEffect(surahNameArabic, surahNameEnglish, state.currentPage, paginatedPages.size) {
                 if (paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.state.value = MushafMiniBarState(
                         surahNameArabic = surahNameArabic,
                         surahNameEnglish = surahNameEnglish,
-                        currentPage = state.current + 1,
+                        currentPage = state.currentPage + 1,
                         totalPages = paginatedPages.size,
                     )
                     MushafMiniBarBus.bind(
-                        next = { mushafScope.launch { state.next() } },
-                        previous = { mushafScope.launch { state.prev() } },
+                        next = {
+                            mushafScope.launch {
+                                state.animateScrollToPage(
+                                    (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
+                                )
+                            }
+                        },
+                        previous = {
+                            mushafScope.launch {
+                                state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                            }
+                        },
                     )
                 }
                 onDispose { MushafMiniBarBus.unbind() }
@@ -5955,7 +6241,7 @@ private fun MushafPagerView(
             LaunchedEffect(arabicFontSize) {
                 if (arabicFontSize == committedFontSize) return@LaunchedEffect
                 kotlinx.coroutines.delay(250)
-                pendingAnchorAyah = paginatedPages.getOrNull(state.current)
+                pendingAnchorAyah = paginatedPages.getOrNull(state.currentPage)
                     ?.ayahRanges?.firstOrNull()?.first ?: 0
                 committedFontSize = arabicFontSize
             }
@@ -5964,7 +6250,7 @@ private fun MushafPagerView(
                     val idx = paginatedPages.indexOfFirst { page ->
                         page.ayahRanges.any { it.first == pendingAnchorAyah }
                     }
-                    if (idx >= 0 && idx != state.current) state.snapTo(idx)
+                    if (idx >= 0 && idx != state.currentPage) state.scrollToPage(idx)
                     pendingAnchorAyah = 0
                 }
             }
@@ -5982,50 +6268,99 @@ private fun MushafPagerView(
 
             // Ink-accurate marker geometry per page, prefetched for the pages the
             // reader can reach next so page turns never show markers moving.
-            val inkGeomCache = remember(paginatedPages) {
-                androidx.compose.runtime.mutableStateMapOf<Int, List<MarkerGeometry>>()
+            //
+            // Keyed by the page's TEXT, not its index. Revealing a translation
+            // re-paginates the whole surah, and an index-keyed cache was discarded
+            // wholesale each time even though every page before the gloss came back
+            // byte-identical — so each double-tap re-measured pages that had not
+            // changed and made every marker fade out and back in. Only the font,
+            // face and column width can actually invalidate this geometry.
+            val inkGeomCache = remember(committedFontSize, arabicFont, availableWidthPx) {
+                androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
             val pagerEmPx = with(density) { committedFontSize.sp.toPx() }
-            LaunchedEffect(state.current, paginatedPages) {
+            LaunchedEffect(state.currentPage, paginatedPages) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
-                for (idx in listOf(state.current, state.current + 1, state.current - 1)) {
-                    if (idx in paginatedPages.indices && idx !in inkGeomCache) {
+                // A page turn can arrive much faster than a bitmap ink scan.
+                // Debounce just long enough for rapid swipes to settle; a newer
+                // state cancels this effect before it allocates another surface.
+                kotlinx.coroutines.delay(120)
+                for (idx in listOf(state.currentPage, state.currentPage + 1, state.currentPage - 1)) {
+                    val pageText = paginatedPages.getOrNull(idx)?.text ?: continue
+                    if (pageText !in inkGeomCache) {
                         val geoms = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                            val scanJob = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
                             runCatching {
                                 computeInkMarkerGeometries(
                                     textMeasurer = textMeasurer,
-                                    pageText = paginatedPages[idx].text,
+                                    pageText = pageText,
                                     style = measureStyle,
                                     maxWidthPx = availableWidthPx.toInt(),
                                     density = density,
                                     emPx = pagerEmPx,
+                                    isActive = { scanJob?.isActive == true },
                                 )
                             }.getOrNull()
                         }
-                        if (geoms != null) inkGeomCache[idx] = geoms
+                        if (geoms != null) inkGeomCache[pageText] = geoms
                     }
+                }
+                // Geometry values are tiny, but AnnotatedString keys retain all
+                // page styling. Keep only the active curl neighbourhood so long
+                // reading sessions have a hard upper memory bound.
+                val retainedTexts = (state.currentPage - 3..state.currentPage + 3)
+                    .mapNotNull { paginatedPages.getOrNull(it)?.text }
+                    .toSet()
+                inkGeomCache.keys.toList().forEach { key ->
+                    if (key !in retainedTexts) inkGeomCache.remove(key)
                 }
             }
 
+            // Consumed once per search jump. The effect below is keyed on
+            // paginatedPages because the target page only exists after the first
+            // measure — but the surah also re-paginates whenever a double-tapped
+            // translation is inlined or dismissed, and without this latch every
+            // reveal re-ran the jump and hauled the reader back to the searched
+            // ayah's page (open 18:1 from search, read to page 7, double-tap an
+            // ayah → thrown back to page 1).
+            var consumedScrollToAyah by remember(ayahs) { mutableStateOf(0) }
             LaunchedEffect(paginatedPages, scrollToAyah) {
-                if (scrollToAyah > 0 && paginatedPages.isNotEmpty()) {
+                if (scrollToAyah > 0 && scrollToAyah != consumedScrollToAyah &&
+                    paginatedPages.isNotEmpty()
+                ) {
                     val targetIndex = paginatedPages.indexOfFirst { page ->
                         page.ayahRanges.any { it.first == scrollToAyah }
                     }
-                    if (targetIndex >= 0 && targetIndex != state.current) {
-                        state.snapTo(targetIndex)
+                    if (targetIndex >= 0) {
+                        consumedScrollToAyah = scrollToAyah
+                        if (targetIndex != state.currentPage) state.scrollToPage(targetIndex)
                     }
                 }
             }
 
-            val pageCurlConfig = eu.wewox.pagecurl.config.rememberPageCurlConfig(
-                dragForwardEnabled = false,
-                dragBackwardEnabled = false
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+            // Parse the ornament vector once for the pager. Loading it inside
+            // every page child repeatedly parsed the XML on the UI thread;
+            // under rapid swipes this was both a frame stall and the allocation
+            // that finally surfaced the Mushaf OOM stack trace.
+            val ornamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
+                image = ImageVector.vectorResource(R.drawable.ayah_ornament_frame),
             )
-            eu.wewox.pagecurl.page.PageCurl(
-                count = paginatedPages.size,
+            val toggleInlineTranslation: (Int) -> Unit = { ayahNumber ->
+                // Arabic-only or incomplete databases have no gloss to reveal.
+                // In that case the gesture should be a no-op rather than leaving
+                // a misleading highlight with no text beneath it.
+                if (!translationByAyah[ayahNumber].isNullOrBlank()) {
+                    revealedAyah = if (revealedAyah == ayahNumber) null else ayahNumber
+                    haptic.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                    )
+                }
+            }
+            HorizontalPager(
                 state = state,
-                config = pageCurlConfig,
+                userScrollEnabled = false,
+                beyondViewportPageCount = 1,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
@@ -6036,21 +6371,36 @@ private fun MushafPagerView(
                         scaleY = preview
                     }
             ) { pageIndex ->
-                val page = paginatedPages[pageIndex]
+                val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
                 MushafPageWithFrame(
                     pageText = page.text,
                     inlineContent = pageInlineContent,
-                    inkGeometries = inkGeomCache[pageIndex],
+                    inkGeometries = inkGeomCache[page.text],
+                    ornamentPainter = ornamentPainter,
                     arabicFont = arabicFont,
                     arabicFontSize = committedFontSize,
                     showBismillah = page.showBismillah,
                     onAyahLongPress = onAyahLongPress,
                     ayahRanges = page.ayahRanges,
-                    highlightedAyahNumber = highlightedAyahNumber,
-                    onAyahDoubleTap = { n ->
+                    // A revealed ayah is also the selected one, so the verse the
+                    // gloss belongs to lights up under the words — otherwise, on a
+                    // dense page, nothing tells the reader which of the ayahs above
+                    // the translation it is explaining. Outranks the search
+                    // highlight, which is stale once the reader starts tapping.
+                    highlightedAyahNumber = revealedAyah ?: highlightedAyahNumber,
+                    interactive = pageIndex == state.currentPage,
+                    onAyahDoubleTap = { ayahNumber ->
+                        // No re-anchoring here on purpose. The gloss is inserted AFTER
+                        // the tapped ayah, which sits on this page, so every line before
+                        // this page's first character is untouched and repagination
+                        // reproduces the same page boundaries up to it — state.currentPage
+                        // still points at the page being read. The anchor that used to
+                        // be set here is what dragged the reader backwards, because it
+                        // re-snapped to the first page that merely *contains* the ayah.
                         // Double-tap the revealed ayah again to dismiss.
-                        revealedAyah = if (revealedAyah == n) null else n
+                        toggleInlineTranslation(ayahNumber)
                     },
+                    onAyahRub = toggleInlineTranslation,
                     modifier = Modifier.fillMaxSize()
                 )
             }
