@@ -5448,6 +5448,8 @@ private fun MushafPageWithFrame(
     inlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> = emptyMap(),
     /** Precomputed ink-accurate marker geometry for THIS page (null while pending). */
     inkGeometries: List<MarkerGeometry>? = null,
+    /** Shared show/hide progress so removal waits for the fade-out to finish. */
+    translationVisibility: Float = 1f,
     ornamentPainter: androidx.compose.ui.graphics.painter.Painter,
     translationOrnamentPainter: androidx.compose.ui.graphics.painter.Painter,
     modifier: Modifier = Modifier
@@ -5565,18 +5567,6 @@ private fun MushafPageWithFrame(
     // surah on every frame and quickly churn native StaticLayout allocations.
     val translationAnnotation = remember(pageText) {
         pageText.getStringAnnotations(MUSHAF_TRANSLATION_TAG, 0, pageText.length).firstOrNull()
-    }
-    val translationReveal = remember { androidx.compose.animation.core.Animatable(1f) }
-    LaunchedEffect(translationAnnotation?.item, pageText.text) {
-        if (translationAnnotation == null) {
-            translationReveal.snapTo(1f)
-        } else {
-            translationReveal.snapTo(0f)
-            translationReveal.animateTo(
-                targetValue = 1f,
-                animationSpec = NiaMotion.enterTween(NiaMotion.Duration.MEDIUM_3),
-            )
-        }
     }
     val translationRevealRects = remember(pageLayout.value, translationAnnotation) {
         val laid = pageLayout.value ?: return@remember emptyList()
@@ -5872,7 +5862,7 @@ private fun MushafPageWithFrame(
             // Reveal the inserted gloss without changing the text being measured.
             // The mask shares the Text's exact content bounds, and its annotated
             // range survives AnnotatedString.subSequence when an ayah crosses pages.
-            if (translationAnnotation != null && translationReveal.value < 0.999f) {
+            if (translationAnnotation != null && translationVisibility < 0.999f) {
                 androidx.compose.foundation.Canvas(
                     modifier = Modifier
                         .fillMaxSize()
@@ -5885,7 +5875,7 @@ private fun MushafPageWithFrame(
                 ) {
                     translationRevealRects.forEach { rect ->
                         drawRect(
-                            color = surfaceColor.copy(alpha = 1f - translationReveal.value),
+                            color = surfaceColor.copy(alpha = 1f - translationVisibility),
                             topLeft = rect.topLeft,
                             size = rect.size,
                         )
@@ -6078,6 +6068,12 @@ private fun MushafPagerView(
     // missing have nothing to reveal. Declared before the master string because the
     // translation is now part of that string rather than drawn over it.
     var revealedAyah by remember(ayahs) { mutableStateOf<Int?>(null) }
+    val translationVisibility = remember(ayahs) {
+        androidx.compose.animation.core.Animatable(1f)
+    }
+    var translationTransitionJob by remember(ayahs) {
+        mutableStateOf<kotlinx.coroutines.Job?>(null)
+    }
     val translationByAyah = remember(ayahs) {
         ayahs.associate { a ->
             a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
@@ -6093,7 +6089,7 @@ private fun MushafPagerView(
         // so both retain identical row metrics.
         fontSize = (committedFontSize * 0.85f).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.90f),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f),
         fontWeight = FontWeight.Normal,
         letterSpacing = 0.sp,
     )
@@ -6737,7 +6733,39 @@ private fun MushafPagerView(
                 // In that case the gesture should be a no-op rather than leaving
                 // a misleading highlight with no text beneath it.
                 if (!translationByAyah[ayahNumber].isNullOrBlank()) {
-                    revealedAyah = if (revealedAyah == ayahNumber) null else ayahNumber
+                    val currentAyah = revealedAyah
+                    val isHidingCurrent = currentAyah == ayahNumber
+                    translationTransitionJob?.cancel()
+                    translationTransitionJob = mushafScope.launch {
+                        if (currentAyah != null) {
+                            // Keep the translation in the measured page while
+                            // the surface-colour mask softly fades it away.
+                            translationVisibility.animateTo(
+                                targetValue = 0f,
+                                animationSpec = NiaMotion.exitTween(
+                                    NiaMotion.Duration.MEDIUM_2,
+                                ),
+                            )
+                        } else {
+                            translationVisibility.snapTo(0f)
+                        }
+
+                        if (isHidingCurrent) {
+                            revealedAyah = null
+                            translationVisibility.snapTo(1f)
+                        } else {
+                            revealedAyah = ayahNumber
+                            // Let the newly paginated text install its opaque
+                            // mask before beginning the reveal, avoiding a flash.
+                            androidx.compose.runtime.withFrameNanos { }
+                            translationVisibility.animateTo(
+                                targetValue = 1f,
+                                animationSpec = NiaMotion.enterTween(
+                                    NiaMotion.Duration.MEDIUM_4,
+                                ),
+                            )
+                        }
+                    }
                     haptic.performHapticFeedback(
                         androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
                     )
@@ -6762,6 +6790,7 @@ private fun MushafPagerView(
                     pageText = page.text,
                     inlineContent = pageInlineContent,
                     inkGeometries = inkGeomCache[page.text],
+                    translationVisibility = translationVisibility.value,
                     ornamentPainter = ornamentPainter,
                     translationOrnamentPainter = translationOrnamentPainter,
                     arabicFont = arabicFont,
