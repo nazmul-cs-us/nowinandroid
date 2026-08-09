@@ -5149,6 +5149,7 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeWordRects(
 
 private data class MarkerGeometry(
     val digits: String,
+    val isTranslation: Boolean,
     val centerX: Float,
     val centerY: Float,
     val left: Float,
@@ -5394,13 +5395,18 @@ private fun computeInkMarkerGeometries(
                 .coerceAtMost(rightInk - MARKER_INK_GAP_EM * emPx - w / 2f)
                 .coerceAtLeast(lineLeft + w / 2f)
         }
+        // The default font-metric center sits slightly below the visible center
+        // of Bengali/Latin translation glyphs. Nudge only the compact gloss
+        // ornament upward; Arabic markers retain their measured placement.
+        val translationOpticalOffsetY = if (belongsToTranslation) -h * 0.10f else 0f
         result.add(
             MarkerGeometry(
                 digits = digits,
+                isTranslation = belongsToTranslation,
                 centerX = centerX,
-                centerY = rect.center.y,
+                centerY = rect.center.y + translationOpticalOffsetY,
                 left = centerX - w / 2f,
-                top = rect.top + (rect.height - h) / 2f,
+                top = rect.top + (rect.height - h) / 2f + translationOpticalOffsetY,
                 w = w,
                 h = h,
             ),
@@ -5443,6 +5449,7 @@ private fun MushafPageWithFrame(
     /** Precomputed ink-accurate marker geometry for THIS page (null while pending). */
     inkGeometries: List<MarkerGeometry>? = null,
     ornamentPainter: androidx.compose.ui.graphics.painter.Painter,
+    translationOrnamentPainter: androidx.compose.ui.graphics.painter.Painter,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -5727,7 +5734,12 @@ private fun MushafPageWithFrame(
                 if (markerAlpha <= 0.01f) return@Canvas
                 for (g in geoms) {
                     translate(g.left, g.top) {
-                        with(ornamentPainter) {
+                        val markerPainter = if (g.isTranslation) {
+                            translationOrnamentPainter
+                        } else {
+                            ornamentPainter
+                        }
+                        with(markerPainter) {
                             draw(
                                 androidx.compose.ui.geometry.Size(g.w, g.h),
                                 alpha = markerAlpha,
@@ -6076,9 +6088,9 @@ private fun MushafPagerView(
     val inlinedText: String = inlinedAyah?.let { translationByAyah[it] }.orEmpty()
 
     val translationSpanStyle = SpanStyle(
-        // Deliberately smaller and lighter than the script it explains, so the eye still
-        // reads the page as Quran with a gloss rather than two competing texts.
-        fontSize = (committedFontSize * 0.48f).sp,
+        // Slightly quieter than the Arabic while remaining comfortably legible.
+        // The marker shares this span, so both retain identical row metrics.
+        fontSize = (committedFontSize * 0.85f).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
         fontWeight = FontWeight.Normal,
@@ -6087,9 +6099,7 @@ private fun MushafPagerView(
     val translationParagraphStyle = ParagraphStyle(
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,
         textAlign = TextAlign.Start,
-        // Independent compact leading; without this the smaller translation
-        // inherited the Quran paragraph's 1.45x Arabic line cadence.
-        lineHeight = (committedFontSize * 0.48f * 1.38f).sp,
+        lineHeight = (committedFontSize * 0.85f * 1.38f).sp,
     )
     val translationSeparatorSpanStyle = SpanStyle(
         fontSize = (committedFontSize * 0.12f).sp,
@@ -6160,12 +6170,12 @@ private fun MushafPagerView(
                         withStyle(translationSpanStyle) {
                             append('\u2066') // LEFT-TO-RIGHT ISOLATE
                             append(inlinedText)
-                            append('\u2069') // POP DIRECTIONAL ISOLATE
-                            append("\u00A0\u00A0")
-                            // Resolve the placeholder's em units from the same
-                            // smaller font as the translation. Its dedicated
-                            // Center alignment reserves the complete frame while
-                            // keeping it on the translation's visual midline.
+                            // This dedicated Center-aligned slot uses the
+                            // translation row metrics. Its separate painter
+                            // avoids reusing the Arabic marker's cached size.
+                            // WORD JOINER attaches it to the final translated
+                            // word; the placeholder already reserves its own
+                            // horizontal breathing room.
                             append('\u2060')
                             val markerStart = length
                             appendInlineContent(MUSHAF_TRANSLATION_ORNAMENT_TAG, digits)
@@ -6176,6 +6186,9 @@ private fun MushafPagerView(
                                     markerStart + digits.length,
                                 ),
                             )
+                            // Close the LTR isolate after the ornament so the
+                            // final translated word and marker wrap as one unit.
+                            append('\u2069') // POP DIRECTIONAL ISOLATE
                         }
                     }
                     // End the selected ayah cleanly after its marker; the next
@@ -6707,12 +6720,16 @@ private fun MushafPagerView(
             }
 
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-            // Parse the ornament vector once for the pager. Loading it inside
-            // every page child repeatedly parsed the XML on the UI thread;
-            // under rapid swipes this was both a frame stall and the allocation
-            // that finally surfaced the Mushaf OOM stack trace.
+            // Parse the ornament vector once, but keep independent painters for
+            // Arabic and translation sizes. Reusing one VectorPainter at both
+            // sizes retained the larger cached viewport and clipped the small
+            // translation frame to its top-left quadrant.
+            val ornamentImage = ImageVector.vectorResource(R.drawable.ayah_ornament_frame)
             val ornamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
-                image = ImageVector.vectorResource(R.drawable.ayah_ornament_frame),
+                image = ornamentImage,
+            )
+            val translationOrnamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
+                image = ornamentImage,
             )
             val toggleInlineTranslation: (Int) -> Unit = { ayahNumber ->
                 // Arabic-only or incomplete databases have no gloss to reveal.
@@ -6745,6 +6762,7 @@ private fun MushafPagerView(
                     inlineContent = pageInlineContent,
                     inkGeometries = inkGeomCache[page.text],
                     ornamentPainter = ornamentPainter,
+                    translationOrnamentPainter = translationOrnamentPainter,
                     arabicFont = arabicFont,
                     arabicFontSize = committedFontSize,
                     showBismillah = page.showBismillah,
