@@ -6088,18 +6088,19 @@ private fun MushafPagerView(
     val inlinedText: String = inlinedAyah?.let { translationByAyah[it] }.orEmpty()
 
     val translationSpanStyle = SpanStyle(
-        // Slightly quieter than the Arabic while remaining comfortably legible.
-        // The marker shares this span, so both retain identical row metrics.
+        // Book-like typography distinguishes the translation gently without
+        // making it feel like secondary UI chrome. The marker shares this span,
+        // so both retain identical row metrics.
         fontSize = (committedFontSize * 0.85f).sp,
-        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.90f),
         fontWeight = FontWeight.Normal,
-        letterSpacing = 0.1.sp,
+        letterSpacing = 0.sp,
     )
     val translationParagraphStyle = ParagraphStyle(
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,
         textAlign = TextAlign.Start,
-        lineHeight = (committedFontSize * 0.85f * 1.38f).sp,
+        lineHeight = (committedFontSize * 0.85f * 1.32f).sp,
     )
     val translationSeparatorSpanStyle = SpanStyle(
         fontSize = (committedFontSize * 0.12f).sp,
