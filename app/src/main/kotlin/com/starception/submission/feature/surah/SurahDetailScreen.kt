@@ -4737,6 +4737,10 @@ private fun ContinuousAyahsContent(
 // ---------------------------------------------------------------------------
 /** Slot height — must stay under the 1.45x line height or the ornament bleeds into neighbouring lines. */
 private const val MARKER_HEIGHT_EM = 1.2f
+/** Translation text is intentionally quieter than Arabic, but its terminal
+ * rosette should remain the same physical size as every Arabic ayah rosette. */
+private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.85f
+private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
 /** Ornament height as a fraction of the slot height. */
 private const val MARKER_ORNAMENT_FILL = 0.92f
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
@@ -5189,7 +5193,8 @@ private fun computeInkMarkerGeometries(
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
     )
     val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        (MARKER_SLOT_WIDTH_EM * TRANSLATION_MARKER_EM_SCALE).em,
+        (MARKER_HEIGHT_EM * TRANSLATION_MARKER_EM_SCALE).em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
     )
     val layout = textMeasurer.measure(
@@ -6050,7 +6055,8 @@ private fun MushafPagerView(
         MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
     val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        (MARKER_SLOT_WIDTH_EM * TRANSLATION_MARKER_EM_SCALE).em,
+        (MARKER_HEIGHT_EM * TRANSLATION_MARKER_EM_SCALE).em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
     )
     val markerInlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> =
@@ -6087,7 +6093,7 @@ private fun MushafPagerView(
         // Book-like typography distinguishes the translation gently without
         // making it feel like secondary UI chrome. The marker shares this span,
         // so both retain identical row metrics.
-        fontSize = (committedFontSize * 0.85f).sp,
+        fontSize = (committedFontSize * MUSHAF_TRANSLATION_FONT_SCALE).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f),
         fontWeight = FontWeight.Normal,
@@ -6096,7 +6102,7 @@ private fun MushafPagerView(
     val translationParagraphStyle = ParagraphStyle(
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,
         textAlign = TextAlign.Start,
-        lineHeight = (committedFontSize * 0.85f * 1.32f).sp,
+        lineHeight = (committedFontSize * MUSHAF_TRANSLATION_FONT_SCALE * 1.32f).sp,
     )
     val translationSeparatorSpanStyle = SpanStyle(
         fontSize = (committedFontSize * 0.12f).sp,
