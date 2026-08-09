@@ -80,6 +80,7 @@ class PrayerNotificationService : Service() {
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var activityTransitionPendingIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
+    private var hasLocationForegroundType = false
     private var toneGenerator: ToneGenerator? = null
     private var timezoneReceiver: BroadcastReceiver? = null
 
@@ -100,6 +101,7 @@ class PrayerNotificationService : Service() {
             "com.starception.submission.action.ACTIVITY_TRANSITION"
         const val EXTRA_DETECTED_ACTIVITY = "detected_activity"
         const val EXTRA_TRANSITION_TYPE = "transition_type"
+        const val EXTRA_IN_VEHICLE_TRANSITION_TYPE = "in_vehicle_transition_type"
         
         // Check if service is running in another process (NON-BLOCKING with timeout)
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
@@ -230,23 +232,50 @@ class PrayerNotificationService : Service() {
     
     /**
      * Starts/updates the foreground notification with types valid for the current
-     * state. On Android 14+ the location type may only be used from a background
-     * start (e.g. boot) when "Allow all the time" location is granted — otherwise
-     * fall back to specialUse alone so the service still comes up after reboot.
+     * state. On Android 14+, a visible app start can use while-in-use location and
+     * retain that foreground capability after the UI closes. A background cold start
+     * without "Allow all the time" falls back to specialUse so boot remains reliable.
      */
     private fun startForegroundWithSafeTypes(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val hasBackgroundLocation = ContextCompat.checkSelfPermission(
+            val hasFineLocation = ContextCompat.checkSelfPermission(
                 this,
-                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            val types = if (hasBackgroundLocation) {
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            } else {
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            val hasCoarseLocation = ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            // When this service is started while an Activity is visible, while-in-use
+            // location permission is sufficient and the location FGS remains valid after
+            // the UI is backgrounded. The old ACCESS_BACKGROUND_LOCATION-only check kept
+            // the service as specialUse even on this valid path, so Android throttled the
+            // detector's one-second GPS request to roughly one update every ten minutes.
+            if (hasFineLocation || hasCoarseLocation) {
+                try {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                    )
+                    hasLocationForegroundType = true
+                    Log.i(TAG, "Foreground service running with location + specialUse")
+                    return
+                } catch (e: SecurityException) {
+                    // A boot/activity-transition cold start cannot use a while-in-use
+                    // permission. Keep prayer updates alive and let a later visible app
+                    // start upgrade the already-running service to the location type.
+                    Log.w(TAG, "Location FGS unavailable from this background start; using specialUse", e)
+                }
             }
-            startForeground(NOTIFICATION_ID, notification, types)
+
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -256,6 +285,12 @@ class PrayerNotificationService : Service() {
         Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId, isServiceRunning: $isServiceRunning")
 
         if (isServiceRunning) {
+            // The service may originally have been cold-started at boot as specialUse.
+            // A later start while the app is visible is our opportunity to add the
+            // location FGS type and restore unthrottled driving-speed updates.
+            if (!hasLocationForegroundType) {
+                startForegroundWithSafeTypes(createInitialNotification())
+            }
             handleActivityTransitionIntent(intent)
             Log.w(TAG, "Service already running, ignoring duplicate start - startId: $startId")
             return START_STICKY
@@ -320,6 +355,10 @@ class PrayerNotificationService : Service() {
 
         val detectedActivity = intent.getStringExtra(EXTRA_DETECTED_ACTIVITY) ?: return
         val transitionType = intent.getIntExtra(EXTRA_TRANSITION_TYPE, -1)
+        val inVehicleTransitionType = intent.getIntExtra(
+            EXTRA_IN_VEHICLE_TRANSITION_TYPE,
+            -1,
+        )
         val previousActivity = currentActivity
         currentActivity = detectedActivity
 
@@ -328,7 +367,10 @@ class PrayerNotificationService : Service() {
             "🏃 Background activity transition: $previousActivity → $detectedActivity " +
                 "(${getTransitionString(transitionType)})",
         )
-        ActivityTracker.updateActivity(detectedActivity)
+        ActivityTracker.updateActivityFromTransition(
+            detectedActivity,
+            inVehicleTransitionType,
+        )
         serviceScope.launch {
             runCatching { updatePrayerNotificationWithRealData() }
                 .onFailure { Log.e(TAG, "Failed to refresh live update after activity transition", it) }
@@ -1948,7 +1990,9 @@ class PrayerNotificationService : Service() {
             try {
                 ActivityTracker.setActivityChangeCallback(null)  // Clear callback first
                 ActivityTracker.setSensorHandler(null)  // Clear sensor handler
-                ActivityTracker.stopDetection()
+                // The service is START_STICKY and may be recreated immediately. Do not
+                // invalidate a wake-up alarm that was already scheduled for an active trip.
+                ActivityTracker.stopDetection(preserveDrivingSession = true)
                 Log.d(TAG, "✓ ActivityTracker detection stopped and callback cleared")
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping ActivityTracker", e)

@@ -64,13 +64,25 @@ fun AssetDownloadScreen(
     modifier: Modifier = Modifier,
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+    val isReady = screenState is DownloadScreenState.AllReady
 
-    LaunchedEffect(screenState) {
-        if (screenState is DownloadScreenState.AllReady) onReady()
+    LaunchedEffect(isReady) {
+        if (isReady) onReady()
     }
 
     AnimatedContent(
         targetState = screenState,
+        // Download progress produces a new NeedsDownload data object for every
+        // update. Keep all of those objects on one stable content key so only
+        // the progress UI recomposes; animate only real screen-phase changes.
+        contentKey = { state ->
+            when (state) {
+                is DownloadScreenState.Loading -> DownloadScreenPhase.Loading
+                is DownloadScreenState.AllReady -> DownloadScreenPhase.AllReady
+                is DownloadScreenState.Error -> DownloadScreenPhase.Error
+                is DownloadScreenState.NeedsDownload -> DownloadScreenPhase.NeedsDownload
+            }
+        },
         transitionSpec = {
             NiaTransitions.fadeThroughEnter() togetherWith NiaTransitions.fadeThroughExit()
         },
@@ -103,6 +115,13 @@ fun AssetDownloadScreen(
             }
         }
     }
+}
+
+private enum class DownloadScreenPhase {
+    Loading,
+    AllReady,
+    Error,
+    NeedsDownload,
 }
 
 @Composable

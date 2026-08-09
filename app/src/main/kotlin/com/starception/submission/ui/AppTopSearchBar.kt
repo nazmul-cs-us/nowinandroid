@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.text.Editable
@@ -363,7 +364,7 @@ fun AppTopSearchBar(
             // Match the rest of the app — Roboto Serif (downloadable Google Font),
             // same family Compose uses via NiaTheme. SearchBar/SearchView are View
             // components so they ignore Compose Typography and default to system sans.
-            val appTypeface = ResourcesCompat.getFont(ctx, R.font.ubuntu_sans)
+            val appTypeface = appSearchTypeface(ctx)
             searchBar.textView?.setHintTextColor(pillTextColor)
             searchBar.textView?.setTextColor(pillTextColor)
             searchBar.textView?.typeface = appTypeface
@@ -1244,6 +1245,21 @@ private fun renderSuggestions(
 private const val MAX_RECENTS_TOTAL = 6
 private const val EMPTY_STATE_VERSES_BATCH = 8
 
+private var cachedAppSearchTypeface: Typeface? = null
+
+/**
+ * Ubuntu Sans is a downloadable Google Play Services font. Emulator images
+ * without the font provider can throw Resources.NotFoundException instead of
+ * returning null, so every View-based search surface uses this safe fallback.
+ */
+private fun appSearchTypeface(context: Context): Typeface {
+    cachedAppSearchTypeface?.let { return it }
+    return (
+        runCatching { ResourcesCompat.getFont(context, R.font.ubuntu_sans) }.getOrNull()
+            ?: Typeface.create("sans-serif", Typeface.NORMAL)
+        ).also { cachedAppSearchTypeface = it }
+}
+
 /** Holds a ranked section's title, lead score, and render closure. */
 private data class RenderableSection(
     val title: String,
@@ -1270,7 +1286,7 @@ private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: S
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView
     view.text = text
     view.setTextColor(subtitleColor)
-    view.typeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    view.typeface = appSearchTypeface(parent.context)
     parent.addView(view)
 }
 
@@ -1284,7 +1300,7 @@ private fun addSurahItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         // Same Twemoji icon as the Holy Quran topic; colorful, so no tint.
         setImageResource(topicIconResFor("quran") ?: R.drawable.ic_app_search_home_24)
@@ -1327,7 +1343,7 @@ private fun addAyahItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         // Same Twemoji icon as the Holy Quran topic; colorful, so no tint.
         setImageResource(topicIconResFor("quran") ?: R.drawable.ic_app_search_home_24)
@@ -1362,7 +1378,7 @@ private fun addQuranicDuaItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         // Same Twemoji icon as the Quranic Duas topic; colorful, so no tint.
         setImageResource(topicIconResFor("dua") ?: R.drawable.ic_app_search_home_24)
@@ -1399,7 +1415,7 @@ private fun addFortressDuaItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         // Same Twemoji icon as the Quranic Duas topic; colorful, so no tint.
         setImageResource(topicIconResFor("dua") ?: R.drawable.ic_app_search_home_24)
@@ -1437,7 +1453,7 @@ private fun addTopicItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         val topicIconRes = topicIconResFor(name)
         if (topicIconRes != null) {
@@ -1477,7 +1493,7 @@ private fun addNewsItem(
     onClick: () -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         // Articles are topical ("Quranic Dua 4: …"), so reuse the topic keyword →
         // Twemoji mapping; colorful icons take no tint. Unmatched titles keep the
@@ -1522,7 +1538,7 @@ private fun addRecentSearchItem(
     onClick: (String) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
         setImageResource(R.drawable.ic_app_search_schedule_24)
         imageTintList = android.content.res.ColorStateList.valueOf(subtitleColor)
@@ -1547,7 +1563,7 @@ private fun addVerseItem(
     onClick: (Int, Int) -> Unit,
 ) {
     val view = inflater.inflate(R.layout.app_search_verse_item, parent, false)
-    val appTypeface = ResourcesCompat.getFont(parent.context, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(parent.context)
     view.findViewById<TextView>(R.id.app_search_verse_badge).apply {
         text = "${verse.surahNumber}:${verse.ayahNumber}"
         setTextColor(accentColor)
@@ -1591,7 +1607,7 @@ private fun addPopularChipsRow(
     onClick: (PopularSuggestion) -> Unit,
 ) {
     val ctx = parent.context
-    val appTypeface = ResourcesCompat.getFont(ctx, R.font.ubuntu_sans)
+    val appTypeface = appSearchTypeface(ctx)
     val scroll = HorizontalScrollView(ctx).apply {
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER

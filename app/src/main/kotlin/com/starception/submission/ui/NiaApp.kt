@@ -931,6 +931,7 @@ private fun NiaMainContent(
             mushafState = appLevelMushafState,
             onMushafPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
             onMushafNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
+            onMushafOpenInfo = { com.starception.submission.feature.surah.MushafMiniBarBus.onOpenInfo?.invoke() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)

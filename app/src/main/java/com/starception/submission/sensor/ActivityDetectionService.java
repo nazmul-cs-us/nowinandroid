@@ -247,7 +247,20 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final int DRIVING_STABLE_COUNT = 3; // Driving needs 3 consecutive detections (6 seconds) to prevent GPS noise false positives
     private int consecutiveDetectionCount = 0;
     private ActivityType lastDetectedActivity = ActivityType.UNKNOWN;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Handler analysisHandler;
+    private final Runnable analysisRunnable = new Runnable() {
+        @Override
+        public void run() {
+            Handler activeHandler = analysisHandler;
+            if (!isRunning.get() || activeHandler == null) {
+                return;
+            }
+            analyzeCurrentActivity();
+            if (isRunning.get() && analysisHandler == activeHandler) {
+                activeHandler.postDelayed(this, ANALYSIS_INTERVAL);
+            }
+        }
+    };
     
     // Callbacks
     private ActivityChangeCallback callback;
@@ -545,13 +558,19 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private void acquireWakeLock() {
         try {
             PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            if (powerManager != null && wakeLock == null) {
-                wakeLock = powerManager.newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK,
-                    "ActivityDetection::SensorWakeLock"
-                );
-                wakeLock.acquire(10 * 60 * 1000L); // 10 minutes max, will be re-acquired periodically
-                Log.i(TAG, "✅ WakeLock acquired for sensor processing");
+            if (powerManager != null) {
+                if (wakeLock == null) {
+                    wakeLock = powerManager.newWakeLock(
+                        PowerManager.PARTIAL_WAKE_LOCK,
+                        "ActivityDetection::SensorWakeLock"
+                    );
+                }
+                if (!wakeLock.isHeld()) {
+                    // Keep the sensor fallback bounded. Google Activity Transition is the
+                    // wake-up-capable authority once the device sleeps.
+                    wakeLock.acquire(10 * 60 * 1000L);
+                    Log.i(TAG, "✅ WakeLock acquired for sensor processing");
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to acquire WakeLock", e);
@@ -563,8 +582,10 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      */
     private void releaseWakeLock() {
         try {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
+            if (wakeLock != null) {
+                if (wakeLock.isHeld()) {
+                    wakeLock.release();
+                }
                 wakeLock = null;
                 Log.i(TAG, "WakeLock released");
             }
@@ -582,6 +603,14 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         }
 
         isRunning.set(false);
+
+        // Moving detection from its fallback thread to the foreground-service thread
+        // must remove the previous analysis runnable. Otherwise every restart creates
+        // another permanent loop that races the current activity state.
+        if (analysisHandler != null) {
+            analysisHandler.removeCallbacks(analysisRunnable);
+            analysisHandler = null;
+        }
 
         // Unregister sensor listeners
         sensorManager.unregisterListener(this);
@@ -626,15 +655,13 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
      * Start periodic analysis of collected data
      */
     private void startPeriodicAnalysis() {
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (isRunning.get()) {
-                    analyzeCurrentActivity();
-                    startPeriodicAnalysis(); // Schedule next analysis
-                }
-            }
-        }, ANALYSIS_INTERVAL);
+        if (analysisHandler != null) {
+            analysisHandler.removeCallbacks(analysisRunnable);
+        }
+        analysisHandler = sensorHandler != null
+                ? sensorHandler
+                : new Handler(Looper.getMainLooper());
+        analysisHandler.postDelayed(analysisRunnable, ANALYSIS_INTERVAL);
     }
     
     /**

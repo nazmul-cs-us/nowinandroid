@@ -51,6 +51,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import com.starception.submission.services.DrivingAudioService
+import com.google.android.gms.location.ActivityTransition
 import java.util.Locale
 
 /**
@@ -226,6 +227,8 @@ object ActivityTracker {
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
     private const val KEY_LAST_DUA_PLAY_TIME = "last_dua_play_time"
+    private const val KEY_GOOGLE_DRIVING_CONFIRMED = "google_driving_confirmed"
+    private var googleDrivingConfirmed = false
 
     // Gap tolerance tracking - continue countdown if driving resumes within gap tolerance
     private var drivingStopTime: Long = 0L  // When driving stopped
@@ -342,7 +345,7 @@ object ActivityTracker {
                     newActivity: ActivityDetectionService.ActivityType,
                     previousActivity: ActivityDetectionService.ActivityType
                 ) {
-                    updateActivity(activityToString(newActivity))
+                    updateActivityFromSensor(activityToString(newActivity))
                     // Update phone position
                     updatePhonePosition()
                     // Play beep sound when activity changes
@@ -424,6 +427,48 @@ object ActivityTracker {
      * - Accumulated driving time is tracked across brief gaps
      */
     fun updateActivity(activity: String) {
+        updateActivityFromSensor(activity)
+    }
+
+    /** Apply an activity update delivered by Google Play services. */
+    fun updateActivityFromTransition(activity: String, inVehicleTransitionType: Int) {
+        when (inVehicleTransitionType) {
+            ActivityTransition.ACTIVITY_TRANSITION_ENTER -> {
+                googleDrivingConfirmed = true
+                persistGoogleDrivingConfirmation(true)
+                Log.i("ActivityTracker", "🚗 Google IN_VEHICLE ENTER confirmed")
+            }
+            ActivityTransition.ACTIVITY_TRANSITION_EXIT -> {
+                googleDrivingConfirmed = false
+                persistGoogleDrivingConfirmation(false)
+                Log.i("ActivityTracker", "🛑 Google IN_VEHICLE EXIT confirmed")
+            }
+        }
+
+        val normalizedActivity = normalizeActivityName(activity)
+        if (googleDrivingConfirmed && normalizedActivity != "Driving") {
+            Log.d(
+                "ActivityTracker",
+                "Ignoring non-vehicle transition '$normalizedActivity' while Google driving is confirmed",
+            )
+            return
+        }
+        updateActivityInternal(normalizedActivity)
+    }
+
+    private fun updateActivityFromSensor(activity: String) {
+        val normalizedActivity = normalizeActivityName(activity)
+        if (googleDrivingConfirmed && normalizedActivity != "Driving") {
+            Log.d(
+                "ActivityTracker",
+                "Ignoring sensor activity '$normalizedActivity' while Google driving is confirmed",
+            )
+            return
+        }
+        updateActivityInternal(normalizedActivity)
+    }
+
+    private fun updateActivityInternal(activity: String) {
         val currentTime = System.currentTimeMillis()
         // Sensor detection uses title case ("Driving") while Google Play Services
         // reports upper case ("DRIVING"). Keep one canonical value so background
@@ -621,9 +666,18 @@ object ActivityTracker {
      * @param releaseResources If true, releases audio resources (for cleanup).
      *                         If false, just pauses detection (can resume quickly)
      */
-    fun stopDetection(releaseResources: Boolean = false) {
-        persistDrivingState(false)
-        cancelPendingDua()
+    fun stopDetection(
+        releaseResources: Boolean = false,
+        preserveDrivingSession: Boolean = false,
+    ) {
+        if (!preserveDrivingSession) {
+            googleDrivingConfirmed = false
+            persistGoogleDrivingConfirmation(false)
+            persistDrivingState(false)
+            cancelPendingDua()
+        } else {
+            Log.i("ActivityTracker", "Preserving active driving session while detector restarts")
+        }
 
         if (activityDetectionService?.isRunning() != true) {
             Log.d("ActivityTracker", "📍 Detection not running, nothing to stop")
@@ -922,6 +976,13 @@ object ActivityTracker {
         context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
             ?.edit()
             ?.putBoolean(TravelDuaSettings.KEY_IS_DRIVING, isDriving)
+            ?.apply()
+    }
+
+    private fun persistGoogleDrivingConfirmation(isConfirmed: Boolean) {
+        context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, isConfirmed)
             ?.apply()
     }
 
@@ -2124,6 +2185,17 @@ object ActivityTracker {
 
             // CRITICAL: Load persisted cooldown timestamp to survive app restarts
             lastDuaPlayTime = prefs.getLong(KEY_LAST_DUA_PLAY_TIME, 0L)
+            // Only restore Google authority when a Travel Dua is still pending. This
+            // preserves the countdown across a sticky service/process restart without
+            // allowing a missed EXIT to leave driving latched after playback completes.
+            googleDrivingConfirmed = prefs.getBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, false) &&
+                prefs.contains(TravelDuaSettings.KEY_PENDING_ALARM_TOKEN)
+            if (googleDrivingConfirmed) {
+                _currentActivity.value = "Driving"
+                Log.i("ActivityTracker", "🚗 Restored Google-confirmed driving session with pending alarm")
+            } else {
+                prefs.edit().putBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, false).apply()
+            }
             val timeSinceLastDua = if (lastDuaPlayTime > 0) (System.currentTimeMillis() - lastDuaPlayTime) / 1000 else -1L
 
             Log.i("ActivityTracker", "🚗 Travel dua settings loaded: enabled=$travelDuaEnabled, cooldown=${cooldownMinutes}min, delay=${playbackDelaySeconds}s, gap=${gapToleranceMinutes}min")

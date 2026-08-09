@@ -25,35 +25,53 @@ class DrivingActivityTransitionReceiver : BroadcastReceiver() {
         }
 
         val events = ActivityTransitionResult.extractResult(intent)?.transitionEvents.orEmpty()
-        var activityUpdate: String? = null
-        var transitionType = -1
-
         events.forEach { event ->
             Log.d(
                 TAG,
                 "Transition: ${activityName(event.activityType)} / ${event.transitionType}",
             )
-            when {
-                event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> {
-                    activityUpdate = activityName(event.activityType)
-                    transitionType = event.transitionType
-                }
-                event.activityType == DetectedActivity.IN_VEHICLE &&
-                    event.transitionType == ActivityTransition.ACTIVITY_TRANSITION_EXIT &&
-                    activityUpdate == null -> {
-                    // Stop any pending travel-dua countdown immediately; a later ENTER
-                    // in the same batch will replace this with the new concrete activity.
-                    activityUpdate = "UNKNOWN"
-                    transitionType = event.transitionType
-                }
-            }
         }
 
-        val detectedActivity = activityUpdate ?: return
+        // Keep the IN_VEHICLE edge separate from the display activity. A batch commonly
+        // contains IN_VEHICLE EXIT + STILL ENTER; collapsing that to only STILL loses the
+        // authoritative vehicle exit and leaves the driving session latched forever.
+        val vehicleTransitionType = events
+            .lastOrNull { it.activityType == DetectedActivity.IN_VEHICLE }
+            ?.transitionType
+            ?: -1
+        val lastEnteredActivity = events.lastOrNull {
+            it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER
+        }
+
+        val detectedActivity: String
+        val transitionType: Int
+        if (vehicleTransitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
+            // An IN_VEHICLE enter is authoritative even if the same delivery also contains
+            // cleanup transitions for the previous activity (for example STILL EXIT).
+            detectedActivity = "DRIVING"
+            transitionType = vehicleTransitionType
+        } else if (
+            lastEnteredActivity != null &&
+            !(vehicleTransitionType == ActivityTransition.ACTIVITY_TRANSITION_EXIT &&
+                lastEnteredActivity.activityType == DetectedActivity.IN_VEHICLE)
+        ) {
+            detectedActivity = activityName(lastEnteredActivity.activityType)
+            transitionType = lastEnteredActivity.transitionType
+        } else if (vehicleTransitionType == ActivityTransition.ACTIVITY_TRANSITION_EXIT) {
+            detectedActivity = "UNKNOWN"
+            transitionType = vehicleTransitionType
+        } else {
+            return
+        }
+
         val serviceIntent = Intent(context, PrayerNotificationService::class.java).apply {
             action = PrayerNotificationService.ACTION_ACTIVITY_TRANSITION
             putExtra(PrayerNotificationService.EXTRA_DETECTED_ACTIVITY, detectedActivity)
             putExtra(PrayerNotificationService.EXTRA_TRANSITION_TYPE, transitionType)
+            putExtra(
+                PrayerNotificationService.EXTRA_IN_VEHICLE_TRANSITION_TYPE,
+                vehicleTransitionType,
+            )
         }
 
         runCatching {

@@ -110,9 +110,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
@@ -216,6 +213,11 @@ import com.starception.submission.R
 
 private const val DUA_SECTION_ORDER_PREFS = "dua_section_order_prefs"
 private const val DUA_SECTION_ORDER_KEY = "section_order"
+
+private enum class DuaToolbarPicker {
+    Translation,
+    ArabicFont,
+}
 
 /**
  * Save dua section order to SharedPreferences
@@ -964,9 +966,8 @@ fun DuaDetailScreen(
     // route's newsResourceId, which is empty for any caller that has no real news id.
     // Keying on the visible dua also keeps the tag correct while paging.
 
-    // Dialog states
-    var showTranslationDialog by remember { mutableStateOf(false) }
-    var showFontDialog by remember { mutableStateOf(false) }
+    // Toolbar language/font icons open focused modal sheets rather than popups.
+    var toolbarPicker by remember { mutableStateOf<DuaToolbarPicker?>(null) }
     var showFloatingToolbar by remember { mutableStateOf(false) }
 
     // Font size state for toolbar controls
@@ -2801,7 +2802,7 @@ fun DuaDetailScreen(
                         ) {
                             // Language icon always first in left group
                             Surface(
-                                onClick = { showTranslationDialog = true },
+                                onClick = { toolbarPicker = DuaToolbarPicker.Translation },
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
@@ -2831,7 +2832,7 @@ fun DuaDetailScreen(
                             if (iconsInLeftZone >= 2) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    onClick = { showFontDialog = true },
+                                    onClick = { toolbarPicker = DuaToolbarPicker.ArabicFont },
                                     modifier = Modifier.size(40.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     color = toolbarContentColor.copy(alpha = 0.12f),
@@ -2871,7 +2872,7 @@ fun DuaDetailScreen(
                         // Language icon goes here when it doesn't fit left of punch hole
                         if (iconsInLeftZone == 0) {
                             Surface(
-                                onClick = { showTranslationDialog = true },
+                                onClick = { toolbarPicker = DuaToolbarPicker.Translation },
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
@@ -2902,7 +2903,7 @@ fun DuaDetailScreen(
                         // Font icon goes here when only Language fit in the left zone
                         if (iconsInLeftZone <= 1) {
                             Surface(
-                                onClick = { showFontDialog = true },
+                                onClick = { toolbarPicker = DuaToolbarPicker.ArabicFont },
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
@@ -2991,31 +2992,24 @@ fun DuaDetailScreen(
         }
     }
 
-    // Translation selection dialog
-    if (showTranslationDialog) {
-        DuaTranslationSelectorDialog(
+    toolbarPicker?.let { picker ->
+        DuaToolbarPickerSheet(
+            picker = picker,
             currentTranslation = selectedTranslation,
-            availableTranslations = availableTranslations,
-            getTranslationName = { viewModel.getTranslationName(it) },
-            onTranslationSelected = { translationCode ->
-                viewModel.changeTranslation(translationCode)
-                showTranslationDialog = false
-            },
-            onDismiss = { showTranslationDialog = false }
-        )
-    }
-
-    // Font selection dialog
-    if (showFontDialog) {
-        DuaFontSelectorDialog(
             currentFont = selectedFont,
+            availableTranslations = availableTranslations,
             availableFonts = availableFonts,
-            getFontName = { viewModel.getArabicFontDisplayName(it) },
-            onFontSelected = { fontName ->
-                viewModel.changeArabicFont(fontName)
-                showFontDialog = false
+            getTranslationName = viewModel::getTranslationName,
+            getFontName = viewModel::getArabicFontDisplayName,
+            onTranslationSelected = { translation ->
+                viewModel.changeTranslation(translation)
+                toolbarPicker = null
             },
-            onDismiss = { showFontDialog = false }
+            onFontSelected = { font ->
+                viewModel.changeArabicFont(font)
+                toolbarPicker = null
+            },
+            onDismiss = { toolbarPicker = null },
         )
     }
 }
@@ -3476,111 +3470,168 @@ private fun SingleDuaContent(
     } // End of outer Column
 }
 
-/**
- * Translation selector dialog for Dua screen - matches SurahDetailScreen style
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DuaTranslationSelectorDialog(
+private fun DuaToolbarPickerSheet(
+    picker: DuaToolbarPicker,
     currentTranslation: String,
+    currentFont: String,
     availableTranslations: List<String>,
+    availableFonts: List<String>,
     getTranslationName: (String) -> String,
+    getFontName: (String) -> String,
     onTranslationSelected: (String) -> Unit,
-    onDismiss: () -> Unit
+    onFontSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    // Filter out any translations with empty or blank display names
     val validTranslations = remember(availableTranslations) {
         availableTranslations.filter { code ->
             getTranslationName(code).isNotBlank()
         }
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Select Translation") },
-        text = {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-            ) {
-                items(validTranslations) { translationCode ->
-                    Row(
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
+    ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(top = 18.dp, bottom = 12.dp),
+                ) {
+                    Text(
+                        text = if (picker == DuaToolbarPicker.Translation) {
+                            "Translation language"
+                        } else {
+                            "Arabic font"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                    Text(
+                        text = if (picker == DuaToolbarPicker.Translation) {
+                            "Choose the language used for this dua"
+                        } else {
+                            "Choose the script used for Arabic text"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 3.dp),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onTranslationSelected(translationCode) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .heightIn(max = 520.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        RadioButton(
-                            selected = translationCode == currentTranslation,
-                            onClick = { onTranslationSelected(translationCode) }
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            text = getTranslationName(translationCode),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (picker == DuaToolbarPicker.Translation) {
+                            items(validTranslations, key = { it }) { code ->
+                                DuaToolbarPickerRow(
+                                    title = getTranslationName(code),
+                                    detail = translationEndonym(code),
+                                    selected = code == currentTranslation,
+                                    onClick = { onTranslationSelected(code) },
+                                )
+                            }
+                        } else {
+                            items(availableFonts, key = { it }) { font ->
+                                DuaToolbarPickerRow(
+                                    title = getFontName(font),
+                                    detail = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                                    detailFontFamily = getArabicFontFamilyForDua(font),
+                                    selected = font == currentFont,
+                                    onClick = { onFontSelected(font) },
+                                )
+                            }
+                        }
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
         }
-    )
+    }
 }
 
-/**
- * Font selector dialog for Dua screen - matches SurahDetailScreen style
- */
 @Composable
-fun DuaFontSelectorDialog(
-    currentFont: String,
-    availableFonts: List<String>,
-    getFontName: (String) -> String,
-    onFontSelected: (String) -> Unit,
-    onDismiss: () -> Unit
+private fun DuaToolbarPickerRow(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    detailFontFamily: FontFamily? = null,
+    onClick: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Arabic Font") },
-        text = {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 300.dp)
-            ) {
-                items(availableFonts) { fontName ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onFontSelected(fontName) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = fontName == currentFont,
-                            onClick = { onFontSelected(fontName) }
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            text = getFontName(fontName),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+                else Color.Transparent,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (detail.isNotBlank()) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = detailFontFamily,
+                    color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-    )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .size(22.dp),
+            )
+        }
+    }
+}
+
+private fun translationEndonym(code: String): String = when (code) {
+    "ar" -> "العربية"
+    "transliteration" -> "Bismillāh"
+    "bn" -> "বাংলা"
+    "zh" -> "中文"
+    "en" -> "English"
+    "es" -> "Español"
+    "fr" -> "Français"
+    "id" -> "Bahasa Indonesia"
+    "ru" -> "Русский"
+    "sv" -> "Svenska"
+    "tr" -> "Türkçe"
+    "ur" -> "اردو"
+    else -> ""
 }
 
 /**

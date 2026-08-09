@@ -136,6 +136,7 @@ fun PullToSyncContainer(
     mushafState: MushafMiniBarState? = null,
     onMushafPrevious: () -> Unit = {},
     onMushafNext: () -> Unit = {},
+    onMushafOpenInfo: () -> Unit = {},
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val resolvedIdleContainerColor = if (idleContainerColor == Color.Unspecified) {
@@ -249,11 +250,17 @@ fun PullToSyncContainer(
     val compactBannerRowDp = maxOf(14.dp, with(bannerDensity) { 14.sp.toDp() })
     val mediaTextDp = with(bannerDensity) { 44.sp.toDp() }
     val mediaRowDp = maxOf(48.dp, mediaTextDp)
+    // Mushaf has two compact text lines and page arrows, so it does not need
+    // the taller media-control row. Keep enough room for increased font scale.
+    val mushafTextDp = with(bannerDensity) { 34.sp.toDp() }
+    val mushafRowDp = maxOf(40.dp, mushafTextDp)
     // Let persistent banners sit 2dp inside the conservative safe-drawing
     // boundary. There is no additional top padding; keep 6dp below the row.
     val bannerTopInsetPadding = (bannerTopInsetDp - 2.dp).coerceAtLeast(0.dp)
+    val mushafTopInsetPadding = (bannerTopInsetDp - 12.dp).coerceAtLeast(0.dp)
     val bannerTopPadding = 0.dp
     val bannerBottomPadding = 6.dp
+    val mushafBottomPadding = 4.dp
     val bannerVerticalPadding = bannerTopPadding + bannerBottomPadding
     val stackedRowSpacing = 4.dp
     val isMushafActive = mushafState != null
@@ -272,7 +279,7 @@ fun PullToSyncContainer(
         }
         isPrayerAlert || isIslamicEvent || isSilentMode ->
             bannerTopInsetPadding + bannerVerticalPadding + bannerRowDp
-        isMushafActive -> bannerTopInsetPadding + bannerVerticalPadding + mediaRowDp
+        isMushafActive -> mushafTopInsetPadding + mushafBottomPadding + mushafRowDp
         isRefreshing || isDownloading || isTtsPreparing -> {
             val holdFraction = if (isDownloading) downloadingHoldFraction else refreshingHoldFraction
             (baseMaxRevealDp * holdFraction).dp
@@ -731,14 +738,15 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .padding(top = bannerTopInsetPadding)
-                        .padding(top = bannerTopPadding, bottom = bannerBottomPadding),
+                        .padding(top = mushafTopInsetPadding)
+                        .padding(bottom = mushafBottomPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     MushafMiniBar(
                         state = mushafState,
                         onPrevious = onMushafPrevious,
                         onNext = onMushafNext,
+                        onOpenInfo = onMushafOpenInfo,
                     )
                 }
             } else if (isRefreshing || isDownloading || isTtsPreparing || rawWobbleIntensity > 0.01f) {

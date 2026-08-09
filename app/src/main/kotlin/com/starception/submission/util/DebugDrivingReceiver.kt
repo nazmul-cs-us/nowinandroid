@@ -12,6 +12,9 @@
  *
  *   Stop driving:
  *     adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_DRIVING --es activity Still -n com.starception.submission.demo.debug/com.starception.submission.util.DebugDrivingReceiver
+ *
+ *   Simulate a stale sensor/non-vehicle transition while Google still confirms driving:
+ *     adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_DRIVING --es activity Still --ez vehicleEdge false -n com.starception.submission.demo.debug/com.starception.submission.util.DebugDrivingReceiver
  */
 package com.starception.submission.util
 
@@ -52,9 +55,17 @@ class DebugDrivingReceiver : BroadcastReceiver() {
             val serviceIntent = Intent(context, PrayerNotificationService::class.java).apply {
                 action = PrayerNotificationService.ACTION_ACTIVITY_TRANSITION
                 putExtra(PrayerNotificationService.EXTRA_DETECTED_ACTIVITY, activity.uppercase())
+                val isDriving = activity.equals("Driving", ignoreCase = true)
+                val includeVehicleEdge = intent.getBooleanExtra("vehicleEdge", true)
+                val transitionType = if (isDriving || !includeVehicleEdge) {
+                    ActivityTransition.ACTIVITY_TRANSITION_ENTER
+                } else {
+                    ActivityTransition.ACTIVITY_TRANSITION_EXIT
+                }
+                putExtra(PrayerNotificationService.EXTRA_TRANSITION_TYPE, transitionType)
                 putExtra(
-                    PrayerNotificationService.EXTRA_TRANSITION_TYPE,
-                    ActivityTransition.ACTIVITY_TRANSITION_ENTER,
+                    PrayerNotificationService.EXTRA_IN_VEHICLE_TRANSITION_TYPE,
+                    if (includeVehicleEdge) transitionType else -1,
                 )
             }
             ContextCompat.startForegroundService(context, serviceIntent)

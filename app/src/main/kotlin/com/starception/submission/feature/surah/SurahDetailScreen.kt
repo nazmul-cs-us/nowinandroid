@@ -4739,7 +4739,7 @@ private fun ContinuousAyahsContent(
 private const val MARKER_HEIGHT_EM = 1.2f
 /** Translation text is intentionally quieter than Arabic, but its terminal
  * rosette should remain the same physical size as every Arabic ayah rosette. */
-private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.85f
+private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.75f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
 /** Ornament height as a fraction of the slot height. */
 private const val MARKER_ORNAMENT_FILL = 0.92f
@@ -5436,6 +5436,8 @@ private fun MushafPageWithFrame(
     pageText: AnnotatedString,
     arabicFont: String,
     arabicFontSize: Float,
+    /** Page-specific leading used to fill complete pages vertically. */
+    lineHeightSp: Float = arabicFontSize * 1.45f,
     showBismillah: Boolean,
     onAyahLongPress: (Int) -> Unit,
     ayahRanges: List<Pair<Int, IntRange>>,
@@ -5601,7 +5603,10 @@ private fun MushafPageWithFrame(
     // screen overlay (pill ↔ grabber); MUST match the paginator's topPadding
     // so measured pages fit exactly.
     val topPadding = 16.dp
-    val bottomPadding = 16.dp
+    // Keep the render bounds identical to the paginator's bounds. The page is
+    // edge-to-edge, so the navigation inset is part of maxHeight and must be
+    // excluded here as well as during page splitting.
+    val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = if (showBismillah) 36.dp else 0.dp
 
     // The ayah ornaments are painted BEHIND the text at the exact placeholder
@@ -5611,7 +5616,6 @@ private fun MushafPageWithFrame(
     // Inline marker annotations in layout order — alt text carries the
     // localized digits, and the char range locates each marker in the page
     // text so the drawing pass can find the neighbouring words.
-    val lineSpacingMultiplier = 1.45f
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
     // Markers fade in once their (cached/prefetched) ink geometry exists —
@@ -5760,7 +5764,7 @@ private fun MushafPageWithFrame(
                     // less. MUST match the paginator's measureStyle exactly.
                     lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
                     textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
-                    lineHeight = (arabicFontSize * lineSpacingMultiplier).sp,
+                    lineHeight = lineHeightSp.sp,
                     // Trim extra font-metric leading/trailing on the first/last
                     // line so pages whose first line contains the Amiri Quran
                     // rosette glyph don't get inflated top padding from the
@@ -6465,7 +6469,15 @@ private fun MushafPagerView(
                 val text: AnnotatedString,
                 val pageNumber: Int,
                 val showBismillah: Boolean,
-                val ayahRanges: List<Pair<Int, IntRange>>
+                val ayahRanges: List<Pair<Int, IntRange>>,
+                /**
+                 * Full Mushaf pages distribute the otherwise-unused fraction of
+                 * a final line between their existing lines. TextAlign.Justify
+                 * only fills horizontally; without this, every page can retain
+                 * almost one complete line of dead space above the navigation
+                 * inset.
+                 */
+                val lineHeightSp: Float = committedFontSize * lineSpacingMultiplier,
             )
 
             val paginatedPages = remember(
@@ -6565,11 +6577,32 @@ private fun MushafPagerView(
                         } else null
                     }
 
+                    val usedHeightPx =
+                        fullLayout.getLineBottom(endLine) - fullLayout.getLineTop(currentLine)
+                    val isFinalPage = endCharIndex >= masterString.length
+                    val lineGapCount = (linesOnPage - 1).coerceAtLeast(0)
+                    // Leave one physical dp for float/rounding differences between
+                    // the master layout and the independently rendered page slice.
+                    // Cap the expansion so a widow-protection decision can never
+                    // produce visibly loose lines.
+                    val stretchPerGapPx = if (!isFinalPage && lineGapCount > 0) {
+                        val roundingSafetyPx = with(density) { 1.dp.toPx() }
+                        val maxStretchPx = with(density) { 3.dp.toPx() }
+                        ((pageHeightPx - usedHeightPx - roundingSafetyPx) / lineGapCount)
+                            .coerceIn(0f, maxStretchPx)
+                    } else {
+                        0f
+                    }
+                    val stretchedLineHeightSp =
+                        committedFontSize * lineSpacingMultiplier +
+                            stretchPerGapPx / (density.density * density.fontScale)
+
                     pages.add(PaginatedPage(
                         text = pageString,
                         pageNumber = pageNum,
                         showBismillah = showBismillah && pageNum == 1,
-                        ayahRanges = pageAyahRanges
+                        ayahRanges = pageAyahRanges,
+                        lineHeightSp = stretchedLineHeightSp,
                     ))
 
                     currentLine += linesOnPage
@@ -6595,6 +6628,7 @@ private fun MushafPagerView(
             DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
                 if (paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.state.value = MushafMiniBarState(
+                        surahNumber = ayahs.first().surahNumber,
                         surahNameArabic = surahNameArabic,
                         surahNameEnglish = surahNameEnglish,
                         currentPage = state.current + 1,
@@ -6609,6 +6643,14 @@ private fun MushafPagerView(
                         previous = {
                             mushafScope.launch {
                                 if (state.current > 0) state.prev()
+                            }
+                        },
+                        openInfo = {
+                            mushafScope.launch {
+                                parentScrollState?.animateScrollToItem(
+                                    index = 0,
+                                    scrollOffset = 0,
+                                )
                             }
                         },
                     )
@@ -6659,7 +6701,13 @@ private fun MushafPagerView(
             // byte-identical — so each double-tap re-measured pages that had not
             // changed and made every marker fade out and back in. Only the font,
             // face and column width can actually invalidate this geometry.
-            val inkGeomCache = remember(committedFontSize, arabicFont, availableWidthPx) {
+            val inkGeomCache = remember(
+                committedFontSize,
+                arabicFont,
+                availableWidthPx,
+                fullPageHeightPx,
+                firstPageHeightPx,
+            ) {
                 androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
             val pagerEmPx = with(density) { committedFontSize.sp.toPx() }
@@ -6670,7 +6718,8 @@ private fun MushafPagerView(
                 // state cancels this effect before it allocates another surface.
                 kotlinx.coroutines.delay(120)
                 for (idx in listOf(state.current, state.current + 1, state.current - 1)) {
-                    val pageText = paginatedPages.getOrNull(idx)?.text ?: continue
+                    val page = paginatedPages.getOrNull(idx) ?: continue
+                    val pageText = page.text
                     if (pageText !in inkGeomCache) {
                         val geoms = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                             val scanJob = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
@@ -6678,7 +6727,7 @@ private fun MushafPagerView(
                                 computeInkMarkerGeometries(
                                     textMeasurer = textMeasurer,
                                     pageText = pageText,
-                                    style = measureStyle,
+                                    style = measureStyle.copy(lineHeight = page.lineHeightSp.sp),
                                     maxWidthPx = availableWidthPx.toInt(),
                                     density = density,
                                     emPx = pagerEmPx,
@@ -6801,6 +6850,7 @@ private fun MushafPagerView(
                     translationOrnamentPainter = translationOrnamentPainter,
                     arabicFont = arabicFont,
                     arabicFontSize = committedFontSize,
+                    lineHeightSp = page.lineHeightSp,
                     showBismillah = page.showBismillah,
                     onAyahLongPress = onAyahLongPress,
                     ayahRanges = page.ayahRanges,
