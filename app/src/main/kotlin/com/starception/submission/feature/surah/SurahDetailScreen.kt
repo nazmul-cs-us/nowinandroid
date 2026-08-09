@@ -131,6 +131,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
+import eu.wewox.pagecurl.ExperimentalPageCurlApi
+import eu.wewox.pagecurl.config.PageCurlConfig
+import eu.wewox.pagecurl.config.rememberPageCurlConfig
+import eu.wewox.pagecurl.page.PageCurl
+import eu.wewox.pagecurl.page.rememberPageCurlState
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.theme.QuranFonts
@@ -4755,31 +4760,118 @@ private const val MARKER_INK_GAP_EM = 0.3f
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
-// Selected-ayah treatment: one softly blurred capsule per VISUAL line. Word-sized
-// ovals looked uneven on justified Arabic because the stretched spaces separated
-// them into unrelated blobs. Line capsules keep the cloud continuous and make
-// both RTL ends receive the same rounded falloff.
-private val MUSHAF_CLOUD_LINE_HPAD = 8.dp
-private val MUSHAF_CLOUD_LINE_VINSET = 5.dp
-private val MUSHAF_CLOUD_LINE_RADIUS = 22.dp
+// Selected ayah: a soft cloud around the actual shaped words. Basing the path
+// on word ink keeps justified RTL whitespace from becoming a page-wide card.
+private val MUSHAF_WORD_CLOUD_HPAD = 6.dp
+private val MUSHAF_WORD_CLOUD_VPAD = 5.dp
+private val MUSHAF_WORD_CLOUD_RADIUS = 16.dp
 
-/**
- * Adds every line capsule to one path and lets the blur merge their contours.
- * This deliberately avoids PathOperation.Union: boolean union occasionally
- * dropped a narrow RTL extension, visually leaving an edge word unhighlighted.
- */
-private fun List<androidx.compose.ui.geometry.Rect>.toCloudPath(
+/** Joins neighbouring selected words on the same visual line into one cloud.
+ * Distant justified words remain separate, while normal word spacing no longer
+ * produces a row of overlapping pill/scallop shapes. */
+private fun List<androidx.compose.ui.geometry.Rect>.toWordCloudClusters():
+    List<androidx.compose.ui.geometry.Rect> {
+    if (isEmpty()) return emptyList()
+
+    fun union(
+        first: androidx.compose.ui.geometry.Rect,
+        second: androidx.compose.ui.geometry.Rect,
+    ) = androidx.compose.ui.geometry.Rect(
+        left = minOf(first.left, second.left),
+        top = minOf(first.top, second.top),
+        right = maxOf(first.right, second.right),
+        bottom = maxOf(first.bottom, second.bottom),
+    )
+
+    val visualLines = mutableListOf<MutableList<androidx.compose.ui.geometry.Rect>>()
+    sortedBy { it.center.y }.forEach { rect ->
+        val line = visualLines.lastOrNull()
+        val lineBounds = line?.reduce(::union)
+        val sameLine = lineBounds != null &&
+            kotlin.math.abs(rect.center.y - lineBounds.center.y) <=
+            maxOf(rect.height, lineBounds.height) * 0.58f
+        if (sameLine) line.add(rect) else visualLines.add(mutableListOf(rect))
+    }
+
+    return visualLines.flatMap { line ->
+        val clusters = mutableListOf<androidx.compose.ui.geometry.Rect>()
+        line.sortedBy { it.left }.forEach { rect ->
+            val previous = clusters.lastOrNull()
+            val joinsPrevious = previous != null &&
+                rect.left - previous.right <= maxOf(rect.height, previous.height) * 0.72f
+            if (joinsPrevious) {
+                clusters[clusters.lastIndex] = union(previous, rect)
+            } else {
+                clusters += rect
+            }
+        }
+        clusters
+    }
+}
+
+private fun List<androidx.compose.ui.geometry.Rect>.toWordCloudPath(
     radiusPx: Float,
 ): androidx.compose.ui.graphics.Path = androidx.compose.ui.graphics.Path().apply {
-    for (r in this@toCloudPath) {
-        if (r.width > 0f && r.height > 0f) {
+    this@toWordCloudPath.forEach { rect ->
+        if (rect.width > 0f && rect.height > 0f) {
             addRoundRect(
                 androidx.compose.ui.geometry.RoundRect(
-                    r, androidx.compose.ui.geometry.CornerRadius(radiusPx, radiusPx),
+                    rect,
+                    androidx.compose.ui.geometry.CornerRadius(radiusPx, radiusPx),
                 ),
             )
+            // A width-aware row of overlapping puffs gives short words and long
+            // justified lines the same cloud silhouette. The round-rect body is
+            // retained underneath so no glyph or Quranic sign can fall through
+            // the gaps between puffs.
+            val puffRadius = minOf(rect.height * 0.25f, radiusPx * 0.72f)
+            if (puffRadius > 0f) {
+                val puffCount = kotlin.math.ceil(
+                    rect.width / (puffRadius * 1.48f),
+                ).toInt().coerceIn(3, 24)
+                val radiusPattern = floatArrayOf(0.84f, 1.08f, 0.92f, 1.16f, 0.88f)
+                repeat(puffCount) { index ->
+                    val fraction = (index + 0.5f) / puffCount
+                    val radius = puffRadius * radiusPattern[index % radiusPattern.size]
+                    val center = androidx.compose.ui.geometry.Offset(
+                        x = rect.left + rect.width * fraction,
+                        y = rect.top + puffRadius * if (index % 2 == 0) 0.22f else 0.32f,
+                    )
+                    addOval(
+                        androidx.compose.ui.geometry.Rect(
+                            center = center,
+                            radius = radius,
+                        ),
+                    )
+                }
+            }
         }
     }
+}
+
+private data class MushafSelectionCloud(
+    val path: androidx.compose.ui.graphics.Path,
+    val sparkleCenters: List<androidx.compose.ui.geometry.Offset>,
+)
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMushafSparkle(
+    center: androidx.compose.ui.geometry.Offset,
+    radius: Float,
+    color: Color,
+) {
+    val inner = radius * 0.28f
+    val sparkle = androidx.compose.ui.graphics.Path().apply {
+        moveTo(center.x, center.y - radius)
+        lineTo(center.x + inner, center.y - inner)
+        lineTo(center.x + radius, center.y)
+        lineTo(center.x + inner, center.y + inner)
+        lineTo(center.x, center.y + radius)
+        lineTo(center.x - inner, center.y + inner)
+        lineTo(center.x - radius, center.y)
+        lineTo(center.x - inner, center.y - inner)
+        close()
+    }
+    drawPath(sparkle, color)
 }
 
 /** Inline-content tag for the invisible line filler appended to non-final page
@@ -4794,6 +4886,12 @@ private const val MUSHAF_LINE_FILLER_TAG = "mushafLineFiller"
  * only the translation without rebuilding/re-measuring the Quran text on every
  * animation frame. */
 private const val MUSHAF_TRANSLATION_TAG = "mushafTranslation"
+
+/** Full-size ayah ornament that follows an inline translation. Its Center
+ * alignment uses the final line's expanded metrics (rather than the preceding
+ * glyph metrics), keeping the complete frame vertically aligned with the text
+ * without letting it rise into the preceding wrapped line. */
+private const val MUSHAF_TRANSLATION_ORNAMENT_TAG = "translationAyahOrnament"
 
 /** Exact Arabic-script range for one ayah. Page-local copies of this annotation
  * are the sole source of highlight geometry, so a translation continuation can
@@ -4838,62 +4936,215 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeLineRects(
     end: Int,
 ): List<androidx.compose.ui.geometry.Rect> {
     if (end <= start) return emptyList()
-    val firstLine = getLineForOffset(start)
-    val lastLine = getLineForOffset((end - 1).coerceAtLeast(start))
-    val out = mutableListOf<androidx.compose.ui.geometry.Rect>()
     val rawText = layoutInput.text.text
-    for (line in firstLine..lastLine) {
-        val lineStart = getLineStart(line)
-        // On justified RTL text Compose's "visible" end can stop before the
-        // final shaped cluster (the leftmost word on screen). Use the complete
-        // logical line and explicitly ignore whitespace/control characters
-        // below, otherwise the cloud visibly ends one word too early.
-        val lineVisibleEnd = getLineEnd(line, visibleEnd = false)
-        val ls = maxOf(start, lineStart)
-        val le = minOf(end, lineVisibleEnd)
-        if (le <= ls) continue
+    data class HorizontalBounds(
+        var left: Float = Float.POSITIVE_INFINITY,
+        var right: Float = Float.NEGATIVE_INFINITY,
+    )
 
-        // Cursor positions at the two logical endpoints are not sufficient for
-        // justified RTL text: at a bidi/inline-content boundary both cursors can
-        // resolve to the same visual side and collapse an otherwise valid line.
-        // Union the actual glyph boxes instead. Spaces between the first and last
-        // glyph remain inside the resulting band, while paragraph separators and
-        // formatting controls cannot inflate it across the page.
+    // Logical offsets are unreliable at a mixed-ayah RTL line boundary:
+    // getLineForOffset(start) can report the following line even though the
+    // selected glyph itself is painted on the preceding visual line. Assign
+    // every selected glyph by its actual vertical box instead.
+    val boundsByVisualLine = sortedMapOf<Int, HorizontalBounds>()
+
+    fun addVisualBounds(box: androidx.compose.ui.geometry.Rect) {
+        if (box.width <= 0f || box.height <= 0f) return
+        val visualLine = getLineForVerticalPosition(box.center.y)
+        val bounds = boundsByVisualLine.getOrPut(visualLine) { HorizontalBounds() }
+        bounds.left = minOf(bounds.left, box.left)
+        bounds.right = maxOf(bounds.right, box.right)
+    }
+
+    var wordStart = -1
+    fun appendWord(wordEnd: Int) {
+        if (wordStart < 0 || wordEnd <= wordStart) return
+        for (offset in wordStart until wordEnd) {
+            val box = getBoundingBox(offset)
+            if (box.width > 0f && box.height > 0f) {
+                addVisualBounds(box)
+            }
+        }
+        // Character boxes can be only PARTIALLY missing for a shaped Arabic
+        // word. In 6:137, Compose exposed boxes for part of the line-final
+        // "وَمَا" but omitted its joined edge, so the old all-or-nothing
+        // fallback never ran and the complete word sat outside the highlight.
+        // Always include the shaped range for this ONE word. Keeping the range
+        // word-local prevents it from absorbing a neighbouring ayah's RTL run.
+        val shapedBounds = getPathForRange(wordStart, wordEnd).getBounds()
+        if (shapedBounds.width > 0f && shapedBounds.height > 0f) {
+            addVisualBounds(shapedBounds)
+        }
+        wordStart = -1
+    }
+
+    for (offset in start until end) {
+        val char = rawText.getOrNull(offset) ?: continue
+        if (char.isWhitespace() || char in MARKER_TRAILING_INVISIBLES) {
+            appendWord(offset)
+        } else if (wordStart < 0) {
+            wordStart = offset
+        }
+    }
+    appendWord(end)
+
+    // Every visual line strictly between the range's first and last lines is
+    // selected in full. Trust that invariant instead of Android's per-offset
+    // boxes: StaticLayout can omit the final shaped RTL word at a soft wrap
+    // (6:137 "وَمَا", 2:161 "اللَّهِ") even when both character boxes and the
+    // word-local selection path are queried. The first/last lines remain
+    // glyph-bounded because they may share space with a neighbouring ayah.
+    val firstSelectedLine = boundsByVisualLine.keys.firstOrNull()
+    val lastSelectedLine = boundsByVisualLine.keys.lastOrNull()
+    if (firstSelectedLine != null && lastSelectedLine != null &&
+        lastSelectedLine - firstSelectedLine > 1
+    ) {
+        for (line in (firstSelectedLine + 1) until lastSelectedLine) {
+            val lineLeft = getLineLeft(line)
+            val lineRight = getLineRight(line)
+            if (lineRight > lineLeft) {
+                val bounds = boundsByVisualLine.getOrPut(line) { HorizontalBounds() }
+                bounds.left = minOf(bounds.left, lineLeft)
+                bounds.right = maxOf(bounds.right, lineRight)
+            }
+        }
+    }
+
+    return boundsByVisualLine.mapNotNull { (line, bounds) ->
+        if (!bounds.left.isFinite() || !bounds.right.isFinite() || bounds.right <= bounds.left) {
+            null
+        } else {
+            androidx.compose.ui.geometry.Rect(
+                bounds.left,
+                getLineTop(line),
+                bounds.right,
+                getLineBottom(line),
+            )
+        }
+    }
+}
+
+/** Tight shaped-word bounds for a selected logical range. Unlike
+ * [rangeLineRects], this deliberately preserves the whitespace between words so
+ * the visual treatment reads as a cloud around the Arabic rather than a card. */
+private fun androidx.compose.ui.text.TextLayoutResult.rangeWordRects(
+    start: Int,
+    end: Int,
+): List<androidx.compose.ui.geometry.Rect> {
+    if (end <= start) return emptyList()
+    val rawText = layoutInput.text.text
+    val result = mutableListOf<androidx.compose.ui.geometry.Rect>()
+    var wordStart = -1
+
+    fun appendWord(wordEnd: Int) {
+        if (wordStart < 0 || wordEnd <= wordStart) return
         var left = Float.POSITIVE_INFINITY
         var right = Float.NEGATIVE_INFINITY
-        for (offset in ls until le) {
-            val char = rawText.getOrNull(offset) ?: continue
-            if (char.isWhitespace() || char in MARKER_TRAILING_INVISIBLES) continue
+        var inkTop = Float.POSITIVE_INFINITY
+        var inkBottom = Float.NEGATIVE_INFINITY
+        var visualLine = -1
+        for (offset in wordStart until wordEnd) {
             val box = getBoundingBox(offset)
-            if (box.width <= 0f || box.height <= 0f) continue
-            left = minOf(left, box.left)
-            right = maxOf(right, box.right)
+            if (box.width > 0f && box.height > 0f) {
+                left = minOf(left, box.left)
+                right = maxOf(right, box.right)
+                if (visualLine < 0) visualLine = getLineForVerticalPosition(box.center.y)
+            }
+        }
+        // Joined Arabic can expose zero-width boxes for part of a cluster. The
+        // shaped word path restores those visible edges without absorbing the
+        // justified space or a neighbouring ayah.
+        val shaped = getPathForRange(wordStart, wordEnd).getBounds()
+        if (shaped.width > 0f && shaped.height > 0f) {
+            left = minOf(left, shaped.left)
+            right = maxOf(right, shaped.right)
+            inkTop = minOf(inkTop, shaped.top)
+            inkBottom = maxOf(inkBottom, shaped.bottom)
+            if (visualLine < 0) visualLine = getLineForVerticalPosition(shaped.center.y)
         }
 
-        // The shaped range path is the safety net for Arabic ligature clusters:
-        // some logical characters have zero-width boxes even though their joined
-        // ink is visible. Its bounds recover short edge words such as "مِن"
-        // without expanding every fully-selected line into a page-wide rectangle.
-        val shapedBounds = getPathForRange(ls, le).getBounds()
-        if (shapedBounds.width > 0f && shapedBounds.height > 0f) {
-            left = minOf(left, shapedBounds.left)
-            right = maxOf(right, shapedBounds.right)
-        }
-
-        // A range containing only a combining/control glyph is rare, but retain
-        // the cursor-based fallback so it still receives a visible selection.
-        if (!left.isFinite() || !right.isFinite() || right <= left) {
-            val x1 = getHorizontalPosition(ls, usePrimaryDirection = true)
-            val x2 = getHorizontalPosition(le, usePrimaryDirection = true)
-            left = minOf(x1, x2)
-            right = maxOf(x1, x2)
-        }
-        if (right <= left) continue
-        out += androidx.compose.ui.geometry.Rect(
-            left, getLineTop(line), right, getLineBottom(line),
+        // StaticLayout can return neither boxes nor a shaped path for a complete
+        // joined word at an RTL soft-wrap edge. Cursor advances are independent
+        // of those APIs, so use the tighter primary/secondary endpoint pair as a
+        // final word-local fallback (never a whole-line fallback).
+        val cursorLine = getLineForOffset((wordEnd - 1).coerceAtLeast(wordStart))
+        val lineLeft = getLineLeft(cursorLine)
+        val lineRight = getLineRight(cursorLine)
+        val lineWidth = (lineRight - lineLeft).coerceAtLeast(1f)
+        // At a bidi boundary the useful start and end cursors are sometimes on
+        // opposite affinities. Trying only primary-primary/secondary-secondary
+        // therefore collapses a complete Arabic word to zero width. Consider all
+        // four local pairs and keep the tightest sane one when glyph geometry is
+        // unavailable.
+        val startCursors = listOf(
+            getHorizontalPosition(wordStart, usePrimaryDirection = true),
+            getHorizontalPosition(wordStart, usePrimaryDirection = false),
         )
+        val endCursors = listOf(
+            getHorizontalPosition(wordEnd, usePrimaryDirection = true),
+            getHorizontalPosition(wordEnd, usePrimaryDirection = false),
+        )
+        val cursorCandidates = startCursors.flatMap { startX ->
+            endCursors.mapNotNull { endX ->
+                val candidateLeft = minOf(startX, endX).coerceIn(lineLeft, lineRight)
+                val candidateRight = maxOf(startX, endX).coerceIn(lineLeft, lineRight)
+                androidx.compose.ui.geometry.Rect(
+                    candidateLeft,
+                    getLineTop(cursorLine),
+                    candidateRight,
+                    getLineBottom(cursorLine),
+                ).takeIf { it.width > 0.5f && it.width < lineWidth * 0.92f }
+            }
+        }.distinctBy { it.left to it.right }
+        val cursorBounds = if (left.isFinite() && right.isFinite()) {
+            cursorCandidates
+                .filter { it.right >= left - 1f && it.left <= right + 1f }
+                .maxByOrNull { it.width }
+        } else {
+            cursorCandidates.minByOrNull { it.width }
+        }
+        if (cursorBounds != null) {
+            left = minOf(left, cursorBounds.left)
+            right = maxOf(right, cursorBounds.right)
+            if (visualLine < 0) visualLine = cursorLine
+        }
+        if (visualLine >= 0 && left.isFinite() && right.isFinite() && right > left) {
+            val top = inkTop.takeIf { it.isFinite() } ?: getLineTop(visualLine)
+            val bottom = inkBottom.takeIf { it.isFinite() && it > top }
+                ?: getLineBottom(visualLine)
+            // At an RTL soft wrap, StaticLayout can report the final visual
+            // word's left edge several glyphs too far to the right (notably
+            // Quranic final forms with combining signs). Protect only that
+            // trailing edge with a line-height-relative allowance; applying
+            // this to every word would make otherwise-correct clouds too wide.
+            val visibleLineEnd = getLineEnd(visualLine, visibleEnd = true)
+            val isRtlSoftWrapTail = visualLine < lineCount - 1 && wordEnd >= visibleLineEnd
+            val protectedLeft = if (isRtlSoftWrapTail) {
+                (left - (getLineBottom(visualLine) - getLineTop(visualLine)) * 0.38f)
+                    .coerceAtLeast(getLineLeft(visualLine))
+            } else {
+                left
+            }
+            result += androidx.compose.ui.geometry.Rect(
+                protectedLeft,
+                top,
+                right,
+                bottom,
+            )
+        }
+        wordStart = -1
     }
-    return out
+
+    for (offset in start until end) {
+        val char = rawText.getOrNull(offset) ?: continue
+        if (char.isWhitespace() || char in MARKER_TRAILING_INVISIBLES) {
+            appendWord(offset)
+        } else if (wordStart < 0) {
+            wordStart = offset
+        }
+    }
+    appendWord(end)
+    return result
 }
 
 private data class MarkerGeometry(
@@ -4936,6 +5187,10 @@ private fun computeInkMarkerGeometries(
         MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
     )
+    val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
+        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
+    )
     val layout = textMeasurer.measure(
         text = pageText,
         style = style,
@@ -4944,6 +5199,8 @@ private fun computeInkMarkerGeometries(
             AnnotatedString.Range(
                 if (it.item == MUSHAF_LINE_FILLER_TAG) {
                     mushafLineFillerPlaceholder(maxWidthPx, emPx)
+                } else if (it.item == MUSHAF_TRANSLATION_ORNAMENT_TAG) {
+                    translationOrnamentPlaceholder
                 } else {
                     ornamentPlaceholder
                 },
@@ -5015,6 +5272,13 @@ private fun computeInkMarkerGeometries(
         val lineLeft = layout.getLineLeft(markerLine)
         val lineRight = layout.getLineRight(markerLine)
         val slotCenter = (rect.left + rect.right) / 2f
+        val belongsToTranslation = pageText
+            .getStringAnnotations(
+                tag = MUSHAF_TRANSLATION_TAG,
+                start = annotation.start,
+                end = annotation.end,
+            )
+            .isNotEmpty()
         val window = 2f * emPx
         // Line extent in scan-bitmap columns — the outward ink walks stop here so
         // a marker can never drift into a neighbouring line's margin.
@@ -5022,7 +5286,13 @@ private fun computeInkMarkerGeometries(
         val lineRightPx = (lineRight * scale).toInt().coerceAtMost(pixels.width - 1)
 
         val centerX: Float
-        if (nextOnSameLine) {
+        if (belongsToTranslation) {
+            // Translation markers already sit in an explicit LTR placeholder
+            // immediately after the translated text. Arabic ink-gap scanning
+            // is direction-specific and can drag that slot back across Bengali
+            // glyphs, so preserve the layout engine's authoritative position.
+            centerX = slotCenter
+        } else if (nextOnSameLine) {
             // Both neighbours share this line. Naive edge scans fail when a deep
             // tail sweeps across the slot (both scans land inside the SAME glyph
             // run — marker 43 of Al-Muddaththir measured a 2px "gap"). Instead,
@@ -5183,22 +5453,104 @@ private fun MushafPageWithFrame(
     // Rosette is now part of the masterString text flow (U+06DD + digits
     // styled with Amiri Quran). No inline content needed here.
 
-    // The selected ayah is drawn as a GLOW behind the text (pass-1 canvas below)
-    // instead of a flat SpanStyle background. Highlight ONLY the Arabic annotation:
-    // the broader hit-test range intentionally includes the marker and revealed
-    // translation, and using it here caused continuation pages to glow behind the
-    // translation or borrow a neighbouring ayah's marker as their endpoint.
-    val highlightRange = remember(highlightedAyahNumber, pageText) {
+    // The selected ayah is drawn as a GLOW behind the text (pass-1 canvas below).
+    // Use the master-string ayah range for the START: unlike a page-local string
+    // annotation it survives an RTL line shared with the preceding ayah without
+    // Compose moving its start to the next visual line. Keep the Arabic annotation
+    // for the END so neither the ornament nor inline translation is highlighted.
+    val highlightRange = remember(highlightedAyahNumber, pageText, ayahRanges) {
         val target = highlightedAyahNumber ?: return@remember null
-        pageText.getStringAnnotations(MUSHAF_ARABIC_AYAH_TAG, 0, pageText.length)
+        val hitRange = ayahRanges.firstOrNull { it.first == target }?.second
+            ?: return@remember null
+        val arabicRange = pageText
+            .getStringAnnotations(MUSHAF_ARABIC_AYAH_TAG, 0, pageText.length)
             .firstOrNull { it.item == target.toString() }
-            ?.let { it.start to it.end }
+            ?: return@remember null
+        val exactStart = hitRange.first.coerceIn(0, pageText.length)
+        val exactEnd = arabicRange.end.coerceIn(exactStart, pageText.length)
+        if (exactEnd > exactStart) exactStart to exactEnd else null
     }
     // Captured page layout — turns that char range into a path for the glow.
     // Null until the first layout pass, so the glow appears one frame late.
     val pageLayout = remember(pageText) {
         androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null)
     }
+    val cloudDensity = LocalDensity.current
+    val selectionCloud = remember(pageLayout.value, highlightRange, inkGeometries) {
+        val laid = pageLayout.value ?: return@remember null
+        val range = highlightRange ?: return@remember null
+        val hPad = with(cloudDensity) { MUSHAF_WORD_CLOUD_HPAD.toPx() }
+        val vPad = with(cloudDensity) { MUSHAF_WORD_CLOUD_VPAD.toPx() }
+        val radius = with(cloudDensity) { MUSHAF_WORD_CLOUD_RADIUS.toPx() }
+        val layoutWidth = laid.size.width.toFloat()
+        val layoutHeight = laid.size.height.toFloat()
+        val wordClouds = laid.rangeWordRects(range.first, range.second).mapNotNull { rect ->
+            val padded = androidx.compose.ui.geometry.Rect(
+                (rect.left - hPad).coerceAtLeast(0f),
+                (rect.top - vPad).coerceAtLeast(0f),
+                (rect.right + hPad).coerceAtMost(layoutWidth),
+                (rect.bottom + vPad).coerceAtMost(layoutHeight),
+            )
+            padded.takeIf { it.width > 0f && it.height > 0f }
+        }
+        if (wordClouds.isEmpty()) return@remember null
+        val cloudClusters = wordClouds.toWordCloudClusters()
+        val sparkles = buildList {
+            cloudClusters.forEachIndexed { index, rect ->
+                add(androidx.compose.ui.geometry.Offset(rect.right - hPad * 0.3f, rect.top))
+                if (rect.width > rect.height * 2.1f) {
+                    add(androidx.compose.ui.geometry.Offset(rect.center.x, rect.top - vPad * 0.35f))
+                }
+                if (rect.width > rect.height * 4.2f) {
+                    add(androidx.compose.ui.geometry.Offset(rect.left + rect.width * 0.22f, rect.top))
+                }
+                if (index % 2 == 1) {
+                    add(androidx.compose.ui.geometry.Offset(rect.left + hPad * 0.3f, rect.bottom))
+                }
+            }
+        }.take(16)
+        val bodyPath = cloudClusters.toWordCloudPath(radius)
+        // Ayah ornaments are semantic boundaries, not selected text. Remove a
+        // small halo from the cloud anywhere it crosses a marker so an adjacent
+        // wrapped word can never make the preceding verse number look selected.
+        val markerExclusions = androidx.compose.ui.graphics.Path().apply {
+            inkGeometries.orEmpty().forEach { marker ->
+                val clearanceRadius = maxOf(marker.w, marker.h) * 0.59f
+                addOval(
+                    androidx.compose.ui.geometry.Rect(
+                        center = androidx.compose.ui.geometry.Offset(
+                            marker.centerX,
+                            marker.centerY,
+                        ),
+                        radius = clearanceRadius,
+                    ),
+                )
+            }
+        }
+        val cloudPath = if (inkGeometries.isNullOrEmpty()) {
+            bodyPath
+        } else {
+            androidx.compose.ui.graphics.Path.combine(
+                operation = androidx.compose.ui.graphics.PathOperation.Difference,
+                path1 = bodyPath,
+                path2 = markerExclusions,
+            )
+        }
+        MushafSelectionCloud(
+            path = cloudPath,
+            sparkleCenters = sparkles,
+        )
+    }
+    val sparkleTransition = rememberInfiniteTransition(label = "mushafSparkleTransition")
+    val sparklePhase by sparkleTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "mushafSparklePhase",
+    )
 
     // A colour mask fades away over only the newly inserted translation. This
     // gives the gloss a calm reveal while keeping the AnnotatedString stable for
@@ -5233,34 +5585,6 @@ private fun MushafPageWithFrame(
             ayahRanges.firstOrNull { off in it.second }?.first
         }
     }
-
-    // Selection cloud, rebuilt only when the layout or selected ayah changes.
-    // The shaped range bounds include Arabic ligatures at both RTL ends; one
-    // capsule per visual line makes the treatment stable regardless of how much
-    // justification stretched the spaces between individual words.
-    val selDensity = LocalDensity.current
-    val selCloud = remember(pageLayout.value, highlightRange) {
-        val laid = pageLayout.value ?: return@remember null
-        val hr = highlightRange ?: return@remember null
-        val lineRects = laid.rangeLineRects(hr.first, hr.second)
-        if (lineRects.isEmpty()) return@remember null
-        val verticalInset = with(selDensity) { MUSHAF_CLOUD_LINE_VINSET.toPx() }
-        val horizontalPad = with(selDensity) { MUSHAF_CLOUD_LINE_HPAD.toPx() }
-        val capsules = lineRects.map { r ->
-            androidx.compose.ui.geometry.Rect(
-                r.left - horizontalPad,
-                r.top + verticalInset,
-                r.right + horizontalPad,
-                r.bottom - verticalInset,
-            )
-        }
-        capsules.toCloudPath(with(selDensity) { MUSHAF_CLOUD_LINE_RADIUS.toPx() })
-    }
-    val selCloudAlpha by animateFloatAsState(
-        targetValue = if (selCloud == null) 0f else 1f,
-        animationSpec = NiaMotion.enterTween(NiaMotion.Duration.MEDIUM_3),
-        label = "mushafSelectionCloud",
-    )
 
     val statusBarHeight = with(LocalDensity.current) {
         val cutout = WindowInsets.displayCutout.getTop(this)
@@ -5332,31 +5656,51 @@ private fun MushafPageWithFrame(
                 }
             }
 
-            // Selected ayah, drawn as a cloud behind the ornament and Text. Three
-            // restrained blur layers soften the per-line capsules without making
-            // isolated dark blobs. Unbounded blur is important here: otherwise a
-            // line ending at a Canvas edge loses its rounded cloud falloff.
-            if (selCloud != null && selCloudAlpha > 0.001f) {
-                listOf(
-                    12.dp to 0.025f,
-                    6.dp to 0.040f,
-                    2.dp to 0.050f,
-                ).forEach { (radius, layerAlpha) ->
+            selectionCloud?.let { cloud ->
+                // Soft cloud body: two restrained blur passes plus a translucent
+                // core. Each lobe comes from one shaped Arabic word, so the glow
+                // follows the selected text instead of justified line whitespace.
+                listOf(10.dp to 0.045f, 5.dp to 0.06f).forEach { (blurRadius, alpha) ->
                     androidx.compose.foundation.Canvas(
                         modifier = Modifier
                             .fillMaxSize()
                             .blur(
-                                radius,
+                                blurRadius,
                                 edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded,
-                            )
+                            ),
                     ) {
                         translate(
                             left = horizontalPadding.toPx(),
                             top = (topPadding + bismillahHeightDp).toPx(),
                         ) {
-                            drawPath(
-                                selCloud,
-                                color = glowColor.copy(alpha = layerAlpha * selCloudAlpha),
+                            drawPath(cloud.path, glowColor.copy(alpha = alpha))
+                        }
+                    }
+                }
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    translate(
+                        left = horizontalPadding.toPx(),
+                        top = (topPadding + bismillahHeightDp).toPx(),
+                    ) {
+                        drawPath(cloud.path, glowColor.copy(alpha = 0.095f))
+                        drawPath(
+                            path = cloud.path,
+                            color = glowColor.copy(alpha = 0.13f),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 0.75.dp.toPx(),
+                            ),
+                        )
+                        cloud.sparkleCenters.forEachIndexed { index, center ->
+                            val alternatingPhase = if (index % 2 == 0) {
+                                sparklePhase
+                            } else {
+                                1.2f - sparklePhase
+                            }.coerceIn(0.2f, 1f)
+                            val radius = if (index % 3 == 0) 3.2.dp.toPx() else 2.2.dp.toPx()
+                            drawMushafSparkle(
+                                center = center,
+                                radius = radius,
+                                color = glowColor.copy(alpha = 0.25f + alternatingPhase * 0.65f),
                             )
                         }
                     }
@@ -5556,7 +5900,11 @@ private fun MushafPageWithFrame(
                             color = markerColor.toArgb()
                             alpha = (255 * markerAlpha).toInt()
                             textAlign = android.graphics.Paint.Align.CENTER
-                            textSize = (arabicFontSize * if (g.digits.length >= 3) 0.25f else 0.32f).sp.toPx()
+                            // Derive the digit size from its measured ornament.
+                            // Translation ornaments use a smaller em than the
+                            // Arabic markers, so the global Arabic size clipped
+                            // their otherwise correctly scaled number.
+                            textSize = g.h * if (g.digits.length >= 3) 0.226f else 0.29f
                             isFakeBoldText = true
                         }
                         val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
@@ -5574,6 +5922,7 @@ private fun MushafPageWithFrame(
 // Builds one master AnnotatedString, measures lines, splits at line boundaries.
 // Ayahs flow naturally across pages like a real printed Quran.
 // ---------------------------------------------------------------------------
+@OptIn(ExperimentalPageCurlApi::class)
 @Composable
 private fun MushafPagerView(
     ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
@@ -5604,15 +5953,29 @@ private fun MushafPagerView(
 
     val markerColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
-    // PageCurl composes/records every page in the surah. On a 95-page
-    // Al-Baqarah layout that retained ~290 MB of GPU layers on a Pixel 9 Pro,
-    // and rapid turns pushed the process into blocking GC and eventually OOM.
-    // Foundation's pager is lazy: only the current page and its immediate
-    // neighbours exist, while our existing gesture layer still owns navigation.
+    // PageCurl 1.5.1 composes only current-1/current/current+1. Keep its state as
+    // the single source of truth so the full 131-page Al-Baqarah list is never
+    // represented by 131 graphics layers.
     var pagerPageCount by remember { androidx.compose.runtime.mutableIntStateOf(1) }
-    val state = rememberPagerState(
-        initialPage = initialPage.coerceAtLeast(0),
-        pageCount = { pagerPageCount },
+    val state = rememberPageCurlState(
+        initialCurrent = initialPage.coerceAtLeast(0),
+    )
+    val pageCurlConfig = rememberPageCurlConfig(
+        backPageColor = surfaceColor,
+        backPageContentAlpha = 0.10f,
+        shadowColor = Color.Black,
+        shadowAlpha = 0.18f,
+        shadowRadius = 12.dp,
+        dragForwardEnabled = true,
+        dragBackwardEnabled = true,
+        // A single tap must stay available to the reader, and a double tap must
+        // reveal translation rather than advancing a page.
+        tapForwardEnabled = false,
+        tapBackwardEnabled = false,
+        tapCustomEnabled = false,
+        dragInteraction = PageCurlConfig.StartEndDragInteraction(
+            pointerBehavior = PageCurlConfig.DragInteraction.PointerBehavior.PageEdge,
+        ),
     )
 
     // Pinch streams a new font size every frame; re-measuring the whole surah at
@@ -5641,12 +6004,12 @@ private fun MushafPagerView(
         MushafKeyBus.bind(
             next = {
                 mushafScope.launch {
-                    state.animateScrollToPage((state.currentPage + 1).coerceAtMost(pagerPageCount - 1))
+                    if (state.current < pagerPageCount - 1) state.next()
                 }
             },
             prev = {
                 mushafScope.launch {
-                    state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                    if (state.current > 0) state.prev()
                 }
             },
         )
@@ -5684,10 +6047,17 @@ private fun MushafPagerView(
     val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
         MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
+    val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
+        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        androidx.compose.ui.text.PlaceholderVerticalAlign.Center,
+    )
     val markerInlineContent: Map<String, androidx.compose.foundation.text.InlineTextContent> =
         remember {
             mapOf(
-                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { _ -> }
+                "ayahOrnament" to androidx.compose.foundation.text.InlineTextContent(ornamentPlaceholder) { _ -> },
+                MUSHAF_TRANSLATION_ORNAMENT_TAG to androidx.compose.foundation.text.InlineTextContent(
+                    translationOrnamentPlaceholder,
+                ) { _ -> },
             )
         }
 
@@ -5731,7 +6101,7 @@ private fun MushafPagerView(
         // A line separator is still a visual line in StaticLayout. Give that
         // line deliberately compact metrics instead of inheriting the Quran
         // paragraph's 1.45x leading, which left a conspicuous blank Arabic line
-        // between the ayah marker and its much smaller translation.
+        // between the Arabic and its much smaller translation.
         lineHeight = (committedFontSize * 0.12f).sp,
     )
 
@@ -5769,46 +6139,70 @@ private fun MushafPagerView(
                     append(arabicText)
                 }
                 pop()
-                val digits = markerDigitsFor(ayah.numberInSurah)
-                // U+2060 WORD JOINER: forbids a line break between the ayah's
-                // last word and its marker.
-                append('⁠')
-                val markerStart = length
-                appendInlineContent("ayahOrnament", digits)
-                placeholderRanges.add(
-                    androidx.compose.ui.text.AnnotatedString.Range(
-                        ornamentPlaceholder, markerStart, markerStart + digits.length
-                    )
-                )
-                append(' ')
 
-                // The revealed translation lives IN the text immediately after this
-                // ayah's marker. It starts on the marker's remaining line space rather
-                // than wasting the rest of that line, then wraps naturally. Unicode
-                // isolate controls preserve Bengali/English reading order inside the
-                // surrounding RTL Quran paragraph.
+                // For the selected ayah the gloss is part of the reading flow
+                // BEFORE its end marker: Arabic → translation → ornament. The
+                // Arabic annotation was already closed above, so the cloud can
+                // never include the translation. Unicode isolate controls keep
+                // Bengali/English order stable inside the surrounding RTL text.
                 if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
-                    // Include the trailing compact separator in the block annotation
-                    // so pagination moves the reveal as one unit with the Arabic line
-                    // that owns its marker.
+                    val digits = markerDigitsFor(ayah.numberInSurah)
                     pushStringAnnotation(
                         tag = MUSHAF_TRANSLATION_TAG,
                         annotation = ayah.numberInSurah.toString(),
                     )
+                    // A compact leading break makes the translation readable
+                    // without inserting a full Arabic line of empty space.
+                    withStyle(translationSeparatorParagraphStyle) {
+                        withStyle(translationSeparatorSpanStyle) { append('\u2028') }
+                    }
                     withStyle(translationParagraphStyle) {
                         withStyle(translationSpanStyle) {
                             append('\u2066') // LEFT-TO-RIGHT ISOLATE
                             append(inlinedText)
                             append('\u2069') // POP DIRECTIONAL ISOLATE
+                            append("\u00A0\u00A0")
+                            // Resolve the placeholder's em units from the same
+                            // smaller font as the translation. Its dedicated
+                            // Center alignment reserves the complete frame while
+                            // keeping it on the translation's visual midline.
+                            append('\u2060')
+                            val markerStart = length
+                            appendInlineContent(MUSHAF_TRANSLATION_ORNAMENT_TAG, digits)
+                            placeholderRanges.add(
+                                androidx.compose.ui.text.AnnotatedString.Range(
+                                    translationOrnamentPlaceholder,
+                                    markerStart,
+                                    markerStart + digits.length,
+                                ),
+                            )
                         }
                     }
+                    // End the selected ayah cleanly after its marker; the next
+                    // Arabic ayah resumes on a fresh RTL line.
                     withStyle(translationSeparatorParagraphStyle) {
                         withStyle(translationSeparatorSpanStyle) { append('\u2028') }
                     }
                     pop()
+                    append(' ')
+                } else {
+                    val digits = markerDigitsFor(ayah.numberInSurah)
+                    // Normally the marker stays attached to the Arabic ending.
+                    append('⁠')
+                    val markerStart = length
+                    appendInlineContent("ayahOrnament", digits)
+                    placeholderRanges.add(
+                        androidx.compose.ui.text.AnnotatedString.Range(
+                            ornamentPlaceholder,
+                            markerStart,
+                            markerStart + digits.length,
+                        ),
+                    )
+                    append(' ')
                 }
-                // Closed after the gloss so a tap on the translation dismisses the ayah
-                // that opened it.
+
+                // Closed after the gloss and marker so tapping either still
+                // resolves to the ayah that opened the translation.
                 builtRanges.add(ayah.numberInSurah to (ayahStart until length))
             }
         }
@@ -5937,11 +6331,12 @@ private fun MushafPagerView(
                 .pointerInput(parentScrollState, state) {
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
+                        val startedAtMushaf =
+                            (parentScrollState?.firstVisibleItemIndex ?: 1) >= 1
                         var totalDx = 0f
                         var totalDy = 0f
                         var directionDecided = false
                         var isVerticalScroll = false
-                        var horizontalDragTotal = 0f
                         var verticalDragTotal = 0f
                         val touchSlop = viewConfiguration.touchSlop
 
@@ -5966,45 +6361,57 @@ private fun MushafPagerView(
                                 }
 
                                 if (directionDecided && !isVerticalScroll) {
-                                    change.consume()
-                                    horizontalDragTotal += delta.x
+                                    // PageCurl owns horizontal movement. Do not
+                                    // consume here or its child detector cannot
+                                    // anchor the paper edge to the reader's finger.
                                 } else if (directionDecided && isVerticalScroll) {
-                                    // Don't consume — let parent scroll first.
+                                    // PageCurl treats an unrestricted Y drag as a left/right
+                                    // page turn, so claim the vertical stream before it reaches
+                                    // the child and route it into the parent Surah list instead.
+                                    change.consume()
                                     verticalDragTotal += delta.y
+                                    parentScrollState?.dispatchRawDelta(-delta.y)
                                 }
                             }
                         } while (event.changes.any { it.pressed })
 
-                        if (directionDecided && !isVerticalScroll) {
-                            val swipeThreshold = size.width * 0.15f
-                            if (horizontalDragTotal < -swipeThreshold) {
-                                scope.launch {
-                                    state.animateScrollToPage(
-                                        (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
-                                    )
-                                }
-                            } else if (horizontalDragTotal > swipeThreshold) {
-                                scope.launch {
-                                    state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                        if (directionDecided && isVerticalScroll) {
+                            val verticalThreshold = size.height * 0.12f
+                            scope.launch {
+                                when {
+                                    // Pulling down from Mushaf reveals the album header and
+                                    // Surah information, then settles cleanly at its top.
+                                    verticalDragTotal > verticalThreshold -> {
+                                        parentScrollState?.animateScrollToItem(
+                                            index = 0,
+                                            scrollOffset = 0,
+                                        )
+                                    }
+
+                                    // A swipe up only advances the Quran page when the gesture
+                                    // began in the full Mushaf position. Swiping up from Surah
+                                    // info returns to Mushaf without skipping a page.
+                                    verticalDragTotal < -verticalThreshold -> {
+                                        if (startedAtMushaf) {
+                                            if (state.current < pagerPageCount - 1) state.next()
+                                        } else {
+                                            parentScrollState?.animateScrollToItem(
+                                                index = 1,
+                                                scrollOffset = 0,
+                                            )
+                                        }
+                                    }
+
+                                    // Cancelled/short pulls return to the section where the
+                                    // gesture started instead of leaving a partial header.
+                                    else -> {
+                                        parentScrollState?.animateScrollToItem(
+                                            index = if (startedAtMushaf) 1 else 0,
+                                            scrollOffset = 0,
+                                        )
+                                    }
                                 }
                             }
-                        } else if (directionDecided && isVerticalScroll) {
-                            // Only fire swipe-up → next page when the parent
-                            // LazyColumn is already at the bottom of its
-                            // scroll range (i.e., Mushaf fully takes the
-                            // viewport — nothing left to scroll). Otherwise
-                            // the parent owns the gesture and scroll up
-                            // behaves normally.
-                            val parentExhausted = parentScrollState?.canScrollForward == false
-                            val upThreshold = size.height * 0.25f
-                            if (parentExhausted && verticalDragTotal < -upThreshold) {
-                                scope.launch {
-                                    state.animateScrollToPage(
-                                        (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
-                                    )
-                                }
-                            }
-                            // Downward swipes never turn the page.
                         }
                     }
                 }
@@ -6158,36 +6565,34 @@ private fun MushafPagerView(
 
             LaunchedEffect(paginatedPages.size) {
                 pagerPageCount = paginatedPages.size.coerceAtLeast(1)
-                if (paginatedPages.isNotEmpty() && state.currentPage > paginatedPages.lastIndex) {
-                    state.scrollToPage(paginatedPages.lastIndex)
+                if (paginatedPages.isNotEmpty() && state.current > paginatedPages.lastIndex) {
+                    state.snapTo(paginatedPages.lastIndex)
                 }
             }
 
-            LaunchedEffect(state.currentPage, paginatedPages.size) {
-                onPageChange(state.currentPage, paginatedPages.size)
+            LaunchedEffect(state.current, paginatedPages.size) {
+                onPageChange(state.current, paginatedPages.size)
             }
 
             // Publish current Mushaf page to PullToSyncContainer's mini-bar.
             // Cleared on dispose so leaving Mushaf mode hides the strip.
-            DisposableEffect(surahNameArabic, surahNameEnglish, state.currentPage, paginatedPages.size) {
+            DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
                 if (paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.state.value = MushafMiniBarState(
                         surahNameArabic = surahNameArabic,
                         surahNameEnglish = surahNameEnglish,
-                        currentPage = state.currentPage + 1,
+                        currentPage = state.current + 1,
                         totalPages = paginatedPages.size,
                     )
                     MushafMiniBarBus.bind(
                         next = {
                             mushafScope.launch {
-                                state.animateScrollToPage(
-                                    (state.currentPage + 1).coerceAtMost(pagerPageCount - 1),
-                                )
+                                if (state.current < pagerPageCount - 1) state.next()
                             }
                         },
                         previous = {
                             mushafScope.launch {
-                                state.animateScrollToPage((state.currentPage - 1).coerceAtLeast(0))
+                                if (state.current > 0) state.prev()
                             }
                         },
                     )
@@ -6204,7 +6609,7 @@ private fun MushafPagerView(
             LaunchedEffect(arabicFontSize) {
                 if (arabicFontSize == committedFontSize) return@LaunchedEffect
                 kotlinx.coroutines.delay(250)
-                pendingAnchorAyah = paginatedPages.getOrNull(state.currentPage)
+                pendingAnchorAyah = paginatedPages.getOrNull(state.current)
                     ?.ayahRanges?.firstOrNull()?.first ?: 0
                 committedFontSize = arabicFontSize
             }
@@ -6213,7 +6618,7 @@ private fun MushafPagerView(
                     val idx = paginatedPages.indexOfFirst { page ->
                         page.ayahRanges.any { it.first == pendingAnchorAyah }
                     }
-                    if (idx >= 0 && idx != state.currentPage) state.scrollToPage(idx)
+                    if (idx >= 0 && idx != state.current) state.snapTo(idx)
                     pendingAnchorAyah = 0
                 }
             }
@@ -6242,13 +6647,13 @@ private fun MushafPagerView(
                 androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
             val pagerEmPx = with(density) { committedFontSize.sp.toPx() }
-            LaunchedEffect(state.currentPage, paginatedPages) {
+            LaunchedEffect(state.current, paginatedPages) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
                 // A page turn can arrive much faster than a bitmap ink scan.
                 // Debounce just long enough for rapid swipes to settle; a newer
                 // state cancels this effect before it allocates another surface.
                 kotlinx.coroutines.delay(120)
-                for (idx in listOf(state.currentPage, state.currentPage + 1, state.currentPage - 1)) {
+                for (idx in listOf(state.current, state.current + 1, state.current - 1)) {
                     val pageText = paginatedPages.getOrNull(idx)?.text ?: continue
                     if (pageText !in inkGeomCache) {
                         val geoms = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -6271,7 +6676,7 @@ private fun MushafPagerView(
                 // Geometry values are tiny, but AnnotatedString keys retain all
                 // page styling. Keep only the active curl neighbourhood so long
                 // reading sessions have a hard upper memory bound.
-                val retainedTexts = (state.currentPage - 3..state.currentPage + 3)
+                val retainedTexts = (state.current - 1..state.current + 1)
                     .mapNotNull { paginatedPages.getOrNull(it)?.text }
                     .toSet()
                 inkGeomCache.keys.toList().forEach { key ->
@@ -6296,7 +6701,7 @@ private fun MushafPagerView(
                     }
                     if (targetIndex >= 0) {
                         consumedScrollToAyah = scrollToAyah
-                        if (targetIndex != state.currentPage) state.scrollToPage(targetIndex)
+                        if (targetIndex != state.current) state.snapTo(targetIndex)
                     }
                 }
             }
@@ -6320,10 +6725,10 @@ private fun MushafPagerView(
                     )
                 }
             }
-            HorizontalPager(
+            PageCurl(
+                count = paginatedPages.size,
                 state = state,
-                userScrollEnabled = false,
-                beyondViewportPageCount = 1,
+                config = pageCurlConfig,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
@@ -6334,7 +6739,7 @@ private fun MushafPagerView(
                         scaleY = preview
                     }
             ) { pageIndex ->
-                val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
+                val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
                 MushafPageWithFrame(
                     pageText = page.text,
                     inlineContent = pageInlineContent,
@@ -6351,12 +6756,12 @@ private fun MushafPagerView(
                     // the translation it is explaining. Outranks the search
                     // highlight, which is stale once the reader starts tapping.
                     highlightedAyahNumber = revealedAyah ?: highlightedAyahNumber,
-                    interactive = pageIndex == state.currentPage,
+                    interactive = pageIndex == state.current,
                     onAyahDoubleTap = { ayahNumber ->
                         // No re-anchoring here on purpose. The gloss is inserted AFTER
                         // the tapped ayah, which sits on this page, so every line before
                         // this page's first character is untouched and repagination
-                        // reproduces the same page boundaries up to it — state.currentPage
+                        // reproduces the same page boundaries up to it — state.current
                         // still points at the page being read. The anchor that used to
                         // be set here is what dragged the reader backwards, because it
                         // re-snapped to the first page that merely *contains* the ayah.
