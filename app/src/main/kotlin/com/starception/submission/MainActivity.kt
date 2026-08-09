@@ -66,7 +66,6 @@ import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.CountryPrayerMethodService
-import com.starception.submission.prayer.model.CalculationMethod
 import android.location.Location as AndroidLocation
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.util.isSystemInDarkTheme
@@ -496,13 +495,10 @@ class MainActivity : FragmentActivity() {
             val settingsRepository = prayerSettingsRepository
             val countryService = CountryPrayerMethodService(this)
             
-            // Check if user already has manual settings (don't override)
+            // Read the location only. The repository owns the consent decision; calculation
+            // method values must never be used here to bypass that country-switch flow.
             val currentSettings = settingsRepository.getSettings()
-            if (currentSettings.calculationMethod != CalculationMethod.MUSLIM_WORLD_LEAGUE) {
-                Log.d("MainActivity", "🔧 User has custom settings, skipping auto-detection")
-                return
-            }
-            
+
             // Get current location from settings or location services
             val location = currentSettings.location
             if (location == null) {
@@ -528,17 +524,11 @@ class MainActivity : FragmentActivity() {
                         Log.i("MainActivity", "🕌 Method: ${detectionResult.calculationMethod.name}")
                         Log.i("MainActivity", "📿 Madhhab: ${detectionResult.madhhab.name}")
                         
-                        // Apply auto-detected settings
-                        val autoDetectedSettings = currentSettings.copy(
-                            calculationMethod = detectionResult.calculationMethod,
-                            asrMadhhab = detectionResult.madhhab,
-                            customFajrAngle = detectionResult.customFajrAngle,
-                            customIshaAngle = detectionResult.customIshaAngle
-                            // Auto-detection metadata removed in new architecture
-                        )
-                        
-                        settingsRepository.updateSettings(autoDetectedSettings, forceCommit = true)
-                        Log.i("MainActivity", "✅ Auto-detection applied successfully")
+                        // This initializes a first-ever country, or publishes a proposal when the
+                        // detected country differs from the active one. Only the sheet's Apply
+                        // action is allowed to mutate settings on a later country change.
+                        settingsRepository.onCountryDetected(detectionResult.countryCode)
+                        Log.i("MainActivity", "✅ Country detection handed to consent flow")
                     } else {
                         Log.d("MainActivity", "ℹ️ No auto-detection available for this location")
                     }

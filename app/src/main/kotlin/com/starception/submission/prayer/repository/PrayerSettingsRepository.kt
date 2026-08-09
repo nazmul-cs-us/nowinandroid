@@ -158,37 +158,22 @@ class PrayerSettingsRepository @Inject constructor(
      * This allows country-based auto-detection to happen after initial app launch
      */
     fun reinitializeWithLocation() {
-        val currentSettings = getCalculationSettings()
-        val cachedCountry = getCachedCountry()
-        
-        // Only re-initialize if:
-        // 1. Current settings are still defaults (MUSLIM_WORLD_LEAGUE)
-        // 2. We now have a country code available
-        if (currentSettings.calculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE && 
-            cachedCountry != null) {
-            
-            Log.i(TAG, "🔄 RE-INITIALIZING: Location now available for country '$cachedCountry'")
-            
-            val autoDetectedSettings = getAutoDetectedSettingsForCountry(cachedCountry)
-            if (autoDetectedSettings != null) {
-                Log.i(TAG, "✅ Applying country-specific settings for '$cachedCountry'")
-                
-                // Update calculation settings with auto-detected values
-                val updatedSettings = PrayerCalculationSettings(
-                    calculationMethod = autoDetectedSettings.calculationMethod,
-                    asrMadhhab = autoDetectedSettings.asrMadhhab,
-                    highLatitudeAdjustment = autoDetectedSettings.highLatitudeAdjustment,
-                    customFajrAngle = autoDetectedSettings.customFajrAngle,
-                    customIshaAngle = autoDetectedSettings.customIshaAngle,
-                    customIshaDelay = autoDetectedSettings.customIshaDelay,
-                    timeOffsets = autoDetectedSettings.timeOffsets
-                )
-                
-                updateCalculationSettings(updatedSettings, forceCommit = true)
-                Log.i(TAG, "🎯 Country-based auto-detection applied successfully")
-            }
-        } else {
-            Log.d(TAG, "⏭️ Skipping re-initialization: method=${currentSettings.calculationMethod.name}, country=$cachedCountry")
+        val location = getLocationPreferences().location ?: return
+        val detectedCountry = location.countryCode.trim().uppercase().ifEmpty {
+            com.starception.submission.prayer.service.CountryCodeMapper.resolveCountryCode(
+                null,
+                location.country,
+            ).trim().uppercase()
+        }
+        if (detectedCountry.isEmpty()) return
+
+        // Country changes are consent-gated. onCountryDetected applies defaults only when there is
+        // no active country yet; every later change merely publishes a proposal for the UI.
+        storeScope.launch {
+            runCatching { onCountryDetected(detectedCountry) }
+                .onFailure {
+                    Log.e(TAG, "Failed to process detected country '$detectedCountry'", it)
+                }
         }
     }
 
@@ -226,19 +211,13 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "   📐 Calculation Method: ${autoDetectedSettings.calculationMethod.name}")
         Log.i(TAG, "   🕌 Madhab: ${autoDetectedSettings.asrMadhhab.name}")
 
-        // Update calculation settings with auto-detected values
-        val updatedSettings = PrayerCalculationSettings(
-            calculationMethod = autoDetectedSettings.calculationMethod,
-            asrMadhhab = autoDetectedSettings.asrMadhhab,
-            highLatitudeAdjustment = autoDetectedSettings.highLatitudeAdjustment,
-            customFajrAngle = autoDetectedSettings.customFajrAngle,
-            customIshaAngle = autoDetectedSettings.customIshaAngle,
-            customIshaDelay = autoDetectedSettings.customIshaDelay,
-            timeOffsets = autoDetectedSettings.timeOffsets
-        )
-
-        updateCalculationSettings(updatedSettings, forceCommit = true)
-        Log.i(TAG, "🎯 Prayer settings FORCE updated for timezone change to: $newTimezoneId")
+        // A timezone change commonly means travel. It must use the same consent path as a GPS or
+        // manual-location country change; otherwise it can overwrite settings behind the sheet.
+        storeScope.launch {
+            runCatching { onCountryDetected(countryCode) }
+                .onFailure { Log.e(TAG, "Failed to process timezone country '$countryCode'", it) }
+        }
+        Log.i(TAG, "🎯 Prayer settings change proposed for timezone: $newTimezoneId")
         Log.i(TAG, "=".repeat(60))
         Log.i(TAG, "")
     }
@@ -955,6 +934,9 @@ class PrayerSettingsRepository @Inject constructor(
         _locationPreferencesFlow.value = preferences
         _locationPreferencesFlow.tryEmit(preferences)
         updateLegacyCombinedFlow()
+        // Resolve the country only after the reactive location has been updated. Calling this from
+        // saveLocationPreferences read the previous location and could bypass/contradict consent.
+        if (preferences.location != null) reinitializeWithLocation()
         triggerPrayerTimeRecalculation()
         
         Log.i(TAG, "✅ LOCATION PREFERENCES UPDATE COMPLETE")
@@ -1422,19 +1404,8 @@ class PrayerSettingsRepository @Inject constructor(
     fun getCachedCountry(): String? {
         Log.i(TAG, "🔍 CACHED COUNTRY DEBUG:")
 
-        // PRIORITY 1: Try to get country from cached prayer settings (auto-detected)
-        val cachedSettings = getCachedPrayerSettings()
-        val autoDetectedCode = cachedSettings?.autoDetectedCountryCode
-
-        if (!autoDetectedCode.isNullOrEmpty()) {
-            Log.i(TAG, "   ✅ PRIORITY 1: Found auto-detected country code in cached settings: $autoDetectedCode")
-            Log.i(TAG, "   - Country name: ${cachedSettings?.autoDetectedCountryName}")
-            Log.i(TAG, "   - Returning country code: $autoDetectedCode")
-            return autoDetectedCode
-        }
-        Log.i(TAG, "   - No auto-detected country code in cached settings")
-
-        // PRIORITY 2: Try to get country from location preferences
+        // The current location is the detected country. Legacy auto-detection metadata describes
+        // the settings currently in use, so reading it first masks a newly selected country.
         val currentLocation = getLocationPreferences().location
         val countryCode = currentLocation?.countryCode
         val countryName = currentLocation?.country
@@ -1478,7 +1449,16 @@ class PrayerSettingsRepository @Inject constructor(
         }
 
         Log.i(TAG, "   - Returning country code: $result")
-        return result
+        if (!result.isNullOrEmpty()) return result
+
+        // Backward-compatible fallback for installs whose saved location predates country codes.
+        val cachedSettings = getCachedPrayerSettings()
+        val autoDetectedCode = cachedSettings?.autoDetectedCountryCode
+        if (!autoDetectedCode.isNullOrEmpty()) {
+            Log.i(TAG, "   ✅ FALLBACK: Using legacy auto-detected code: $autoDetectedCode")
+            return autoDetectedCode
+        }
+        return null
     }
     
     /**
@@ -2220,6 +2200,8 @@ class PrayerSettingsRepository @Inject constructor(
         val currentMethod: String,
         /** true if we already hold the user's saved settings for this country (restore vs first visit). */
         val isRestore: Boolean,
+        /** Repair an active-country bucket polluted by the former pre-consent auto-apply bug. */
+        val preferAutoDetected: Boolean = false,
     )
 
     /** Persist the ACTIVE country's settings into its SQLite bucket and signal cloud sync. */
@@ -2255,20 +2237,48 @@ class PrayerSettingsRepository @Inject constructor(
 
         val active = userSettingsStore.lastKnownCountry()
 
-        // First-ever run: adopt current settings as this country's baseline (no change to confirm).
+        // First-ever run has no prior country/settings to preserve, so initialize directly from
+        // that country's defaults and establish the baseline without showing a consent prompt.
         if (active.isNullOrEmpty()) {
             val auto = getAutoDetectedSettingsForCountry(code)
-            userSettingsStore.save(code, getCalculationSettings(), auto?.autoDetectedCountryName)
+            val initialSettings = auto?.toCalculationSettings() ?: getCalculationSettings()
+            applyActiveSettings(initialSettings, code)
+            userSettingsStore.save(code, initialSettings, auto?.autoDetectedCountryName)
             userSettingsStore.setLastKnownCountry(code)
             userSettingsStore.markLocalChange() // back up the initial bucket
             Log.i(TAG, "🌍 STORE: seeded baseline bucket for '$code' (first run)")
             return
         }
 
+        val declinedCountry = userSettingsStore.getMeta(UserSettingsStore.KEY_DECLINED_COUNTRY)
         if (code == active) {
-            _pendingCountrySwitch.value = null
-            // Returned to the active country — allow a fresh prompt on the next departure.
-            if (userSettingsStore.getMeta(UserSettingsStore.KEY_DECLINED_COUNTRY) != null) {
+            val auto = getAutoDetectedSettingsForCountry(code)
+            val current = getCalculationSettings()
+            val activeSettingsMismatch = auto != null &&
+                (current.calculationMethod != auto.calculationMethod ||
+                    current.asrMadhhab != auto.asrMadhhab)
+
+            if (activeSettingsMismatch && declinedCountry != code) {
+                // Older builds could change the calculation settings before consent while leaving
+                // lastKnownCountry untouched. Returning to that country must offer its real
+                // defaults instead of trusting the now-polluted saved bucket.
+                _pendingCountrySwitch.value = CountrySwitchProposal(
+                    countryCode = code,
+                    countryName = auto.autoDetectedCountryName,
+                    proposedMethod = auto.calculationMethod.displayName,
+                    proposedAsr = auto.asrMadhhab.displayName,
+                    currentMethod = current.calculationMethod.displayName,
+                    isRestore = false,
+                    preferAutoDetected = true,
+                )
+                Log.i(TAG, "🌍 STORE: active '$code' has mismatched settings — requesting repair consent")
+            } else {
+                _pendingCountrySwitch.value = null
+            }
+
+            // Returning from a different declined country allows that departure to prompt again.
+            // A decline for this same country is retained to avoid repeatedly showing the repair.
+            if (declinedCountry != null && declinedCountry != code) {
                 userSettingsStore.putMeta(UserSettingsStore.KEY_DECLINED_COUNTRY, null)
             }
             return
@@ -2276,7 +2286,7 @@ class PrayerSettingsRepository @Inject constructor(
 
         // Only an explicit "Keep current" for THIS country stops the prompt. Otherwise re-publish
         // every time so the consent sheet reappears on each app open until the user decides.
-        if (userSettingsStore.getMeta(UserSettingsStore.KEY_DECLINED_COUNTRY) == code) return
+        if (declinedCountry == code) return
 
         Log.i(TAG, "🌍 STORE: country '$active' → '$code' — requesting consent")
         val existing = userSettingsStore.getForCountry(code)
@@ -2304,8 +2314,12 @@ class PrayerSettingsRepository @Inject constructor(
         val code = proposal.countryCode
         val existing = userSettingsStore.getForCountry(code)
         val auto = getAutoDetectedSettingsForCountry(code)
-        val settings = existing ?: auto?.toCalculationSettings() ?: getCalculationSettings()
-        if (existing == null) {
+        val settings = if (proposal.preferAutoDetected) {
+            auto?.toCalculationSettings() ?: existing ?: getCalculationSettings()
+        } else {
+            existing ?: auto?.toCalculationSettings() ?: getCalculationSettings()
+        }
+        if (existing == null || proposal.preferAutoDetected) {
             userSettingsStore.save(code, settings, auto?.autoDetectedCountryName)
             userSettingsStore.markLocalChange()
         }
@@ -3106,11 +3120,6 @@ class PrayerSettingsRepository @Inject constructor(
         
         verifyPrefWrite(KEY_LOCATION_PREFERENCES_JSON, settingsJson, "location preferences")
         Log.i(TAG, "✅ Location preferences saved successfully")
-        
-        // Check if we need to re-initialize with country-based auto-detection
-        if (preferences.location != null) {
-            reinitializeWithLocation()
-        }
         
         Log.i(TAG, "")
     }
