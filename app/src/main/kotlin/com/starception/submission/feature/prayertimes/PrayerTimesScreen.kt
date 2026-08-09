@@ -1310,6 +1310,10 @@ fun PrayerTimesScreen(
                                 // Notification bell toggle icon (only for main 5 prayers)
                                 if (prayerName != "Sunrise") {
                                     IconButton(
+                                        // Keep notification state visible during normal
+                                        // reading, but only allow changes after the user
+                                        // explicitly enters Tune schedule mode.
+                                        enabled = prayerTimeEditMode,
                                         onClick = {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             onNotificationToggle(!notificationEnabled)
@@ -1323,8 +1327,20 @@ fun PrayerTimesScreen(
                                             } else {
                                                 FlaticonIcons.NOTIFICATIONS
                                             },
-                                            contentDescription = if (notificationEnabled) "Notifications enabled" else "Notifications disabled",
-                                            tint = accentColor.copy(alpha = if (notificationEnabled) 1f else 0.48f),
+                                            contentDescription = when {
+                                                prayerTimeEditMode && notificationEnabled -> "Notifications enabled. Tap to disable"
+                                                prayerTimeEditMode -> "Notifications disabled. Tap to enable"
+                                                notificationEnabled -> "Notifications enabled. Enter edit mode to change"
+                                                else -> "Notifications disabled. Enter edit mode to change"
+                                            },
+                                            tint = accentColor.copy(
+                                                alpha = when {
+                                                    notificationEnabled && prayerTimeEditMode -> 1f
+                                                    notificationEnabled -> 0.78f
+                                                    prayerTimeEditMode -> 0.48f
+                                                    else -> 0.36f
+                                                },
+                                            ),
                                             fontSize = 16.sp,
                                         )
                                     }
@@ -1632,6 +1648,16 @@ fun PrayerTimesScreen(
             // Detect orientation for adaptive layout
             val configuration = LocalConfiguration.current
             val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val fontScale = LocalDensity.current.fontScale
+            // Reserve room for the search chrome, prayer rows, location card and
+            // floating navigation, then give the Insights carousel what remains.
+            // This keeps Location visible at rest instead of relying on a height
+            // tuned for one handset. Larger accessibility text gets extra room too.
+            val portraitInsightHeight = (
+                configuration.screenHeightDp.dp -
+                    645.dp -
+                    (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
+                ).coerceIn(220.dp, 288.dp)
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -1937,6 +1963,7 @@ fun PrayerTimesScreen(
                         showCompassPopup = true
                     },
                     timeOffsets = storedOffsets,
+                    portraitStripHeight = portraitInsightHeight,
                     onSurahClick = onSurahClick,
                     onSurahClickWithAyah = onSurahClickWithAyah,
                     onFortressDuaClick = onFortressDuaClick,

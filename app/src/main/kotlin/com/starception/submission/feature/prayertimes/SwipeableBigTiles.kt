@@ -1094,6 +1094,7 @@ fun SwipeableBigTiles(
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
+    portraitStripHeight: Dp = 288.dp,
     compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
@@ -1214,9 +1215,13 @@ fun SwipeableBigTiles(
     ) { isCompact ->
         if (isCompact) 1f else 0f
     }
-    // Keep the portrait dashboard compact enough that the location card clears
-    // the floating navigation at rest. The compact state remains 170dp.
-    val stripHeight = (288f - (118f * compactProgress)).dp
+    // The host derives the normal portrait height from the real window height,
+    // so the content below the carousel is not pushed under floating navigation
+    // on shorter/taller phone profiles. The expanded-prayer state remains 170dp.
+    val stripHeight = (
+        portraitStripHeight.value +
+            ((170f - portraitStripHeight.value) * compactProgress)
+        ).dp
     val headerFontSize = (20f - (4f * compactProgress)).sp
     val headerLineHeight = (24f - (4f * compactProgress)).sp
     val headerBottomPadding = (10f - (4f * compactProgress)).dp
