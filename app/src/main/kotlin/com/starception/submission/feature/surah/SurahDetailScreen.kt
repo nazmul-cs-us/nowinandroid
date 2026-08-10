@@ -4739,7 +4739,7 @@ private fun ContinuousAyahsContent(
 private const val MARKER_HEIGHT_EM = 1.2f
 /** Translation text is intentionally quieter than Arabic, but its terminal
  * rosette should remain the same physical size as every Arabic ayah rosette. */
-private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.75f
+private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.65f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
 /** Ornament height as a fraction of the slot height. */
 private const val MARKER_ORNAMENT_FILL = 0.92f

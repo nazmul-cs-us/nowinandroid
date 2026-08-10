@@ -1,13 +1,8 @@
 package com.starception.submission.media
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -18,13 +13,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.ui.MiniBarShell
 
 /**
  * Media mini-bar for the PullToSyncContainer sage area.
@@ -52,47 +47,41 @@ fun MediaMiniBar(
 
     // Use sage-area colors so the mini-bar blends into PullToSyncContainer
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val subtitleColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val subtitleColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.70f)
+    val progress = if (playback.duration > 0) {
+        playback.currentPosition.toFloat() / playback.duration.toFloat()
+    } else {
+        0f
+    }
 
-    // Single row: title area on left, controls on right
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    MiniBarShell(
+        progress = progress,
+        modifier = modifier,
     ) {
-        // Title + Subtitle, takes remaining space.
+        // Title + subtitle share one line so playback and Mushaf navigation use
+        // exactly the same compact geometry.
         // Tapping the title navigates to the playing surah; drag-to-dismiss is bound
         // to this area only so taps on the playback buttons are never intercepted.
-        Column(
+        val subtitleText = if (preparingAudio) "Preparing audio…" else playback.subtitle
+        val displayText = if (subtitleText.isBlank()) {
+            playback.title
+        } else {
+            "${playback.title} · $subtitleText"
+        }
+        Text(
+            text = displayText,
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 12.dp)
+                .padding(end = 6.dp)
                 .clickable(onClick = onTitleClick)
                 .then(titleDragModifier),
-        ) {
-            Text(
-                text = playback.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontSize = 15.sp,
-                color = contentColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // While TTS is generating (initial request or the gap between long-text
-            // chunks) the subtitle line explains why audio is paused.
-            val subtitleText = if (preparingAudio) "Preparing audio…" else playback.subtitle
-            if (subtitleText.isNotEmpty()) {
-                Text(
-                    text = subtitleText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 13.sp,
-                    color = subtitleColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 15.sp,
+            lineHeight = 17.sp,
+            color = if (preparingAudio) subtitleColor else contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
 
         // Controls: skip prev, play/pause, skip next
         IconButton(
@@ -100,17 +89,15 @@ fun MediaMiniBar(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onAction(MediaAction.SkipPrevious)
             },
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(28.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
                 contentDescription = "Previous",
-                modifier = Modifier.size(28.dp),
-                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+                tint = contentColor.copy(alpha = 0.78f),
             )
         }
-
-        Spacer(modifier = Modifier.width(4.dp))
 
         IconButton(
             onClick = {
@@ -118,30 +105,28 @@ fun MediaMiniBar(
                 if (playback.isPlaying) onAction(MediaAction.Pause)
                 else onAction(MediaAction.Play)
             },
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(28.dp),
         ) {
             Icon(
                 imageVector = if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(20.dp),
                 tint = contentColor,
             )
         }
-
-        Spacer(modifier = Modifier.width(4.dp))
 
         IconButton(
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onAction(MediaAction.SkipNext)
             },
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(28.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.SkipNext,
                 contentDescription = "Next",
-                modifier = Modifier.size(28.dp),
-                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+                tint = contentColor.copy(alpha = 0.78f),
             )
         }
     }

@@ -248,20 +248,17 @@ fun PullToSyncContainer(
     // above media use a 14dp indicator.
     val bannerRowDp = maxOf(18.dp, with(bannerDensity) { 16.sp.toDp() })
     val compactBannerRowDp = maxOf(14.dp, with(bannerDensity) { 14.sp.toDp() })
-    val mediaTextDp = with(bannerDensity) { 44.sp.toDp() }
-    val mediaRowDp = maxOf(48.dp, mediaTextDp)
-    // Mushaf has two compact text lines and page arrows, so it does not need
-    // the taller media-control row. Keep enough room for increased font scale.
-    val mushafTextDp = with(bannerDensity) { 34.sp.toDp() }
-    val mushafRowDp = maxOf(50.dp, mushafTextDp)
-    // Let persistent banners sit 2dp inside the conservative safe-drawing
-    // boundary. There is no additional top padding; keep 6dp below the row.
-    val bannerTopInsetPadding = (bannerTopInsetDp - 2.dp).coerceAtLeast(0.dp)
-    val mushafTopInsetPadding = (bannerTopInsetDp - 12.dp).coerceAtLeast(0.dp)
+    val miniBarRowDp = 30.dp
+    // Pull the compact strips into the otherwise unused lower portion of the
+    // cutout-safe area while retaining clearance from the camera/status region.
+    val bannerTopInsetPadding = (bannerTopInsetDp - 10.dp).coerceAtLeast(0.dp)
     val bannerTopPadding = 0.dp
     val bannerBottomPadding = 6.dp
-    val mushafBottomPadding = 4.dp
     val bannerVerticalPadding = bannerTopPadding + bannerBottomPadding
+    // The persistent mini bars use the status-bar space more efficiently. Their
+    // total hold height now equals a normal one-line alert at the default scale.
+    val miniBarTopInsetPadding = (bannerTopInsetDp - 20.dp).coerceAtLeast(0.dp)
+    val miniBarBottomPadding = 4.dp
     val stackedRowSpacing = 4.dp
     val isMushafActive = mushafState != null
 
@@ -275,11 +272,11 @@ fun PullToSyncContainer(
             } else {
                 0.dp
             }
-            bannerTopInsetPadding + bannerVerticalPadding + statusRowDp + mediaRowDp
+            miniBarTopInsetPadding + miniBarBottomPadding + statusRowDp + miniBarRowDp
         }
         isPrayerAlert || isIslamicEvent || isSilentMode ->
             bannerTopInsetPadding + bannerVerticalPadding + bannerRowDp
-        isMushafActive -> mushafTopInsetPadding + mushafBottomPadding + mushafRowDp
+        isMushafActive -> miniBarTopInsetPadding + miniBarBottomPadding + miniBarRowDp
         isRefreshing || isDownloading || isTtsPreparing -> {
             val holdFraction = if (isDownloading) downloadingHoldFraction else refreshingHoldFraction
             (baseMaxRevealDp * holdFraction).dp
@@ -323,6 +320,16 @@ fun PullToSyncContainer(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
         )
+    )
+    val animatedMushafPageProgress by animateFloatAsState(
+        targetValue = if (mushafState != null && mushafState.totalPages > 0) {
+            (mushafState.currentPage.toFloat() / mushafState.totalPages.toFloat())
+                .coerceIn(0f, 1f)
+        } else {
+            0f
+        },
+        animationSpec = tween(durationMillis = 420),
+        label = "Mushaf page sweep",
     )
 
     // Animated sync progress: fills from 0 to 1 over 3 seconds during syncing
@@ -419,17 +426,29 @@ fun PullToSyncContainer(
         }
 
         // Horizontal progress fill: sweeps sage color left-to-right (background hidden until sweep covers it)
-        // Shows during syncing, downloading, or media playback
-        val showSweep = (isRefreshing || isDownloading || mediaState.isVisible || isPrayerAlert) && wobbleIntensity > 0.01f
+        // Mushaf page position uses this same full-width treatment as playback
+        // progress; the thin bar remains as a precise secondary indicator.
+        val showSweep = (
+            isRefreshing ||
+                isDownloading ||
+                mediaState.isVisible ||
+                isPrayerAlert ||
+                isMushafActive
+            ) && wobbleIntensity > 0.01f
         if (showSweep) {
             val fillProgress = when {
                 isDownloading -> animatedDownloadProgress
                 isRefreshing -> syncProgress.value
-                mediaState.isVisible && mediaState.playback.duration > 0 -> {
-                    (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
-                        .coerceIn(0f, 1f)
+                mediaState.isVisible -> {
+                    if (mediaState.playback.duration > 0) {
+                        (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
+                            .coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
                 }
                 isPrayerAlert -> prayerAlertState.fillProgress
+                isMushafActive -> animatedMushafPageProgress
                 else -> 0f
             }
             Box(
@@ -496,8 +515,8 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .padding(top = bannerTopInsetPadding)
-                        .padding(top = bannerTopPadding, bottom = bannerBottomPadding),
+                        .padding(top = miniBarTopInsetPadding)
+                        .padding(bottom = miniBarBottomPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(
@@ -738,8 +757,8 @@ fun PullToSyncContainer(
                         .zIndex(1f)
                         .fillMaxWidth()
                         .height(contentOffsetY)
-                        .padding(top = mushafTopInsetPadding)
-                        .padding(bottom = mushafBottomPadding),
+                        .padding(top = miniBarTopInsetPadding)
+                        .padding(bottom = miniBarBottomPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     MushafMiniBar(
