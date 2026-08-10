@@ -243,3 +243,4 @@ fun MushafMiniBar(
         }
     }
 }
+

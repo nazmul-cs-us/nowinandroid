@@ -1655,11 +1655,12 @@ fun PrayerTimesScreen(
             // floating navigation, then give the Insights carousel what remains.
             // This keeps Location visible at rest instead of relying on a height
             // tuned for one handset. Larger accessibility text gets extra room too.
+            val portraitInsightMaxHeight = if (configuration.screenHeightDp < 1_000) 280.dp else 288.dp
             val portraitInsightHeight = (
                 configuration.screenHeightDp.dp -
                     645.dp -
                     (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
-                ).coerceIn(220.dp, 288.dp)
+                ).coerceIn(208.dp, portraitInsightMaxHeight)
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right

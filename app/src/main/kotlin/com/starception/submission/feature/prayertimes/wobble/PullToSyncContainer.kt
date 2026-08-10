@@ -253,7 +253,7 @@ fun PullToSyncContainer(
     // Mushaf has two compact text lines and page arrows, so it does not need
     // the taller media-control row. Keep enough room for increased font scale.
     val mushafTextDp = with(bannerDensity) { 34.sp.toDp() }
-    val mushafRowDp = maxOf(40.dp, mushafTextDp)
+    val mushafRowDp = maxOf(50.dp, mushafTextDp)
     // Let persistent banners sit 2dp inside the conservative safe-drawing
     // boundary. There is no additional top padding; keep 6dp below the row.
     val bannerTopInsetPadding = (bannerTopInsetDp - 2.dp).coerceAtLeast(0.dp)

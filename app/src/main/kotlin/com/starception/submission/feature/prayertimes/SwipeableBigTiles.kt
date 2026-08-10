@@ -41,6 +41,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -92,8 +93,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
@@ -183,6 +186,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Celebration
@@ -1100,6 +1104,7 @@ fun SmartIndicator(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
     prayerTimes: DayPrayerTimes?,
@@ -1148,6 +1153,16 @@ fun SwipeableBigTiles(
     val lifecycleOwner = LocalLifecycleOwner.current
     val carouselScope = rememberCoroutineScope()
     var showGlobePopup by remember { mutableStateOf(false) }
+    var showAutoSwipeSettings by remember { mutableStateOf(false) }
+    val carouselPreferences = remember(context) {
+        context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
+    }
+    var autoSwipeEnabled by remember {
+        mutableStateOf(carouselPreferences.getBoolean("auto_swipe_enabled", true))
+    }
+    var autoSwipeDurationSeconds by remember {
+        mutableIntStateOf(carouselPreferences.getInt("auto_swipe_duration_seconds", 30).coerceIn(6, 30))
+    }
     var isResumed by remember {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
@@ -1274,9 +1289,9 @@ fun SwipeableBigTiles(
     val dailySurahIsActive = dailyReadingPlayback.surahIndex == dailySurah.number - 1
     val readingKeepsFocus = focusedLogicalPage == 2 && dailySurahIsActive &&
         (dailyReadingPlayback.isPlaying || dailyReadingPlayback.isDownloading || dailyReadingPlayback.isLoading)
-    val autoAdvanceEnabled = isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
+    val autoAdvanceEnabled = autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
         !isUserTouching && (!pagerState.isScrollInProgress || isAutoAdvancing) && !isInteractionBlocked &&
-        !showGlobePopup && pendingPrayerUndo == null && !readingKeepsFocus
+        !showGlobePopup && !showAutoSwipeSettings && pendingPrayerUndo == null && !readingKeepsFocus
 
     LaunchedEffect(pendingPrayerUndo) {
         if (pendingPrayerUndo != null) {
@@ -1290,7 +1305,7 @@ fun SwipeableBigTiles(
         if (!autoAdvanceEnabled) return@LaunchedEffect
         autoAdvanceProgress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 12_000, easing = LinearEasing),
+            animationSpec = tween(durationMillis = autoSwipeDurationSeconds * 1_000, easing = LinearEasing),
         )
         isAutoAdvancing = true
         try {
@@ -1350,13 +1365,13 @@ fun SwipeableBigTiles(
                 fontWeight = FontWeight.Bold,
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 repeat(insightPageCount) { index ->
                     val selected = pagerState.currentPage % insightPageCount == index
                     val indicatorWidth by animateDpAsState(
-                        targetValue = if (selected) 18.dp else 6.dp,
+                        targetValue = if (selected) 14.dp else 4.dp,
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessMedium,
@@ -1370,24 +1385,30 @@ fun SwipeableBigTiles(
                     )
                     Box(
                         modifier = Modifier
-                            .size(width = 28.dp, height = 32.dp)
+                            .size(width = 14.dp, height = 28.dp)
                             .semantics {
                                 contentDescription = "Insight ${index + 1} of $insightPageCount"
                                 this.selected = selected
                             }
-                            .clickable(
+                            .combinedClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                            ) {
-                                interactionEpoch++
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                carouselScope.launch {
-                                    val currentLogical = pagerState.currentPage % insightPageCount
-                                    pagerState.animateScrollToPage(
-                                        pagerState.currentPage + (index - currentLogical),
-                                    )
-                                }
-                            },
+                                onClick = {
+                                    interactionEpoch++
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    carouselScope.launch {
+                                        val currentLogical = pagerState.currentPage % insightPageCount
+                                        pagerState.animateScrollToPage(
+                                            pagerState.currentPage + (index - currentLogical),
+                                        )
+                                    }
+                                },
+                                onLongClick = {
+                                    interactionEpoch++
+                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    showAutoSwipeSettings = true
+                                },
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
@@ -1613,6 +1634,113 @@ fun SwipeableBigTiles(
                                 }
                             },
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAutoSwipeSettings) {
+        ModalBottomSheet(
+            onDismissRequest = { showAutoSwipeSettings = false },
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Insight carousel",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Choose whether the cards move automatically and how long each insight stays visible.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Auto-swipe",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = if (autoSwipeEnabled) "On" else "Off",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = autoSwipeEnabled,
+                            onCheckedChange = { enabled ->
+                                autoSwipeEnabled = enabled
+                                interactionEpoch++
+                                carouselPreferences.edit()
+                                    .putBoolean("auto_swipe_enabled", enabled)
+                                    .apply()
+                            },
+                        )
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Time per insight",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "$autoSwipeDurationSeconds seconds",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (autoSwipeEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Slider(
+                        value = autoSwipeDurationSeconds.toFloat(),
+                        onValueChange = { value ->
+                            autoSwipeDurationSeconds = value.roundToInt().coerceIn(6, 30)
+                            interactionEpoch++
+                        },
+                        onValueChangeFinished = {
+                            carouselPreferences.edit()
+                                .putInt("auto_swipe_duration_seconds", autoSwipeDurationSeconds)
+                                .apply()
+                        },
+                        enabled = autoSwipeEnabled,
+                        valueRange = 6f..30f,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("6s", style = MaterialTheme.typography.labelSmall)
+                        Text("30s", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
