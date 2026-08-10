@@ -27,7 +27,14 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import android.hardware.GeomagneticField
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.provider.Settings
 import android.util.Log
+import android.view.accessibility.AccessibilityManager as AndroidAccessibilityManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
@@ -73,6 +80,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.VolumeUp
@@ -127,6 +135,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -204,6 +217,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.flow.StateFlow
 import androidx.activity.ComponentActivity
 import androidx.core.app.ActivityCompat
@@ -225,6 +241,19 @@ private val HomeReferenceSlate = Color(0xFF5D6574)
 private val HomeReferenceBlue = Color(0xFF4F779D)
 private val HomeReferenceRust = Color(0xFF99593C)
 private val HomeReferenceGold = Color(0xFFD8AB59)
+
+data class DailyReadingPlaybackState(
+    val surahIndex: Int = -1,
+    val isPlaying: Boolean = false,
+    val isLoading: Boolean = false,
+    val isDownloading: Boolean = false,
+    val downloadProgress: Float = 0f,
+    val error: String? = null,
+)
+
+private data class PrayerUndoState(
+    val prayerName: String,
+)
 
 @Composable
 private fun referenceHeroBrush(accentColor: Color): Brush {
@@ -1090,6 +1119,11 @@ fun SwipeableBigTiles(
     getDailyStatsTitle: () -> String,
     getDailyStatsMessage: () -> String,
     getPrayed: () -> Int = { 0 },
+    prayedPrayers: Set<String> = emptySet(),
+    onTogglePrayer: (String) -> Unit = {},
+    dailyReadingPlayback: DailyReadingPlaybackState = DailyReadingPlaybackState(),
+    onDailyReadingPlayPause: (surahIndex: Int) -> Unit = {},
+    onDailyReadingRetry: () -> Unit = {},
     getCurrentActivity: () -> String,
     onCompassClick: () -> Unit,
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
@@ -1101,6 +1135,7 @@ fun SwipeableBigTiles(
     onFortressDuaClick: (Dua) -> Unit = {},
     fortressDuasByChapter: Map<Int, List<Dua>> = emptyMap(),
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
+    isInteractionBlocked: Boolean = false,
 ) {
     val insightPageCount = 5
     val middleLoopStart = insightPageCount
@@ -1109,7 +1144,36 @@ fun SwipeableBigTiles(
         pageCount = { insightPageCount * 3 },
     )
     val view = LocalView.current
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val carouselScope = rememberCoroutineScope()
     var showGlobePopup by remember { mutableStateOf(false) }
+    var isResumed by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            isResumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val touchExplorationEnabled = remember(context) {
+        (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AndroidAccessibilityManager)
+            ?.isTouchExplorationEnabled == true
+    }
+    val systemAnimationsEnabled = remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+    var isUserTouching by remember { mutableStateOf(false) }
+    var interactionEpoch by remember { mutableIntStateOf(0) }
+    var isAutoAdvancing by remember { mutableStateOf(false) }
+    var pendingPrayerUndo by remember { mutableStateOf<PrayerUndoState?>(null) }
+    val autoAdvanceProgress = remember { Animatable(0f) }
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
         state = pagerState,
         pagerSnapDistance = PagerSnapDistance.atMost(1),
@@ -1122,10 +1186,10 @@ fun SwipeableBigTiles(
     var lastSettledPage by remember { mutableIntStateOf(0) }
     LaunchedEffect(pagerState.settledPage) {
         val settledLogicalPage = pagerState.settledPage % insightPageCount
-        if (settledLogicalPage != lastSettledPage) {
+        if (settledLogicalPage != lastSettledPage && !isAutoAdvancing) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            lastSettledPage = settledLogicalPage
         }
+        lastSettledPage = settledLogicalPage
 
         // Keep one complete copy of the carousel available on either side.
         // The duplicate pages make the first and last cards connect naturally;
@@ -1164,7 +1228,7 @@ fun SwipeableBigTiles(
     }
     val (_, totalPrayers) = getPrayerProgress()
     val prayedCount = getPrayed().coerceIn(0, totalPrayers)
-    val prayerRecap = remember(prayedCount, currentTime) {
+    val prayerRecap = remember(prayedPrayers, currentTime) {
         listOf(
             "Fajr" to "F",
             "Dhuhr" to "D",
@@ -1175,8 +1239,7 @@ fun SwipeableBigTiles(
             PrayerRecapIndicator(
                 name = name,
                 initial = initial,
-                isPrayed = com.starception.submission.util.PrayerTracker
-                    .isPrayerMarkedToday(name),
+                isPrayed = name in prayedPrayers,
             )
         }
     }
@@ -1200,6 +1263,46 @@ fun SwipeableBigTiles(
     val qiblaBearing = remember(prayerTimes?.location) {
         prayerTimes?.location?.let { location ->
             calculateQiblaDirection(location.latitude, location.longitude).roundToInt()
+        }
+    }
+    val focusedLogicalPage = pagerState.settledPage % insightPageCount
+    val liveQiblaHeading = rememberLiveCompassHeading(
+        enabled = focusedLogicalPage == 3 && isResumed && !showGlobePopup,
+        latitude = prayerTimes?.location?.latitude,
+        longitude = prayerTimes?.location?.longitude,
+    )
+    val dailySurahIsActive = dailyReadingPlayback.surahIndex == dailySurah.number - 1
+    val readingKeepsFocus = focusedLogicalPage == 2 && dailySurahIsActive &&
+        (dailyReadingPlayback.isPlaying || dailyReadingPlayback.isDownloading || dailyReadingPlayback.isLoading)
+    val autoAdvanceEnabled = isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
+        !isUserTouching && (!pagerState.isScrollInProgress || isAutoAdvancing) && !isInteractionBlocked &&
+        !showGlobePopup && pendingPrayerUndo == null && !readingKeepsFocus
+
+    LaunchedEffect(pendingPrayerUndo) {
+        if (pendingPrayerUndo != null) {
+            delay(4_000)
+            pendingPrayerUndo = null
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage, interactionEpoch, autoAdvanceEnabled) {
+        autoAdvanceProgress.snapTo(0f)
+        if (!autoAdvanceEnabled) return@LaunchedEffect
+        autoAdvanceProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 12_000, easing = LinearEasing),
+        )
+        isAutoAdvancing = true
+        try {
+            pagerState.animateScrollToPage(
+                page = pagerState.settledPage + 1,
+                animationSpec = spring(
+                    dampingRatio = 0.88f,
+                    stiffness = 420f,
+                ),
+            )
+        } finally {
+            isAutoAdvancing = false
         }
     }
     val compact = compactForExpandedPrayers && !isLandscape
@@ -1267,18 +1370,48 @@ fun SwipeableBigTiles(
                     )
                     Box(
                         modifier = Modifier
-                            .width(indicatorWidth)
-                            .height(6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                            .alpha(indicatorAlpha),
-                    )
+                            .size(width = 28.dp, height = 32.dp)
+                            .semantics {
+                                contentDescription = "Insight ${index + 1} of $insightPageCount"
+                                this.selected = selected
+                            }
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                interactionEpoch++
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                carouselScope.launch {
+                                    val currentLogical = pagerState.currentPage % insightPageCount
+                                    pagerState.animateScrollToPage(
+                                        pagerState.currentPage + (index - currentLogical),
+                                    )
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(indicatorWidth)
+                                .height(6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                        alpha = if (selected) 0.2f else 0.34f,
+                                    ),
+                                )
+                                .alpha(indicatorAlpha),
+                        ) {
+                            if (selected) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(autoAdvanceProgress.value.coerceIn(0.04f, 1f))
+                                        .background(MaterialTheme.colorScheme.primary),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1317,7 +1450,20 @@ fun SwipeableBigTiles(
                 contentPadding = PaddingValues(end = 18.dp),
                 beyondViewportPageCount = 0,
                 flingBehavior = pagerFlingBehavior,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val touching = event.changes.any { it.pressed }
+                                if (touching != isUserTouching) {
+                                    isUserTouching = touching
+                                    if (!touching) interactionEpoch++
+                                }
+                            }
+                        }
+                    },
             ) { page ->
                 val logicalPage = page % insightPageCount
                 val pageOffset = kotlin.math.abs(
@@ -1334,6 +1480,7 @@ fun SwipeableBigTiles(
                             alpha = lerp(0.9f, 1f, focus)
                         },
                 ) {
+                    val isFocused = page == pagerState.settledPage && !pagerState.isScrollInProgress
                     when (logicalPage) {
                         0 -> InsightPreviewCard(
                             label = "Prayer now",
@@ -1346,8 +1493,13 @@ fun SwipeableBigTiles(
                                     .joinToString(" · "),
                             backgroundPainterRes = R.drawable.insight_salah,
                             compactProgress = compactProgress,
+                            isFocused = isFocused,
+                            ambientProgress = autoAdvanceProgress.value,
+                            timelineProgress = prayerWindowProgress(prayerTimes, currentTime),
+                            actionLabel = "Compass",
                             actionDescription = "Open prayer compass",
                             onClick = {
+                                interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 onCompassClick()
                             },
@@ -1364,7 +1516,24 @@ fun SwipeableBigTiles(
                             footerText = "Completed prayers stay highlighted",
                             backgroundPainterRes = R.drawable.insight_prayer,
                             compactProgress = compactProgress,
+                            isFocused = isFocused,
+                            ambientProgress = autoAdvanceProgress.value,
                             prayerRecap = prayerRecap,
+                            onPrayerToggle = { prayerName ->
+                                interactionEpoch++
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                onTogglePrayer(prayerName)
+                                pendingPrayerUndo = PrayerUndoState(prayerName)
+                            },
+                            undoPrayerName = pendingPrayerUndo?.prayerName,
+                            onPrayerUndo = {
+                                pendingPrayerUndo?.let { undo ->
+                                    interactionEpoch++
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    onTogglePrayer(undo.prayerName)
+                                    pendingPrayerUndo = null
+                                }
+                            },
                         )
 
                         2 -> InsightPreviewCard(
@@ -1374,8 +1543,23 @@ fun SwipeableBigTiles(
                             footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
                             backgroundPainterRes = R.drawable.insight_quran,
                             compactProgress = compactProgress,
+                            isFocused = isFocused,
+                            ambientProgress = autoAdvanceProgress.value,
+                            readingSurahIndex = dailySurah.number - 1,
+                            readingPlayback = dailyReadingPlayback,
+                            onReadingPlayPause = {
+                                interactionEpoch++
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                onDailyReadingPlayPause(dailySurah.number - 1)
+                            },
+                            onReadingRetry = {
+                                interactionEpoch++
+                                onDailyReadingRetry()
+                            },
+                            actionLabel = "Read",
                             actionDescription = "Open ${dailySurah.nameEnglish}",
                             onClick = {
+                                interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 onSurahClick(dailySurah.number)
                             },
@@ -1389,8 +1573,13 @@ fun SwipeableBigTiles(
                             footerText = "Open the live compass and 3D globe",
                             backgroundPainterRes = R.drawable.insight_qibla,
                             compactProgress = compactProgress,
+                            isFocused = isFocused,
+                            ambientProgress = autoAdvanceProgress.value,
+                            directionalHintBearing = qiblaBearing,
+                            deviceHeadingDegrees = liveQiblaHeading,
                             actionDescription = "Open Qibla compass",
                             onClick = {
+                                interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 showGlobePopup = true
                             },
@@ -1403,8 +1592,15 @@ fun SwipeableBigTiles(
                             footerText = aiRecommendation.footerText,
                             backgroundPainterRes = R.drawable.insight_suggestion,
                             compactProgress = compactProgress,
+                            isFocused = isFocused,
+                            ambientProgress = autoAdvanceProgress.value,
+                            actionLabel = when (aiRecommendation.target) {
+                                is ContextualRecommendationTarget.Surah -> "Read"
+                                is ContextualRecommendationTarget.FortressDua -> "Open dua"
+                            },
                             actionDescription = aiRecommendation.actionDescription,
                             onClick = {
+                                interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 when (val target = aiRecommendation.target) {
                                     is ContextualRecommendationTarget.Surah -> {
@@ -1502,9 +1698,22 @@ private fun InsightPreviewCard(
     title: String,
     backgroundPainterRes: Int,
     compactProgress: Float,
+    isFocused: Boolean = false,
+    ambientProgress: Float = 0f,
     supportingText: String? = null,
     footerText: String? = null,
+    timelineProgress: Float? = null,
     prayerRecap: List<PrayerRecapIndicator> = emptyList(),
+    onPrayerToggle: ((String) -> Unit)? = null,
+    undoPrayerName: String? = null,
+    onPrayerUndo: (() -> Unit)? = null,
+    readingSurahIndex: Int? = null,
+    readingPlayback: DailyReadingPlaybackState = DailyReadingPlaybackState(),
+    onReadingPlayPause: (() -> Unit)? = null,
+    onReadingRetry: (() -> Unit)? = null,
+    directionalHintBearing: Int? = null,
+    deviceHeadingDegrees: Float? = null,
+    actionLabel: String? = null,
     actionDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -1514,6 +1723,26 @@ private fun InsightPreviewCard(
     val cornerExtent = (26f - (8f * compactProgress)).dp
     val shape = ContinuousCornerShape(cornerExtent)
     val shadowElevation = (6f - (2f * compactProgress)).dp
+    val rawDirectionalRotation = directionalHintBearing?.let { bearing ->
+        normalizeDegrees(bearing - (deviceHeadingDegrees ?: 0f))
+    }
+    var continuousDirectionalRotation by remember(directionalHintBearing) {
+        mutableFloatStateOf(rawDirectionalRotation ?: 0f)
+    }
+    LaunchedEffect(rawDirectionalRotation) {
+        rawDirectionalRotation?.let { target ->
+            val shortestDelta = shortestAngleDelta(continuousDirectionalRotation, target)
+            continuousDirectionalRotation += shortestDelta
+        }
+    }
+    val animatedDirectionalRotation by animateFloatAsState(
+        targetValue = continuousDirectionalRotation,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "liveQiblaDirection",
+    )
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -1552,14 +1781,20 @@ private fun InsightPreviewCard(
             val footerFontSize = (12f - (3f * compactProgress)).sp
             val footerLineHeight = (16f - (4f * compactProgress)).sp
             val recapIndicatorSize = (24f - (7f * compactProgress)).dp
-            val recapIndicatorSpacing = (5f - (2f * compactProgress)).dp
             val recapFontSize = (11f - (3f * compactProgress)).sp
 
             Image(
                 painter = painterResource(backgroundPainterRes),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val focusedMotion = if (isFocused) ambientProgress else 0f
+                        val imageScale = 1f + (0.035f * focusedMotion)
+                        scaleX = imageScale
+                        scaleY = imageScale
+                    },
             )
 
             Box(
@@ -1580,42 +1815,202 @@ private fun InsightPreviewCard(
                     ),
             )
 
-            NiaTopicTag(
+            val showHeaderActions = compactProgress < 0.5f &&
+                (onClick != null || onReadingPlayPause != null || directionalHintBearing != null || onPrayerUndo != null)
+            val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null
+
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .fillMaxWidth()
                     .padding(tagInset),
-                followed = false,
-                onClick = onClick ?: {},
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = labelFontSize,
-                        letterSpacing = 0.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                )
-            }
-
-            if (onClick != null && compactProgress < 0.5f) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(tagInset)
-                        .size(34.dp),
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.34f),
-                    shadowElevation = 0.dp,
+                NiaTopicTag(
+                    followed = false,
+                    onClick = onClick ?: {},
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = actionDescription,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = labelFontSize,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+
+                if (showHeaderActions) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Row(
+                    horizontalArrangement = Arrangement.spacedBy(if (isReadingHeader) 4.dp else 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                    if (undoPrayerName != null && onPrayerUndo != null) {
+                        Surface(
+                            onClick = onPrayerUndo,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            shadowElevation = 0.dp,
+                            modifier = Modifier.semantics {
+                                liveRegion = LiveRegionMode.Polite
+                                contentDescription = "$undoPrayerName changed. Undo"
+                            },
+                        ) {
+                            Text(
+                                text = "Undo",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            )
+                        }
+                    }
+
+                    if (readingSurahIndex != null && onReadingPlayPause != null) {
+                        val isCurrentReading = readingPlayback.surahIndex == readingSurahIndex
+                        Surface(
+                            onClick = if (readingPlayback.error != null) {
+                                onReadingRetry ?: onReadingPlayPause
+                            } else {
+                                onReadingPlayPause
+                            },
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.42f),
+                            shadowElevation = 0.dp,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                when {
+                                    readingPlayback.isDownloading && isCurrentReading -> {
+                                        CircularProgressIndicator(
+                                            progress = { readingPlayback.downloadProgress.coerceIn(0.02f, 1f) },
+                                            color = Color.White,
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+
+                                    readingPlayback.isLoading && isCurrentReading -> {
+                                        CircularProgressIndicator(
+                                            color = Color.White,
+                                            strokeWidth = 2.dp,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+
+                                    readingPlayback.error != null && isCurrentReading -> {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Retry daily Surah audio",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+
+                                    readingPlayback.isPlaying && isCurrentReading -> {
+                                        Icon(
+                                            imageVector = Icons.Default.Pause,
+                                            contentDescription = "Pause daily Surah",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+
+                                    else -> {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Listen to daily Surah",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(21.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (directionalHintBearing != null) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.38f),
+                            shadowElevation = 0.dp,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .graphicsLayer {
+                                    val pulse = if (isFocused) {
+                                        kotlin.math.sin(ambientProgress * PI.toFloat() * 2f) * 0.05f
+                                    } else {
+                                        0f
+                                    }
+                                    scaleX = 1f + pulse
+                                    scaleY = 1f + pulse
+                                },
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Navigation,
+                                    contentDescription = if (deviceHeadingDegrees != null) {
+                                        "Live Qibla direction"
+                                    } else {
+                                        "Bearing $directionalHintBearing degrees from north"
+                                    },
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(animatedDirectionalRotation),
+                                )
+                            }
+                        }
+                    } else if (onClick != null) {
+                        Surface(
+                            modifier = (if (actionLabel != null) {
+                                Modifier.height(40.dp)
+                            } else {
+                                Modifier.size(40.dp)
+                            })
+                                .graphicsLayer {
+                                    val pulse = if (isFocused) ambientProgress * 0.04f else 0f
+                                    scaleX = 1f + pulse
+                                    scaleY = 1f + pulse
+                                },
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.34f),
+                            shadowElevation = 0.dp,
+                        ) {
+                            Row(
+                                modifier = if (actionLabel != null) {
+                                    Modifier.padding(
+                                        start = if (isReadingHeader) 8.dp else 11.dp,
+                                        end = if (isReadingHeader) 4.dp else 7.dp,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                actionLabel?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = actionDescription,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(
+                                        if (isReadingHeader) 16.dp else if (actionLabel != null) 18.dp else 20.dp,
+                                    ),
+                                )
+                            }
+                        }
+                    }
                     }
                 }
             }
@@ -1633,49 +2028,71 @@ private fun InsightPreviewCard(
             ) {
                 if (prayerRecap.isNotEmpty()) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(recapIndicatorSpacing),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         prayerRecap.forEach { prayer ->
                             Box(
                                 modifier = Modifier
-                                    .size(recapIndicatorSize)
-                                    .background(
-                                        color = if (prayer.isPrayed) {
-                                            MaterialTheme.colorScheme.primary
+                                    .size(40.dp)
+                                    .semantics {
+                                        contentDescription = if (prayer.isPrayed) {
+                                            "${prayer.name} completed. Tap to unmark"
                                         } else {
-                                            Color.Black.copy(alpha = 0.28f)
-                                        },
-                                        shape = CircleShape,
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (prayer.isPrayed) {
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                            "${prayer.name} not completed. Tap to mark"
+                                        }
+                                        selected = prayer.isPrayed
+                                    }
+                                    .then(
+                                        if (onPrayerToggle != null) {
+                                            Modifier.clickable { onPrayerToggle(prayer.name) }
                                         } else {
-                                            Color.White.copy(alpha = 0.48f)
+                                            Modifier
                                         },
-                                        shape = CircleShape,
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text(
-                                    text = prayer.initial,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = recapFontSize,
-                                        lineHeight = recapFontSize,
-                                        platformStyle = PlatformTextStyle(
-                                            includeFontPadding = false,
+                                Box(
+                                    modifier = Modifier
+                                        .size(recapIndicatorSize)
+                                        .background(
+                                            color = if (prayer.isPrayed) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                Color.Black.copy(alpha = 0.28f)
+                                            },
+                                            shape = CircleShape,
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (prayer.isPrayed) {
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                            } else {
+                                                Color.White.copy(alpha = 0.48f)
+                                            },
+                                            shape = CircleShape,
                                         ),
-                                    ),
-                                    color = if (prayer.isPrayed) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        Color.White.copy(alpha = 0.78f)
-                                    },
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                )
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = if (prayer.isPrayed) "✓" else prayer.initial,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = recapFontSize,
+                                            lineHeight = recapFontSize,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
+                                        ),
+                                        color = if (prayer.isPrayed) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            Color.White.copy(alpha = 0.78f)
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1709,6 +2126,18 @@ private fun InsightPreviewCard(
                     )
                 }
 
+                timelineProgress?.let { progress ->
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.White.copy(alpha = 0.22f),
+                    )
+                }
+
                 footerText?.takeIf { it.isNotBlank() }?.let { text ->
                     Text(
                         text = text,
@@ -1728,6 +2157,26 @@ private fun InsightPreviewCard(
     }
 }
 
+private fun prayerWindowProgress(
+    prayerTimes: DayPrayerTimes?,
+    currentTime: LocalTime,
+): Float? {
+    val times = prayerTimes?.let {
+        listOf(it.fajr, it.sunrise, it.dhuhr, it.asr, it.maghrib, it.isha)
+    } ?: return null
+    val nowMinute = currentTime.hour * 60 + currentTime.minute
+    val scheduleMinutes = times
+        .map { it.hour * 60 + it.minute }
+        .sorted()
+    val previous = scheduleMinutes.lastOrNull { it <= nowMinute }
+        ?: scheduleMinutes.last() - (24 * 60)
+    val next = scheduleMinutes.firstOrNull { it > nowMinute }
+        ?: scheduleMinutes.first() + (24 * 60)
+    if (next <= previous) return null
+    return ((nowMinute - previous).toFloat() / (next - previous).toFloat())
+        .coerceIn(0f, 1f)
+}
+
 private fun qiblaCardinalDirection(bearing: Int): String {
     val directions = listOf(
         "North", "Northeast", "East", "Southeast",
@@ -1736,6 +2185,138 @@ private fun qiblaCardinalDirection(bearing: Int): String {
     val normalized = ((bearing % 360) + 360) % 360
     val index = ((normalized + 22.5) / 45.0).toInt() % directions.size
     return "${directions[index]} from your location"
+}
+
+private fun normalizeDegrees(value: Float): Float = ((value % 360f) + 360f) % 360f
+
+private fun shortestAngleDelta(from: Float, to: Float): Float =
+    normalizeDegrees(to - from + 180f) - 180f
+
+/** Reads a smoothed true-north heading only while the Qibla preview is visible. */
+@Composable
+private fun rememberLiveCompassHeading(
+    enabled: Boolean,
+    latitude: Double?,
+    longitude: Double?,
+): Float? {
+    val context = LocalContext.current
+    var heading by remember { mutableStateOf<Float?>(null) }
+    val magneticDeclination = remember(latitude, longitude) {
+        if (latitude != null && longitude != null) {
+            GeomagneticField(
+                latitude.toFloat(),
+                longitude.toFloat(),
+                0f,
+                System.currentTimeMillis(),
+            ).declination
+        } else {
+            0f
+        }
+    }
+
+    DisposableEffect(context, enabled, magneticDeclination) {
+        if (!enabled) {
+            return@DisposableEffect onDispose { }
+        }
+
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        if (sensorManager == null) {
+            return@DisposableEffect onDispose { }
+        }
+
+        val orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+        val rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+        val gravity = FloatArray(3)
+        val geomagnetic = FloatArray(3)
+        val rotationMatrix = FloatArray(9)
+        val orientation = FloatArray(3)
+        var hasGravity = false
+        var hasGeomagnetic = false
+        var lastPublishedHeading = heading
+        var lastUpdateAt = 0L
+
+        fun publishHeading(rawMagneticHeading: Float) {
+            val now = System.currentTimeMillis()
+            if (now - lastUpdateAt < 50L) return
+
+            val correctedHeading = normalizeDegrees(rawMagneticHeading + magneticDeclination)
+            val previous = lastPublishedHeading
+            val nextHeading = if (previous == null) {
+                correctedHeading
+            } else {
+                normalizeDegrees(previous + shortestAngleDelta(previous, correctedHeading) * 0.24f)
+            }
+            if (previous == null || kotlin.math.abs(shortestAngleDelta(previous, nextHeading)) >= 0.35f) {
+                lastPublishedHeading = nextHeading
+                heading = nextHeading
+            }
+            lastUpdateAt = now
+        }
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                when (event.sensor.type) {
+                    Sensor.TYPE_ORIENTATION -> publishHeading(event.values[0])
+
+                    Sensor.TYPE_ROTATION_VECTOR -> {
+                        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                        SensorManager.getOrientation(rotationMatrix, orientation)
+                        publishHeading(Math.toDegrees(orientation[0].toDouble()).toFloat())
+                    }
+
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        event.values.copyInto(gravity, endIndex = 3)
+                        hasGravity = true
+                    }
+
+                    Sensor.TYPE_MAGNETIC_FIELD -> {
+                        event.values.copyInto(geomagnetic, endIndex = 3)
+                        hasGeomagnetic = true
+                    }
+                }
+
+                if (orientationSensor == null && rotationVectorSensor == null && hasGravity && hasGeomagnetic &&
+                    SensorManager.getRotationMatrix(rotationMatrix, null, gravity, geomagnetic)
+                ) {
+                    SensorManager.getOrientation(rotationMatrix, orientation)
+                    publishHeading(Math.toDegrees(orientation[0].toDouble()).toFloat())
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+
+        when {
+            orientationSensor != null -> sensorManager.registerListener(
+                listener,
+                orientationSensor,
+                SensorManager.SENSOR_DELAY_UI,
+            )
+
+            rotationVectorSensor != null -> sensorManager.registerListener(
+                listener,
+                rotationVectorSensor,
+                SensorManager.SENSOR_DELAY_UI,
+            )
+
+            else -> {
+                accelerometer?.let {
+                    sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_UI)
+                }
+                magnetometer?.let {
+                    sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_UI)
+                }
+            }
+        }
+
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+
+    return heading
 }
 
 @Suppress("UNUSED_PARAMETER")

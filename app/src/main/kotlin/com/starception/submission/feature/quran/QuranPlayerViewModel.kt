@@ -26,6 +26,7 @@ class QuranPlayerViewModel(
 
     private var playbackService: QuranPlaybackService? = null
     private var serviceBound = false
+    private var pendingPlaySurahIndex: Int? = null
 
     // Player state - using private backing fields for internal mutation
     private var _isPlaying = mutableStateOf(false)
@@ -74,6 +75,7 @@ class QuranPlayerViewModel(
             // Set up callbacks
             playbackService?.onPlaybackStateChanged = { playing ->
                 _isPlaying.value = playing
+                _isLoading.value = false
             }
             playbackService?.onSurahChanged = { index ->
                 _currentSurahIndex.value = index
@@ -97,6 +99,11 @@ class QuranPlayerViewModel(
             _currentSurahIndex.value = playbackService?.getCurrentSurahIndex() ?: 0
 
             Log.d("QuranPlayerViewModel", "Service connected")
+
+            pendingPlaySurahIndex?.let { index ->
+                pendingPlaySurahIndex = null
+                playbackService?.playSurah(index)
+            }
 
             // Start progress tracking
             startProgressTracking()
@@ -137,7 +144,12 @@ class QuranPlayerViewModel(
         _isLoading.value = true
         _errorMessage.value = null
         _currentSurahIndex.value = index
-        playbackService?.playSurah(index)
+        val service = playbackService
+        if (service == null) {
+            pendingPlaySurahIndex = index
+        } else {
+            service.playSurah(index)
+        }
     }
 
     fun toggleLanguage() {
@@ -201,6 +213,7 @@ class QuranPlayerViewModel(
         viewModelScope.launch {
             try {
                 _isDownloading.value = true
+                _isLoading.value = false
                 _downloadProgress.value = 0f
                 _downloadError.value = null
                 Log.i("QuranPlayerViewModel", "Starting on-demand download: $cdnKey")
@@ -236,10 +249,12 @@ class QuranPlayerViewModel(
                         _isDownloading.value = false
                         _downloadProgress.value = 0f
                         _downloadError.value = result.error
+                        _isLoading.value = false
                     }
                     else -> {
                         _isDownloading.value = false
                         _downloadProgress.value = 0f
+                        _isLoading.value = false
                     }
                 }
             } catch (e: Exception) {
@@ -247,6 +262,7 @@ class QuranPlayerViewModel(
                 _isDownloading.value = false
                 _downloadProgress.value = 0f
                 _downloadError.value = e.message ?: "Download failed"
+                _isLoading.value = false
             }
         }
     }
@@ -264,6 +280,7 @@ class QuranPlayerViewModel(
      * Called from DisposableEffect when composable leaves composition.
      */
     fun cleanup() {
+        pendingPlaySurahIndex = null
         if (serviceBound) {
             try {
                 context.unbindService(serviceConnection)

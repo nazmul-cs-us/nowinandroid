@@ -21,6 +21,9 @@ import android.content.SharedPreferences
 import android.util.Log
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Tracks which prayers have been marked as prayed by the user
@@ -31,13 +34,28 @@ object PrayerTracker {
     private const val KEY_PRAYED_PRAYERS_PREFIX = "prayed_prayers_"
     
     private lateinit var prefs: SharedPreferences
+    private var observedDate: String? = null
+    private val _prayedPrayersToday = MutableStateFlow<Set<String>>(emptySet())
+    val prayedPrayersToday: StateFlow<Set<String>> = _prayedPrayersToday.asStateFlow()
     
     /**
      * Initialize the tracker with application context
      */
     fun initialize(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        refreshToday()
         Log.d(TAG, "PrayerTracker initialized")
+    }
+
+    /** Refreshes the reactive snapshot, including across a midnight date change. */
+    fun refreshToday() {
+        if (!::prefs.isInitialized) return
+        val today = todayKey()
+        val current = getPrayedPrayersForDate(today).toSet()
+        if (observedDate != today || _prayedPrayersToday.value != current) {
+            observedDate = today
+            _prayedPrayersToday.value = current
+        }
     }
     
     /**
@@ -62,6 +80,8 @@ object PrayerTracker {
         prefs.edit()
             .putStringSet(key, prayedPrayers)
             .apply()
+        observedDate = today
+        _prayedPrayersToday.value = prayedPrayers.toSet()
 
         Log.i(TAG, "✅ Marked $prayerName as prayed for $today. Total prayed: ${prayedPrayers.size}")
     }
@@ -88,6 +108,8 @@ object PrayerTracker {
         prefs.edit()
             .putStringSet(key, prayedPrayers)
             .apply()
+        observedDate = today
+        _prayedPrayersToday.value = prayedPrayers.toSet()
 
         Log.i(TAG, "❌ Unmarked $prayerName as prayed for $today. Total prayed: ${prayedPrayers.size}")
     }
@@ -112,8 +134,13 @@ object PrayerTracker {
             return 0
         }
         
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        return getPrayedPrayersForDate(today).size
+        refreshToday()
+        return _prayedPrayersToday.value.size
+    }
+
+    fun getPrayedPrayersToday(): Set<String> {
+        refreshToday()
+        return _prayedPrayersToday.value
     }
     
     /**
@@ -132,8 +159,8 @@ object PrayerTracker {
      * Check if a specific prayer has been marked as prayed today
      */
     fun isPrayerMarkedToday(prayerName: String): Boolean {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        return getPrayedPrayersForDate(today).contains(prayerName)
+        refreshToday()
+        return _prayedPrayersToday.value.contains(prayerName)
     }
     
     /**
@@ -147,8 +174,13 @@ object PrayerTracker {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val key = "$KEY_PRAYED_PRAYERS_PREFIX$today"
         prefs.edit().remove(key).apply()
+        observedDate = today
+        _prayedPrayersToday.value = emptySet()
         Log.d(TAG, "Cleared prayed prayers for $today")
     }
+
+    private fun todayKey(): String =
+        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     
     /**
      * Clean up old prayer records (older than 7 days)
@@ -173,4 +205,3 @@ object PrayerTracker {
         }
     }
 }
-

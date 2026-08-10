@@ -178,6 +178,8 @@ import com.starception.submission.feature.prayertimes.utils.getCurrentDate
 import com.starception.submission.feature.prayertimes.utils.formatTime
 import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.starception.submission.feature.quran.QuranPlayerViewModel
 import com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint
 import com.starception.submission.feature.prayertimes.animations.RefreshIndicator
 import com.starception.submission.feature.prayertimes.animations.FlowingArrowsAnimation
@@ -332,6 +334,15 @@ fun PrayerTimesScreen(
     onSetSyncing: (Boolean) -> Unit = {},
 ) {
     val screenContext = LocalContext.current
+    val dailyReadingPlayer: QuranPlayerViewModel = viewModel(
+        key = "homeDailyReadingPlayer",
+    ) {
+        val audioDownloadHelper = EntryPointAccessors.fromApplication(
+            screenContext.applicationContext,
+            AudioDownloadHelperEntryPoint::class.java,
+        ).audioDownloadHelper()
+        QuranPlayerViewModel(screenContext.applicationContext, audioDownloadHelper)
+    }
     val contextualDuasByChapter by produceState(
         initialValue = emptyMap<Int, List<com.starception.submission.core.duadatabase.Dua>>(),
         key1 = screenContext.applicationContext,
@@ -500,23 +511,14 @@ fun PrayerTimesScreen(
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
 
-    // PRAYER COUNTER STATE - Tracks how many prayers have been marked as prayed today
-    var prayedCount by remember { mutableStateOf(
-        try {
-            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
-        } catch (e: Exception) {
-            0
-        }
-    ) }
+    val prayedPrayersToday by com.starception.submission.util.PrayerTracker
+        .prayedPrayersToday
+        .collectAsStateWithLifecycle()
+    val prayedCount = prayedPrayersToday.size
 
     // Track current time updates for prayer status calculations
     LaunchedEffect(currentTime) {
-        // Update prayed count when time changes (this happens every minute)
-        prayedCount = try {
-            com.starception.submission.util.PrayerTracker.getPrayedCountToday()
-        } catch (e: Exception) {
-            0
-        }
+        com.starception.submission.util.PrayerTracker.refreshToday()
         android.util.Log.d("PrayerTimesScreen", "⏰ CURRENT TIME UPDATED: $currentTime")
         prayerTimes?.let { times ->
             val nextPrayer = times.getNextPrayer()
@@ -1707,6 +1709,26 @@ fun PrayerTimesScreen(
                                     SmartContentUtils.getDailyStatsMessage(completed, total)
                                 },
                                 getPrayed = { prayedCount },
+                                prayedPrayers = prayedPrayersToday,
+                                onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
+                                dailyReadingPlayback = DailyReadingPlaybackState(
+                                    surahIndex = dailyReadingPlayer.currentSurahIndex,
+                                    isPlaying = dailyReadingPlayer.isPlaying,
+                                    isLoading = dailyReadingPlayer.isLoading,
+                                    isDownloading = dailyReadingPlayer.isDownloading,
+                                    downloadProgress = dailyReadingPlayer.downloadProgress,
+                                    error = dailyReadingPlayer.downloadError,
+                                ),
+                                onDailyReadingPlayPause = { surahIndex ->
+                                    if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
+                                        (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
+                                    ) {
+                                        dailyReadingPlayer.togglePlayPause()
+                                    } else {
+                                        dailyReadingPlayer.playSurah(surahIndex)
+                                    }
+                                },
+                                onDailyReadingRetry = dailyReadingPlayer::retryDownload,
                                 getCurrentActivity = {
                                     try {
                                         com.starception.submission.util.ActivityTracker.getCurrentActivity()
@@ -1726,6 +1748,7 @@ fun PrayerTimesScreen(
                                 onFortressDuaClick = onFortressDuaClick,
                                 fortressDuasByChapter = contextualDuasByChapter,
                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
+                                isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                             )
                         }
 
@@ -1949,6 +1972,26 @@ fun PrayerTimesScreen(
                         SmartContentUtils.getDailyStatsMessage(completed, total) 
                     },
                     getPrayed = { prayedCount },
+                    prayedPrayers = prayedPrayersToday,
+                    onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
+                    dailyReadingPlayback = DailyReadingPlaybackState(
+                        surahIndex = dailyReadingPlayer.currentSurahIndex,
+                        isPlaying = dailyReadingPlayer.isPlaying,
+                        isLoading = dailyReadingPlayer.isLoading,
+                        isDownloading = dailyReadingPlayer.isDownloading,
+                        downloadProgress = dailyReadingPlayer.downloadProgress,
+                        error = dailyReadingPlayer.downloadError,
+                    ),
+                    onDailyReadingPlayPause = { surahIndex ->
+                        if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
+                            (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
+                        ) {
+                            dailyReadingPlayer.togglePlayPause()
+                        } else {
+                            dailyReadingPlayer.playSurah(surahIndex)
+                        }
+                    },
+                    onDailyReadingRetry = dailyReadingPlayer::retryDownload,
                     getCurrentActivity = { 
                         // Get current activity from ActivityTracker
                         try {
@@ -1969,6 +2012,7 @@ fun PrayerTimesScreen(
                     onFortressDuaClick = onFortressDuaClick,
                     fortressDuasByChapter = contextualDuasByChapter,
                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
+                    isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
                 )
                 }
 
