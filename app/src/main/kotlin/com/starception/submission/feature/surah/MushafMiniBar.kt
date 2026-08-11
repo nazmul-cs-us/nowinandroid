@@ -39,6 +39,14 @@ fun MushafMiniBar(
     onNext: () -> Unit,
     onOpenInfo: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Optional strip status (prayer alert, sync, Islamic event, …) shown in place
+     * of the surah's secondary name line. The strip has exactly one row, so a
+     * status that is live while reading rides here rather than claiming a row.
+     */
+    statusText: String? = null,
+    /** See [MiniBarShell]; off in the strip, whose sweep already shows the page. */
+    showProgressLine: Boolean = true,
 ) {
     val haptic = LocalHapticFeedback.current
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -54,6 +62,7 @@ fun MushafMiniBar(
     MiniBarShell(
         progress = progress,
         modifier = modifier,
+        showProgressLine = showProgressLine,
     ) {
         Row(
             modifier = Modifier
@@ -72,18 +81,22 @@ fun MushafMiniBar(
             Text(
                 text = state.surahNameArabic,
                 style = MaterialTheme.typography.titleMedium,
-                fontSize = 15.sp,
-                lineHeight = 17.sp,
+                fontSize = 17.sp,
+                lineHeight = 19.sp,
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "· ${state.surahNameEnglish} · ${state.surahNumber}",
+                text = if (statusText != null) {
+                    "· $statusText"
+                } else {
+                    "· ${state.surahNameEnglish} · ${state.surahNumber}"
+                },
                 style = MaterialTheme.typography.bodyMedium,
-                fontSize = 12.sp,
-                lineHeight = 14.sp,
+                fontSize = 14.sp,
+                lineHeight = 16.sp,
                 color = secondaryColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -92,7 +105,7 @@ fun MushafMiniBar(
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = "Show Surah information",
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(15.dp),
                 tint = secondaryColor,
             )
         }
@@ -100,8 +113,8 @@ fun MushafMiniBar(
         Text(
             text = "${state.currentPage}/${state.totalPages}",
             style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            lineHeight = 14.sp,
+            fontSize = 14.sp,
+            lineHeight = 16.sp,
             fontWeight = FontWeight.SemiBold,
             color = contentColor.copy(alpha = 0.82f),
             maxLines = 1,
@@ -120,7 +133,7 @@ fun MushafMiniBar(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 contentDescription = "Previous page",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = if (canGoPrevious) 0.78f else 0.22f),
             )
         }
@@ -136,7 +149,7 @@ fun MushafMiniBar(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Next page",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = if (canGoNext) 0.90f else 0.22f),
             )
         }

@@ -13,6 +13,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
@@ -21,24 +22,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material3.Icon
@@ -47,15 +43,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -74,12 +73,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.starception.submission.feature.surah.MushafMiniBar
 import com.starception.submission.feature.surah.MushafMiniBarState
 import com.starception.submission.media.MediaAction
 import com.starception.submission.media.MediaControllerUiState
 import com.starception.submission.media.MediaMiniBar
+import com.starception.submission.ui.MiniBarRowHeight
+import kotlinx.coroutines.delay
 
 /**
  * Sync container state forwarded to the content lambda. `pullModifier` carries
@@ -124,8 +126,6 @@ fun PullToSyncContainer(
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
     isTtsPreparing: Boolean = false,
-    refreshingHoldFraction: Float = 0.50f,
-    downloadingHoldFraction: Float = 0.50f,
     mediaState: MediaControllerUiState = MediaControllerUiState(),
     onMediaAction: (MediaAction) -> Unit = {},
     onMediaTitleClick: () -> Unit = {},
@@ -234,58 +234,40 @@ fun PullToSyncContainer(
         )
     )
 
-    // Persistent banner height is derived from what is actually rendered. The
-    // previous fixed fractions left a large empty band above a single prayer
-    // alert and could still clip a status row stacked over the media controls.
+    // ── One standard bar height, for every kind of information ──────────────
+    // Every state the strip can be in — media, Mushaf, prayer alert, Islamic
+    // event, silent mode, sync, download, TTS — renders inside the same single
+    // [MiniBarRowHeight] row and therefore holds the page down by exactly the
+    // same amount. Previously each state computed its own height (a sync banner
+    // held 110dp while a prayer alert held ~60dp, and media grew by another row
+    // when a status stacked on it), so the strip visibly jumped as state changed.
     val baseMaxRevealDp =
         if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 130f else 220f
     val bannerDensity = LocalDensity.current
     val bannerTopInsetDp = with(bannerDensity) {
         WindowInsets.safeDrawing.getTop(this).toDp()
     }
-    // Match the rendered rows, while still allowing text to grow with the
-    // user's font scale. Standalone rows use an 18dp indicator; compact rows
-    // above media use a 14dp indicator.
-    val bannerRowDp = maxOf(18.dp, with(bannerDensity) { 16.sp.toDp() })
-    val compactBannerRowDp = maxOf(14.dp, with(bannerDensity) { 14.sp.toDp() })
-    val miniBarRowDp = 30.dp
-    // Pull the compact strips into the otherwise unused lower portion of the
-    // cutout-safe area while retaining clearance from the camera/status region.
-    val bannerTopInsetPadding = (bannerTopInsetDp - 10.dp).coerceAtLeast(0.dp)
-    val bannerTopPadding = 0.dp
-    val bannerBottomPadding = 6.dp
-    val bannerVerticalPadding = bannerTopPadding + bannerBottomPadding
-    // The persistent mini bars use the status-bar space more efficiently. Their
-    // total hold height now equals a normal one-line alert at the default scale.
-    val miniBarTopInsetPadding = (bannerTopInsetDp - 20.dp).coerceAtLeast(0.dp)
-    val miniBarBottomPadding = 4.dp
-    val stackedRowSpacing = 4.dp
+    // Sit inside the otherwise unused lower portion of the cutout-safe area
+    // while retaining clearance from the camera/status region.
+    val barTopInsetPadding = (bannerTopInsetDp - 20.dp).coerceAtLeast(0.dp)
+    val barBottomPadding = 4.dp
+    // Fixed row, but still allowed to grow with the user's font scale so long
+    // labels never clip.
+    val barRowDp = maxOf(MiniBarRowHeight, with(bannerDensity) { 17.sp.toDp() } + 13.dp)
+    val standardBarHeightDp = barTopInsetPadding + barRowDp + barBottomPadding
     val isMushafActive = mushafState != null
 
-    // Match the same priority as the rendering branches below. In particular,
-    // media remains the visible row while TTS is preparing, so its height must
-    // win over the generic preparing-audio banner height.
-    val targetHoldHeightDp = when {
-        mediaState.isVisible -> {
-            val statusRowDp = if (isPrayerAlert || isSilentMode) {
-                compactBannerRowDp + stackedRowSpacing
-            } else {
-                0.dp
-            }
-            miniBarTopInsetPadding + miniBarBottomPadding + statusRowDp + miniBarRowDp
-        }
-        isPrayerAlert || isIslamicEvent || isSilentMode ->
-            bannerTopInsetPadding + bannerVerticalPadding + bannerRowDp
-        isMushafActive -> miniBarTopInsetPadding + miniBarBottomPadding + miniBarRowDp
-        isRefreshing || isDownloading || isTtsPreparing -> {
-            val holdFraction = if (isDownloading) downloadingHoldFraction else refreshingHoldFraction
-            (baseMaxRevealDp * holdFraction).dp
-        }
-        else -> 0.dp
+    // Nothing here branches on *which* information is live: the row is either up
+    // at its standard height or fully closed.
+    val hasStatus = isPrayerAlert || isIslamicEvent || isSilentMode ||
+        isRefreshing || isDownloading || isTtsPreparing
+    val targetHoldHeightDp = if (mediaState.isVisible || isMushafActive || hasStatus) {
+        standardBarHeightDp
+    } else {
+        0.dp
     }
-    // Normally the pull gesture can reveal more than any persistent banner. At
-    // large font scales or in landscape, allow a stacked banner to expand past
-    // the old cap rather than clipping it.
+    // Normally the pull gesture can reveal more than the resting bar. At large
+    // font scales or in landscape, let the bar expand past the cap rather than clip.
     val maxRevealDpForBanners = maxOf(baseMaxRevealDp, targetHoldHeightDp.value)
     val targetHoldFraction =
         (targetHoldHeightDp.value / maxRevealDpForBanners).coerceIn(0f, 1f)
@@ -352,13 +334,8 @@ fun PullToSyncContainer(
     val wobbleIntensity = maxOf(rawWobbleIntensity, refreshingOffset.value)
 
     // --- Fitbit-style visual parameters ---
-    // PRIMARY: Vertical translation (content pushes down)
-    // Download uses the same sheet geometry as sync so the banner-to-title spacing
-    // matches the pull-to-sync state exactly.
-    // The reveal is a fixed dp height; landscape screens are far shorter, so a
-    // portrait-sized reveal eats too much vertical space and squeezes the page
-    // content. Use a smaller reveal in landscape (the strip only needs a single line).
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // PRIMARY: Vertical translation (content pushes down). How far a finger drag
+    // can reveal — the resting bar is always [standardBarHeightDp] regardless.
     val maxRevealDp = maxRevealDpForBanners
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
@@ -390,6 +367,53 @@ fun PullToSyncContainer(
         ),
         label = "spin_angle"
     )
+
+    // Every status line that is live right now, most urgent first. They all
+    // share the single row: when a mini bar owns the row they ride along as its
+    // subtitle, otherwise the top one owns the row directly. With more than one
+    // live, the row cycles between them — that is how the bar carries several
+    // pieces of information without ever growing a second row.
+    val statuses = buildList {
+        if (isDownloading) {
+            val pct = (animatedDownloadProgress * 100).toInt()
+            val label = downloadLabel.ifEmpty { "Downloading" }
+            add(SyncBarStatus("download", "$label  $pct%", SyncBarIcon.Spinner))
+        }
+        if (isRefreshing) {
+            add(SyncBarStatus("sync", "Syncing your data", SyncBarIcon.Spinner))
+        }
+        // The media bar renders this as its own subtitle, so it would be a
+        // duplicate here.
+        if (isTtsPreparing && !mediaState.isVisible) {
+            add(SyncBarStatus("tts", "Preparing audio…", SyncBarIcon.Spinner))
+        }
+        if (isPrayerAlert) {
+            add(
+                SyncBarStatus(
+                    key = "prayer",
+                    text = prayerAlertState.displayText,
+                    icon = SyncBarIcon.Spinner,
+                    onDismiss = { prayerAlertDismissed = true },
+                ),
+            )
+        }
+        if (isIslamicEvent) {
+            add(
+                SyncBarStatus(
+                    key = "event:${islamicEventState.eventKey}",
+                    text = islamicEventState.title,
+                    icon = SyncBarIcon.Sparkle,
+                    onClick = { onIslamicEventClick(islamicEventState) },
+                    onDismiss = { islamicEventDismissed = true },
+                ),
+            )
+        }
+        if (isSilentMode) {
+            add(SyncBarStatus("silent", silentModeState.displayText, SyncBarIcon.DoNotDisturb))
+        }
+    }
+    val activeStatusIndex = rememberCyclingStatusIndex(statuses)
+    val activeStatus = statuses.getOrNull(activeStatusIndex)
 
     // Create sync container state for content
     val syncState = SyncContainerState(
@@ -499,89 +523,33 @@ fun PullToSyncContainer(
             content(syncState)
         }
 
-        // Indicator / media area: render above the content sheet in the revealed sage background.
-        // Media controls, download text, and sync indicators all render here.
-        // For media, fill the full height of the revealed area and center content vertically.
+        // Indicator row: one fixed-height line above the content sheet carrying
+        // whatever is live. A mini bar owns the row when playback or Mushaf
+        // reading is active and shows any status as its subtitle; otherwise the
+        // status owns the row itself. Either way the row — and so the height of
+        // the whole strip — is the same.
         if (wobbleIntensity > 0.05f) {
-            if (mediaState.isVisible) {
-                // --- Media Mini-Bar fills the sage area ---
-                // Pull-up-to-dismiss is scoped to the title column inside MediaMiniBar
-                // (via titleDragModifier) so playback button taps are not swallowed.
-                // If a prayer alert or silent-mode window is also live (e.g. Isha
-                // silence while a dua recitation plays), stack a compact chip on top
-                // so the user sees both instead of media silently winning the if/else.
-                Box(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .height(contentOffsetY)
-                        .padding(top = miniBarTopInsetPadding)
-                        .padding(bottom = miniBarBottomPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isPrayerAlert) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Canvas(modifier = Modifier.size(14.dp)) {
-                                    val strokeWidth = 1.5.dp.toPx()
-                                    drawArc(
-                                        color = indicatorColor,
-                                        startAngle = spinAngle,
-                                        sweepAngle = 270f,
-                                        useCenter = false,
-                                        style = Stroke(
-                                            width = strokeWidth,
-                                            cap = StrokeCap.Round
-                                        ),
-                                        topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                        size = androidx.compose.ui.geometry.Size(
-                                            size.width - strokeWidth,
-                                            size.height - strokeWidth
-                                        )
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = prayerAlertState.displayText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 13.sp,
-                                    color = indicatorColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        } else if (isSilentMode) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DoNotDisturbOn,
-                                    contentDescription = null,
-                                    tint = indicatorColor,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = silentModeState.displayText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 13.sp,
-                                    color = indicatorColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+            Box(
+                modifier = Modifier
+                    .zIndex(1f)
+                    .fillMaxWidth()
+                    .height(contentOffsetY)
+                    .padding(top = barTopInsetPadding, bottom = barBottomPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    mediaState.isVisible -> {
+                        // Pull-up-to-dismiss is scoped to the title inside MediaMiniBar
+                        // (via titleDragModifier) so playback button taps are not swallowed.
                         MediaMiniBar(
                             state = mediaState,
                             onAction = onMediaAction,
                             onTitleClick = onMediaTitleClick,
                             preparingAudio = isTtsPreparing,
+                            statusText = activeStatus?.text,
+                            // The strip's own sweep is the playback position, so a
+                            // track under the row would state it a second time.
+                            showProgressLine = false,
                             titleDragModifier = Modifier.pointerInput(Unit) {
                                 var totalDrag = 0f
                                 detectVerticalDragGestures(
@@ -599,331 +567,220 @@ fun PullToSyncContainer(
                             },
                         )
                     }
-                }
-            } else if (isPrayerAlert) {
-                Box(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .height(contentOffsetY)
-                        .padding(top = bannerTopInsetPadding)
-                        .pointerInput(Unit) {
-                            var totalDrag = 0f
-                            detectVerticalDragGestures(
-                                onDragStart = { totalDrag = 0f },
-                                onVerticalDrag = { _, dragAmount ->
-                                    totalDrag += dragAmount
-                                },
-                                onDragEnd = {
-                                    if (totalDrag < -80f) {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        prayerAlertDismissed = true
-                                    }
-                                },
-                            )
-                        }
-                        .padding(
-                            start = 16.dp,
-                            top = bannerTopPadding,
-                            end = 16.dp,
-                            bottom = bannerBottomPadding,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Canvas(
-                            modifier = Modifier.size(18.dp)
-                        ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
-                                color = indicatorColor,
-                                startAngle = spinAngle,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = prayerAlertState.displayText,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+
+                    mushafState != null -> {
+                        MushafMiniBar(
+                            state = mushafState,
+                            onPrevious = onMushafPrevious,
+                            onNext = onMushafNext,
+                            onOpenInfo = onMushafOpenInfo,
+                            statusText = activeStatus?.text,
+                            // The strip's sweep is already the page position;
+                            // drawing the same fraction twice reads as clutter.
+                            showProgressLine = false,
                         )
                     }
-                }
-            } else if (isIslamicEvent) {
-                Box(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .height(contentOffsetY)
-                        .padding(top = bannerTopInsetPadding)
-                        .pointerInput(islamicEventState.eventKey) {
-                            var totalDrag = 0f
-                            detectVerticalDragGestures(
-                                onDragStart = { totalDrag = 0f },
-                                onVerticalDrag = { _, dragAmount ->
-                                    totalDrag += dragAmount
-                                },
-                                onDragEnd = {
-                                    if (totalDrag < -80f) {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        islamicEventDismissed = true
-                                    }
+
+                    activeStatus != null -> {
+                        // Swap between cycling statuses rather than cutting, so the
+                        // row reads as one surface changing its message.
+                        Crossfade(
+                            targetState = activeStatus,
+                            animationSpec = tween(durationMillis = 220),
+                            label = "sync_bar_status",
+                        ) { status ->
+                            SyncBarStatusRow(
+                                status = status,
+                                totalStatuses = statuses.size,
+                                activeIndex = activeStatusIndex,
+                                spinAngle = spinAngle,
+                                contentColor = indicatorColor,
+                                onDismissed = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 },
                             )
                         }
-                        .padding(
-                            start = 16.dp,
-                            top = bannerTopPadding,
-                            end = 16.dp,
-                            bottom = bannerBottomPadding,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onIslamicEventClick(islamicEventState)
-                        },
-                    ) {
-                        Text(
-                            text = "✦",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = islamicEventState.title,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
                     }
-                }
-            } else if (isSilentMode) {
-                Box(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .height(contentOffsetY)
-                        .padding(top = bannerTopInsetPadding)
-                        .padding(
-                            start = 16.dp,
-                            top = bannerTopPadding,
-                            end = 16.dp,
-                            bottom = bannerBottomPadding,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.DoNotDisturbOn,
-                            contentDescription = null,
-                            tint = indicatorColor,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = silentModeState.displayText,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            } else if (mushafState != null) {
-                Box(
-                    modifier = Modifier
-                        .zIndex(1f)
-                        .fillMaxWidth()
-                        .height(contentOffsetY)
-                        .padding(top = miniBarTopInsetPadding)
-                        .padding(bottom = miniBarBottomPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MushafMiniBar(
-                        state = mushafState,
-                        onPrevious = onMushafPrevious,
-                        onNext = onMushafNext,
-                        onOpenInfo = onMushafOpenInfo,
-                    )
-                }
-            } else if (isRefreshing || isDownloading || isTtsPreparing || rawWobbleIntensity > 0.01f) {
-            // Only show sync/download indicators when actively dragging or syncing/downloading.
-            // Skip during settle-back animation after media dismiss (rawWobbleIntensity == 0).
-            Column(
-                modifier = Modifier
-                    .zIndex(1f)
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                    .padding(top = (wobbleIntensity * 8f).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (isDownloading) {
-                    val pct = (animatedDownloadProgress * 100).toInt()
-                    val label = if (downloadLabel.isNotEmpty()) downloadLabel else "Downloading"
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Canvas(
-                            modifier = Modifier.size(18.dp)
+
+                    // Nothing persistent is live — this is the transient pull gesture.
+                    rawWobbleIntensity > 0.01f -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
+                            },
                         ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
+                            Canvas(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .graphicsLayer {
+                                        rotationZ = wobbleIntensity * 360f
+                                    },
+                            ) {
+                                drawIndicatorArc(indicatorColor, startAngle = -90f)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (wobbleIntensity > 0.4f) "Release to sync" else "Pull to sync",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontSize = 15.sp,
                                 color = indicatorColor,
-                                startAngle = spinAngle,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "$label  $pct%",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                } else if (isTtsPreparing) {
-                    // TTS generating with no media session visible yet — show the
-                    // spinner banner (once the media bar appears, the status moves
-                    // into its subtitle instead).
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Canvas(
-                            modifier = Modifier.size(18.dp)
-                        ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
-                                color = indicatorColor,
-                                startAngle = spinAngle,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Preparing audio…",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor
-                        )
-                    }
-                } else if (isRefreshing) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Canvas(
-                            modifier = Modifier.size(18.dp)
-                        ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
-                                color = indicatorColor,
-                                startAngle = spinAngle,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Syncing your data",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor
-                        )
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
-                        }
-                    ) {
-                        Canvas(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .graphicsLayer {
-                                    rotationZ = wobbleIntensity * 360f
-                                }
-                        ) {
-                            val strokeWidth = 2.dp.toPx()
-                            drawArc(
-                                color = indicatorColor,
-                                startAngle = -90f,
-                                sweepAngle = 270f,
-                                useCenter = false,
-                                style = Stroke(
-                                    width = strokeWidth,
-                                    cap = StrokeCap.Round
-                                ),
-                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width - strokeWidth,
-                                    size.height - strokeWidth
-                                )
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (wobbleIntensity > 0.4f) "Release to sync" else "Pull to sync",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 14.sp,
-                            color = indicatorColor
-                        )
                     }
                 }
             }
-            } // close else (non-media indicator Column)
-        } // close if (wobbleIntensity > 0.05f)
+        }
+    }
+}
+
+/** Leading glyph for a [SyncBarStatus]. */
+private enum class SyncBarIcon { Spinner, Sparkle, DoNotDisturb }
+
+/**
+ * One line of information the top strip can show. Several can be live at once;
+ * the strip cycles between them inside its single row instead of stacking rows,
+ * so its height never depends on how much there is to say.
+ */
+private data class SyncBarStatus(
+    val key: String,
+    val text: String,
+    val icon: SyncBarIcon,
+    val onClick: (() -> Unit)? = null,
+    val onDismiss: (() -> Unit)? = null,
+)
+
+/** How long each status holds the row before the next one takes over. */
+private const val SyncBarStatusCycleMillis = 3_500L
+
+/**
+ * Index of the status currently holding the row. Restarts from the top whenever
+ * the live set changes, and stops advancing when there is only one — a lone
+ * status must never flicker.
+ */
+@Composable
+private fun rememberCyclingStatusIndex(statuses: List<SyncBarStatus>): Int {
+    val keys = statuses.joinToString("|") { it.key }
+    var index by remember { mutableIntStateOf(0) }
+    LaunchedEffect(keys) {
+        index = 0
+        if (statuses.size > 1) {
+            while (true) {
+                delay(SyncBarStatusCycleMillis)
+                index = (index + 1) % statuses.size
+            }
+        }
+    }
+    return if (statuses.isEmpty()) 0 else index % statuses.size
+}
+
+/** The shared spinning/steady indicator arc drawn beside a status. */
+private fun DrawScope.drawIndicatorArc(color: Color, startAngle: Float) {
+    val strokeWidth = 2.dp.toPx()
+    drawArc(
+        color = color,
+        startAngle = startAngle,
+        sweepAngle = 270f,
+        useCenter = false,
+        style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+        topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
+        size = Size(size.width - strokeWidth, size.height - strokeWidth),
+    )
+}
+
+/**
+ * A status occupying the strip's single row: glyph, message, and — when more
+ * than one status is live — dots showing which of them is on screen.
+ */
+@Composable
+private fun SyncBarStatusRow(
+    status: SyncBarStatus,
+    totalStatuses: Int,
+    activeIndex: Int,
+    spinAngle: Float,
+    contentColor: Color,
+    onDismissed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (status.onDismiss != null) {
+                    Modifier.pointerInput(status.key) {
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (totalDrag < -80f) {
+                                    onDismissed()
+                                    status.onDismiss.invoke()
+                                }
+                            },
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
+            .then(
+                if (status.onClick != null) {
+                    Modifier.clickable(onClick = status.onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when (status.icon) {
+            SyncBarIcon.Spinner -> Canvas(modifier = Modifier.size(18.dp)) {
+                drawIndicatorArc(contentColor, startAngle = spinAngle)
+            }
+
+            SyncBarIcon.Sparkle -> Text(
+                text = "✦",
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 15.sp,
+                color = contentColor,
+            )
+
+            SyncBarIcon.DoNotDisturb -> Icon(
+                imageVector = Icons.Default.DoNotDisturbOn,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = status.text,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 15.sp,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (totalStatuses > 1) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                repeat(totalStatuses) { dot ->
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(
+                                contentColor.copy(alpha = if (dot == activeIndex) 0.85f else 0.28f),
+                            ),
+                    )
+                }
+            }
+        }
     }
 }

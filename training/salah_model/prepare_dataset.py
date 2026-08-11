@@ -137,6 +137,25 @@ def decimate_to_window_period(rows: list[dict]) -> tuple[list[dict], int]:
     return kept, len(ordered) - len(kept)
 
 
+_output_dir_cleaned = False
+
+
+def ensure_clean_output_dir() -> None:
+    """Empty train_ready once per run, before the first file is written.
+
+    Recordings get renamed as their contents are re-derived (a session can go
+    from `..._full_...` to `..._partial8_...`), so copying without clearing left
+    the previous name behind. Two files, one session id — the session then lands
+    in more than one split and the test score reads high for the wrong reason.
+    """
+    global _output_dir_cleaned
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if not _output_dir_cleaned:
+        for stale in OUTPUT_DIR.glob("*.jsonl"):
+            stale.unlink()
+        _output_dir_cleaned = True
+
+
 def main(dry_run: bool) -> None:
     sources = sorted(p for p in DATA_ROOT.rglob("*.jsonl") if OUTPUT_DIR not in p.parents)
 
@@ -185,7 +204,7 @@ def main(dry_run: bool) -> None:
         out_name = descriptive_name(path.name, rows)
         kept.append((path, out_name, len(rows), note))
         if not dry_run:
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            ensure_clean_output_dir()
             # Copying only stays correct while the rows are untouched; a rewritten
             # provenance or a thinned recording has to be written out.
             if rows[0].get("label_source") == "manual_selection" or dropped:

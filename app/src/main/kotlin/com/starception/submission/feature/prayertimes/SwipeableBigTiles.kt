@@ -100,6 +100,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -180,6 +183,7 @@ import kotlin.math.PI
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.SkipNext
@@ -1104,6 +1108,18 @@ fun SmartIndicator(
     }
 }
 
+/** Insight cards in the Home carousel, and therefore page dots in its indicator. */
+private const val INSIGHT_PAGE_COUNT = 5
+
+/**
+ * Air between two page dots. Carried by each dot's hit target rather than by the
+ * Row's arrangement, so the spacing stays even as the active dot widens.
+ */
+private val INSIGHT_INDICATOR_GAP = 10.dp
+
+/** Key in `insight_carousel_preferences` holding the chosen indicator style name. */
+private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
@@ -1142,7 +1158,7 @@ fun SwipeableBigTiles(
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
 ) {
-    val insightPageCount = 5
+    val insightPageCount = INSIGHT_PAGE_COUNT
     val middleLoopStart = insightPageCount
     val pagerState = rememberPagerState(
         initialPage = middleLoopStart,
@@ -1162,6 +1178,14 @@ fun SwipeableBigTiles(
     }
     var autoSwipeDurationSeconds by remember {
         mutableIntStateOf(carouselPreferences.getInt("auto_swipe_duration_seconds", 30).coerceIn(6, 30))
+    }
+    var indicatorStyle by remember {
+        // Stored by name so reordering the enum can't silently repoint the setting.
+        val stored = carouselPreferences.getString(INSIGHT_INDICATOR_STYLE_KEY, null)
+        mutableStateOf(
+            InsightIndicatorStyle.entries.firstOrNull { it.name == stored }
+                ?: InsightIndicatorStyle.Capsules,
+        )
     }
     var isResumed by remember {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -1364,76 +1388,28 @@ fun SwipeableBigTiles(
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(0.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                repeat(insightPageCount) { index ->
-                    val selected = pagerState.currentPage % insightPageCount == index
-                    val indicatorWidth by animateDpAsState(
-                        targetValue = if (selected) 14.dp else 4.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                        label = "insightIndicatorWidth",
-                    )
-                    val indicatorAlpha by animateFloatAsState(
-                        targetValue = if (selected) 1f else 0.24f,
-                        animationSpec = tween(180, easing = FastOutSlowInEasing),
-                        label = "insightIndicatorAlpha",
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(width = 14.dp, height = 28.dp)
-                            .semantics {
-                                contentDescription = "Insight ${index + 1} of $insightPageCount"
-                                this.selected = selected
-                            }
-                            .combinedClickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {
-                                    interactionEpoch++
-                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    carouselScope.launch {
-                                        val currentLogical = pagerState.currentPage % insightPageCount
-                                        pagerState.animateScrollToPage(
-                                            pagerState.currentPage + (index - currentLogical),
-                                        )
-                                    }
-                                },
-                                onLongClick = {
-                                    interactionEpoch++
-                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                    showAutoSwipeSettings = true
-                                },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(indicatorWidth)
-                                .height(6.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                        alpha = if (selected) 0.2f else 0.34f,
-                                    ),
-                                )
-                                .alpha(indicatorAlpha),
-                        ) {
-                            if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .fillMaxWidth(autoAdvanceProgress.value.coerceIn(0.04f, 1f))
-                                        .background(MaterialTheme.colorScheme.primary),
-                                )
-                            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                InsightPageIndicator(
+                    style = indicatorStyle,
+                    pageCount = insightPageCount,
+                    currentIndex = pagerState.currentPage % insightPageCount,
+                    progress = autoAdvanceProgress.value,
+                    onSelect = { index ->
+                        interactionEpoch++
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        carouselScope.launch {
+                            val currentLogical = pagerState.currentPage % insightPageCount
+                            pagerState.animateScrollToPage(
+                                pagerState.currentPage + (index - currentLogical),
+                            )
                         }
-                    }
-                }
+                    },
+                    onLongPress = {
+                        interactionEpoch++
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        showAutoSwipeSettings = true
+                    },
+                )
             }
         }
 
@@ -1469,7 +1445,10 @@ fun SwipeableBigTiles(
                 pageSize = PageSize.Fixed(cardWidth),
                 pageSpacing = pageSpacing,
                 contentPadding = PaddingValues(end = 18.dp),
-                beyondViewportPageCount = 0,
+                // One page of runway either side. At 0 the card entering the peek
+                // slot composed exactly as it became visible, which showed up as a
+                // pop partway through the drag.
+                beyondViewportPageCount = 1,
                 flingBehavior = pagerFlingBehavior,
                 modifier = Modifier
                     .fillMaxSize()
@@ -1487,14 +1466,19 @@ fun SwipeableBigTiles(
                     },
             ) { page ->
                 val logicalPage = page % insightPageCount
-                val pageOffset = kotlin.math.abs(
-                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
-                ).coerceIn(0f, 1f)
-                val focus = 1f - pageOffset
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        // The scroll offset is read inside the layer block, not in
+                        // composition: currentPageOffsetFraction changes every frame
+                        // of a drag, and reading it above would re-run this whole
+                        // card — background image, texts, compass — at frame rate.
+                        // Here it only re-runs the draw phase.
                         .graphicsLayer {
+                            val pageOffset = kotlin.math.abs(
+                                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
+                            ).coerceIn(0f, 1f)
+                            val focus = 1f - pageOffset
                             val cardScale = lerp(0.97f, 1f, focus)
                             scaleX = cardScale
                             scaleY = cardScale
@@ -1647,6 +1631,9 @@ fun SwipeableBigTiles(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    // The indicator options push the sheet past a half-expanded
+                    // ModalBottomSheet, and the last one was unreachable without this.
+                    .verticalScroll(rememberScrollState())
                     .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
@@ -1741,6 +1728,77 @@ fun SwipeableBigTiles(
                     ) {
                         Text("6s", style = MaterialTheme.typography.labelSmall)
                         Text("30s", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Page indicator",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Each option is drawn live, on the real page position.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                    InsightIndicatorStyle.entries.forEach { option ->
+                        val isCurrent = option == indicatorStyle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    indicatorStyle = option
+                                    interactionEpoch++
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                    carouselPreferences.edit()
+                                        .putString(INSIGHT_INDICATOR_STYLE_KEY, option.name)
+                                        .apply()
+                                }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
+                                Text(
+                                    text = option.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isCurrent) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                                // Selection is the primary colour plus this rule —
+                                // the sheet stays borderless, with no chip around
+                                // the choice.
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 3.dp)
+                                        .width(if (isCurrent) 22.dp else 0.dp)
+                                        .height(2.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                )
+                            }
+                            // The preview is the real indicator, on the real page,
+                            // so what is chosen is exactly what was seen.
+                            InsightPageIndicator(
+                                style = option,
+                                pageCount = insightPageCount,
+                                currentIndex = pagerState.currentPage % insightPageCount,
+                                progress = autoAdvanceProgress.value,
+                                onSelect = {
+                                    indicatorStyle = option
+                                    carouselPreferences.edit()
+                                        .putString(INSIGHT_INDICATOR_STYLE_KEY, option.name)
+                                        .apply()
+                                },
+                                onLongPress = {},
+                            )
+                        }
                     }
                 }
             }
@@ -5177,4 +5235,231 @@ private fun formatTime(milliseconds: Int): String {
     val seconds = (milliseconds / 1000) % 60
     val minutes = (milliseconds / 1000) / 60
     return String.format("%d:%02d", minutes, seconds)
+}
+
+// ── Insight page indicator ───────────────────────────────────────────────────
+// Treatments for the row to the right of the "Insights" heading. The choice is a
+// user setting, picked in the carousel bottom sheet and persisted; each option is
+// previewed live there so it is judged by eye rather than by name.
+
+private enum class InsightIndicatorStyle(val label: String) {
+    /** Capsule dots; the active one widens and fills with the auto-advance. */
+    Capsules("Capsules"),
+
+    /** Uniform hairlines — the calmest of the four, closest to the editorial style. */
+    Hairlines("Hairlines"),
+
+    /** Position as a figure — the least decorated of the three. */
+    Counter("Counter"),
+}
+
+@Composable
+private fun InsightPageIndicator(
+    style: InsightIndicatorStyle,
+    pageCount: Int,
+    currentIndex: Int,
+    progress: Float,
+    onSelect: (Int) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (style) {
+        InsightIndicatorStyle.Capsules -> CapsuleIndicator(
+            pageCount, currentIndex, progress, onSelect, onLongPress, modifier,
+        )
+
+        InsightIndicatorStyle.Hairlines -> HairlineIndicator(
+            pageCount, currentIndex, progress, onSelect, onLongPress, modifier,
+        )
+
+        InsightIndicatorStyle.Counter -> CounterIndicator(
+            pageCount, currentIndex, progress, onSelect, onLongPress, modifier,
+        )
+    }
+}
+
+/** Shared hit target: a comfortable 28dp tall row slot carrying its own gap. */
+@Composable
+private fun Modifier.indicatorSlot(
+    index: Int,
+    pageCount: Int,
+    selected: Boolean,
+    width: Dp,
+    onSelect: (Int) -> Unit,
+    onLongPress: () -> Unit,
+): Modifier = this
+    .size(width = width, height = 28.dp)
+    .semantics {
+        contentDescription = "Insight ${index + 1} of $pageCount"
+        this.selected = selected
+    }
+    .combinedClickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = { onSelect(index) },
+        onLongClick = onLongPress,
+    )
+
+@Composable
+private fun CapsuleIndicator(
+    pageCount: Int,
+    currentIndex: Int,
+    progress: Float,
+    onSelect: (Int) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        repeat(pageCount) { index ->
+            val selected = index == currentIndex
+            val width by animateDpAsState(
+                targetValue = if (selected) 18.dp else 6.dp,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                label = "capsuleWidth",
+            )
+            val track by animateColorAsState(
+                targetValue = if (selected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.30f)
+                },
+                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                label = "capsuleTrack",
+            )
+            Box(
+                modifier = Modifier.indicatorSlot(
+                    index, pageCount, selected,
+                    width + INSIGHT_INDICATOR_GAP, onSelect, onLongPress,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(width)
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(track),
+                ) {
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progress.coerceIn(0.04f, 1f))
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HairlineIndicator(
+    pageCount: Int,
+    currentIndex: Int,
+    progress: Float,
+    onSelect: (Int) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Every segment keeps the same width. Nothing resizes as pages change, so the
+    // row stays perfectly still and only the ink moves.
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        repeat(pageCount) { index ->
+            val selected = index == currentIndex
+            val restColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.20f)
+            Box(
+                modifier = Modifier.indicatorSlot(
+                    index, pageCount, selected, 13.dp + 5.dp, onSelect, onLongPress,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(13.dp)
+                        .height(2.5.dp)
+                        .clip(CircleShape)
+                        .background(restColor),
+                ) {
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progress.coerceIn(0.06f, 1f))
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CounterIndicator(
+    pageCount: Int,
+    currentIndex: Int,
+    progress: Float,
+    onSelect: (Int) -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // No row of marks at all — the position is stated, and the auto-advance runs
+    // underneath it as a hairline. Takes the least width of the three.
+    Row(
+        modifier = modifier
+            .height(28.dp)
+            .semantics {
+                contentDescription = "Insight ${currentIndex + 1} of $pageCount"
+            }
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onSelect((currentIndex + 1) % pageCount) },
+                onLongClick = onLongPress,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "${currentIndex + 1}",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontSize = 13.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = " / $pageCount",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontSize = 12.sp,
+                    lineHeight = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                )
+            }
+            Spacer(modifier = Modifier.height(3.dp))
+            Box(
+                modifier = Modifier
+                    .width(30.dp)
+                    .height(2.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.20f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress.coerceIn(0.04f, 1f))
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
 }

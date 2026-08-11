@@ -41,6 +41,15 @@ fun MediaMiniBar(
     titleDragModifier: Modifier = Modifier,
     onTitleClick: () -> Unit = {},
     preparingAudio: Boolean = false,
+    /**
+     * Optional strip status (prayer alert, sync, Islamic event, …) shown in place
+     * of the track subtitle. The strip has exactly one row, so a status that is
+     * live at the same time as playback rides here instead of claiming a row of
+     * its own.
+     */
+    statusText: String? = null,
+    /** See [MiniBarShell]; off while reading Mushaf so the page stays uncluttered. */
+    showProgressLine: Boolean = true,
 ) {
     val haptic = LocalHapticFeedback.current
     val playback = state.playback
@@ -57,12 +66,17 @@ fun MediaMiniBar(
     MiniBarShell(
         progress = progress,
         modifier = modifier,
+        showProgressLine = showProgressLine,
     ) {
         // Title + subtitle share one line so playback and Mushaf navigation use
         // exactly the same compact geometry.
         // Tapping the title navigates to the playing surah; drag-to-dismiss is bound
         // to this area only so taps on the playback buttons are never intercepted.
-        val subtitleText = if (preparingAudio) "Preparing audio…" else playback.subtitle
+        val subtitleText = when {
+            statusText != null -> statusText
+            preparingAudio -> "Preparing audio…"
+            else -> playback.subtitle
+        }
         val displayText = if (subtitleText.isBlank()) {
             playback.title
         } else {
@@ -76,8 +90,8 @@ fun MediaMiniBar(
                 .clickable(onClick = onTitleClick)
                 .then(titleDragModifier),
             style = MaterialTheme.typography.bodyMedium,
-            fontSize = 15.sp,
-            lineHeight = 17.sp,
+            fontSize = 17.sp,
+            lineHeight = 19.sp,
             color = if (preparingAudio) subtitleColor else contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -94,7 +108,7 @@ fun MediaMiniBar(
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
                 contentDescription = "Previous",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = 0.78f),
             )
         }
@@ -110,7 +124,7 @@ fun MediaMiniBar(
             Icon(
                 imageVector = if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
                 tint = contentColor,
             )
         }
@@ -125,7 +139,7 @@ fun MediaMiniBar(
             Icon(
                 imageVector = Icons.Default.SkipNext,
                 contentDescription = "Next",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = 0.78f),
             )
         }

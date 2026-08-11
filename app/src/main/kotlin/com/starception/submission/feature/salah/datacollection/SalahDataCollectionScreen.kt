@@ -227,10 +227,16 @@ fun SalahDataCollectionScreen(
                         CollectionReadinessCard(
                             uiState = uiState,
                             onSelectPosture = { viewModel.setPosture(it) },
+                            onStartCapture = {
+                                viewModel.setPosture(it)
+                                viewModel.startRecording()
+                            },
                         )
                     }
-                    item { RecordingHero(uiState, viewModel) }
+                    // Pick the posture, then record it. The record card used to sit
+                    // above the chooser, so the sequence read backwards.
                     item { PostureSelector(uiState, viewModel) }
+                    item { RecordingHero(uiState, viewModel) }
                     // Capture quality feedback during recording
                     if (uiState.isRecording && uiState.lastSample != null) {
                         item { CaptureQualityCard(uiState) }
@@ -297,10 +303,14 @@ fun SalahDataCollectionScreen(
                     CollectionReadinessCard(
                         uiState = uiState,
                         onSelectPosture = { viewModel.setPosture(it) },
+                        onStartCapture = {
+                            viewModel.setPosture(it)
+                            viewModel.startRecording()
+                        },
                     )
                 }
-                item { RecordingHero(uiState, viewModel) }
                 item { PostureSelector(uiState, viewModel) }
+                item { RecordingHero(uiState, viewModel) }
                 // Keep onboarding available without placing it before the primary action.
                 if (!uiState.isRecording && !uiState.isCountingDown && uiState.dataFiles.isEmpty()) {
                     item { QuickGuide() }
@@ -1275,6 +1285,7 @@ private fun eligibleSessionCount(
 private fun CollectionReadinessCard(
     uiState: SalahDataCollectionUiState,
     onSelectPosture: (SalahPosture) -> Unit,
+    onStartCapture: (SalahPosture) -> Unit = onSelectPosture,
 ) {
     val labels = SalahPosture.classificationLabels
     val windowsReady = labels.count { posture ->
@@ -1392,14 +1403,17 @@ private fun CollectionReadinessCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // The headline counts postures that clear BOTH gates, so it is
+                // always <= these two. Naming each gate for what it measures stops
+                // "4 of 9 ready" next to "5/9" and "5/9" reading as a contradiction.
                 TrainingReadinessMetric(
                     value = "$windowsReady/${labels.size}",
-                    label = "Coverage",
+                    label = "Enough data",
                     modifier = Modifier.weight(1f),
                 )
                 TrainingReadinessMetric(
                     value = "$sessionsReady/${labels.size}",
-                    label = "Sessions",
+                    label = "Enough takes",
                     modifier = Modifier.weight(1f),
                 )
                 TrainingReadinessMetric(
@@ -1455,15 +1469,25 @@ private fun CollectionReadinessCard(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
                             )
                         }
+                        // This reads as a record button, so it now is one: it picks
+                        // the posture and starts the capture, which is the whole
+                        // point of recommending one. Previously it only selected,
+                        // and the selection showed up elsewhere on the page — so
+                        // pressing it looked like nothing had happened.
+                        // startRecording opens with a countdown, so there is still
+                        // time to pocket the phone.
+                        val captureBusy = uiState.isRecording || uiState.isCountingDown
                         Surface(
+                            onClick = { if (!captureBusy) onStartCapture(posture) },
+                            enabled = !captureBusy,
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(44.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Select ${posture.displayName}",
+                                    contentDescription = "Record ${posture.displayName} now",
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(22.dp),
                                 )
@@ -2231,6 +2255,29 @@ private fun PostureSelector(
                     }
                 }
             }
+
+            // The negative class gets its own row. It is neither a static posture
+            // nor a movement, and without a chip here it could only be reached via
+            // the "next capture" recommendation — which set it silently, with no
+            // chip to light up, so selecting it looked like nothing had happened.
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "NEGATIVE · RECORD ANYTHING THAT IS NOT PRAYER",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            PostureChip(
+                posture = SalahPosture.NOT_PRAYING,
+                label = "Not Praying\n(walk, sit, stairs, desk)",
+                isSelected = uiState.currentPosture == SalahPosture.NOT_PRAYING,
+                isRecording = uiState.isRecording,
+                sessionCount = uiState.postureCounts[SalahPosture.NOT_PRAYING] ?: 0,
+                globalCount = uiState.globalPostureCounts[SalahPosture.NOT_PRAYING.name] ?: 0,
+                onClick = { viewModel.setPosture(SalahPosture.NOT_PRAYING) },
+            )
         }
     }
 }

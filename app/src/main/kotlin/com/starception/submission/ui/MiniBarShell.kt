@@ -16,11 +16,24 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.dp
 
+/**
+ * The single row height every top strip row uses — mini bars and plain status
+ * lines alike. PullToSyncContainer derives its standard bar height from this so
+ * the strip never changes size as its content changes.
+ */
+val MiniBarRowHeight = 30.dp
+
 /** Shared, transparent geometry for persistent reading and playback mini bars. */
 @Composable
 fun MiniBarShell(
     progress: Float,
     modifier: Modifier = Modifier,
+    /**
+     * Draw the thin track under the row. Callers turn it off where the strip's
+     * own full-width sweep already shows the same position, so a Mushaf page
+     * isn't sitting under two readings of one number.
+     */
+    showProgressLine: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     val trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f)
@@ -29,30 +42,34 @@ fun MiniBarShell(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(30.dp),
+            .height(MiniBarRowHeight),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 12.dp, end = 12.dp, bottom = 2.dp),
+                // Clear the track only when it's actually drawn — without it the
+                // row gets those 2dp back for text.
+                .padding(start = 12.dp, end = 12.dp, bottom = if (showProgressLine) 2.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
             content = content,
         )
 
-        Canvas(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .height(1.5.dp),
-        ) {
-            val radius = CornerRadius(size.height / 2f, size.height / 2f)
-            drawRoundRect(trackColor, size = size, cornerRadius = radius)
-            drawRoundRect(
-                progressColor,
-                size = Size(size.width * progress.coerceIn(0f, 1f), size.height),
-                cornerRadius = radius,
-            )
+        if (showProgressLine) {
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .height(1.5.dp),
+            ) {
+                val radius = CornerRadius(size.height / 2f, size.height / 2f)
+                drawRoundRect(trackColor, size = size, cornerRadius = radius)
+                drawRoundRect(
+                    progressColor,
+                    size = Size(size.width * progress.coerceIn(0f, 1f), size.height),
+                    cornerRadius = radius,
+                )
+            }
         }
     }
 }
