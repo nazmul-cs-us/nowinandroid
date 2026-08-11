@@ -23,14 +23,27 @@ object MushafMiniBarBus {
     var onNext: (() -> Unit)? = null
     var onPrevious: (() -> Unit)? = null
     var onOpenInfo: (() -> Unit)? = null
+    private var activeOwner: Any? = null
 
-    fun bind(next: () -> Unit, previous: () -> Unit, openInfo: () -> Unit) {
+    fun bind(owner: Any, next: () -> Unit, previous: () -> Unit, openInfo: () -> Unit) {
+        activeOwner = owner
         onNext = next
         onPrevious = previous
         onOpenInfo = openInfo
     }
 
-    fun unbind() {
+    fun publish(owner: Any, newState: MushafMiniBarState) {
+        if (activeOwner === owner) {
+            state.value = newState
+        }
+    }
+
+    fun unbind(owner: Any) {
+        // AnimatedContent briefly keeps the outgoing and incoming Surah readers
+        // composed together. The outgoing reader may dispose after the incoming
+        // reader has already bound; it must not clear its replacement's strip.
+        if (activeOwner !== owner) return
+        activeOwner = null
         onNext = null
         onPrevious = null
         onOpenInfo = null

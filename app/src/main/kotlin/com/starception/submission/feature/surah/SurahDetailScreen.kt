@@ -474,6 +474,7 @@ fun SurahDetailScreen(
     // own (preloaded) data — same pattern as DuaDetailScreen's HorizontalPager
     // and HadithDetailScreen's swipe transition.
     val surahCache = remember { androidx.compose.runtime.mutableStateMapOf<Int, Pair<Surah, List<Ayah>>>() }
+    var surahCacheTranslation by remember { mutableStateOf(currentTranslation) }
 
     // Fetch per-ayah timings for the currently playing surah so we can highlight
     // the ayah being recited as audio plays.
@@ -488,11 +489,22 @@ fun SurahDetailScreen(
     // selected translation joined by "\n\n" — otherwise the renderer's split would
     // produce one-part text and the translation row would silently disappear.
     LaunchedEffect(currentPlayingSurahNumber, currentTranslation) {
-        // Translation changed — invalidate the cache so neighbours reload in the
-        // new language instead of serving stale Arabic-only entries.
-        surahCache.clear()
-        listOf(currentPlayingSurahNumber - 1, currentPlayingSurahNumber, currentPlayingSurahNumber + 1)
-            .filter { it in 1..114 && it !in surahCache }
+        // A Surah swipe must retain the already-preloaded incoming pane. Clearing
+        // here on every number change made AnimatedContent briefly fall back to
+        // the route's original Surah, then destroy/recreate the pane when its real
+        // data arrived. That disposal also cleared the app-level Mushaf strip.
+        // Only a translation change invalidates the cached text.
+        if (surahCacheTranslation != currentTranslation) {
+            surahCache.clear()
+            surahCacheTranslation = currentTranslation
+        }
+        val retainedSurahs = listOf(
+            currentPlayingSurahNumber - 1,
+            currentPlayingSurahNumber,
+            currentPlayingSurahNumber + 1,
+        ).filter { it in 1..114 }
+        retainedSurahs
+            .filter { it !in surahCache }
             .forEach { num ->
                 try {
                     val pair = viewModel.loadSurahWithTranslation(num)
@@ -503,6 +515,10 @@ fun SurahDetailScreen(
                     // Neighbour preload failure is non-fatal — silent.
                 }
             }
+        // Keep the cache bounded without removing the outgoing transition pane.
+        surahCache.keys.toList().forEach { num ->
+            if (num !in retainedSurahs) surahCache.remove(num)
+        }
     }
 
     // Load volume from ViewModel (persisted in SharedPreferences)
@@ -5478,9 +5494,46 @@ private fun MushafPageWithFrame(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = MaterialTheme.colorScheme.primary
-    // Inline content reserves the marker slots; the ornament itself is painted
-    // from the precomputed ink geometry in the two Canvas passes below.
-    val markersRenderedInline = false
+    // PageCurl snapshots its first page draw. If precise marker geometry is still
+    // being prepared during that draw, use the reserved inline slots themselves
+    // to render the rosettes so a cached page can never lose its ayah endings.
+    // Once geometry is ready, the two ink-aware Canvas passes below take over.
+    val markersRenderedInline = inkGeometries == null
+    val renderedInlineContent = remember(
+        inlineContent,
+        markersRenderedInline,
+        arabicFontSize,
+    ) {
+        if (!markersRenderedInline) {
+            inlineContent
+        } else {
+            buildMap {
+                putAll(inlineContent)
+                inlineContent["ayahOrnament"]?.placeholder?.let { placeholder ->
+                    put(
+                        "ayahOrnament",
+                        androidx.compose.foundation.text.InlineTextContent(placeholder) { digits ->
+                            MushafInlineAyahOrnament(
+                                digits = digits,
+                                arabicFontSize = arabicFontSize,
+                            )
+                        },
+                    )
+                }
+                inlineContent[MUSHAF_TRANSLATION_ORNAMENT_TAG]?.placeholder?.let { placeholder ->
+                    put(
+                        MUSHAF_TRANSLATION_ORNAMENT_TAG,
+                        androidx.compose.foundation.text.InlineTextContent(placeholder) { digits ->
+                            MushafInlineAyahOrnament(
+                                digits = digits,
+                                arabicFontSize = arabicFontSize,
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
 
     // Rosette is now part of the masterString text flow (U+06DD + digits
     // styled with Amiri Quran). No inline content needed here.
@@ -5769,7 +5822,7 @@ private fun MushafPageWithFrame(
             Text(
                 text = pageText,
                 onTextLayout = { pageLayout.value = it },
-                inlineContent = inlineContent,
+                inlineContent = renderedInlineContent,
                 color = onSurfaceColor,
                 style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
                     fontSize = arabicFontSize.sp,
@@ -6028,6 +6081,7 @@ private fun MushafPagerView(
     // Wire physical volume keys to Mushaf page navigation while this composable
     // is on screen. Activity.onKeyDown checks MushafKeyBus.handle{Next,Prev}().
     val mushafScope = rememberCoroutineScope()
+    val miniBarOwner = remember { Any() }
     DisposableEffect(state, pagerPageCount) {
         MushafKeyBus.bind(
             next = {
@@ -6644,14 +6698,8 @@ private fun MushafPagerView(
             // Cleared on dispose so leaving Mushaf mode hides the strip.
             DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
                 if (paginatedPages.isNotEmpty()) {
-                    MushafMiniBarBus.state.value = MushafMiniBarState(
-                        surahNumber = ayahs.first().surahNumber,
-                        surahNameArabic = surahNameArabic,
-                        surahNameEnglish = surahNameEnglish,
-                        currentPage = state.current + 1,
-                        totalPages = paginatedPages.size,
-                    )
                     MushafMiniBarBus.bind(
+                        owner = miniBarOwner,
                         next = {
                             mushafScope.launch {
                                 if (state.current < pagerPageCount - 1) state.next()
@@ -6671,8 +6719,18 @@ private fun MushafPagerView(
                             }
                         },
                     )
+                    MushafMiniBarBus.publish(
+                        owner = miniBarOwner,
+                        newState = MushafMiniBarState(
+                            surahNumber = ayahs.first().surahNumber,
+                            surahNameArabic = surahNameArabic,
+                            surahNameEnglish = surahNameEnglish,
+                            currentPage = state.current + 1,
+                            totalPages = paginatedPages.size,
+                        ),
+                    )
                 }
-                onDispose { MushafMiniBarBus.unbind() }
+                onDispose { MushafMiniBarBus.unbind(miniBarOwner) }
             }
 
             // Snap to the page containing scrollToAyah after pagination is ready.
@@ -6716,8 +6774,9 @@ private fun MushafPagerView(
             // re-paginates the whole surah, and an index-keyed cache was discarded
             // wholesale each time even though every page before the gloss came back
             // byte-identical — so each double-tap re-measured pages that had not
-            // changed and made every marker fade out and back in. Only the font,
-            // face and column width can actually invalidate this geometry.
+            // changed and made every marker fade out and back in. Font, face,
+            // column width, and page height can invalidate the geometry; page
+            // height also controls slicing and stretched leading.
             val inkGeomCache = remember(
                 committedFontSize,
                 arabicFont,
@@ -6728,7 +6787,7 @@ private fun MushafPagerView(
                 androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
             val pagerEmPx = with(density) { committedFontSize.sp.toPx() }
-            LaunchedEffect(state.current, paginatedPages) {
+            LaunchedEffect(state.current, paginatedPages, inkGeomCache) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
                 // A page turn can arrive much faster than a bitmap ink scan.
                 // Debounce just long enough for rapid swipes to settle; a newer
@@ -6750,9 +6809,19 @@ private fun MushafPagerView(
                                     emPx = pagerEmPx,
                                     isActive = { scanJob?.isActive == true },
                                 )
+                            }.onFailure { error ->
+                                if (error !is kotlinx.coroutines.CancellationException) {
+                                    android.util.Log.e(
+                                        "MushafPager",
+                                        "Unable to prepare ayah-marker geometry; using inline marker fallback",
+                                        error,
+                                    )
+                                }
                             }.getOrNull()
                         }
-                        if (geoms != null) inkGeomCache[pageText] = geoms
+                        if (geoms != null) {
+                            inkGeomCache[pageText] = geoms
+                        }
                     }
                 }
                 // Geometry values are tiny, but AnnotatedString keys retain all
@@ -6845,17 +6914,19 @@ private fun MushafPagerView(
             }
             // PageCurl composes its page before the asynchronous ink scan finishes,
             // and that initial captured draw does not reliably refresh when only the
-            // geometry map changes. Navigating away and back worked because the cache
-            // was ready before PageCurl was recreated. Create the curl only after the
-            // current page has geometry so its very first frame contains all markers.
+            // geometry map changes. Keep the geometry in the curl's identity so the
+            // prepared markers are installed when ready, but render the Quran text
+            // immediately. Geometry is decorative; blocking the entire reader on it
+            // left a permanently blank page whenever an ink scan failed. It also meant
+            // PageCurl still had a zero page count while search/offline restoration
+            // effects attempted to snap, which could crash inside PageCurlState.
             val currentPageText = paginatedPages.getOrNull(state.current)?.text
             val currentPageGeometry = currentPageText?.let(inkGeomCache::get)
-            if (currentPageGeometry != null) {
-                // Make the prepared geometry part of the curl's identity. This is
-                // important because PageCurl owns a subcomposition and otherwise can
-                // retain the page it created while the async geometry was absent.
-                androidx.compose.runtime.key(currentPageGeometry) {
-                    PageCurl(
+            // Make the prepared geometry part of the curl's identity. This is
+            // important because PageCurl owns a subcomposition and otherwise can
+            // retain the page it created while the async geometry was absent.
+            androidx.compose.runtime.key(currentPageGeometry) {
+                PageCurl(
                     count = paginatedPages.size,
                     state = state,
                     config = pageCurlConfig,
@@ -6873,11 +6944,11 @@ private fun MushafPagerView(
                     MushafPageWithFrame(
                         pageText = page.text,
                         inlineContent = pageInlineContent,
-                    inkGeometries = if (pageIndex == state.current) {
-                        currentPageGeometry
-                    } else {
-                        inkGeomCache[page.text]
-                    },
+                        inkGeometries = if (pageIndex == state.current) {
+                            currentPageGeometry
+                        } else {
+                            inkGeomCache[page.text]
+                        },
                         translationVisibility = translationVisibility.value,
                         ornamentPainter = ornamentPainter,
                         translationOrnamentPainter = translationOrnamentPainter,
@@ -6908,14 +6979,7 @@ private fun MushafPagerView(
                         onAyahRub = toggleInlineTranslation,
                         modifier = Modifier.fillMaxSize()
                     )
-                    }
                 }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(surfaceColor),
-                )
             }
         }
     }
