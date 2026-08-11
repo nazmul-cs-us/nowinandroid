@@ -5307,6 +5307,8 @@ private fun computeInkMarkerGeometries(
         val lineLeftPx = (lineLeft * scale).toInt().coerceAtLeast(0)
         val lineRightPx = (lineRight * scale).toInt().coerceAtMost(pixels.width - 1)
 
+        var detectedGapLeft: Float? = null
+        var detectedGapRight: Float? = null
         val centerX: Float
         if (belongsToTranslation) {
             // Translation markers already sit in an explicit LTR placeholder
@@ -5392,6 +5394,8 @@ private fun computeInkMarkerGeometries(
                 while (trueL - 1 >= lineLeftPx && !columnHasInk(trueL - 1, bandTop, bandBottom)) trueL--
                 var trueR = bestGapR
                 while (trueR + 1 <= lineRightPx && !columnHasInk(trueR + 1, bandTop, bandBottom)) trueR++
+                detectedGapLeft = trueL / scale
+                detectedGapRight = trueR / scale
                 ((trueL + trueR) / 2f) / scale
             } else {
                 slotCenter // window solid with ink — degenerate; keep the slot center
@@ -5420,16 +5424,39 @@ private fun computeInkMarkerGeometries(
         // of Bengali/Latin translation glyphs. Nudge only the compact gloss
         // ornament upward; Arabic markers retain their measured placement.
         val translationOpticalOffsetY = if (belongsToTranslation) -h * 0.10f else 0f
-        // The ink scan may find a wider white run elsewhere on a dense justified
-        // line and move a mid-line marker onto a glyph. The text layout already
-        // reserved [rect] specifically for this ornament, so retain the optical
-        // adjustment only while the complete medallion remains inside that slot.
-        // Line-end and translation markers use their dedicated placement rules.
+        // Prefer keeping a mid-line ornament inside its placeholder, but never
+        // enforce that preference by pushing it out of the ink-safe interval.
+        // Arabic final forms can overhang deeply into the nominal slot (most
+        // visibly in short Surahs such as Al-Kafirun); the old slot-only clamp
+        // placed the ornament back on top of that measured ink.
         val safeCenterX = if (nextOnSameLine && !belongsToTranslation) {
-            centerX.coerceIn(
-                minimumValue = rect.left + w / 2f,
-                maximumValue = rect.right - w / 2f,
-            )
+            val slotMin = rect.left + w / 2f
+            val slotMax = rect.right - w / 2f
+            val gapLeft = detectedGapLeft
+            val gapRight = detectedGapRight
+            if (gapLeft != null && gapRight != null) {
+                val minimumInkGap = MARKER_INK_GAP_EM * emPx
+                val inkMin = gapLeft + minimumInkGap + w / 2f
+                val inkMax = gapRight - minimumInkGap - w / 2f
+                val intersectionMin = maxOf(slotMin, inkMin)
+                val intersectionMax = minOf(slotMax, inkMax)
+                when {
+                    // Ideal: both the reserved slot and measured ink clearance agree.
+                    intersectionMin <= intersectionMax ->
+                        centerX.coerceIn(intersectionMin, intersectionMax)
+                    // Deep glyph overhang: prioritize the real ink-safe interval.
+                    inkMin <= inkMax -> centerX.coerceIn(inkMin, inkMax)
+                    // The gap cannot provide the preferred clearance, but can at
+                    // least contain the complete ornament without touching ink.
+                    gapRight - gapLeft >= w -> centerX.coerceIn(
+                        gapLeft + w / 2f,
+                        gapRight - w / 2f,
+                    )
+                    else -> centerX.coerceIn(slotMin, slotMax)
+                }
+            } else {
+                centerX.coerceIn(slotMin, slotMax)
+            }
         } else {
             centerX
         }
@@ -6289,7 +6316,14 @@ private fun MushafPagerView(
                             markerStart + digits.length,
                         ),
                     )
-                    append(' ')
+                    // A regular space becomes a justification expansion point.
+                    // That is especially visible in short Surahs, whose sparse
+                    // lines can pour most of their unused width immediately after
+                    // an ayah marker and destroy its symmetric breathing room.
+                    // Keep the visual separator fixed-width, then provide a
+                    // zero-width wrapping opportunity between ayahs.
+                    append('\u202F') // NARROW NO-BREAK SPACE: fixed visual gap
+                    append('\u200B') // ZERO WIDTH SPACE: line may still wrap here
                 }
 
                 // Closed after the gloss and marker so tapping either still
