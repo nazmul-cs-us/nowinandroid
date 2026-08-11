@@ -33,6 +33,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
@@ -66,6 +67,7 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import androidx.compose.material.icons.filled.ExpandLess
@@ -82,8 +84,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,6 +147,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -211,6 +219,8 @@ import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import com.starception.submission.feature.prayertimes.weather.CurrentWeather
+import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import androidx.compose.ui.graphics.lerp
 
 private val PrayerReferenceInk = Color(0xFF0A0808)
@@ -2432,36 +2442,71 @@ fun PrayerTimesScreen(
                 // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
                 Spacer(modifier = Modifier.height(0.dp))
 
-                // Location info using Material 3 Expressive Design - symmetric rounded shape
+                // One-line adaptation of Google's outlined information tile. The city
+                // remains the anchor while optional detail yields first on narrow screens.
+                val locationTileSurface = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                val locationTileContent = MaterialTheme.colorScheme.onSurface
+                val locationTileSupporting = MaterialTheme.colorScheme.onSurfaceVariant
+                val locationTileOutline = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shadowElevation = 0.dp  // Removed to prevent navigation artifacts
+                        .fillMaxWidth()
+                        .height(58.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = locationTileSurface,
+                    border = BorderStroke(
+                        1.dp,
+                        locationTileOutline,
+                    ),
+                    shadowElevation = 0.dp,
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = "Location",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // Get location text
-                        val locationText = getLocationWithCountryCode(location, prayerTimes?.location)
+                        val locationData = prayerTimes?.location
+                        val city = locationData?.city?.trim().orEmpty()
+                        val area = locationData?.area?.trim().takeUnless { it.isNullOrEmpty() }
+                            ?: locationData?.subLocality?.trim().takeUnless { it.isNullOrEmpty() }
+                        val countryCode = locationData?.countryCode?.trim()?.uppercase()
+                            ?.takeIf { it.length in 2..3 }
+                        val locationTitle = city.ifBlank {
+                            getLocationWithCountryCode(location, locationData)
+                        }
+                        val locationDetail = area
+                            ?.takeUnless { it.equals(locationTitle, ignoreCase = true) }
+                            ?: locationData?.administrativeArea?.trim()
+                                ?.takeUnless {
+                                    it.isEmpty() || it.equals(locationTitle, ignoreCase = true)
+                                }
+                            ?: locationData?.country?.trim().orEmpty()
 
                         // Check if location text contains Arabic (Unicode range 0600-06FF)
-                        val containsArabic = locationText.any { it in '\u0600'..'\u06FF' }
+                        val containsArabic = (locationTitle + locationDetail)
+                            .any { it in '\u0600'..'\u06FF' }
 
                         // Get selected Arabic font if location contains Arabic
                         val context = androidx.compose.ui.platform.LocalContext.current
+                        val locationMarkerPainter = remember(context) {
+                            BitmapPainter(
+                                image = ImageBitmap.imageResource(
+                                    res = context.resources,
+                                    id = R.drawable.ic_flaticon_location_marker,
+                                ),
+                                filterQuality = FilterQuality.High,
+                            )
+                        }
+                        val precipitationPainter = remember(context) {
+                            BitmapPainter(
+                                image = ImageBitmap.imageResource(
+                                    res = context.resources,
+                                    id = R.drawable.flaticon_precipitation,
+                                ),
+                                filterQuality = FilterQuality.High,
+                            )
+                        }
                         val arabicFontFamily = if (containsArabic) {
                             val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
                             val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
@@ -2477,30 +2522,205 @@ fun PrayerTimesScreen(
                             null
                         }
 
-                        Text(
-                            text = locationText,
-                            style = if (containsArabic && arabicFontFamily != null) {
-                                MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = arabicFontFamily,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
-                                    lineHeight = 22.sp,
-                                )
-                            } else {
-                                MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    lineHeight = 22.sp,
-                                )
-                            },
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            textAlign = TextAlign.Start,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                        val currentWeather by produceState<CurrentWeather?>(
+                            initialValue = null,
+                            key1 = locationData?.latitude,
+                            key2 = locationData?.longitude,
+                        ) {
+                            value = locationData
+                                ?.takeIf { it.isValid() }
+                                ?.let {
+                                    CurrentWeatherRepository.get(
+                                        latitude = it.latitude,
+                                        longitude = it.longitude,
+                                    )
+                                }
+                        }
+
+                        val supportingLocation = listOfNotNull(
+                            locationDetail.takeIf { it.isNotBlank() },
+                            countryCode,
+                        ).joinToString(" · ")
+                        val locationLine = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Medium)) {
+                                append(locationTitle)
+                            }
+                            if (supportingLocation.isNotBlank()) {
+                                withStyle(
+                                    SpanStyle(color = locationTileSupporting),
+                                ) {
+                                    append("  ·  ")
+                                    append(supportingLocation)
+                                }
+                            }
+                        }
+                        val weatherLocationLine = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Medium)) {
+                                append(locationTitle)
+                            }
+                            if (locationDetail.isNotBlank()) {
+                                withStyle(
+                                    SpanStyle(color = locationTileSupporting),
+                                ) {
+                                    append(" · ")
+                                    append(locationDetail)
+                                }
+                            }
+                        }
+
+                        Image(
+                            painter = locationMarkerPainter,
+                            contentDescription = "Prayer location",
+                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.size(22.dp),
                         )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        currentWeather?.let { weather ->
+                            val conditionIcon = when (weather.weatherCode) {
+                                0 -> if (weather.isDay) {
+                                    R.drawable.flaticon_weather_clear
+                                } else {
+                                    R.drawable.flaticon_weather_moon
+                                }
+                                1, 2 -> R.drawable.flaticon_weather_partly_cloudy
+                                3, 45, 48 -> R.drawable.flaticon_weather_cloudy
+                                in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
+                                in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
+                                in 95..99 -> R.drawable.flaticon_weather_storm
+                                else -> R.drawable.flaticon_weather_cloudy
+                            }
+                            val conditionLabel = when (weather.weatherCode) {
+                                0 -> if (weather.isDay) "Clear sky" else "Clear night"
+                                1 -> "Mostly clear"
+                                2 -> "Partly cloudy"
+                                3 -> "Overcast"
+                                45, 48 -> "Foggy"
+                                in 51..57 -> "Drizzle"
+                                in 61..67 -> "Rain"
+                                in 71..77 -> "Snow"
+                                in 80..82 -> "Rain showers"
+                                85, 86 -> "Snow showers"
+                                in 95..99 -> "Thunderstorms"
+                                else -> "Cloudy"
+                            }
+                            val precipitationLabel = if (weather.precipitationProbability == 0) {
+                                "No rain"
+                            } else {
+                                "${weather.precipitationProbability}% rain"
+                            }
+                            val conditionPainter = remember(context, conditionIcon) {
+                                BitmapPainter(
+                                    image = ImageBitmap.imageResource(
+                                        res = context.resources,
+                                        id = conditionIcon,
+                                    ),
+                                    filterQuality = FilterQuality.High,
+                                )
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Text(
+                                    text = weatherLocationLine,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = arabicFontFamily
+                                            ?: MaterialTheme.typography.bodyLarge.fontFamily,
+                                        fontSize = 15.sp,
+                                        lineHeight = 18.sp,
+                                    ),
+                                    color = locationTileContent,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = conditionLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = locationTileSupporting,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        text = "  ·  ",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp,
+                                        ),
+                                        color = locationTileSupporting,
+                                    )
+                                    Image(
+                                        painter = precipitationPainter,
+                                        contentDescription = null,
+                                        colorFilter = ColorFilter.tint(locationTileSupporting),
+                                        modifier = Modifier.size(9.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = precipitationLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = locationTileSupporting,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "${weather.temperatureCelsius.roundToInt()}°",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 18.sp,
+                                        lineHeight = 22.sp,
+                                    ),
+                                    color = locationTileContent,
+                                    maxLines = 1,
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Image(
+                                    painter = conditionPainter,
+                                    contentDescription = conditionLabel,
+                                    colorFilter = ColorFilter.tint(
+                                        MaterialTheme.colorScheme.primary,
+                                    ),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        } ?: run {
+                            Text(
+                                text = locationLine,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontFamily = arabicFontFamily
+                                        ?: MaterialTheme.typography.bodyLarge.fontFamily,
+                                    fontSize = 16.sp,
+                                    lineHeight = 22.sp,
+                                ),
+                                color = locationTileContent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(FloatingNavClearance))
+                Spacer(modifier = Modifier.height(FloatingNavClearance + 10.dp))
             }
             } // End of portrait layout else block
         }

@@ -160,7 +160,7 @@ def main(dry_run: bool) -> None:
     sources = sorted(p for p in DATA_ROOT.rglob("*.jsonl") if OUTPUT_DIR not in p.parents)
 
     seen: dict[str, Path] = {}
-    kept: list[tuple[Path, int, str]] = []
+    kept: list[tuple[Path, str, int, str]] = []
     skipped: list[tuple[Path, str]] = []
 
     for path in sources:
@@ -230,7 +230,11 @@ def main(dry_run: bool) -> None:
             sessions_per_class.setdefault(row["posture"], set()).add(row["session_id"])
 
     print("\nIndependent sessions per class (train/val/test split needs 3):")
-    for posture, ids in sorted(sessions_per_class.items(), key=lambda kv: len(kv[1])):
+    all_session_counts = [
+        (posture, sessions_per_class.get(posture, set()))
+        for posture in POSTURE_SLUGS
+    ]
+    for posture, ids in sorted(all_session_counts, key=lambda kv: len(kv[1])):
         mark = "ok " if len(ids) >= 3 else "SHORT"
         print(f"  {mark} {posture:16s} {len(ids)}")
 

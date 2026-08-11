@@ -3,14 +3,15 @@
 import json
 from pathlib import Path
 
+from feature_engineering import POSTURE_LABELS as TRAINING_POSTURE_LABELS
+
 
 MIN_DEPLOY_TEST_ACCURACY = 0.80
 MIN_DEPLOY_CLASS_F1 = 0.60
 MIN_DEPLOY_TEST_SEQUENCES_PER_CLASS = 10
-POSTURE_LABELS = (
-    "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD",
-    "JALSA", "TASHAHHUD", "QIYAM_RISING", "RISING_TO_QIYAM",
-)
+# Use the training pipeline's canonical order so a newly appended output class
+# cannot be trained while silently escaping the deployment quality gate.
+POSTURE_LABELS = tuple(TRAINING_POSTURE_LABELS)
 
 
 def deployment_quality_issues(report_path: Path) -> list[str]:

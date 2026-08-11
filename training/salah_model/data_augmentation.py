@@ -239,15 +239,21 @@ def augment_dataset(
 def balance_classes(
     X: np.ndarray,
     y: np.ndarray,
-    strategy: str = "oversample"
+    strategy: str = "oversample",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Balance class distribution by oversampling minority classes.
+    Balance class distribution without allowing one outlier class to inflate the
+    complete training set.
 
     Args:
         X: Feature array
         y: Labels
-        strategy: "oversample" minority or "undersample" majority
+        strategy: ``oversample`` minorities to the largest class, ``undersample``
+            majorities to the smallest class, or ``hybrid``. Hybrid normally uses
+            the largest class, but when it is more than 3x the runner-up it caps the
+            target at the runner-up and downsamples the outlier. This is important
+            for long NOT_PRAYING captures: otherwise every prayer class is copied to
+            the size of a single long negative recording before augmentation.
 
     Returns:
         Balanced X, y
@@ -260,8 +266,14 @@ def balance_classes(
 
     if strategy == "oversample":
         target_count = max_count
-    else:
+    elif strategy == "undersample":
         target_count = min_count
+    elif strategy == "hybrid":
+        descending = np.sort(counts)[::-1]
+        runner_up = descending[1] if len(descending) > 1 else descending[0]
+        target_count = runner_up if max_count > 3 * runner_up else max_count
+    else:
+        raise ValueError(f"Unknown balancing strategy: {strategy}")
 
     X_list = []
     y_list = []
@@ -276,7 +288,7 @@ def balance_classes(
             indices = np.random.choice(len(X_cls), target_count, replace=True)
             X_list.append(X_cls[indices])
             y_list.append(y_cls[indices])
-        elif len(X_cls) > target_count and strategy == "undersample":
+        elif len(X_cls) > target_count and strategy in {"undersample", "hybrid"}:
             indices = np.random.choice(len(X_cls), target_count, replace=False)
             X_list.append(X_cls[indices])
             y_list.append(y_cls[indices])

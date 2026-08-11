@@ -3,7 +3,7 @@ Train a salah posture detection model.
 
 Architecture: 1D CNN (TFLite-compatible, no LSTM/RNN ops)
 Input: sequences of 20 windows x 30 features (2 seconds of sensor data)
-Output: 8-class classification (QIYAM, RUKU, GOING_TO_SUJUD, SUJUD, JALSA, TASHAHHUD, QIYAM_RISING, RISING_TO_QIYAM)
+Output: 9-class classification (8 prayer postures plus NOT_PRAYING)
 
 Usage:
     python train_salah_detector.py --data_dir ../data
@@ -25,7 +25,8 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score
 from feature_engineering import (
     load_jsonl_files, create_sequences, normalize_features,
     assign_sessions_to_splits, session_ids_from_groups,
-    POSTURE_LABELS, NUM_CLASSES, SEQUENCE_LENGTH, FEATURES_PER_WINDOW
+    usable_session_counts, POSTURE_LABELS, NUM_CLASSES, SEQUENCE_LENGTH,
+    FEATURES_PER_WINDOW
 )
 from data_augmentation import augment_dataset, balance_classes
 from dataset_report import build_report, write_report
@@ -143,7 +144,7 @@ def evaluate_leave_one_session_out(args, X, y, groups):
         if len(np.unique(y_tr)) < 2:
             continue
 
-        X_tr, y_tr = balance_classes(X_tr, y_tr, strategy="oversample")
+        X_tr, y_tr = balance_classes(X_tr, y_tr, strategy="hybrid")
         if args.augment:
             X_tr, y_tr = augment_dataset(
                 X_tr, y_tr,
@@ -203,43 +204,56 @@ def train(args):
             print("Too few samples. Collect more data first.")
             return
 
-    # Create sequences grouped by contiguous posture segments to avoid leakage
-    X, y, groups = create_sequences(
-        samples,
-        sequence_length=args.seq_length,
-        stride=args.stride,
-        return_groups=True
-    )
-
-    if len(X) == 0:
-        print("Could not create sequences. Need longer continuous recordings per posture.")
-        return
-
     # A leakage-safe split needs each output class in at least three independent
     # recording sessions. Keeping a whole session in one partition prevents the
-    # the same continuous recording conditions leaking into test results.
-    # Diagnostics run before the readiness gate on purpose: leave-one-session-out is how
-    # you watch a class climb toward the bar, so it has to keep working while the dataset
-    # is still short of it. It exports nothing, so it cannot ship an unready model.
-    if args.loso:
-        evaluate_leave_one_session_out(args, X, y, groups)
-        return
-
-    sequence_session_ids = session_ids_from_groups(groups)
-    sessions_per_class = {
-        posture_name: len(np.unique(sequence_session_ids[y == class_index]))
-        for class_index, posture_name in enumerate(POSTURE_LABELS)
-    }
+    # same continuous recording conditions leaking into test results. Check this
+    # before feature extraction so a very long but insufficient recording fails fast.
+    sessions_per_class = usable_session_counts(samples, args.seq_length)
     insufficient_sessions = {
         posture_name: count
         for posture_name, count in sessions_per_class.items()
         if count < 3
     }
+
+    # Diagnostics run before the readiness gate on purpose: leave-one-session-out is how
+    # you watch a class climb toward the bar, so it has to keep working while the dataset
+    # is still short of it. It exports nothing, so it cannot ship an unready model.
+    if args.loso:
+        X, y, groups = create_sequences(
+            samples,
+            sequence_length=args.seq_length,
+            stride=args.stride,
+            return_groups=True,
+        )
+        evaluate_leave_one_session_out(args, X, y, groups)
+        return
+
     if insufficient_sessions:
         print("\nDataset is not ready for a session-isolated train/validation/test split.")
         for posture_name, count in insufficient_sessions.items():
             print(f"  {posture_name}: {count}/3 independent sessions")
-        print("Collect at least 3 complete guided sessions (and review any salah_live_* files) before training.")
+        if "NOT_PRAYING" in insufficient_sessions:
+            print(
+                "Record at least 3 separate NOT_PRAYING takes (for example walking, "
+                "sitting, and driving), with one activity per take."
+            )
+        if any(label != "NOT_PRAYING" for label in insufficient_sessions):
+            print(
+                "Collect more complete guided prayer sessions and review any "
+                "salah_live_* files for the missing prayer postures."
+            )
+        return
+
+    # Create sequences grouped by contiguous posture segments to avoid leakage.
+    X, y, groups = create_sequences(
+        samples,
+        sequence_length=args.seq_length,
+        stride=args.stride,
+        return_groups=True,
+    )
+
+    if len(X) == 0:
+        print("Could not create sequences. Need longer continuous recordings per posture.")
         return
 
     try:
@@ -258,7 +272,7 @@ def train(args):
     y_train_raw = y_train.copy()
 
     # Balance classes
-    X_train, y_train = balance_classes(X_train, y_train, strategy="oversample")
+    X_train, y_train = balance_classes(X_train, y_train, strategy="hybrid")
 
     # Data augmentation
     if args.augment:

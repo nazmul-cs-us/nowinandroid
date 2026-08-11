@@ -5404,13 +5404,26 @@ private fun computeInkMarkerGeometries(
         // of Bengali/Latin translation glyphs. Nudge only the compact gloss
         // ornament upward; Arabic markers retain their measured placement.
         val translationOpticalOffsetY = if (belongsToTranslation) -h * 0.10f else 0f
+        // The ink scan may find a wider white run elsewhere on a dense justified
+        // line and move a mid-line marker onto a glyph. The text layout already
+        // reserved [rect] specifically for this ornament, so retain the optical
+        // adjustment only while the complete medallion remains inside that slot.
+        // Line-end and translation markers use their dedicated placement rules.
+        val safeCenterX = if (nextOnSameLine && !belongsToTranslation) {
+            centerX.coerceIn(
+                minimumValue = rect.left + w / 2f,
+                maximumValue = rect.right - w / 2f,
+            )
+        } else {
+            centerX
+        }
         result.add(
             MarkerGeometry(
                 digits = digits,
                 isTranslation = belongsToTranslation,
-                centerX = centerX,
+                centerX = safeCenterX,
                 centerY = rect.center.y + translationOpticalOffsetY,
-                left = centerX - w / 2f,
+                left = safeCenterX - w / 2f,
                 top = rect.top + (rect.height - h) / 2f + translationOpticalOffsetY,
                 w = w,
                 h = h,
@@ -5465,6 +5478,9 @@ private fun MushafPageWithFrame(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = MaterialTheme.colorScheme.primary
+    // Inline content reserves the marker slots; the ornament itself is painted
+    // from the precomputed ink geometry in the two Canvas passes below.
+    val markersRenderedInline = false
 
     // Rosette is now part of the masterString text flow (U+06DD + digits
     // styled with Amiri Quran). No inline content needed here.
@@ -5618,14 +5634,11 @@ private fun MushafPageWithFrame(
     // text so the drawing pass can find the neighbouring words.
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
 
-    // Markers fade in once their (cached/prefetched) ink geometry exists —
-    // never drawn at provisional positions, so page turns show no marker jump.
-    val markerAlpha by animateFloatAsState(
-        targetValue = if (inkGeometries != null) 1f else 0f,
-        animationSpec = com.starception.submission.core.designsystem.animation.NiaMotion
-            .standardTween(com.starception.submission.core.designsystem.animation.NiaMotion.Duration.SHORT_3),
-        label = "markerFade"
-    )
+    // PageCurl caches its page draw. Starting this value at zero and animating it
+    // after the first draw left the initial page permanently marker-less; returning
+    // from another page happened to redraw it at the animation's final value.
+    // Geometry is prepared before the curl is created now, so paint it immediately.
+    val markerAlpha = if (inkGeometries != null) 1f else 0f
 
     // Deliberately a Box painted with the surface colour rather than a Surface.
     // Surface installs a `pointerInput {}` whose only job is to stop touches
@@ -5719,31 +5732,33 @@ private fun MushafPageWithFrame(
             //   2) AFTER it (Canvas below the Text): the digits, always crisp. With
             //      ink-accurate placement nothing should reach the digit zone; when
             //      a tail does cross the ring it slides under the digits untouched.
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = horizontalPadding,
-                        end = horizontalPadding,
-                        top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding
-                    )
-            ) {
-                val geoms = inkGeometries ?: return@Canvas
-                if (markerAlpha <= 0.01f) return@Canvas
-                for (g in geoms) {
-                    translate(g.left, g.top) {
-                        val markerPainter = if (g.isTranslation) {
-                            translationOrnamentPainter
-                        } else {
-                            ornamentPainter
-                        }
-                        with(markerPainter) {
-                            draw(
-                                androidx.compose.ui.geometry.Size(g.w, g.h),
-                                alpha = markerAlpha,
-                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
-                            )
+            if (!markersRenderedInline) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topPadding + bismillahHeightDp,
+                            bottom = bottomPadding
+                        )
+                ) {
+                    val geoms = inkGeometries ?: return@Canvas
+                    if (markerAlpha <= 0.01f) return@Canvas
+                    for (g in geoms) {
+                        translate(g.left, g.top) {
+                            val markerPainter = if (g.isTranslation) {
+                                translationOrnamentPainter
+                            } else {
+                                ornamentPainter
+                            }
+                            with(markerPainter) {
+                                draw(
+                                    androidx.compose.ui.geometry.Size(g.w, g.h),
+                                    alpha = markerAlpha,
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
+                                )
+                            }
                         }
                     }
                 }
@@ -5893,33 +5908,35 @@ private fun MushafPageWithFrame(
             }
 
             // Pass 2: digits + shield above the text (see comment on pass 1).
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = horizontalPadding,
-                        end = horizontalPadding,
-                        top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding
-                    )
-            ) {
-                val geoms = inkGeometries ?: return@Canvas
-                if (markerAlpha <= 0.01f) return@Canvas
-                for (g in geoms) {
-                    drawIntoCanvas { canvas ->
-                        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                            color = markerColor.toArgb()
-                            alpha = (255 * markerAlpha).toInt()
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            // Derive the digit size from its measured ornament.
-                            // Translation ornaments use a smaller em than the
-                            // Arabic markers, so the global Arabic size clipped
-                            // their otherwise correctly scaled number.
-                            textSize = g.h * if (g.digits.length >= 3) 0.226f else 0.29f
-                            isFakeBoldText = true
+            if (!markersRenderedInline) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topPadding + bismillahHeightDp,
+                            bottom = bottomPadding
+                        )
+                ) {
+                    val geoms = inkGeometries ?: return@Canvas
+                    if (markerAlpha <= 0.01f) return@Canvas
+                    for (g in geoms) {
+                        drawIntoCanvas { canvas ->
+                            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                color = markerColor.toArgb()
+                                alpha = (255 * markerAlpha).toInt()
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                // Derive the digit size from its measured ornament.
+                                // Translation ornaments use a smaller em than the
+                                // Arabic markers, so the global Arabic size clipped
+                                // their otherwise correctly scaled number.
+                                textSize = g.h * if (g.digits.length >= 3) 0.226f else 0.29f
+                                isFakeBoldText = true
+                            }
+                            val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
+                            canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
                         }
-                        val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
-                        canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
                     }
                 }
             }
@@ -6826,54 +6843,78 @@ private fun MushafPagerView(
                     )
                 }
             }
-            PageCurl(
-                count = paginatedPages.size,
-                state = state,
-                config = pageCurlConfig,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        // Live pinch preview: scale the committed layout toward the
-                        // in-flight size; snaps back to 1x when the commit lands.
-                        val preview = if (committedFontSize > 0f) arabicFontSize / committedFontSize else 1f
-                        scaleX = preview
-                        scaleY = preview
-                    }
-            ) { pageIndex ->
-                val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
-                MushafPageWithFrame(
-                    pageText = page.text,
-                    inlineContent = pageInlineContent,
-                    inkGeometries = inkGeomCache[page.text],
-                    translationVisibility = translationVisibility.value,
-                    ornamentPainter = ornamentPainter,
-                    translationOrnamentPainter = translationOrnamentPainter,
-                    arabicFont = arabicFont,
-                    arabicFontSize = committedFontSize,
-                    lineHeightSp = page.lineHeightSp,
-                    showBismillah = page.showBismillah,
-                    onAyahLongPress = onAyahLongPress,
-                    ayahRanges = page.ayahRanges,
-                    // A revealed ayah is also the selected one, so the verse the
-                    // gloss belongs to lights up under the words — otherwise, on a
-                    // dense page, nothing tells the reader which of the ayahs above
-                    // the translation it is explaining. Outranks the search
-                    // highlight, which is stale once the reader starts tapping.
-                    highlightedAyahNumber = revealedAyah ?: highlightedAyahNumber,
-                    interactive = pageIndex == state.current,
-                    onAyahDoubleTap = { ayahNumber ->
-                        // No re-anchoring here on purpose. The gloss is inserted AFTER
-                        // the tapped ayah, which sits on this page, so every line before
-                        // this page's first character is untouched and repagination
-                        // reproduces the same page boundaries up to it — state.current
-                        // still points at the page being read. The anchor that used to
-                        // be set here is what dragged the reader backwards, because it
-                        // re-snapped to the first page that merely *contains* the ayah.
-                        // Double-tap the revealed ayah again to dismiss.
-                        toggleInlineTranslation(ayahNumber)
+            // PageCurl composes its page before the asynchronous ink scan finishes,
+            // and that initial captured draw does not reliably refresh when only the
+            // geometry map changes. Navigating away and back worked because the cache
+            // was ready before PageCurl was recreated. Create the curl only after the
+            // current page has geometry so its very first frame contains all markers.
+            val currentPageText = paginatedPages.getOrNull(state.current)?.text
+            val currentPageGeometry = currentPageText?.let(inkGeomCache::get)
+            if (currentPageGeometry != null) {
+                // Make the prepared geometry part of the curl's identity. This is
+                // important because PageCurl owns a subcomposition and otherwise can
+                // retain the page it created while the async geometry was absent.
+                androidx.compose.runtime.key(currentPageGeometry) {
+                    PageCurl(
+                    count = paginatedPages.size,
+                    state = state,
+                    config = pageCurlConfig,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Live pinch preview: scale the committed layout toward the
+                            // in-flight size; snaps back to 1x when the commit lands.
+                            val preview = if (committedFontSize > 0f) arabicFontSize / committedFontSize else 1f
+                            scaleX = preview
+                            scaleY = preview
+                        }
+                ) { pageIndex ->
+                    val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
+                    MushafPageWithFrame(
+                        pageText = page.text,
+                        inlineContent = pageInlineContent,
+                    inkGeometries = if (pageIndex == state.current) {
+                        currentPageGeometry
+                    } else {
+                        inkGeomCache[page.text]
                     },
-                    onAyahRub = toggleInlineTranslation,
-                    modifier = Modifier.fillMaxSize()
+                        translationVisibility = translationVisibility.value,
+                        ornamentPainter = ornamentPainter,
+                        translationOrnamentPainter = translationOrnamentPainter,
+                        arabicFont = arabicFont,
+                        arabicFontSize = committedFontSize,
+                        lineHeightSp = page.lineHeightSp,
+                        showBismillah = page.showBismillah,
+                        onAyahLongPress = onAyahLongPress,
+                        ayahRanges = page.ayahRanges,
+                        // A revealed ayah is also the selected one, so the verse the
+                        // gloss belongs to lights up under the words — otherwise, on a
+                        // dense page, nothing tells the reader which of the ayahs above
+                        // the translation it is explaining. Outranks the search
+                        // highlight, which is stale once the reader starts tapping.
+                        highlightedAyahNumber = revealedAyah ?: highlightedAyahNumber,
+                        interactive = pageIndex == state.current,
+                        onAyahDoubleTap = { ayahNumber ->
+                            // No re-anchoring here on purpose. The gloss is inserted AFTER
+                            // the tapped ayah, which sits on this page, so every line before
+                            // this page's first character is untouched and repagination
+                            // reproduces the same page boundaries up to it — state.current
+                            // still points at the page being read. The anchor that used to
+                            // be set here is what dragged the reader backwards, because it
+                            // re-snapped to the first page that merely *contains* the ayah.
+                            // Double-tap the revealed ayah again to dismiss.
+                            toggleInlineTranslation(ayahNumber)
+                        },
+                        onAyahRub = toggleInlineTranslation,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(surfaceColor),
                 )
             }
         }
@@ -6903,6 +6944,50 @@ private fun Int.toArabicIndic(): String = this.toString().map { c ->
         else -> c
     }
 }.joinToString("")
+
+/**
+ * Draws an ayah ornament inside the inline placeholder reserved by the text
+ * layout. Keeping the frame and digits in that slot prevents a later Canvas
+ * pass from drifting onto Arabic glyphs on justified RTL lines.
+ */
+@Composable
+private fun MushafInlineAyahOrnament(
+    digits: String,
+    arabicFontSize: Float,
+) {
+    val tint = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight(MARKER_ORNAMENT_FILL)
+                .aspectRatio(MARKER_ASPECT),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ayah_ornament_frame),
+                contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
+                modifier = Modifier.fillMaxSize(),
+            )
+            Text(
+                text = digits,
+                color = tint,
+                fontFamily = ubuntuInspiredFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = (
+                    arabicFontSize * if (digits.length >= 3) 0.25f else 0.32f
+                    ).sp,
+                lineHeight = (
+                    arabicFontSize * if (digits.length >= 3) 0.25f else 0.32f
+                    ).sp,
+                maxLines = 1,
+            )
+        }
+    }
+}
 
 /**
  * Ayah number rendered inside the Mushaf ayah-ending ornament

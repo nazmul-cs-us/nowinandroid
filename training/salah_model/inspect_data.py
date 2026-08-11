@@ -24,13 +24,12 @@ import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from feature_engineering import POSTURE_LABELS as TRAINING_POSTURE_LABELS
+
 TARGET_WINDOWS_PER_CLASS = 500       # UI dataset target (100ms windows)
 MIN_USEFUL_WINDOWS = 20              # below this a file can't yield one sequence
 MIN_SPLIT_SESSIONS_PER_CLASS = 3     # one independent session per split
-POSTURE_LABELS = [
-    "QIYAM", "RUKU", "GOING_TO_SUJUD", "SUJUD", "JALSA", "TASHAHHUD",
-    "QIYAM_RISING", "RISING_TO_QIYAM",
-]
+POSTURE_LABELS = list(TRAINING_POSTURE_LABELS)
 
 
 def load_file(path: Path):
@@ -188,7 +187,12 @@ def print_report(data_dir: Path):
     print(f"\n{'-'*40}\nTRAINING SPLIT READINESS (minimum {MIN_SPLIT_SESSIONS_PER_CLASS} independent sessions/class)\n{'-'*40}")
     for label in POSTURE_LABELS:
         sessions = len(sessions_per_class[label])
-        status = "✓" if sessions >= MIN_SPLIT_SESSIONS_PER_CLASS else "← record more guided sessions"
+        if sessions >= MIN_SPLIT_SESSIONS_PER_CLASS:
+            status = "✓"
+        elif label == "NOT_PRAYING":
+            status = "← record more separate negative takes"
+        else:
+            status = "← record more guided sessions"
         print(f"{label:<16} {sessions:>3} sessions  {status}")
 
     split_ready = all(
@@ -204,7 +208,7 @@ def print_report(data_dir: Path):
     if not eligible_reports:
         print("No reviewed, manual, or guided files are eligible for training.")
     elif not split_ready:
-        print("A guided recording contributes valid sequences, but collect at least 3 complete guided sessions")
+        print("A recording contributes valid sequences, but every class needs at least 3 independent sessions")
         print("before the trainer can make independent train, validation, and test splits.")
     elif not target_ready:
         print("The pipeline can train now; keep collecting toward 500 clean windows per class")

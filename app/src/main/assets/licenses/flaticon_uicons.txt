@@ -1,6 +1,6 @@
 Flaticon UIcons attribution
 
-The Settings and Salah Training icons use the Rounded Regular UIcons family.
+The Settings, Salah Training, and location marker icons use the Rounded Regular UIcons family.
 Salah Training and posture workflows use Flaticon's machine-learning glyph.
 
 UIcons by Flaticon
@@ -9,3 +9,10 @@ https://www.flaticon.com/uicons
 Used under the Flaticon free license with attribution. The font has been subset to
 the glyphs used by this application and is not offered as a standalone download.
 License information: https://www.flaticon.com/terms-of-use
+
+Weather PNG icons
+
+Weather condition and precipitation PNG icons are used from Flaticon with
+attribution to their listed creators, including Magnific/Freepik, Alfian Dwi
+Hartanto, and KP Arts. Source icon IDs: 414926, 1146869, 414927, 4112036,
+414968, 1146860, 7682153, and 414974.

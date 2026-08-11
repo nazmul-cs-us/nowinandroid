@@ -8,14 +8,17 @@ from pathlib import Path
 import numpy as np
 
 from feature_engineering import (
+    GROUP_SEPARATOR,
     POSTURE_LABELS,
     assign_sessions_to_splits,
     create_sequences,
     load_jsonl_files,
     session_ids_from_groups,
+    usable_session_counts,
     validate_training_sample,
 )
 from deployment_quality import POSTURE_LABELS as DEPLOY_LABELS, deployment_quality_issues
+from data_augmentation import balance_classes
 
 
 GUIDED_LABEL_ORDER = [
@@ -54,6 +57,43 @@ def make_sample(session_id: str, posture: str, timestamp: int) -> dict:
 
 
 class TrainingContractTest(unittest.TestCase):
+    def test_split_keeps_a_dominant_session_in_the_training_majority(self):
+        labels = []
+        groups = []
+        prayer_labels = range(len(POSTURE_LABELS) - 1)
+        for session_number in range(3):
+            for label in prayer_labels:
+                labels.append(label)
+                groups.append(f"prayer-{session_number}{GROUP_SEPARATOR}{label}")
+        for session_id, sequence_count in (("negative-large", 100), ("negative-a", 5), ("negative-b", 5)):
+            labels.extend([len(POSTURE_LABELS) - 1] * sequence_count)
+            groups.extend([f"{session_id}{GROUP_SEPARATOR}negative"] * sequence_count)
+
+        train_sessions, val_sessions, test_sessions = assign_sessions_to_splits(
+            np.array(labels, dtype=np.int32),
+            np.array(groups),
+        )
+
+        self.assertIn("negative-large", train_sessions)
+        self.assertTrue({"negative-a", "negative-b"} & val_sessions)
+        self.assertTrue({"negative-a", "negative-b"} & test_sessions)
+
+    def test_hybrid_balancing_caps_a_single_large_negative_class(self):
+        class_counts = [10, 20, 1_000]
+        y = np.concatenate([
+            np.full(count, class_index, dtype=np.int32)
+            for class_index, count in enumerate(class_counts)
+        ])
+        X = np.arange(len(y), dtype=np.float32).reshape(-1, 1, 1)
+
+        X_balanced, y_balanced = balance_classes(X, y, strategy="hybrid")
+
+        self.assertEqual(len(X_balanced), 60)
+        self.assertEqual(
+            dict(zip(*np.unique(y_balanced, return_counts=True))),
+            {0: 20, 1: 20, 2: 20},
+        )
+
     def test_three_guided_sessions_create_split_groups_for_every_class(self):
         samples = []
         timestamp = 1_000_000
@@ -75,6 +115,11 @@ class TrainingContractTest(unittest.TestCase):
                 timestamp += 100
 
         X, y, groups = create_sequences(samples, return_groups=True)
+
+        self.assertEqual(
+            usable_session_counts(samples),
+            {posture: 3 for posture in POSTURE_LABELS},
+        )
 
         self.assertEqual(X.shape[1:], (20, 30))
         for class_index, posture in enumerate(POSTURE_LABELS):

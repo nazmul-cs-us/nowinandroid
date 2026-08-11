@@ -12,6 +12,7 @@ import json
 import math
 import numpy as np
 import os
+from itertools import combinations
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 
@@ -334,6 +335,51 @@ def create_sequences(
     return X, y
 
 
+def usable_session_counts(
+    samples: List[dict],
+    sequence_length: int = SEQUENCE_LENGTH,
+) -> Dict[str, int]:
+    """Count independent sessions that can yield a sequence for each class.
+
+    This intentionally avoids feature extraction so the trainer can reject an
+    incomplete dataset before expanding a long recording into thousands of
+    overlapping feature sequences.
+    """
+    sessions: Dict[str, List[dict]] = {}
+    for sample in samples:
+        sessions.setdefault(sample["session_id"], []).append(sample)
+
+    usable: Dict[str, set] = {label: set() for label in POSTURE_LABELS}
+    for session_id, session_samples in sessions.items():
+        session_samples.sort(key=lambda sample: sample["timestamp"])
+        run_label: Optional[str] = None
+        run_length = 0
+        previous_timestamp: Optional[float] = None
+
+        def finish_run() -> None:
+            if run_label in usable and run_length >= sequence_length:
+                usable[run_label].add(session_id)
+
+        for sample in session_samples:
+            label = sample["posture"]
+            timestamp = sample["timestamp"]
+            continues = (
+                label == run_label
+                and previous_timestamp is not None
+                and 0 < timestamp - previous_timestamp <= MAX_SEQUENCE_GAP_MS
+            )
+            if continues:
+                run_length += 1
+            else:
+                finish_run()
+                run_label = label
+                run_length = 1
+            previous_timestamp = timestamp
+        finish_run()
+
+    return {label: len(session_ids) for label, session_ids in usable.items()}
+
+
 def session_ids_from_groups(groups: np.ndarray) -> np.ndarray:
     """Return the source recording/session id for each generated sequence."""
     return np.array([str(group).split(GROUP_SEPARATOR, 1)[0] for group in groups])
@@ -369,7 +415,9 @@ def assign_sessions_to_splits(
             break
 
     required_labels = set(range(NUM_CLASSES))
-    rng = np.random.default_rng(random_state)
+    # Retained for API compatibility. Candidate selection below is exhaustive and
+    # deterministic, so quality no longer depends on a lucky random shuffle.
+    _ = random_state
 
     # How many sessions a partition needs is a property of the data, not of the ratios.
     # A prayer recording never contains NOT_PRAYING and a negative take never contains a
@@ -377,22 +425,61 @@ def assign_sessions_to_splits(
     # never satisfy the requirement below. Rather than fail, grow the held-out partitions
     # until they can cover every class, keeping train the majority.
     max_holdout = max(1, (len(unique_sessions) - 1) // 2)
+    total_sequences = len(y)
+    target_fractions = (1.0 - test_ratio - val_ratio, val_ratio, test_ratio)
     while test_count <= max_holdout and val_count <= max_holdout:
-        for _ in range(5000):
-            shuffled = unique_sessions.copy()
-            rng.shuffle(shuffled)
-            test_sessions = set(shuffled[:test_count])
-            val_sessions = set(shuffled[test_count:test_count + val_count])
-            train_sessions = set(shuffled[test_count + val_count:])
-            if not train_sessions:
-                break
+        best_split = None
+        best_score = float("inf")
+        all_sessions = set(unique_sessions)
+        labels_by_session = {
+            session: set(y[session_ids == session])
+            for session in unique_sessions
+        }
+        sequence_counts = {
+            session: int((session_ids == session).sum())
+            for session in unique_sessions
+        }
 
-            split_sessions = (train_sessions, val_sessions, test_sessions)
-            if all(
-                set(y[np.isin(session_ids, list(selected))]) == required_labels
-                for selected in split_sessions
-            ):
-                return split_sessions
+        def labels_for(selected) -> set:
+            labels = set()
+            for session in selected:
+                labels.update(labels_by_session[session])
+            return labels
+
+        # At current dataset sizes this is a few hundred thousand small set
+        # combinations, fast enough to guarantee the best valid split. The old
+        # random search frequently missed the only good arrangement.
+        for test_tuple in combinations(unique_sessions, test_count):
+            test_sessions = set(test_tuple)
+            if labels_for(test_sessions) != required_labels:
+                continue
+            remaining = sorted(all_sessions - test_sessions)
+            for val_tuple in combinations(remaining, val_count):
+                val_sessions = set(val_tuple)
+                if labels_for(val_sessions) != required_labels:
+                    continue
+                train_sessions = all_sessions - test_sessions - val_sessions
+                if labels_for(train_sessions) != required_labels:
+                    continue
+
+                split_sessions = (train_sessions, val_sessions, test_sessions)
+                # A session can be seconds or tens of minutes long. Returning the
+                # first label-valid shuffle can therefore put most sequences in a
+                # held-out partition. Pick the valid assignment closest to the
+                # requested sequence ratios, while retaining whole-session isolation.
+                actual_fractions = tuple(
+                    sum(sequence_counts[session] for session in selected) / total_sequences
+                    for selected in split_sessions
+                )
+                score = sum(
+                    (actual - target) ** 2
+                    for actual, target in zip(actual_fractions, target_fractions)
+                )
+                if score < best_score:
+                    best_score = score
+                    best_split = split_sessions
+        if best_split is not None:
+            return best_split
         test_count += 1
         val_count += 1
 
