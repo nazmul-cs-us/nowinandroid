@@ -136,6 +136,9 @@ fun QiblaGlobeView(
     )
     var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
     var qiblaLayerRef by remember { mutableStateOf<RenderableLayer?>(null) }
+    val lifecycleObservers = remember(lifecycleOwner) {
+        mutableMapOf<WorldWindow, LifecycleEventObserver>()
+    }
     var isUserInteracting by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableStateOf(0L) }
     var wasAlignedWithQibla by remember { mutableStateOf(false) }
@@ -195,7 +198,7 @@ fun QiblaGlobeView(
     // Also keyed on isActiveTile: while the card is stacked behind others the
     // globe is hidden, so compass work would be wasted — sensors unregister
     // and re-register when the card lands on front again.
-    DisposableEffect(context, isActiveTile) {
+    DisposableEffect(context, isActiveTile, magneticDeclination) {
         if (!isActiveTile) {
             return@DisposableEffect onDispose { }
         }
@@ -276,7 +279,13 @@ fun QiblaGlobeView(
     // Prediction globe. Regenerates the marker bitmap at ~20fps with a varying dot
     // radius while the tile is in the foreground; the cone and white ring stay
     // constant and the fill stays the accuracy-driven color — only the dot scales.
-    LaunchedEffect(isInForeground, isActiveTile) {
+    LaunchedEffect(
+        isInForeground,
+        isActiveTile,
+        qiblaDirection,
+        userLatitude,
+        userLongitude,
+    ) {
         if (!isInForeground || !isActiveTile) return@LaunchedEffect
         val cycleMs = 2200f
         while (true) {
@@ -385,7 +394,12 @@ fun QiblaGlobeView(
         }
 
         // WorldWind globe view with lifecycle management
-        AndroidView(
+        // WorldWind builds marker positions, the Qibla path and camera framing in
+        // its factory. Key the retained Android view by coordinates so a location
+        // refresh replaces that complete coordinate-derived scene instead of only
+        // recomposing the Compose overlays around a stale globe.
+        key(userLatitude, userLongitude) {
+            AndroidView(
                 factory = { ctx ->
                     val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
                         context = ctx,
@@ -459,6 +473,7 @@ fun QiblaGlobeView(
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
+                    lifecycleObservers[worldWindow] = observer
 
                     worldWindow
                 },
@@ -475,10 +490,18 @@ fun QiblaGlobeView(
                 },
                 onRelease = { worldWindow ->
                     android.util.Log.d("GlobeSurface", "🗑️ WorldWindow RELEASED @${android.os.SystemClock.uptimeMillis()}")
+                    lifecycleObservers.remove(worldWindow)?.let { observer ->
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
                     worldWindow.onPause()
-                    worldWindowRef = null
+                    if (worldWindowRef === worldWindow) {
+                        worldWindowRef = null
+                        qiblaLayerRef = null
+                        userMarkerPlacemark = null
+                    }
                 }
             )
+        }
 
         // Only show overlay controls when showControls is true
         if (showControls) {
@@ -853,16 +876,22 @@ private fun createWorldWindow(
 
     android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters/1000).toInt()}km, midpoint=($midLat, $midLon)")
 
-    // Pulled back so the whole Earth reads as a sphere inside the wide carousel card.
-    // 1.8x still clipped the lower limb in this short viewport; 2.05x preserves a small
-    // black margin around the complete disc and its atmosphere glow.
+    // Pull back far enough for the complete sphere to fit the narrowest viewport
+    // dimension. The old fixed 2.05R minimum worked for the wide home tile but
+    // cropped both sides of the globe inside the portrait bottom sheet.
     val baseRange = distanceMeters * 1.8
-    val minRange = earthRadius * 2.05
-    val maxRange = earthRadius * 3.2
+    val minRange = minimumRangeForFullGlobe(
+        earthRadius = earthRadius,
+        viewWidth = viewWidth,
+        viewHeight = viewHeight,
+    )
+    val maxRange = earthRadius * 5.0
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 
-    // Small tilt for a touch of 3D depth (still mostly head-on, glow all around).
-    val tilt = 12.0
+    // A tall bottom-sheet viewport already gives the sphere plenty of depth.
+    // Keep it head-on there so perspective does not push the Earth downward and
+    // leave a large empty black cap above it; retain the subtle tilt in wide tiles.
+    val tilt = if (viewHeight > viewWidth) 0.0 else 12.0
 
     val lookAt = LookAt().apply {
         set(
@@ -912,8 +941,12 @@ private fun resetCameraToShowBoth(
 
     // Calculate range to show the full sphere (matches createWorldWindow framing)
     val baseRange = distanceMeters * 1.8
-    val minRange = earthRadius * 2.05
-    val maxRange = earthRadius * 3.2
+    val minRange = minimumRangeForFullGlobe(
+        earthRadius = earthRadius,
+        viewWidth = worldWindow.width,
+        viewHeight = worldWindow.height,
+    )
+    val maxRange = earthRadius * 5.0
     val finalRange = baseRange.coerceIn(minRange, maxRange)
 
     val lookAt = LookAt().apply {
@@ -922,7 +955,7 @@ private fun resetCameraToShowBoth(
             AltitudeMode.ABSOLUTE,
             finalRange,
             heading,
-            12.0.degrees,  // tilt (small, for 3D depth)
+            (if (worldWindow.height > worldWindow.width) 0.0 else 12.0).degrees,
             0.0.degrees,   // roll
         )
     }
@@ -931,6 +964,27 @@ private fun resetCameraToShowBoth(
     worldWindow.requestRedraw()
 
     android.util.Log.d("QiblaGlobeView", "📍 Camera reset to show user ($userLat, $userLon) and Kaaba")
+}
+
+/**
+ * WorldWind's camera field-of-view is vertical. In a portrait viewport the
+ * horizontal field is considerably narrower, so fitting the globe vertically
+ * is not enough. Scale the established wide-card range by the inverse aspect
+ * ratio to preserve the complete circular limb and atmosphere glow.
+ */
+private fun minimumRangeForFullGlobe(
+    earthRadius: Double,
+    viewWidth: Int,
+    viewHeight: Int,
+): Double {
+    if (viewWidth <= 0 || viewHeight <= 0) return earthRadius * 2.05
+    val aspectRatio = viewWidth.toDouble() / viewHeight.toDouble()
+    val narrowViewportBoost = if (aspectRatio < 1.0) {
+        (1.0 / aspectRatio).coerceAtMost(2.2)
+    } else {
+        1.0
+    }
+    return earthRadius * 2.05 * narrowViewportBoost
 }
 
 /**

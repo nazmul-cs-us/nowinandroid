@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -21,6 +22,9 @@ import com.starception.submission.prayer.silent.PrayerSilentModeController
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.prayer.util.FileLogger
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
@@ -38,6 +42,14 @@ import java.util.concurrent.TimeUnit
 class PrayerNotificationReceiver : BroadcastReceiver() {
     
     override fun onReceive(context: Context, intent: Intent) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            handleNotification(context.applicationContext, intent)
+            pendingResult.finish()
+        }
+    }
+
+    private suspend fun handleNotification(context: Context, intent: Intent) {
         val receiveTime = System.currentTimeMillis()
         try {
             Log.d(TAG, "📱 PrayerNotificationReceiver triggered")
@@ -148,7 +160,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         Log.d(TAG, "✅ Scheduled WorkManager job for $prayerName")
     }
     
-    private fun showPrayerNotification(
+    private suspend fun showPrayerNotification(
         context: Context,
         prayerName: String,
         prayerTime: String,
@@ -162,6 +174,11 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
             // The notification fires on the prayer's own day, so today's date is the right key.
             val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+            val weatherInsight = getPrayerWeatherInsightForNotification(
+                context = context,
+                prayerName = displayName,
+                prayerTimeText = prayerTime,
+            )
 
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
 
@@ -183,10 +200,18 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 // Prayer time notification - when it's actually prayer time
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setContentTitle("$displayName Prayer")
-                    .setContentText("It's time for $displayName • $prayerTime")
+                    .setContentText(
+                        listOfNotNull(
+                            "It's time for $displayName • $prayerTime",
+                            weatherInsight?.summary,
+                        ).joinToString(" · "),
+                    )
                     .setStyle(NotificationCompat.BigTextStyle()
                         .bigText("$displayName Prayer Time\n\n" +
                                 "Time: $prayerTime\n" +
+                                weatherInsight?.let {
+                                    "${it.notificationLine}\n${it.advice}\n"
+                                }.orEmpty() +
                                 "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                                 "(O Allah, accept from us)"))
                     .setSmallIcon(R.drawable.ic_prayer)
@@ -202,10 +227,18 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 // Prayer reminder notification - X minutes before prayer (user configurable)
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setContentTitle("$displayName in $priorMinutes min")
-                    .setContentText("Starts at $prayerTime")
+                    .setContentText(
+                        listOfNotNull(
+                            "Starts at $prayerTime",
+                            weatherInsight?.summary,
+                        ).joinToString(" · "),
+                    )
                     .setStyle(NotificationCompat.BigTextStyle()
                         .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
-                                "Time: $prayerTime\n"))
+                                "Time: $prayerTime\n" +
+                                weatherInsight?.let {
+                                    "${it.notificationLine}\n${it.advice}\n"
+                                }.orEmpty()))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setLargeIcon(largeIcon)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -250,4 +283,3 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         private const val CHANNEL_NAME = "Scheduled Prayer Notifications"
     }
 }
-

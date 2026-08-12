@@ -100,6 +100,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -168,6 +169,10 @@ import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
+import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherInsight
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
+import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
@@ -1157,6 +1162,7 @@ fun SwipeableBigTiles(
     fortressDuasByChapter: Map<Int, List<Dua>> = emptyMap(),
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
+    weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
 ) {
     val insightPageCount = INSIGHT_PAGE_COUNT
     val middleLoopStart = insightPageCount
@@ -1168,7 +1174,7 @@ fun SwipeableBigTiles(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val carouselScope = rememberCoroutineScope()
-    var showGlobePopup by remember { mutableStateOf(false) }
+    var showGlobePopup by rememberSaveable { mutableStateOf(false) }
     var showAutoSwipeSettings by remember { mutableStateOf(false) }
     val carouselPreferences = remember(context) {
         context.getSharedPreferences("insight_carousel_preferences", Context.MODE_PRIVATE)
@@ -1264,6 +1270,35 @@ fun SwipeableBigTiles(
             timeOffsets = timeOffsets,
             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
         )
+    }
+    val forecastTarget = remember(prayerTimes, timeOffsets, currentTime) {
+        prayerTimes?.let {
+            getUpcomingPrayerForecastTarget(
+                prayerTimes = it,
+                timeOffsets = timeOffsets,
+                now = java.time.LocalDateTime.of(LocalDate.now(), currentTime),
+            )
+        }
+    }
+    val prayerWeatherInsight by produceState<PrayerWeatherInsight?>(
+        null,
+        prayerTimes?.location?.latitude,
+        prayerTimes?.location?.longitude,
+        forecastTarget,
+        weatherThresholds,
+    ) {
+        value = if (prayerTimes != null && forecastTarget != null) {
+            CurrentWeatherRepository.getPrayerInsight(
+                latitude = prayerTimes.location.latitude,
+                longitude = prayerTimes.location.longitude,
+                prayerName = getPrayerDisplayName(forecastTarget.prayerName, forecastTarget.date),
+                prayerDate = forecastTarget.date,
+                prayerTime = forecastTarget.time,
+                thresholds = weatherThresholds,
+            )
+        } else {
+            null
+        }
     }
     val (_, totalPrayers) = getPrayerProgress()
     val prayedCount = getPrayed().coerceIn(0, totalPrayers)
@@ -1425,7 +1460,12 @@ fun SwipeableBigTiles(
 
         BoxWithConstraints(modifier = stripModifier) {
             val normalCardWidth = if (isLandscape) {
-                (maxWidth * 0.58f).coerceIn(220.dp, 280.dp)
+                // The split-screen home layout is already narrow enough to signal
+                // that this is a carousel through its indicator. A portrait-style
+                // peek here exposed half of the next card and clipped its copy at
+                // the prayer-column boundary, so give the focused insight the full
+                // left-column canvas in landscape.
+                maxWidth
             } else {
                 (maxWidth * 0.64f).coerceIn(232.dp, 250.dp)
             }
@@ -1438,13 +1478,13 @@ fun SwipeableBigTiles(
                 normalCardWidth.value +
                     ((compactCardWidth.value - normalCardWidth.value) * compactProgress)
                 ).dp
-            val pageSpacing = (14f - (4f * compactProgress)).dp
+            val pageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
 
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(cardWidth),
                 pageSpacing = pageSpacing,
-                contentPadding = PaddingValues(end = 18.dp),
+                contentPadding = if (isLandscape) PaddingValues(0.dp) else PaddingValues(end = 18.dp),
                 // One page of runway either side. At 0 the card entering the peek
                 // slot composed exactly as it became visible, which showed up as a
                 // pop partway through the drag.
@@ -1493,9 +1533,17 @@ fun SwipeableBigTiles(
                             supportingText = prayerPrediction?.content
                                 ?: getTimeUntilNextPrayer().takeIf { it.isNotBlank() },
                             footerText = prayerPrediction?.nextPrayerInfo
-                                ?: listOf(nextPrayerName, nextPrayerTime)
-                                    .filter { it.isNotBlank() }
-                                    .joinToString(" · "),
+                                .orEmpty()
+                                .let { nextPrayerInfo ->
+                                    listOfNotNull(
+                                        nextPrayerInfo.takeIf { it.isNotBlank() }
+                                            ?: listOf(nextPrayerName, nextPrayerTime)
+                                                .filter { it.isNotBlank() }
+                                                .joinToString(" · ")
+                                                .takeIf { it.isNotBlank() },
+                                        prayerWeatherInsight?.tileText,
+                                    ).joinToString("\n")
+                                },
                             backgroundPainterRes = R.drawable.insight_salah,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
@@ -2313,15 +2361,21 @@ private fun InsightPreviewCard(
                 }
 
                 timelineProgress?.let { progress ->
-                    LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
+                    val boundedProgress = progress.coerceIn(0f, 1f)
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(3.dp)
-                            .clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = Color.White.copy(alpha = 0.22f),
-                    )
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.22f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(boundedProgress)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
                 }
 
                 footerText?.takeIf { it.isNotBlank() }?.let { text ->
@@ -2544,7 +2598,7 @@ private fun FullWidthSwipeableBigTiles(
     val context = LocalContext.current
     val isDarkTheme = LocalDarkTheme.current
     val overlayDensity = LocalDensity.current
-    var showGlobePopup by remember { mutableStateOf(false) }
+    var showGlobePopup by rememberSaveable { mutableStateOf(false) }
     var carouselHostInRoot by remember { mutableStateOf(Offset.Zero) }
     var globeOverlayRect by remember { mutableStateOf<Rect?>(null) }
     var hasActivityPermission by remember {
@@ -2923,7 +2977,7 @@ private fun LegacySwipeableBigTilesDeck(
     val coroutineScope = rememberCoroutineScope()
 
     // Globe fullscreen popup state
-    var showGlobePopup by remember { mutableStateOf(false) }
+    var showGlobePopup by rememberSaveable { mutableStateOf(false) }
 
     // Activity Recognition Permission for Smart Tracking tile
     val context = LocalContext.current

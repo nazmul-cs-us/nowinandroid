@@ -67,6 +67,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import android.content.res.Configuration
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,6 +95,7 @@ class SyncContainerState(
     val isWobbling: Boolean = false,
     val maxDragDistance: Float = 0f,
     val wobbleIntensity: Float = 0f,
+    val heldContentInsetTop: Dp = 0.dp,
     val pullModifier: Modifier = Modifier,
 )
 
@@ -119,6 +121,8 @@ class SyncContainerState(
 fun PullToSyncContainer(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    syncResultText: String? = null,
+    onSyncResultDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
     idleContainerColor: Color = Color.Unspecified,
     idleContainerBrush: Brush? = null,
@@ -259,7 +263,8 @@ fun PullToSyncContainer(
 
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
-    val hasStatus = isPrayerAlert || isIslamicEvent || isSilentMode ||
+    val hasSyncResult = !syncResultText.isNullOrBlank()
+    val hasStatus = isPrayerAlert || isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
     val targetHoldHeightDp = if (mediaState.isVisible || isMushafActive || hasStatus) {
         standardBarHeightDp
@@ -382,6 +387,16 @@ fun PullToSyncContainer(
         if (isRefreshing) {
             add(SyncBarStatus("sync", "Syncing your data", SyncBarIcon.Spinner))
         }
+        if (hasSyncResult) {
+            add(
+                SyncBarStatus(
+                    key = "sync-result:$syncResultText",
+                    text = syncResultText.orEmpty(),
+                    icon = SyncBarIcon.Sparkle,
+                    onDismiss = onSyncResultDismiss,
+                ),
+            )
+        }
         // The media bar renders this as its own subtitle, so it would be a
         // duplicate here.
         if (isTtsPreparing && !mediaState.isVisible) {
@@ -415,12 +430,15 @@ fun PullToSyncContainer(
     val activeStatusIndex = rememberCyclingStatusIndex(statuses)
     val activeStatus = statuses.getOrNull(activeStatusIndex)
 
+    val heldContentInsetTop = (refreshingOffset.value * maxRevealDpForBanners).dp
+
     // Create sync container state for content
     val syncState = SyncContainerState(
         dragDistance = dragDistanceAnimated,
         isWobbling = wobbleIntensity > 0.01f,
         maxDragDistance = maxDragDistance,
         wobbleIntensity = wobbleIntensity,
+        heldContentInsetTop = heldContentInsetTop,
         pullModifier = Modifier.nestedScroll(nestedScrollConnection),
     )
 
@@ -494,7 +512,7 @@ fun PullToSyncContainer(
         // up; the transient finger-drag part TRANSLATES the sheet instead, so pulling
         // slides the page rigidly rather than squeezing weight-based layouts — and the
         // offset lambda runs in the placement phase, skipping per-frame relayout.
-        val holdOffsetY = (refreshingOffset.value * maxRevealDp).dp
+        val holdOffsetY = heldContentInsetTop
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -591,8 +609,6 @@ fun PullToSyncContainer(
                         ) { status ->
                             SyncBarStatusRow(
                                 status = status,
-                                totalStatuses = statuses.size,
-                                activeIndex = activeStatusIndex,
                                 spinAngle = spinAngle,
                                 contentColor = indicatorColor,
                                 onDismissed = {
@@ -689,14 +705,12 @@ private fun DrawScope.drawIndicatorArc(color: Color, startAngle: Float) {
 }
 
 /**
- * A status occupying the strip's single row: glyph, message, and — when more
- * than one status is live — dots showing which of them is on screen.
+ * A status occupying the strip's single row: glyph and message. Multiple live
+ * statuses still cycle, but remain visually quiet without pagination dots.
  */
 @Composable
 private fun SyncBarStatusRow(
     status: SyncBarStatus,
-    totalStatuses: Int,
-    activeIndex: Int,
     spinAngle: Float,
     contentColor: Color,
     onDismissed: () -> Unit,
@@ -764,23 +778,5 @@ private fun SyncBarStatusRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        if (totalStatuses > 1) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                repeat(totalStatuses) { dot ->
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(
-                                contentColor.copy(alpha = if (dot == activeIndex) 0.85f else 0.28f),
-                            ),
-                    )
-                }
-            }
-        }
     }
 }

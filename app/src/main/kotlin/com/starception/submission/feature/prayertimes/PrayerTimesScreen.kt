@@ -66,6 +66,13 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Grain
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import com.starception.submission.R
@@ -99,6 +106,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
@@ -127,6 +135,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.AnimatedVisibility
@@ -206,6 +216,7 @@ import android.content.SharedPreferences
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -217,10 +228,18 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDragHandle
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
+import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
 import androidx.compose.ui.graphics.lerp
 
 private val PrayerReferenceInk = Color(0xFF0A0808)
@@ -395,6 +414,30 @@ fun PrayerTimesScreen(
     // SHARED STATE - Track which prayer card has swipe actions revealed (iOS-style)
     var revealedPrayerCard by remember { mutableStateOf<String?>(null) }
     var prayerTimeEditMode by rememberSaveable { mutableStateOf(false) }
+    var showWeatherThresholds by rememberSaveable { mutableStateOf(false) }
+    var prayerWeatherThresholds by remember {
+        mutableStateOf(PrayerWeatherThresholdStore.load(screenContext))
+    }
+    var syncWeatherResult by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(syncWeatherResult) {
+        if (syncWeatherResult != null) {
+            delay(10_000L)
+            syncWeatherResult = null
+        }
+    }
+
+    if (showWeatherThresholds) {
+        PrayerWeatherThresholdSheet(
+            thresholds = prayerWeatherThresholds,
+            onDismiss = { showWeatherThresholds = false },
+            onSave = { updated ->
+                prayerWeatherThresholds = updated
+                PrayerWeatherThresholdStore.save(screenContext, updated)
+                showWeatherThresholds = false
+            },
+        )
+    }
 
     LaunchedEffect(prayerTimeEditMode) {
         if (!prayerTimeEditMode) {
@@ -722,12 +765,19 @@ fun PrayerTimesScreen(
 
     // Helper function to apply AI suggestion
     val applySuggestion: (String, Int) -> Unit = { prayerName, suggestedOffset ->
-        kotlinx.coroutines.MainScope().launch {
-            try {
-                repository.updateSinglePrayerOffset(prayerName, suggestedOffset)
-                android.util.Log.i("PrayerTimesScreen", "✨ AI suggestion applied: $prayerName → $suggestedOffset minutes")
-            } catch (e: Exception) {
-                android.util.Log.e("PrayerTimesScreen", "❌ Failed to apply suggestion: ${e.message}")
+        if (!prayerTimeEditMode) {
+            android.util.Log.d(
+                "PrayerTimesScreen",
+                "Ignoring AI suggestion for $prayerName while prayer schedule is locked",
+            )
+        } else {
+            kotlinx.coroutines.MainScope().launch {
+                try {
+                    repository.updateSinglePrayerOffset(prayerName, suggestedOffset)
+                    android.util.Log.i("PrayerTimesScreen", "✨ AI suggestion applied: $prayerName → $suggestedOffset minutes")
+                } catch (e: Exception) {
+                    android.util.Log.e("PrayerTimesScreen", "❌ Failed to apply suggestion: ${e.message}")
+                }
             }
         }
     }
@@ -751,6 +801,7 @@ fun PrayerTimesScreen(
     // REFRESH LOGIC - Handle pull-to-refresh action with location service checking
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
+            syncWeatherResult = null
             // Track visual start time — ensures minimum 3s hold for sync progress animation
             val visualStartTime = System.currentTimeMillis()
             try {
@@ -839,6 +890,26 @@ fun PrayerTimesScreen(
                     }
                     android.util.Log.d("PullToRefresh", "Calculation completed successfully in ${System.currentTimeMillis() - startTime}ms")
                     android.util.Log.d("PullToRefresh", "FINAL LOCATION AFTER REFRESH: \"$location\"")
+                    prayerTimes?.let { refreshedTimes ->
+                        val target = getUpcomingPrayerForecastTarget(
+                            prayerTimes = refreshedTimes,
+                            timeOffsets = storedOffsets,
+                            now = LocalDateTime.now(),
+                        )
+                        val displayName = getPrayerDisplayName(target.prayerName, target.date)
+                        val insight = withTimeoutOrNull(3_500L) {
+                            CurrentWeatherRepository.getPrayerInsight(
+                                latitude = refreshedTimes.location.latitude,
+                                longitude = refreshedTimes.location.longitude,
+                                prayerName = displayName,
+                                prayerDate = target.date,
+                                prayerTime = target.time,
+                                forceRefresh = true,
+                                thresholds = prayerWeatherThresholds,
+                            )
+                        }
+                        syncWeatherResult = insight?.compactText
+                    }
                 } catch (e: TimeoutCancellationException) {
                     android.util.Log.w("PullToRefresh", "Calculation timed out after 3 seconds, keeping existing data")
                     // Keep current prayer times if they exist, or show default location
@@ -994,6 +1065,7 @@ fun PrayerTimesScreen(
         onShowPopup: (String) -> Unit = {},
         suggestion: com.starception.submission.prayer.model.PrayerTimeSuggestion? = null,
         onApplySuggestion: ((String, Int) -> Unit)? = null,
+        compactForSync: Boolean = false,
         // iOS-style swipe-to-reveal state
         isRevealed: Boolean = false,
         onRevealChange: (Boolean) -> Unit = {}
@@ -1001,6 +1073,8 @@ fun PrayerTimesScreen(
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
         val isAnotherTileInEditMode = currentEditingTile != null && currentEditingTile != prayerName
+        val compactTile = compactForSync ||
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         
         // Material 3 expressive animation states with spring physics
         val expressiveAnimationSpec = spring<Float>(
@@ -1249,7 +1323,7 @@ fun PrayerTimesScreen(
                     PrayerReferenceSlate
                 }
                 Surface(
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(if (compactTile) 20.dp else 28.dp),
                     color = tileColor,
                     tonalElevation = 0.dp,
                     modifier = Modifier
@@ -1295,7 +1369,12 @@ fun PrayerTimesScreen(
                                     center = Offset(size.width * 0.96f, size.height * 0.98f),
                                 )
                             }
-                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
+                            .padding(
+                                start = if (compactTile) 11.dp else 14.dp,
+                                end = if (compactTile) 11.dp else 14.dp,
+                                top = if (compactTile) 5.dp else 8.dp,
+                                bottom = if (compactTile) 6.dp else 10.dp,
+                            ),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // Top section: Prayer names with notification bell
@@ -1311,7 +1390,11 @@ fun PrayerTimesScreen(
                             ) {
                                 Text(
                                     text = getPrayerDisplayName(prayerName),
-                                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontSize = if (compactTile) 15.sp else 18.sp,
+                                        lineHeight = if (compactTile) 18.sp else 22.sp,
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                    ),
                                     color = titleColor,
                                     fontWeight = FontWeight.SemiBold,
                                     overflow = TextOverflow.Ellipsis,
@@ -1331,7 +1414,7 @@ fun PrayerTimesScreen(
                                             onNotificationToggle(!notificationEnabled)
                                             android.util.Log.d("PrayerCard", "🔔 Notification toggled for $prayerName: ${!notificationEnabled}")
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(if (compactTile) 22.dp else 28.dp)
                                     ) {
                                         FlaticonIcon(
                                             glyph = if (notificationEnabled) {
@@ -1353,29 +1436,31 @@ fun PrayerTimesScreen(
                                                     else -> 0.36f
                                                 },
                                             ),
-                                            fontSize = 16.sp,
+                                            fontSize = if (compactTile) 13.sp else 16.sp,
                                         )
                                     }
                                 }
                             }
-                            Text(
-                                text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                                // The Arabic fonts carry very tall ascent/descent, so an
-                                // unconstrained line box here eats the 112dp expanded tile's
-                                // height budget and the time row below gets clipped. Pin the
-                                // line box like the time text does.
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = getSelectedArabicFontFamily(screenContext),
-                                    fontSize = 16.sp,
-                                    letterSpacing = 0.4.sp,
-                                    lineHeight = 22.sp,
-                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                ),
-                                color = supportingColor,
-                                fontWeight = FontWeight.Normal,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
-                            )
+                            if (!compactTile) {
+                                Text(
+                                    text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
+                                    // The Arabic fonts carry very tall ascent/descent, so an
+                                    // unconstrained line box here eats the 112dp expanded tile's
+                                    // height budget and the time row below gets clipped. Pin the
+                                    // line box like the time text does.
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontFamily = getSelectedArabicFontFamily(screenContext),
+                                        fontSize = 16.sp,
+                                        letterSpacing = 0.4.sp,
+                                        lineHeight = 22.sp,
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                    ),
+                                    color = supportingColor,
+                                    fontWeight = FontWeight.Normal,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.weight(1f))
@@ -1427,20 +1512,22 @@ fun PrayerTimesScreen(
                                     Text(
                                         text = timeOnly,
                                         style = MaterialTheme.typography.headlineMedium.copy(
-                                            fontSize = 24.sp,
-                                            lineHeight = 30.sp,
+                                            fontSize = if (compactTile) 19.sp else 24.sp,
+                                            lineHeight = if (compactTile) 22.sp else 30.sp,
                                             platformStyle = PlatformTextStyle(includeFontPadding = false),
                                         ),
                                         color = baseColor,
                                         fontWeight = FontWeight.Bold
                                     )
 
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
 
                                     // AM/PM (smaller)
                                     Text(
                                         text = amPm,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = if (compactTile) 11.sp else 14.sp,
+                                        ),
                                         color = baseColor.copy(alpha = 0.85f),
                                         fontWeight = FontWeight.Medium,
                                         modifier = Modifier.padding(bottom = 2.dp)
@@ -1452,6 +1539,7 @@ fun PrayerTimesScreen(
                                     currentOffset = currentOffset,
                                     suggestion = suggestion,
                                     baseColor = baseColor,
+                                    enabled = prayerTimeEditMode,
                                     onApplySuggestion = if (onApplySuggestion != null) {
                                         { suggestedOffset -> onApplySuggestion(prayerName, suggestedOffset) }
                                     } else null
@@ -1582,6 +1670,8 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
+                syncResultText = syncWeatherResult,
+                onSyncResultDismiss = { syncWeatherResult = null },
                 idleContainerColor = Color.Transparent,
                 idleContainerBrush = mainPageBackgroundBrush(),
                 downloadProgress = downloadProgress,
@@ -1608,6 +1698,18 @@ fun PrayerTimesScreen(
             ) { syncState ->
             val outerConfiguration = LocalConfiguration.current
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            var showAllPrayers by rememberSaveable { mutableStateOf(false) }
+            val portraitScrollState = rememberScrollState()
+            // A disabled verticalScroll does not dispatch nested-scroll deltas, which
+            // prevents PullToSyncContainer from seeing downward drags while the prayer
+            // list is collapsed. This no-op scrollable keeps the page stationary while
+            // still forwarding those gestures to the pull-to-sync connection.
+            val pullGestureScrollState = rememberScrollableState { 0f }
+            LaunchedEffect(showAllPrayers, outerIsLandscape) {
+                if (!outerIsLandscape && !showAllPrayers && portraitScrollState.value != 0) {
+                    portraitScrollState.animateScrollTo(0)
+                }
+            }
             // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
             val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
                 .asPaddingValues().calculateTopPadding()
@@ -1625,7 +1727,18 @@ fun PrayerTimesScreen(
             Column(modifier = Modifier
                 .fillMaxSize()
                 .then(syncState.pullModifier)
-                .then(if (outerIsLandscape) Modifier else Modifier.verticalScroll(rememberScrollState()))) {
+                .then(
+                    if (!outerIsLandscape && showAllPrayers) {
+                        Modifier.verticalScroll(
+                            state = portraitScrollState,
+                        )
+                    } else {
+                        Modifier.scrollable(
+                            state = pullGestureScrollState,
+                            orientation = Orientation.Vertical,
+                        )
+                    },
+                )) {
             // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
             // Home page content with wobble transformation applied to actual content
             Box(
@@ -1666,11 +1779,27 @@ fun PrayerTimesScreen(
             // This keeps Location visible at rest instead of relying on a height
             // tuned for one handset. Larger accessibility text gets extra room too.
             val portraitInsightMaxHeight = if (configuration.screenHeightDp < 1_000) 280.dp else 288.dp
-            val portraitInsightHeight = (
+            val portraitInsightRestingHeight = (
                 configuration.screenHeightDp.dp -
                     645.dp -
                     (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
                 ).coerceIn(208.dp, portraitInsightMaxHeight)
+            // Keep the location tile at the same screen position while the sync strip
+            // is held. The sheet moves down by heldContentInsetTop, while the search
+            // chrome simultaneously gives back only the portion of the status-bar
+            // inset represented by dynamicTopInset. Shrink the prayer rows by the
+            // exact remaining displacement instead of using the navigation-clearance
+            // estimate; the old estimate left Location visibly lower during sync.
+            val syncTopInsetReclaim = (statusBarInset - dynamicTopInset)
+                .coerceAtLeast(0.dp)
+                .coerceAtMost(syncState.heldContentInsetTop)
+            val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
+            val portraitInsightHeight = portraitInsightRestingHeight
+            val syncPrayerRows = if (showAllPrayers) 3 else 2
+            val prayerTileSyncShrink = (
+                (syncState.heldContentInsetTop - syncTopInsetReclaim)
+                    .coerceAtLeast(0.dp) / syncPrayerRows.toFloat()
+                ).coerceAtMost(26.dp)
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -1760,57 +1889,29 @@ fun PrayerTimesScreen(
                                 fortressDuasByChapter = contextualDuasByChapter,
                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
+                                weatherThresholds = prayerWeatherThresholds,
                             )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Location info at bottom - larger for better visibility
-                        Surface(
+                        LandscapeLocationWeatherTile(
+                            locationString = location,
+                            locationData = prayerTimes?.location,
+                            onLongPress = { showWeatherThresholds = true },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shadowElevation = 0.dp  // Removed to prevent navigation artifacts
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.Start,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LocationOn,
-                                    contentDescription = "Location",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = getLocationWithCountryCode(location, prayerTimes?.location),
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        lineHeight = 22.sp,
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    textAlign = TextAlign.Start,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
+                        )
                     }
 
-                    // Right column: Prayer cards in scrollable column
+                    // Right column: compact header + all six prayer cards. The rows
+                    // share the measured height so the last pair cannot fall behind
+                    // the bottom edge or require a hidden initial scroll.
                     Column(
                         modifier = Modifier
                             .weight(0.5f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .padding(bottom = FloatingNavClearance),
+                            .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // No instruction banner in landscape to save space
-
                         // Get ordered prayers
                         val orderedPrayers = remember(currentTime, prayerTimes) {
                             val result = mutableListOf<String>()
@@ -1835,12 +1936,46 @@ fun PrayerTimesScreen(
                             result
                         }
 
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Prayer times",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = "Today’s schedule",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            PrayerHeaderAction(
+                                active = prayerTimeEditMode,
+                                compact = true,
+                                onClick = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    if (prayerTimeEditMode) {
+                                        revealedPrayerCard = null
+                                        currentEditingTile = null
+                                    }
+                                    prayerTimeEditMode = !prayerTimeEditMode
+                                },
+                            )
+                        }
+
                         // Prayer cards in a 2-column grid for landscape
-                        // Use appropriate height to show prayer time info (name + arabic + time)
-                        val landscapeTileHeight = 115.dp
                         for (i in orderedPrayers.indices step 2) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // First card in row
@@ -1870,7 +2005,7 @@ fun PrayerTimesScreen(
                                     },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(landscapeTileHeight),
+                                        .fillMaxHeight(),
                                     onShowPopup = { prayerName -> popupDialState = prayerName },
                                     suggestion = getSuggestionFor(orderedPrayers[i]),
                                     onApplySuggestion = applySuggestion,
@@ -1906,7 +2041,7 @@ fun PrayerTimesScreen(
                                         },
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(landscapeTileHeight),
+                                            .fillMaxHeight(),
                                         onShowPopup = { prayerName -> popupDialState = prayerName },
                                         suggestion = getSuggestionFor(orderedPrayers[i + 1]),
                                         onApplySuggestion = applySuggestion,
@@ -1932,19 +2067,20 @@ fun PrayerTimesScreen(
                     ),
                 verticalArrangement = Arrangement.Top
             ) {
-                var showAllPrayers by remember { mutableStateOf(false) }
                 val dashboardTransition = updateTransition(
                     targetState = showAllPrayers,
                     label = "prayerDashboardExpansion",
                 )
-                val tileHeight by dashboardTransition.animateDp(
+                val baseTileHeight by dashboardTransition.animateDp(
                     transitionSpec = {
                         tween(durationMillis = 520, easing = FastOutSlowInEasing)
                     },
                     label = "prayerTileHeight",
                 ) { expanded ->
-                    if (expanded) 122.dp else 116.dp
+                    if (expanded) 122.dp else 112.dp
                 }
+                val tileHeight = (baseTileHeight - prayerTileSyncShrink).coerceAtLeast(90.dp)
+                val compactPrayerTilesForSync = prayerTileSyncShrink > 0.dp
                 val buttonIconRotation by dashboardTransition.animateFloat(
                     transitionSpec = {
                         tween(durationMillis = 520, easing = FastOutSlowInEasing)
@@ -2024,6 +2160,7 @@ fun PrayerTimesScreen(
                     fortressDuasByChapter = contextualDuasByChapter,
                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                     isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
+                    weatherThresholds = prayerWeatherThresholds,
                 )
                 }
 
@@ -2152,6 +2289,7 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[0]),
                             onApplySuggestion = applySuggestion,
+                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[0],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[0] else null }
                         )
@@ -2194,6 +2332,7 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[1]),
                             onApplySuggestion = applySuggestion,
+                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[1],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[1] else null }
                         )
@@ -2243,6 +2382,7 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[2]),
                             onApplySuggestion = applySuggestion,
+                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[2],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[2] else null }
                         )
@@ -2285,6 +2425,7 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[3]),
                             onApplySuggestion = applySuggestion,
+                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[3],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[3] else null }
                         )
@@ -2357,6 +2498,7 @@ fun PrayerTimesScreen(
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[4]),
                                 onApplySuggestion = applySuggestion,
+                                compactForSync = compactPrayerTilesForSync,
                                 isRevealed = revealedPrayerCard == orderedPrayers[4],
                                 onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[4] else null }
                             )
@@ -2399,6 +2541,7 @@ fun PrayerTimesScreen(
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[5]),
                                 onApplySuggestion = applySuggestion,
+                                compactForSync = compactPrayerTilesForSync,
                                 isRevealed = revealedPrayerCard == orderedPrayers[5],
                                 onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[5] else null }
                             )
@@ -2444,19 +2587,25 @@ fun PrayerTimesScreen(
 
                 // One-line adaptation of Google's outlined information tile. The city
                 // remains the anchor while optional detail yields first on narrow screens.
-                val locationTileSurface = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                 val locationTileContent = MaterialTheme.colorScheme.onSurface
                 val locationTileSupporting = MaterialTheme.colorScheme.onSurfaceVariant
-                val locationTileOutline = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(58.dp),
+                        .height(58.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showWeatherThresholds = true
+                            },
+                        ),
                     shape = RoundedCornerShape(16.dp),
-                    color = locationTileSurface,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
                     border = BorderStroke(
                         1.dp,
-                        locationTileOutline,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
                     ),
                     shadowElevation = 0.dp,
                 ) {
@@ -2494,15 +2643,6 @@ fun PrayerTimesScreen(
                                 image = ImageBitmap.imageResource(
                                     res = context.resources,
                                     id = R.drawable.ic_flaticon_location_marker,
-                                ),
-                                filterQuality = FilterQuality.High,
-                            )
-                        }
-                        val precipitationPainter = remember(context) {
-                            BitmapPainter(
-                                image = ImageBitmap.imageResource(
-                                    res = context.resources,
-                                    id = R.drawable.flaticon_precipitation,
                                 ),
                                 filterQuality = FilterQuality.High,
                             )
@@ -2578,47 +2718,15 @@ fun PrayerTimesScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         currentWeather?.let { weather ->
-                            val conditionIcon = when (weather.weatherCode) {
-                                0 -> if (weather.isDay) {
-                                    R.drawable.flaticon_weather_clear
-                                } else {
-                                    R.drawable.flaticon_weather_moon
-                                }
-                                1, 2 -> R.drawable.flaticon_weather_partly_cloudy
-                                3, 45, 48 -> R.drawable.flaticon_weather_cloudy
-                                in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
-                                in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
-                                in 95..99 -> R.drawable.flaticon_weather_storm
-                                else -> R.drawable.flaticon_weather_cloudy
-                            }
-                            val conditionLabel = when (weather.weatherCode) {
-                                0 -> if (weather.isDay) "Clear sky" else "Clear night"
-                                1 -> "Mostly clear"
-                                2 -> "Partly cloudy"
-                                3 -> "Overcast"
-                                45, 48 -> "Foggy"
-                                in 51..57 -> "Drizzle"
-                                in 61..67 -> "Rain"
-                                in 71..77 -> "Snow"
-                                in 80..82 -> "Rain showers"
-                                85, 86 -> "Snow showers"
-                                in 95..99 -> "Thunderstorms"
-                                else -> "Cloudy"
-                            }
+                            val conditionIconRes = weatherIconRes(weather)
+                            val conditionLabel = weatherConditionLabel(weather)
                             val precipitationLabel = if (weather.precipitationProbability == 0) {
                                 "No rain"
                             } else {
                                 "${weather.precipitationProbability}% rain"
                             }
-                            val conditionPainter = remember(context, conditionIcon) {
-                                BitmapPainter(
-                                    image = ImageBitmap.imageResource(
-                                        res = context.resources,
-                                        id = conditionIcon,
-                                    ),
-                                    filterQuality = FilterQuality.High,
-                                )
-                            }
+                            val weatherDetailsLabel =
+                                "$conditionLabel · $precipitationLabel · Humidity ${weather.relativeHumidity}%"
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.Center,
@@ -2639,32 +2747,7 @@ fun PrayerTimesScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = conditionLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                            letterSpacing = 0.sp,
-                                        ),
-                                        color = locationTileSupporting,
-                                        maxLines = 1,
-                                    )
-                                    Text(
-                                        text = "  ·  ",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
-                                        ),
-                                        color = locationTileSupporting,
-                                    )
-                                    Image(
-                                        painter = precipitationPainter,
-                                        contentDescription = null,
-                                        colorFilter = ColorFilter.tint(locationTileSupporting),
-                                        modifier = Modifier.size(9.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = precipitationLabel,
+                                        text = weatherDetailsLabel,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 11.sp,
                                             lineHeight = 14.sp,
@@ -2680,26 +2763,31 @@ fun PrayerTimesScreen(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .wrapContentWidth()
+                                    .height(32.dp),
+                                verticalAlignment = Alignment.Bottom,
                             ) {
                                 Text(
-                                    text = "${weather.temperatureCelsius.roundToInt()}°",
+                                    text = weather.temperatureCelsius.roundToInt().toString(),
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.SemiBold,
-                                        fontSize = 18.sp,
+                                        fontSize = 19.sp,
                                         lineHeight = 22.sp,
                                     ),
                                     color = locationTileContent,
                                     maxLines = 1,
+                                    modifier = Modifier
+                                        .offset(y = 2.dp),
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Image(
-                                    painter = conditionPainter,
+                                    painter = painterResource(conditionIconRes),
                                     contentDescription = conditionLabel,
-                                    colorFilter = ColorFilter.tint(
-                                        MaterialTheme.colorScheme.primary,
-                                    ),
-                                    modifier = Modifier.size(24.dp),
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .align(Alignment.Top)
+                                        .size(14.dp)
+                                        .offset(x = (-2).dp, y = 1.dp),
                                 )
                             }
                         } ?: run {
@@ -2720,7 +2808,11 @@ fun PrayerTimesScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(FloatingNavClearance + 10.dp))
+                Spacer(
+                    modifier = Modifier.height(
+                        FloatingNavClearance + 10.dp - syncBottomClearanceReclaim,
+                    ),
+                )
             }
             } // End of portrait layout else block
         }
@@ -2996,6 +3088,7 @@ fun PrayerTimesScreen(
 @Composable
 private fun PrayerHeaderAction(
     active: Boolean,
+    compact: Boolean = false,
     onClick: () -> Unit,
 ) {
     val containerColor by animateColorAsState(
@@ -3018,7 +3111,12 @@ private fun PrayerHeaderAction(
     )
     val iconColor = MaterialTheme.colorScheme.onPrimary
     val actionWidth by animateDpAsState(
-        targetValue = if (active) 96.dp else 148.dp,
+        targetValue = when {
+            compact && active -> 82.dp
+            compact -> 126.dp
+            active -> 96.dp
+            else -> 148.dp
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -3029,7 +3127,7 @@ private fun PrayerHeaderAction(
     Surface(
         modifier = Modifier
             .width(actionWidth)
-            .height(44.dp),
+            .height(if (compact) 36.dp else 44.dp),
         onClick = onClick,
         shape = RoundedCornerShape(50),
         color = containerColor,
@@ -3071,13 +3169,13 @@ private fun PrayerHeaderAction(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    .padding(horizontal = if (compact) 5.dp else 6.dp, vertical = if (compact) 5.dp else 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(if (compact) 26.dp else 32.dp)
                         .clip(CircleShape)
                         .background(iconContainerColor),
                     contentAlignment = Alignment.Center,
@@ -3086,7 +3184,7 @@ private fun PrayerHeaderAction(
                         imageVector = stateIcon,
                         contentDescription = null,
                         tint = iconColor,
-                        modifier = Modifier.size(17.dp),
+                        modifier = Modifier.size(if (compact) 15.dp else 17.dp),
                     )
                 }
                 Text(
@@ -3099,6 +3197,421 @@ private fun PrayerHeaderAction(
             }
         }
     }
+}
+
+@Composable
+private fun weatherIconRes(weather: CurrentWeather): Int = when (weather.weatherCode) {
+    0 -> if (weather.isDay) {
+        R.drawable.flaticon_weather_clear
+    } else {
+        R.drawable.flaticon_weather_moon
+    }
+    1, 2 -> R.drawable.flaticon_weather_partly_cloudy
+    3, 45, 48 -> R.drawable.flaticon_weather_cloudy
+    in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
+    in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
+    in 95..99 -> R.drawable.flaticon_weather_storm
+    else -> R.drawable.flaticon_weather_cloudy
+}
+
+private fun weatherConditionLabel(weather: CurrentWeather): String = when (weather.weatherCode) {
+    0 -> if (weather.isDay) "Clear" else "Clear night"
+    1 -> "Mostly clear"
+    2 -> "Partly cloudy"
+    3 -> "Overcast"
+    45, 48 -> "Foggy"
+    in 51..57 -> "Drizzle"
+    in 61..67 -> "Rain"
+    in 71..77 -> "Snow"
+    in 80..82 -> "Rain showers"
+    85, 86 -> "Snow showers"
+    in 95..99 -> "Thunderstorms"
+    else -> "Cloudy"
+}
+
+@Composable
+private fun LandscapeLocationWeatherTile(
+    locationString: String,
+    locationData: com.starception.submission.prayer.model.Location?,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val markerPainter = remember(context) {
+        BitmapPainter(
+            image = ImageBitmap.imageResource(
+                res = context.resources,
+                id = R.drawable.ic_flaticon_location_marker,
+            ),
+            filterQuality = FilterQuality.High,
+        )
+    }
+
+    val area = locationData?.area?.trim().takeUnless { it.isNullOrBlank() }
+        ?: locationData?.subLocality?.trim().takeUnless { it.isNullOrBlank() }
+    val city = locationData?.city?.trim().orEmpty()
+    val placeLine = listOfNotNull(
+        area,
+        city.takeIf { it.isNotBlank() && !it.equals(area, ignoreCase = true) },
+    ).joinToString(" · ").ifBlank {
+        getLocationWithCountryCode(locationString, locationData)
+    }
+    val fallbackDetail = locationData?.countryCode?.trim()?.uppercase()
+        ?.takeIf { it.length in 2..3 }
+        ?: locationData?.country?.trim().orEmpty()
+
+    val weather by produceState<CurrentWeather?>(
+        initialValue = null,
+        key1 = locationData?.latitude,
+        key2 = locationData?.longitude,
+    ) {
+        value = locationData
+            ?.takeIf { it.isValid() }
+            ?.let {
+                CurrentWeatherRepository.get(
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                )
+            }
+    }
+
+    Surface(
+        modifier = modifier
+            .height(58.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                onClick = {},
+                onLongClick = {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress()
+                },
+            ),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, primary.copy(alpha = 0.20f)),
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = markerPainter,
+                contentDescription = "Prayer location",
+                colorFilter = ColorFilter.tint(primary),
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = placeLine,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 14.sp,
+                        lineHeight = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    ),
+                    color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                weather?.let { current ->
+                    val conditionLabel = weatherConditionLabel(current)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "$conditionLabel · ${current.precipitationProbability}% rain" +
+                                " · Humidity ${current.relativeHumidity}%",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp,
+                                letterSpacing = 0.sp,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            ),
+                            color = supportingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } ?: Text(
+                    text = fallbackDetail,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    ),
+                    color = supportingColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            weather?.let { current ->
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .height(32.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = current.temperatureCelsius.roundToInt().toString(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 19.sp,
+                            lineHeight = 22.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        ),
+                        color = contentColor,
+                        modifier = Modifier
+                            .offset(y = 2.dp),
+                    )
+                    Image(
+                        painter = painterResource(weatherIconRes(current)),
+                        contentDescription = weatherConditionLabel(current),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.Top)
+                            .size(14.dp)
+                            .offset(x = (-2).dp, y = 1.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrayerWeatherThresholdSheet(
+    thresholds: PrayerWeatherThresholds,
+    onDismiss: () -> Unit,
+    onSave: (PrayerWeatherThresholds) -> Unit,
+) {
+    var rain by remember(thresholds) { mutableIntStateOf(thresholds.rainProbability) }
+    var humidity by remember(thresholds) { mutableIntStateOf(thresholds.humidity) }
+    var temperature by remember(thresholds) { mutableIntStateOf(thresholds.temperatureCelsius) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = NiaBottomSheetDefaults.FloatingShape,
+        containerColor = Color.Transparent,
+        contentColor = NiaBottomSheetDefaults.contentColor(),
+        scrimColor = NiaBottomSheetDefaults.scrimColor(),
+        tonalElevation = 0.dp,
+        dragHandle = null,
+    ) {
+        NiaBottomSheetTheme {
+            NiaBottomSheetFrame {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 20.dp),
+                ) {
+                    NiaBottomSheetDragHandle(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 10.dp, bottom = 18.dp),
+                    )
+
+                    Text(
+                        text = "Prayer weather alerts",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Set the conditions that should add guidance to prayer alerts.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+
+                    Spacer(Modifier.height(20.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            WeatherThresholdRow(
+                                iconRes = rainThresholdIconRes(rain),
+                                label = "Rain chance",
+                                description = "$rain% or higher",
+                                value = rain,
+                                valueText = "$rain%",
+                                range = 0f..100f,
+                                onValueChange = { rain = it },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            WeatherThresholdRow(
+                                iconRes = humidityThresholdIconRes(humidity),
+                                label = "Humidity",
+                                description = "Higher than $humidity%",
+                                value = humidity,
+                                valueText = "$humidity%",
+                                range = 0f..99f,
+                                onValueChange = { humidity = it },
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            WeatherThresholdRow(
+                                iconRes = temperatureThresholdIconRes(temperature),
+                                label = "Temperature",
+                                description = "$temperature°C or higher",
+                                value = temperature,
+                                valueText = "$temperature°C",
+                                range = 20f..50f,
+                                onValueChange = { temperature = it },
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        NiaOutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) {
+                            Text("Cancel")
+                        }
+                        NiaOutlinedButton(
+                            onClick = {
+                                onSave(
+                                    PrayerWeatherThresholds(
+                                        rainProbability = rain,
+                                        humidity = humidity,
+                                        temperatureCelsius = temperature,
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun rainThresholdIconRes(value: Int): Int = when {
+    value < 20 -> R.drawable.flaticon_weather_cloudy
+    value < 60 -> R.drawable.flaticon_weather_rain
+    else -> R.drawable.flaticon_weather_storm
+}
+
+private fun humidityThresholdIconRes(value: Int): Int = when {
+    value < 40 -> R.drawable.flaticon_precipitation
+    value < 70 -> R.drawable.flaticon_weather_cloudy
+    else -> R.drawable.flaticon_weather_rain
+}
+
+private fun temperatureThresholdIconRes(value: Int): Int = when {
+    value < 26 -> R.drawable.flaticon_weather_partly_cloudy
+    else -> R.drawable.flaticon_weather_clear
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeatherThresholdRow(
+    iconRes: Int,
+    label: String,
+    description: String,
+    value: Int,
+    valueText: String,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Int) -> Unit,
+) {
+        Column(modifier = Modifier.padding(vertical = 14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AnimatedContent(
+                    targetState = iconRes,
+                    transitionSpec = {
+                        fadeIn(tween(140)) togetherWith fadeOut(tween(100))
+                    },
+                    label = "thresholdWeatherIcon",
+                    modifier = Modifier.size(32.dp),
+                ) { currentIconRes ->
+                    Image(
+                        painter = painterResource(currentIconRes),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 14.dp, end = 10.dp),
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = valueText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Slider(
+                value = value.toFloat(),
+                onValueChange = { onValueChange(it.roundToInt()) },
+                valueRange = range,
+                steps = 0,
+                modifier = Modifier.padding(top = 6.dp),
+                thumb = {
+                    Surface(
+                        modifier = Modifier.size(22.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        border = BorderStroke(
+                            width = 3.dp,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                    ) {}
+                },
+                colors = SliderDefaults.colors(
+                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                    inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                ),
+            )
+        }
 }
 
 /**

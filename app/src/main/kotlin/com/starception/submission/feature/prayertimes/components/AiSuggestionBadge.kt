@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,7 @@ import com.starception.submission.prayer.model.PrayerTimeSuggestion
  * @param currentOffset The user's current offset in minutes
  * @param suggestion Optional AI suggestion for this prayer
  * @param baseColor The text color to use
+ * @param enabled Whether tapping the suggestion may change the prayer offset
  * @param onApplySuggestion Callback when user taps sparkle to apply suggestion
  */
 @Composable
@@ -32,6 +34,7 @@ fun AiSuggestionBadge(
     currentOffset: Int,
     suggestion: PrayerTimeSuggestion?,
     baseColor: Color,
+    enabled: Boolean = true,
     onApplySuggestion: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -55,7 +58,10 @@ fun AiSuggestionBadge(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset(x = 10.dp, y = (-2).dp)
-                    .clickable { onApplySuggestion(suggestion!!.suggestedOffset) }
+                    .alpha(if (enabled) 1f else 0.45f)
+                    .clickable(enabled = enabled) {
+                        onApplySuggestion(suggestion!!.suggestedOffset)
+                    }
             )
         }
     }

@@ -17,6 +17,7 @@ import android.media.MediaPlayer
 import android.net.Uri
 import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -160,13 +161,18 @@ class PrayerNotificationWorker @AssistedInject constructor(
         }
     }
 
-    private fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
+    private suspend fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
         // Play Adhan sound
         playAdhanSound()
 
         // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
         // The notification fires on the prayer's own day, so today's date is the right key.
         val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+        val weatherInsight = getPrayerWeatherInsightForNotification(
+            context = applicationContext,
+            prayerName = displayName,
+            prayerTimeText = prayerTime,
+        )
 
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
@@ -176,10 +182,18 @@ class PrayerNotificationWorker @AssistedInject constructor(
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setContentTitle("$displayName Prayer")
-            .setContentText("It's time for $displayName • $prayerTime")
+            .setContentText(
+                listOfNotNull(
+                    "It's time for $displayName • $prayerTime",
+                    weatherInsight?.summary,
+                ).joinToString(" · "),
+            )
             .setStyle(NotificationCompat.BigTextStyle()
                 .bigText("$displayName Prayer Time\n\n" +
                         "Time: $prayerTime\n" +
+                        weatherInsight?.let {
+                            "${it.notificationLine}\n${it.advice}\n"
+                        }.orEmpty() +
                         "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
                         "(O Allah, accept from us)"))
             .setSmallIcon(R.drawable.ic_prayer)
@@ -229,19 +243,32 @@ class PrayerNotificationWorker @AssistedInject constructor(
         }
     }
 
-    private fun showPrayerReminderNotification(prayerName: String, prayerTime: String, priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {
+    private suspend fun showPrayerReminderNotification(prayerName: String, prayerTime: String, priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {
         // On Fridays the midday (Dhuhr) reminder is for Jumu'ah — show that name to the user.
         val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
+        val weatherInsight = getPrayerWeatherInsightForNotification(
+            context = applicationContext,
+            prayerName = displayName,
+            prayerTimeText = prayerTime,
+        )
 
         // Create large icon from app launcher icon
         val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
         val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
             .setContentTitle("$displayName in $priorMinutes min")
-            .setContentText("Starts at $prayerTime")
+            .setContentText(
+                listOfNotNull(
+                    "Starts at $prayerTime",
+                    weatherInsight?.summary,
+                ).joinToString(" · "),
+            )
             .setStyle(NotificationCompat.BigTextStyle()
                 .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
-                        "Time: $prayerTime\n"))
+                        "Time: $prayerTime\n" +
+                        weatherInsight?.let {
+                            "${it.notificationLine}\n${it.advice}\n"
+                        }.orEmpty()))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

@@ -401,7 +401,7 @@ private fun NiaFloatingBottomBar(
         @Composable { sizeModifier: Modifier ->
             val darkTheme = LocalDarkTheme.current
             val colorScheme = MaterialTheme.colorScheme
-            val navBarHeight = 64.dp
+            val navBarHeight = if (vertical) 56.dp else 64.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
@@ -420,13 +420,13 @@ private fun NiaFloatingBottomBar(
                 }
                 BoxWithConstraints(
                     modifier = if (vertical) {
-                        // Fixed height (56.dp per item + the 6.dp paddings) so the pill
-                        // wraps its items compactly; without it the inner fillMaxSize
-                        // Column stretches the pill to the full screen height and pushes
-                        // the voice button off-screen.
+                        // Landscape has much less vertical room than portrait has width.
+                        // Keep each destination to a compact 44dp cell so the rail and
+                        // voice action read as floating controls instead of a full-height
+                        // sidebar.
                         Modifier
-                            .width(64.dp)
-                            .height((destinations.size * 56 + 12).dp)
+                            .width(56.dp)
+                            .height((destinations.size * 44 + 12).dp)
                             .padding(vertical = 6.dp)
                     } else {
                         Modifier.height(navBarHeight)
@@ -443,7 +443,7 @@ private fun NiaFloatingBottomBar(
                     // Extend the active shape beyond its icon cell while keeping
                     // the first and last capsules inset from the bar's outer edge.
                     val bubbleMainSize = if (vertical) {
-                        48.dp
+                        38.dp
                     } else {
                         itemExtent + (horizontalContentInset - capsuleGap) * 2
                     }
@@ -507,7 +507,7 @@ private fun NiaFloatingBottomBar(
                     ) {
                         val mainSize = bubbleMainSize.toPx()
                         val crossSize = if (vertical) {
-                            50.dp.toPx()
+                            44.dp.toPx()
                         } else {
                             (navBarHeight - capsuleGap * 2).toPx()
                         }
@@ -556,7 +556,7 @@ private fun NiaFloatingBottomBar(
                                 imageVector = destination.unselectedIcon,
                                 contentDescription = stringResource(destination.iconTextId),
                                 tint = contentTint,
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(if (vertical) 22.dp else 24.dp),
                             )
                         }
                     }
@@ -598,6 +598,7 @@ private fun NiaFloatingBottomBar(
         VoiceAssistantButton(
             listening = listening,
             level = level,
+            buttonSize = if (vertical) 50.dp else 60.dp,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
         )
     }
@@ -613,12 +614,12 @@ private fun NiaFloatingBottomBar(
                         WindowInsetsSides.Start + WindowInsetsSides.Top + WindowInsetsSides.Bottom,
                     ),
                 )
-                .padding(start = 12.dp),
+                .padding(start = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            pill(Modifier.width(64.dp))
-            Spacer(modifier = Modifier.height(10.dp))
+            pill(Modifier.width(56.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             voiceButton()
         }
     } else {
@@ -648,6 +649,7 @@ private fun NiaFloatingBottomBar(
 private fun VoiceAssistantButton(
     listening: Boolean,
     level: Float,
+    buttonSize: Dp = 60.dp,
     onClick: () -> Unit,
 ) {
     // Eased state 0 (idle) → 1 (listening); a light spring gives an organic
@@ -684,7 +686,7 @@ private fun VoiceAssistantButton(
         color = container,
         shadowElevation = 2.dp,
         modifier = Modifier
-            .size(60.dp)
+            .size(buttonSize)
             .graphicsLayer {
                 val s = 1f + 0.06f * ampActive
                 scaleX = s
@@ -692,7 +694,7 @@ private fun VoiceAssistantButton(
             },
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Canvas(modifier = Modifier.size(24.dp)) {
+            Canvas(modifier = Modifier.size(if (buttonSize < 56.dp) 21.dp else 24.dp)) {
                 // Five bars echoing the graphic-eq icon. The resting silhouette
                 // (heights below) shows when idle; while listening each bar is
                 // driven by the mic level plus a small per-bar shimmer, so it
@@ -748,14 +750,14 @@ private fun NiaLandscapeLayout(
         // never overlaps tile content. The bar is a 64.dp pill with 12.dp start
         // padding, itself shifted right by the safe-area start inset (camera cutout
         // sits on the left edge in landscape), so the content must reserve that same
-        // inset PLUS ~92.dp to clear the pill.
+        // inset PLUS 76.dp to clear the compact landscape pill.
         NiaMainContent(
             appState = appState,
             snackbarHostState = snackbarHostState,
             onTopAppBarActionClick = onTopAppBarActionClick,
             modifier = modifier
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
-                .padding(start = 92.dp),
+                .padding(start = 76.dp),
             isLandscape = true,
             mainViewModel = mainViewModel,
             deepLinkCourseId = deepLinkCourseId,

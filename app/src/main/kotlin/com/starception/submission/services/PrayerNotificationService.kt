@@ -44,6 +44,8 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import javax.inject.Inject
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -1155,7 +1157,30 @@ class PrayerNotificationService : Service() {
                     PrayerPhase.MAKE_TIME -> "Make Time for $currentDisplayName"
                 }
                 val content = buildPrayerProgressContent(prayerProgress, currentPrayer)
-                val detailedMessage = buildDetailedPrayerProgressMessage(prayerTimes, currentPrayer, nextPrayer, prayerProgress)
+                val prayerWeatherInsight = CurrentWeatherRepository.getPrayerInsight(
+                    latitude = prayerTimes.location.latitude,
+                    longitude = prayerTimes.location.longitude,
+                    prayerName = currentDisplayName,
+                    prayerDate = if (
+                        currentPrayer.name.equals("Isha", ignoreCase = true) &&
+                        now.isBefore(adjustedFajr)
+                    ) {
+                        LocalDate.now().minusDays(1)
+                    } else {
+                        LocalDate.now()
+                    },
+                    prayerTime = currentPrayer.time,
+                    thresholds = PrayerWeatherThresholdStore.load(applicationContext),
+                )
+                val detailedMessage = buildDetailedPrayerProgressMessage(
+                    prayerTimes = prayerTimes,
+                    currentPrayer = currentPrayer,
+                    nextPrayer = nextPrayer,
+                    progress = prayerProgress,
+                    weatherLine = prayerWeatherInsight?.let {
+                        "${it.notificationLine}\n${it.advice}"
+                    },
+                )
                 
                 // Include prayer phase for accurate notification display
                 val phaseString = when (prayerProgress.phase) {
@@ -1479,7 +1504,8 @@ class PrayerNotificationService : Service() {
         prayerTimes: DayPrayerTimes,
         currentPrayer: PrayerTime,
         nextPrayer: PrayerTime?,
-        progress: PrayerProgress
+        progress: PrayerProgress,
+        weatherLine: String? = null,
     ): String {
         return buildString {
             // Show next prayer countdown (Jumu'ah instead of Dhuhr on Fridays)
@@ -1488,6 +1514,7 @@ class PrayerNotificationService : Service() {
                 val nextDisplayName = getPrayerDisplayName(nextPrayer.name, LocalDate.now())
                 appendLine("Next • $nextDisplayName in $timeRemaining")
             }
+            weatherLine?.takeIf { it.isNotBlank() }?.let(::appendLine)
         }
     }
 
