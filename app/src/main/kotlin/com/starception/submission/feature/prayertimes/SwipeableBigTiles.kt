@@ -1155,6 +1155,7 @@ fun SwipeableBigTiles(
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
     portraitStripHeight: Dp = 288.dp,
+    portraitCardScale: Float = 1f,
     compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
@@ -1467,7 +1468,8 @@ fun SwipeableBigTiles(
                 // left-column canvas in landscape.
                 maxWidth
             } else {
-                (maxWidth * 0.64f).coerceIn(232.dp, 250.dp)
+                val restingCardWidth = (maxWidth * 0.64f).coerceIn(232.dp, 250.dp)
+                restingCardWidth * portraitCardScale.coerceIn(0.6f, 1f)
             }
             val compactCardWidth = if (isLandscape) {
                 normalCardWidth

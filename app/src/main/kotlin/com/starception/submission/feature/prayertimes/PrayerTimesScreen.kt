@@ -101,9 +101,6 @@ import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
@@ -137,6 +134,7 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.AnimatedVisibility
@@ -1065,7 +1063,6 @@ fun PrayerTimesScreen(
         onShowPopup: (String) -> Unit = {},
         suggestion: com.starception.submission.prayer.model.PrayerTimeSuggestion? = null,
         onApplySuggestion: ((String, Int) -> Unit)? = null,
-        compactForSync: Boolean = false,
         // iOS-style swipe-to-reveal state
         isRevealed: Boolean = false,
         onRevealChange: (Boolean) -> Unit = {}
@@ -1073,8 +1070,7 @@ fun PrayerTimesScreen(
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
         val isAnotherTileInEditMode = currentEditingTile != null && currentEditingTile != prayerName
-        val compactTile = compactForSync ||
-            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val compactTile = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         
         // Material 3 expressive animation states with spring physics
         val expressiveAnimationSpec = spring<Float>(
@@ -1700,14 +1696,38 @@ fun PrayerTimesScreen(
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
             var showAllPrayers by rememberSaveable { mutableStateOf(false) }
             val portraitScrollState = rememberScrollState()
+            var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
+            val expansionScrollDistancePx = with(LocalDensity.current) { 142.dp.toPx() }
             // A disabled verticalScroll does not dispatch nested-scroll deltas, which
             // prevents PullToSyncContainer from seeing downward drags while the prayer
             // list is collapsed. This no-op scrollable keeps the page stationary while
             // still forwarding those gestures to the pull-to-sync connection.
             val pullGestureScrollState = rememberScrollableState { 0f }
             LaunchedEffect(showAllPrayers, outerIsLandscape) {
-                if (!outerIsLandscape && !showAllPrayers && portraitScrollState.value != 0) {
-                    portraitScrollState.animateScrollTo(0)
+                if (!outerIsLandscape) {
+                    if (showAllPrayers) {
+                        // The two existing rows each grow by 10dp and the optional
+                        // row unfolds to 122dp. Scroll by the same 142dp on the same
+                        // curve so the control remains visible below the full list.
+                        keepExpansionScrollEnabled = true
+                        withFrameNanos { }
+                        portraitScrollState.animateScrollBy(
+                            value = expansionScrollDistancePx,
+                            animationSpec = tween(
+                                durationMillis = 680,
+                                easing = FastOutSlowInEasing,
+                            ),
+                        )
+                    } else if (keepExpansionScrollEnabled) {
+                        portraitScrollState.animateScrollTo(
+                            value = 0,
+                            animationSpec = tween(
+                                durationMillis = 680,
+                                easing = FastOutSlowInEasing,
+                            ),
+                        )
+                        keepExpansionScrollEnabled = false
+                    }
                 }
             }
             // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
@@ -1728,7 +1748,7 @@ fun PrayerTimesScreen(
                 .fillMaxSize()
                 .then(syncState.pullModifier)
                 .then(
-                    if (!outerIsLandscape && showAllPrayers) {
+                    if (!outerIsLandscape && (showAllPrayers || keepExpansionScrollEnabled)) {
                         Modifier.verticalScroll(
                             state = portraitScrollState,
                         )
@@ -1787,19 +1807,24 @@ fun PrayerTimesScreen(
             // Keep the location tile at the same screen position while the sync strip
             // is held. The sheet moves down by heldContentInsetTop, while the search
             // chrome simultaneously gives back only the portion of the status-bar
-            // inset represented by dynamicTopInset. Shrink the prayer rows by the
-            // exact remaining displacement instead of using the navigation-clearance
-            // estimate; the old estimate left Location visibly lower during sync.
+            // inset represented by dynamicTopInset. Let the large Insights strip absorb
+            // the remaining displacement so prayer cards keep their complete design,
+            // including the localized Arabic prayer name.
             val syncTopInsetReclaim = (statusBarInset - dynamicTopInset)
                 .coerceAtLeast(0.dp)
                 .coerceAtMost(syncState.heldContentInsetTop)
             val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
-            val portraitInsightHeight = portraitInsightRestingHeight
-            val syncPrayerRows = if (showAllPrayers) 3 else 2
-            val prayerTileSyncShrink = (
+            val syncContentCompression =
                 (syncState.heldContentInsetTop - syncTopInsetReclaim)
-                    .coerceAtLeast(0.dp) / syncPrayerRows.toFloat()
-                ).coerceAtMost(26.dp)
+                    .coerceAtLeast(0.dp)
+            val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
+                .coerceAtLeast(170.dp)
+            val portraitInsightCardScale = if (portraitInsightRestingHeight > 0.dp) {
+                (portraitInsightHeight.value / portraitInsightRestingHeight.value)
+                    .coerceIn(0.6f, 1f)
+            } else {
+                1f
+            }
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -2073,17 +2098,16 @@ fun PrayerTimesScreen(
                 )
                 val baseTileHeight by dashboardTransition.animateDp(
                     transitionSpec = {
-                        tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                        tween(durationMillis = 680, easing = FastOutSlowInEasing)
                     },
                     label = "prayerTileHeight",
                 ) { expanded ->
                     if (expanded) 122.dp else 112.dp
                 }
-                val tileHeight = (baseTileHeight - prayerTileSyncShrink).coerceAtLeast(90.dp)
-                val compactPrayerTilesForSync = prayerTileSyncShrink > 0.dp
+                val tileHeight = baseTileHeight
                 val buttonIconRotation by dashboardTransition.animateFloat(
                     transitionSpec = {
-                        tween(durationMillis = 520, easing = FastOutSlowInEasing)
+                        tween(durationMillis = 680, easing = FastOutSlowInEasing)
                     },
                     label = "prayerToggleRotation",
                 ) { expanded ->
@@ -2154,6 +2178,7 @@ fun PrayerTimesScreen(
                     },
                     timeOffsets = storedOffsets,
                     portraitStripHeight = portraitInsightHeight,
+                    portraitCardScale = portraitInsightCardScale,
                     onSurahClick = onSurahClick,
                     onSurahClickWithAyah = onSurahClickWithAyah,
                     onFortressDuaClick = onFortressDuaClick,
@@ -2289,7 +2314,6 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[0]),
                             onApplySuggestion = applySuggestion,
-                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[0],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[0] else null }
                         )
@@ -2332,7 +2356,6 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[1]),
                             onApplySuggestion = applySuggestion,
-                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[1],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[1] else null }
                         )
@@ -2382,7 +2405,6 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[2]),
                             onApplySuggestion = applySuggestion,
-                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[2],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[2] else null }
                         )
@@ -2425,36 +2447,36 @@ fun PrayerTimesScreen(
                             },
                             suggestion = getSuggestionFor(orderedPrayers[3]),
                             onApplySuggestion = applySuggestion,
-                            compactForSync = compactPrayerTilesForSync,
                             isRevealed = revealedPrayerCard == orderedPrayers[3],
                             onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[3] else null }
                         )
                     }
                 }
 
-                // Material 3 expressive expandable section with spring-based animations
+                // Material 3 expressive expandable section with a deliberately
+                // unhurried curve; this avoids the abrupt accordion-like jump.
                 AnimatedVisibility(
                     visible = showAllPrayers,
                     enter = expandVertically(
                         animationSpec = tween(
-                            durationMillis = 520,
+                            durationMillis = 680,
                             easing = FastOutSlowInEasing,
                         ),
                         expandFrom = Alignment.Top,
                     ) + fadeIn(
                         animationSpec = tween(
-                            durationMillis = 260,
-                            delayMillis = 100,
+                            durationMillis = 360,
+                            delayMillis = 80,
                         ),
                     ),
                     exit = shrinkVertically(
                         animationSpec = tween(
-                            durationMillis = 520,
+                            durationMillis = 680,
                             easing = FastOutSlowInEasing,
                         ),
                         shrinkTowards = Alignment.Top,
                     ) + fadeOut(
-                        animationSpec = tween(durationMillis = 180),
+                        animationSpec = tween(durationMillis = 240),
                     ),
                 ) {
                     Row(
@@ -2498,7 +2520,6 @@ fun PrayerTimesScreen(
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[4]),
                                 onApplySuggestion = applySuggestion,
-                                compactForSync = compactPrayerTilesForSync,
                                 isRevealed = revealedPrayerCard == orderedPrayers[4],
                                 onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[4] else null }
                             )
@@ -2541,7 +2562,6 @@ fun PrayerTimesScreen(
                                 },
                                 suggestion = getSuggestionFor(orderedPrayers[5]),
                                 onApplySuggestion = applySuggestion,
-                                compactForSync = compactPrayerTilesForSync,
                                 isRevealed = revealedPrayerCard == orderedPrayers[5],
                                 onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[5] else null }
                             )
@@ -2549,12 +2569,14 @@ fun PrayerTimesScreen(
                     }
                 }
 
-                // The toggle rotates on the same timeline as the layout.
+                // Keep the control in the natural reading order after every prayer.
+                // The synchronized scroll above follows it during expansion so it
+                // remains reachable without splitting the prayer list in two.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 0.dp),
-                    horizontalArrangement = Arrangement.Center
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
                 ) {
                     TextButton(
                         onClick = {
@@ -2562,22 +2584,22 @@ fun PrayerTimesScreen(
                             showAllPrayers = !showAllPrayers
                         },
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        ),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ExpandMore, // Always use ExpandMore, rotation handles the direction
+                            imageVector = Icons.Default.ExpandMore,
                             contentDescription = null,
                             modifier = Modifier
                                 .size(18.dp)
                                 .graphicsLayer {
                                     rotationZ = buttonIconRotation
-                                }
+                                },
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (showAllPrayers) "Show Less" else "Show All Prayers",
-                            style = MaterialTheme.typography.labelMedium
+                            style = MaterialTheme.typography.labelMedium,
                         )
                     }
                 }
@@ -2585,8 +2607,8 @@ fun PrayerTimesScreen(
                 // Spacer between Show Less/Show All button and location card (4dp to match spacing above for symmetry)
                 Spacer(modifier = Modifier.height(0.dp))
 
-                // One-line adaptation of Google's outlined information tile. The city
-                // remains the anchor while optional detail yields first on narrow screens.
+                // Compact location and weather summary: place identity on the left and
+                // current conditions on the right, matching the dashboard reference.
                 val locationTileContent = MaterialTheme.colorScheme.onSurface
                 val locationTileSupporting = MaterialTheme.colorScheme.onSurfaceVariant
                 Surface(
@@ -2595,7 +2617,7 @@ fun PrayerTimesScreen(
                         .height(58.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .combinedClickable(
-                            onClick = {},
+                            onClick = { showWeatherThresholds = true },
                             onLongClick = {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showWeatherThresholds = true
@@ -2677,36 +2699,8 @@ fun PrayerTimesScreen(
                                 }
                         }
 
-                        val supportingLocation = listOfNotNull(
-                            locationDetail.takeIf { it.isNotBlank() },
-                            countryCode,
-                        ).joinToString(" · ")
-                        val locationLine = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Medium)) {
-                                append(locationTitle)
-                            }
-                            if (supportingLocation.isNotBlank()) {
-                                withStyle(
-                                    SpanStyle(color = locationTileSupporting),
-                                ) {
-                                    append("  ·  ")
-                                    append(supportingLocation)
-                                }
-                            }
-                        }
-                        val weatherLocationLine = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Medium)) {
-                                append(locationTitle)
-                            }
-                            if (locationDetail.isNotBlank()) {
-                                withStyle(
-                                    SpanStyle(color = locationTileSupporting),
-                                ) {
-                                    append(" · ")
-                                    append(locationDetail)
-                                }
-                            }
-                        }
+                        val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
+                            ?: countryCode.orEmpty()
 
                         Image(
                             painter = locationMarkerPainter,
@@ -2715,7 +2709,40 @@ fun PrayerTimesScreen(
                             modifier = Modifier.size(22.dp),
                         )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = locationTitle,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontFamily = arabicFontFamily
+                                        ?: MaterialTheme.typography.bodyLarge.fontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    lineHeight = 18.sp,
+                                ),
+                                color = locationTileContent,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+
+                            if (supportingLocation.isNotBlank()) {
+                                Text(
+                                    text = supportingLocation,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        letterSpacing = 0.sp,
+                                    ),
+                                    color = locationTileSupporting,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
 
                         currentWeather?.let { weather ->
                             val conditionIconRes = weatherIconRes(weather)
@@ -2725,84 +2752,62 @@ fun PrayerTimesScreen(
                             } else {
                                 "${weather.precipitationProbability}% rain"
                             }
-                            val weatherDetailsLabel =
-                                "$conditionLabel · $precipitationLabel · Humidity ${weather.relativeHumidity}%"
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
                             Column(
-                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.Center,
                             ) {
-                                Text(
-                                    text = weatherLocationLine,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontFamily = arabicFontFamily
-                                            ?: MaterialTheme.typography.bodyLarge.fontFamily,
-                                        fontSize = 15.sp,
-                                        lineHeight = 18.sp,
-                                    ),
-                                    color = locationTileContent,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                                 ) {
                                     Text(
-                                        text = weatherDetailsLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
+                                        text = conditionLabel,
+                                        style = MaterialTheme.typography.labelMedium.copy(
                                             fontSize = 11.sp,
                                             lineHeight = 14.sp,
                                             letterSpacing = 0.sp,
                                         ),
-                                        color = locationTileSupporting,
+                                        color = locationTileContent,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Image(
+                                        painter = painterResource(conditionIconRes),
+                                        contentDescription = conditionLabel,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Text(
+                                        text = "${weather.temperatureCelsius.roundToInt()}°",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 18.sp,
+                                            lineHeight = 20.sp,
+                                        ),
+                                        color = locationTileContent,
+                                        maxLines = 1,
                                     )
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .wrapContentWidth()
-                                    .height(32.dp),
-                                verticalAlignment = Alignment.Bottom,
-                            ) {
                                 Text(
-                                    text = weather.temperatureCelsius.roundToInt().toString(),
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 19.sp,
-                                        lineHeight = 22.sp,
+                                    text = "${weather.relativeHumidity}% Humidity · $precipitationLabel",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        lineHeight = 14.sp,
+                                        letterSpacing = 0.sp,
                                     ),
-                                    color = locationTileContent,
+                                    color = locationTileSupporting,
                                     maxLines = 1,
-                                    modifier = Modifier
-                                        .offset(y = 2.dp),
-                                )
-                                Image(
-                                    painter = painterResource(conditionIconRes),
-                                    contentDescription = conditionLabel,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .align(Alignment.Top)
-                                        .size(14.dp)
-                                        .offset(x = (-2).dp, y = 1.dp),
                                 )
                             }
-                        } ?: run {
-                            Text(
-                                text = locationLine,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = arabicFontFamily
-                                        ?: MaterialTheme.typography.bodyLarge.fontFamily,
-                                    fontSize = 16.sp,
-                                    lineHeight = 22.sp,
-                                ),
-                                color = locationTileContent,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
+
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Weather details",
+                                tint = locationTileSupporting,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }

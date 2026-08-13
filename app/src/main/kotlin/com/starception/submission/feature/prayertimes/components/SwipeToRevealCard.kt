@@ -192,9 +192,10 @@ fun SwipeToRevealCard(
         label = "elevationAnimation"
     )
 
-    // Outer container with minimal padding for shadow space
+    // Keep vertical shadow breathing room without narrowing the card. The prayer
+    // grid now shares the same outer edges as the Insights strip and location tile.
     Box(
-        modifier = modifier.padding(2.dp)
+        modifier = modifier.padding(vertical = 2.dp)
     ) {
         // Shadow layer rendered outside the clip with animated elevation
         Box(
