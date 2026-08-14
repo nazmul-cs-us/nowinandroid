@@ -2818,7 +2818,13 @@ fun PrayerTimesScreen(
 
                             Column(
                                 horizontalAlignment = Alignment.End,
-                                verticalArrangement = Arrangement.Center,
+                                // The Meteocon canvases have a little internal air.
+                                // Slightly overlap the row bounds so the condition and
+                                // humidity/rain lines read as one compact weather block.
+                                verticalArrangement = Arrangement.spacedBy(
+                                    space = (-2).dp,
+                                    alignment = Alignment.CenterVertically,
+                                ),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,

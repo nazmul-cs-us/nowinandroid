@@ -133,6 +133,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -2114,12 +2115,12 @@ private fun InsightPreviewCard(
         tonalElevation = 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val tagInset = (20f - (10f * compactProgress)).dp
+            val tagInset = (16f - (8f * compactProgress)).dp
             val labelFontSize = (11f - (3f * compactProgress)).sp
             val titleFontSize = (17f - (5f * compactProgress)).sp
             val titleLineHeight = (22f - (8f * compactProgress)).sp
             val titleHorizontalPadding = (22f - (10f * compactProgress)).dp
-            val titleBottomPadding = (26f - (12f * compactProgress)).dp
+            val titleBottomPadding = (22f - (10f * compactProgress)).dp
             val contentSpacing = (7f - (4f * compactProgress)).dp
             val supportingFontSize = (13f - (3f * compactProgress)).sp
             val supportingLineHeight = (17f - (4f * compactProgress)).sp
@@ -2127,6 +2128,15 @@ private fun InsightPreviewCard(
             val footerLineHeight = (16f - (4f * compactProgress)).sp
             val recapIndicatorSize = (24f - (7f * compactProgress)).dp
             val recapFontSize = (11f - (3f * compactProgress)).sp
+            val requestedHeroAccent = MaterialTheme.colorScheme.primaryContainer
+            val heroAccent = if (requestedHeroAccent.luminance() >= 0.35f) {
+                requestedHeroAccent
+            } else {
+                // Custom and monochrome themes can supply a near-black accent.
+                // This content always sits over a dark photographic scrim, so
+                // fall back locally instead of sacrificing legibility.
+                Color.White
+            }
 
             Image(
                 painter = painterResource(backgroundPainterRes),
@@ -2528,7 +2538,7 @@ private fun InsightPreviewCard(
                             modifier = Modifier
                                 .fillMaxWidth(boundedProgress)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.primary),
+                                .background(heroAccent.copy(alpha = 0.92f)),
                         )
                     }
                 }
@@ -2548,11 +2558,28 @@ private fun InsightPreviewCard(
                         summary = statusMetaText,
                         thresholds = weatherThresholds,
                     )
-                    val useCompactForecast = nextPrayerName.length > 6 || compactProgress >= 0.08f
+                    // Weather is supporting context here. Always keep it to one
+                    // actionable metric so the next-prayer countdown owns the row.
+                    val useCompactForecast = true
                     val displayedForecastMetrics = if (useCompactForecast) {
                         formatPrimaryPrayerForecastMetric(statusMetaText)
                     } else {
                         forecastMetrics
+                    }
+                    val forecastMotion = rememberInfiniteTransition(
+                        label = "prayerForecastCloudMotion",
+                    )
+                    val forecastFloatDp by forecastMotion.animateFloat(
+                        initialValue = -1.5f,
+                        targetValue = 1.5f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(durationMillis = 900),
+                            repeatMode = RepeatMode.Reverse,
+                        ),
+                        label = "prayerForecastCloudFloat",
+                    )
+                    val forecastFloatPx = with(LocalDensity.current) {
+                        forecastFloatDp.dp.toPx()
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2562,18 +2589,20 @@ private fun InsightPreviewCard(
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         Column(
-                            modifier = Modifier.weight(1.2f),
-                            verticalArrangement = Arrangement.spacedBy(1.dp),
+                            // The countdown is the primary action cue on this tile. Give it
+                            // enough width and type size to stay more prominent than weather.
+                            modifier = Modifier.weight(1.25f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(
-                                text = "Next prayer",
+                                text = "Next Prayer",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = (10f - (1.5f * compactProgress)).sp,
-                                    lineHeight = (12f - (2f * compactProgress)).sp,
-                                    letterSpacing = 0.1.sp,
+                                    fontSize = (11f - compactProgress).sp,
+                                    lineHeight = (13f - compactProgress).sp,
+                                    letterSpacing = 0.7.sp,
                                 ),
-                                color = Color.White.copy(alpha = 0.72f),
-                                fontWeight = FontWeight.SemiBold,
+                                color = heroAccent,
+                                fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                             )
                             Row(
@@ -2585,27 +2614,43 @@ private fun InsightPreviewCard(
                                 Text(
                                     text = nextPrayerName,
                                     style = MaterialTheme.typography.labelMedium.copy(
-                                        fontSize = footerFontSize,
-                                        lineHeight = footerLineHeight,
+                                        fontSize = (16f - (2f * compactProgress)).sp,
+                                        lineHeight = (19f - (2f * compactProgress)).sp,
                                         letterSpacing = 0.sp,
                                     ),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
                                 if (nextPrayerCountdown.isNotBlank()) {
-                                    Text(
-                                        text = "in $nextPrayerCountdown",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = (footerFontSize.value - 1f).sp,
-                                            lineHeight = footerLineHeight,
-                                            letterSpacing = 0.sp,
-                                        ),
-                                        color = Color.White.copy(alpha = 0.76f),
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = "in",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontSize = (15f - (2f * compactProgress)).sp,
+                                                lineHeight = (19f - (2f * compactProgress)).sp,
+                                                letterSpacing = 0.sp,
+                                            ),
+                                            color = Color.White.copy(alpha = 0.82f),
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                        )
+                                        Text(
+                                            text = nextPrayerCountdown,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontSize = (16f - (2f * compactProgress)).sp,
+                                                lineHeight = (19f - (2f * compactProgress)).sp,
+                                                letterSpacing = 0.sp,
+                                            ),
+                                            color = heroAccent,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2618,23 +2663,19 @@ private fun InsightPreviewCard(
                                     .background(Color.White.copy(alpha = 0.22f)),
                             )
                             Column(
-                                modifier = Modifier.weight(0.8f),
+                                modifier = Modifier.weight(0.75f),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(1.dp),
                             ) {
                                 Text(
-                                    text = if (useCompactForecast) {
-                                        "Forecast"
-                                    } else {
-                                        "$nextPrayerName forecast"
-                                    },
+                                    text = "Forecast",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = (10f - (1.5f * compactProgress)).sp,
-                                        lineHeight = (12f - (2f * compactProgress)).sp,
-                                        letterSpacing = 0.1.sp,
+                                        fontSize = (10.5f - compactProgress).sp,
+                                        lineHeight = (13f - compactProgress).sp,
+                                        letterSpacing = 0.6.sp,
                                     ),
-                                    color = Color.White.copy(alpha = 0.62f),
-                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White.copy(alpha = 0.78f),
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
                                 Row(
@@ -2646,9 +2687,16 @@ private fun InsightPreviewCard(
                                             visual = visual,
                                             level = forecastLevel,
                                             preferFlat = true,
-                                            modifier = Modifier.size(
-                                                if (useCompactForecast) 15.dp else 17.dp,
-                                            ),
+                                            animationSpeed = 1f,
+                                            paletteColorOverride = heroAccent,
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .graphicsLayer {
+                                                    // Meteocons animates the rain internally;
+                                                    // this gentle float keeps the tiny cloud
+                                                    // body visibly alive on the hero tile.
+                                                    translationY = forecastFloatPx
+                                                },
                                         )
                                     }
                                     Text(

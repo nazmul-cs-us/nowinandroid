@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -168,6 +169,8 @@ internal fun AnimatedPrayerWeatherIcon(
     visual: PrayerWeatherVisual,
     level: WeatherThresholdLevel = WeatherThresholdLevel.Alert,
     preferFlat: Boolean = false,
+    animationSpeed: Float = 0.72f,
+    paletteColorOverride: ComposeColor? = null,
     modifier: Modifier = Modifier,
 ) {
     val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -176,7 +179,7 @@ internal fun AnimatedPrayerWeatherIcon(
         useDarkPalette -> MeteoconStyle.Flat
         else -> MeteoconStyle.Fill
     }
-    val paletteColor = when (visual) {
+    val paletteColor = paletteColorOverride ?: when (visual) {
         PrayerWeatherVisual.Rain -> MaterialTheme.colorScheme.primary
         PrayerWeatherVisual.Humidity -> MaterialTheme.colorScheme.tertiary
         PrayerWeatherVisual.Heat -> MaterialTheme.colorScheme.secondary
@@ -186,6 +189,7 @@ internal fun AnimatedPrayerWeatherIcon(
         paletteColorFilter = remember(paletteColor) {
             themedMeteoconColorFilter(paletteColor.toArgb())
         },
+        animationSpeed = animationSpeed,
         modifier = modifier,
     )
 }
@@ -204,6 +208,7 @@ internal fun AnimatedCurrentWeatherIcon(
         paletteColorFilter = remember(paletteColor) {
             themedMeteoconColorFilter(paletteColor.toArgb())
         },
+        animationSpeed = 0.72f,
         modifier = modifier,
     )
 }
@@ -224,6 +229,7 @@ private fun themedMeteoconColorFilter(paletteColor: Int): ColorFilter =
 private fun AnimatedMeteocon(
     @RawRes animationResource: Int,
     paletteColorFilter: ColorFilter?,
+    animationSpeed: Float,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -241,7 +247,7 @@ private fun AnimatedMeteocon(
         composition = composition,
         isPlaying = animationsEnabled,
         iterations = LottieConstants.IterateForever,
-        speed = 0.72f,
+        speed = animationSpeed,
         restartOnPlay = false,
     )
 
