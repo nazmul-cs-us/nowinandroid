@@ -141,8 +141,11 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -2115,11 +2118,20 @@ private fun InsightPreviewCard(
         tonalElevation = 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val cardMaxWidth = maxWidth
             val tagInset = (16f - (8f * compactProgress)).dp
             val labelFontSize = (11f - (3f * compactProgress)).sp
             val titleFontSize = (17f - (5f * compactProgress)).sp
             val titleLineHeight = (22f - (8f * compactProgress)).sp
-            val titleHorizontalPadding = (22f - (10f * compactProgress)).dp
+            val defaultHorizontalPadding = (22f - (10f * compactProgress)).dp
+            val titleHorizontalPadding = if (hasPrayerContext && maxWidth < 240.dp) {
+                // A half-width insight card cannot afford desktop-like 22dp side
+                // insets. Preserve the original footer composition while giving
+                // the prayer countdown enough room to remain complete.
+                minOf(defaultHorizontalPadding, 14.dp)
+            } else {
+                defaultHorizontalPadding
+            }
             val titleBottomPadding = (22f - (10f * compactProgress)).dp
             val contentSpacing = (7f - (4f * compactProgress)).dp
             val supportingFontSize = (13f - (3f * compactProgress)).sp
@@ -2566,32 +2578,13 @@ private fun InsightPreviewCard(
                     } else {
                         forecastMetrics
                     }
-                    val forecastMotion = rememberInfiniteTransition(
-                        label = "prayerForecastCloudMotion",
-                    )
-                    val forecastFloatDp by forecastMotion.animateFloat(
-                        initialValue = -1.5f,
-                        targetValue = 1.5f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(durationMillis = 900),
-                            repeatMode = RepeatMode.Reverse,
-                        ),
-                        label = "prayerForecastCloudFloat",
-                    )
-                    val forecastFloatPx = with(LocalDensity.current) {
-                        forecastFloatDp.dp.toPx()
-                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(
-                            if (useCompactForecast) 6.dp else 10.dp,
-                        ),
+                        horizontalArrangement = Arrangement.spacedBy(1.dp),
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         Column(
-                            // The countdown is the primary action cue on this tile. Give it
-                            // enough width and type size to stay more prominent than weather.
-                            modifier = Modifier.weight(1.25f),
+                            modifier = Modifier.weight(1.48f),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(
@@ -2605,54 +2598,48 @@ private fun InsightPreviewCard(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                             )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(
-                                    if (useCompactForecast) 4.dp else 7.dp,
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = nextPrayerName,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontSize = (16f - (2f * compactProgress)).sp,
-                                        lineHeight = (19f - (2f * compactProgress)).sp,
-                                        letterSpacing = 0.sp,
-                                    ),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                )
-                                if (nextPrayerCountdown.isNotBlank()) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = "in",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontSize = (15f - (2f * compactProgress)).sp,
-                                                lineHeight = (19f - (2f * compactProgress)).sp,
-                                                letterSpacing = 0.sp,
-                                            ),
-                                            color = Color.White.copy(alpha = 0.82f),
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                        )
-                                        Text(
-                                            text = nextPrayerCountdown,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontSize = (16f - (2f * compactProgress)).sp,
-                                                lineHeight = (19f - (2f * compactProgress)).sp,
-                                                letterSpacing = 0.sp,
-                                            ),
-                                            color = heroAccent,
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(
+                                        SpanStyle(
+                                            color = Color.White,
                                             fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
+                                        ),
+                                    ) {
+                                        append(nextPrayerName)
                                     }
-                                }
-                            }
+                                    if (nextPrayerCountdown.isNotBlank()) {
+                                        withStyle(
+                                            SpanStyle(
+                                                color = Color.White.copy(alpha = 0.82f),
+                                                fontWeight = FontWeight.Medium,
+                                            ),
+                                        ) {
+                                            append(" in ")
+                                        }
+                                        withStyle(
+                                            SpanStyle(
+                                                color = heroAccent,
+                                                fontWeight = FontWeight.Bold,
+                                            ),
+                                        ) {
+                                            append(nextPrayerCountdown)
+                                        }
+                                    }
+                                },
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = if (cardMaxWidth < 240.dp) {
+                                        13.25.sp
+                                    } else {
+                                        (15.5f - (2.5f * compactProgress)).sp
+                                    },
+                                    lineHeight = (19f - (2f * compactProgress)).sp,
+                                    letterSpacing = 0.sp,
+                                ),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
 
                         if (displayedForecastMetrics != null) {
@@ -2663,23 +2650,23 @@ private fun InsightPreviewCard(
                                     .background(Color.White.copy(alpha = 0.22f)),
                             )
                             Column(
-                                modifier = Modifier.weight(0.75f),
+                                modifier = Modifier.weight(0.52f),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(1.dp),
                             ) {
                                 Text(
                                     text = "Forecast",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = (10.5f - compactProgress).sp,
-                                        lineHeight = (13f - compactProgress).sp,
-                                        letterSpacing = 0.6.sp,
+                                        fontSize = (9.5f - (0.5f * compactProgress)).sp,
+                                        lineHeight = (12f - compactProgress).sp,
+                                        letterSpacing = 0.3.sp,
                                     ),
                                     color = Color.White.copy(alpha = 0.78f),
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     forecastVisual?.let { visual ->
@@ -2689,24 +2676,14 @@ private fun InsightPreviewCard(
                                             preferFlat = true,
                                             animationSpeed = 1f,
                                             paletteColorOverride = heroAccent,
-                                            modifier = Modifier
-                                                .size(20.dp)
-                                                .graphicsLayer {
-                                                    // Meteocons animates the rain internally;
-                                                    // this gentle float keeps the tiny cloud
-                                                    // body visibly alive on the hero tile.
-                                                    translationY = forecastFloatPx
-                                                },
+                                            modifier = Modifier.size(16.dp),
                                         )
                                     }
                                     Text(
                                         text = displayedForecastMetrics,
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = (
-                                                footerFontSize.value -
-                                                    if (displayedForecastMetrics.length > 13) 1f else 0f
-                                                ).sp,
-                                            lineHeight = footerLineHeight,
+                                            fontSize = (12.5f - compactProgress).sp,
+                                            lineHeight = (14f - compactProgress).sp,
                                             letterSpacing = 0.sp,
                                         ),
                                         color = Color.White,

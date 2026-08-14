@@ -84,17 +84,13 @@ import com.starception.submission.auth.ProfileSheet
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -116,6 +112,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -153,6 +151,15 @@ import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
+import com.airbnb.lottie.LottieProperty
+import com.airbnb.lottie.SimpleColorFilter
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.rememberLottieDynamicProperties
+import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import com.starception.submission.feature.settings.R as settingsR
 
 /** Unwraps the hosting [Activity] from a Compose [Context], needed for Firebase OAuth flows. */
@@ -593,10 +600,13 @@ private fun NiaFloatingBottomBar(
     val voiceButton = @Composable {
         val listening by com.starception.submission.ui.search.SearchPrefillBus.listening
             .collectAsStateWithLifecycle()
+        val processing by com.starception.submission.ui.search.SearchPrefillBus.processing
+            .collectAsStateWithLifecycle()
         val level by com.starception.submission.ui.search.SearchPrefillBus.voiceLevel
             .collectAsStateWithLifecycle()
         VoiceAssistantButton(
             listening = listening,
+            processing = processing,
             level = level,
             buttonSize = if (vertical) 50.dp else 60.dp,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
@@ -639,15 +649,15 @@ private fun NiaFloatingBottomBar(
 
 /**
  * Voice-assistant button: the circular button beside the floating nav. It idles
- * as the five-bar graphic-eq mark; while [listening], those same five bars
- * become a live equalizer — each bar rises and falls with the mic [level] (with
- * a gentle shimmer even in silence so it reads as actively listening), and the
- * button breathes subtly with your voice. Tapping toggles capture (start / stop)
- * via the shared bus; this composable only reflects state.
+ * as the five-bar graphic-eq mark. Listening and processing use a related pair
+ * of traced, Face-ID-inspired Lottie loops; mic [level] still drives the button's
+ * breathing scale. Tapping toggles capture, and taps during processing cancel
+ * transcription through the shared bus.
  */
 @Composable
 private fun VoiceAssistantButton(
     listening: Boolean,
+    processing: Boolean,
     level: Float,
     buttonSize: Dp = 60.dp,
     onClick: () -> Unit,
@@ -670,17 +680,59 @@ private fun VoiceAssistantButton(
 
     val container = MaterialTheme.colorScheme.onSurface
     val barColor = MaterialTheme.colorScheme.surface
-
-    // Time source for the per-bar shimmer while listening.
-    val infinite = rememberInfiniteTransition(label = "assistant")
-    val t by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
-        label = "assistantBars",
+    val preferredVoiceAccent = if (container.luminance() < 0.5f) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    // Keep the exported Face-ID orbit tied to the selected app palette while
+    // retaining enough contrast on the inverted floating button.
+    val voiceAccent = if (
+        abs(preferredVoiceAccent.luminance() - container.luminance()) >= 0.35f
+    ) {
+        preferredVoiceAccent
+    } else {
+        barColor
+    }
+    val listeningComposition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.voice_search_listening),
     )
+    val listeningProgress by animateLottieCompositionAsState(
+        composition = listeningComposition,
+        isPlaying = listening,
+        iterations = LottieConstants.IterateForever,
+        // Speech energy makes the trace feel responsive without tying its
+        // geometry to noisy frame-by-frame amplitude values.
+        speed = 0.72f + (ampActive * 0.24f),
+        restartOnPlay = true,
+    )
+    val processingComposition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.voice_search_processing),
+    )
+    val processingProgress by animateLottieCompositionAsState(
+        composition = processingComposition,
+        isPlaying = processing,
+        iterations = LottieConstants.IterateForever,
+        speed = 0.78f,
+        restartOnPlay = true,
+    )
+    val voiceLottieTint = voiceAccent.toArgb()
+    val voiceLottieDynamicProperties = rememberLottieDynamicProperties(
+        rememberLottieDynamicProperty(
+            property = LottieProperty.COLOR_FILTER,
+            value = SimpleColorFilter(voiceLottieTint),
+            keyPath = arrayOf("**"),
+        ),
+    )
+    val visualPhase = when {
+        processing -> 2
+        listening -> 1
+        else -> 0
+    }
 
     Surface(
+        // During processing the same tap routes back to Whisper and cancels
+        // transcription; the Lottie therefore doubles as a visible stop target.
         onClick = onClick,
         shape = CircleShape,
         color = container,
@@ -694,34 +746,46 @@ private fun VoiceAssistantButton(
             },
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Canvas(modifier = Modifier.size(if (buttonSize < 56.dp) 21.dp else 24.dp)) {
-                // Five bars echoing the graphic-eq icon. The resting silhouette
-                // (heights below) shows when idle; while listening each bar is
-                // driven by the mic level plus a small per-bar shimmer, so it
-                // visibly tracks the user's voice.
-                val rest = floatArrayOf(0.4f, 0.6f, 1f, 0.6f, 0.4f)
-                val bars = rest.size
-                val slot = size.width / bars
-                val barW = slot * 0.5f
-                val cy = size.height / 2f
-                val maxH = size.height
-                val twoPi = 2f * Math.PI.toFloat()
-                for (i in 0 until bars) {
-                    val wob = 0.5f + 0.5f * kotlin.math.sin((t + i * 0.16f) * twoPi)
-                    // Small idle shimmer while listening + a voice-driven leap.
-                    val drive = (ampActive + 0.12f * progress).coerceIn(0f, 1f)
-                    val live = ((0.2f + 0.8f * wob) * drive + 0.14f).coerceIn(0.12f, 1f)
-                    // Blend from the resting icon shape (idle) to the live bar.
-                    val frac = rest[i] * (1f - progress) + live * progress
-                    val h = (maxH * frac).coerceAtLeast(barW)
-                    val x = slot * i + slot / 2f
-                    drawLine(
-                        color = barColor,
-                        start = Offset(x, cy - h / 2f),
-                        end = Offset(x, cy + h / 2f),
-                        strokeWidth = barW,
-                        cap = StrokeCap.Round,
+            Crossfade(
+                targetState = visualPhase,
+                animationSpec = tween(durationMillis = 220),
+                label = "voiceAssistantPhase",
+            ) { phase ->
+                when (phase) {
+                    2 -> LottieAnimation(
+                        composition = processingComposition,
+                        progress = { processingProgress },
+                        dynamicProperties = voiceLottieDynamicProperties,
+                        modifier = Modifier.size(if (buttonSize < 56.dp) 29.dp else 34.dp),
                     )
+                    1 -> LottieAnimation(
+                        composition = listeningComposition,
+                        progress = { listeningProgress },
+                        dynamicProperties = voiceLottieDynamicProperties,
+                        modifier = Modifier.size(if (buttonSize < 56.dp) 29.dp else 34.dp),
+                    )
+                    else -> Canvas(
+                        modifier = Modifier.size(if (buttonSize < 56.dp) 21.dp else 24.dp),
+                    ) {
+                        // Stable resting mark before voice capture begins.
+                        val rest = floatArrayOf(0.4f, 0.6f, 1f, 0.6f, 0.4f)
+                        val bars = rest.size
+                        val slot = size.width / bars
+                        val barW = slot * 0.5f
+                        val cy = size.height / 2f
+                        val maxH = size.height
+                        for (i in 0 until bars) {
+                            val h = (maxH * rest[i]).coerceAtLeast(barW)
+                            val x = slot * i + slot / 2f
+                            drawLine(
+                                color = barColor,
+                                start = Offset(x, cy - h / 2f),
+                                end = Offset(x, cy + h / 2f),
+                                strokeWidth = barW,
+                                cap = StrokeCap.Round,
+                            )
+                        }
+                    }
                 }
             }
         }

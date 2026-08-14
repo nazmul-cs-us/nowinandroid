@@ -1,0 +1,15 @@
+Voice-search animation attribution
+
+The listening and transcribing motion is a vector adaptation of the Apple Face ID
+Lottie Animation community resource by Mau Ali. The app uses only vector Lottie
+shapes derived from the supplied SVG sequence; the exported PNG frames are not
+packaged in the application.
+
+Figma Community source:
+https://www.figma.com/community/file/1487058393232924456/apple-face-id-lottie-animation
+
+Matching creator listing:
+https://lottiefiles.com/free-animation/apple-face-id-g6sYZlc35d
+
+Figma free Community files are provided under CC BY 4.0.
+https://creativecommons.org/licenses/by/4.0/

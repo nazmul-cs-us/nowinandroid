@@ -24,6 +24,8 @@ private const val FEEDBACK_URL = "https://goo.gle/nia-app-feedback"
 private const val FLATICON_URL = "https://www.flaticon.com/uicons"
 private const val OPEN_METEO_URL = "https://open-meteo.com/"
 private const val METEOCONS_URL = "https://meteocons.com/"
+private const val VOICE_ANIMATION_URL =
+    "https://www.figma.com/community/file/1487058393232924456/apple-face-id-lottie-animation"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -57,7 +59,8 @@ fun AboutSection(
         )
         Text(
             text = "Interface, location, and weather PNG icons by Flaticon creators. " +
-                "Animated weather icons by Meteocons. Weather data by Open-Meteo.",
+                "Animated weather icons by Meteocons. Weather data by Open-Meteo. " +
+                "Voice-search motion adapted from Mau Ali's Apple Face ID Lottie Animation.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -113,6 +116,12 @@ fun AboutSection(
                 onClick = { uriHandler.openUri(METEOCONS_URL) }
             ) {
                 Text(text = "Animations by Meteocons")
+            }
+
+            TextButton(
+                onClick = { uriHandler.openUri(VOICE_ANIMATION_URL) }
+            ) {
+                Text(text = "Voice animation credit")
             }
         }
     }

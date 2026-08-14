@@ -63,6 +63,16 @@ object SearchPrefillBus {
         _listening.value = value
     }
 
+    // Whisper stops recording before it begins its comparatively expensive
+    // on-device transcription pass. Publishing that second phase separately
+    // prevents ambient voice controls from looking idle while work continues.
+    private val _processing = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val processing: kotlinx.coroutines.flow.StateFlow<Boolean> = _processing
+
+    fun setProcessing(value: Boolean) {
+        _processing.value = value
+    }
+
     private val _voiceLevel = kotlinx.coroutines.flow.MutableStateFlow(0f)
     val voiceLevel: kotlinx.coroutines.flow.StateFlow<Float> = _voiceLevel
 

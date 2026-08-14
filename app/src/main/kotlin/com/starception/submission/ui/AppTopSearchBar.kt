@@ -195,6 +195,7 @@ fun AppTopSearchBar(
     // actual recording state so it ends the instant recording stops — during
     // transcription the field must not look like it's still capturing.
     val isListening by whisperService.isListening.collectAsStateWithLifecycle()
+    val isProcessing by whisperService.isTranscribing.collectAsStateWithLifecycle()
     // Single progress driving the fluid listening transition: chrome (mic +
     // magnifier + hint) fades out and the voice wave slides up as this animates
     // 0 → 1, and the reverse on stop. A light spring gives it an organic settle.
@@ -214,6 +215,9 @@ fun AppTopSearchBar(
     LaunchedEffect(isListening) {
         com.starception.submission.ui.search.SearchPrefillBus.setListening(isListening)
     }
+    LaunchedEffect(isProcessing) {
+        com.starception.submission.ui.search.SearchPrefillBus.setProcessing(isProcessing)
+    }
     LaunchedEffect(whisperService) {
         whisperService.voiceLevel.collect {
             com.starception.submission.ui.search.SearchPrefillBus.setVoiceLevel(it)
@@ -228,6 +232,7 @@ fun AppTopSearchBar(
         onDispose {
             com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(false)
             com.starception.submission.ui.search.SearchPrefillBus.setListening(false)
+            com.starception.submission.ui.search.SearchPrefillBus.setProcessing(false)
             com.starception.submission.ui.search.SearchPrefillBus.setVoiceLevel(0f)
         }
     }
@@ -1682,6 +1687,15 @@ private fun startVoiceCapture(
         != PackageManager.PERMISSION_GRANTED
     ) {
         Toast.makeText(ctx, "Microphone permission required", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    // The same floating button that starts capture becomes the stop control
+    // while its processing Lottie is visible.
+    if (whisper.isTranscribing.value) {
+        if (whisper.cancelTranscription()) {
+            Toast.makeText(ctx, "Voice processing cancelled", Toast.LENGTH_SHORT).show()
+        }
         return
     }
 

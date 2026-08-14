@@ -25,6 +25,7 @@ import com.whispercpp.media.decodeWaveFile
 import com.whispercpp.recorder.Recorder
 import com.whispercpp.whisper.WhisperContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -98,6 +99,13 @@ class WhisperVoiceService(
     private var initJob: Job? = null
     private var recordJob: Job? = null
     private var autoStopJob: Job? = null
+    private var transcriptionJob: Job? = null
+
+    // Native Whisper inference is not cooperatively cancellable on every build.
+    // This generation prevents a result that finishes after cancellation from
+    // reaching the UI or replacing a newer voice search.
+    @Volatile
+    private var transcriptionGeneration = 0L
 
     // Silero VAD: recognizes speech rather than loudness, so end-pointing works
     // even when quiet speech overlaps ambient noise in RMS terms (measured on
@@ -488,7 +496,8 @@ class WhisperVoiceService(
         if (_isListening.value) {
             _statusMessage.value = "Processing..."
 
-            scope.launch {
+            transcriptionJob?.cancel()
+            transcriptionJob = scope.launch {
                 try {
                     // Stop recording
                     recorder?.stopRecording()
@@ -511,6 +520,7 @@ class WhisperVoiceService(
     }
 
     private suspend fun startTranscription() {
+        val generation = ++transcriptionGeneration
         _isTranscribing.value = true
         _statusMessage.value = "Transcribing..."
 
@@ -545,9 +555,16 @@ class WhisperVoiceService(
             // Transcribe using whisper.cpp
             val result = whisperContext?.transcribeData(audioData, printTimestamp = false)
 
+            if (generation != transcriptionGeneration) {
+                Log.i(TAG, "Ignoring cancelled transcription result")
+                return
+            }
             handleTranscriptionResult(result)
 
+        } catch (e: CancellationException) {
+            Log.i(TAG, "Transcription coroutine cancelled")
         } catch (e: Exception) {
+            if (generation != transcriptionGeneration) return
             Log.e(TAG, "Error during transcription", e)
             _isTranscribing.value = false
             _error.value = "Transcription error: ${e.message}"
@@ -556,6 +573,21 @@ class WhisperVoiceService(
             )
             currentCallback = null
         }
+    }
+
+    /**
+     * Cancels the processing phase without reporting a recognition failure.
+     * Returns true only when a transcription was active.
+     */
+    fun cancelTranscription(): Boolean {
+        if (!_isTranscribing.value) return false
+        transcriptionGeneration++
+        transcriptionJob?.cancel()
+        transcriptionJob = null
+        currentCallback = null
+        _isTranscribing.value = false
+        _statusMessage.value = "Transcription cancelled"
+        return true
     }
 
     /**
@@ -644,6 +676,9 @@ class WhisperVoiceService(
      */
     fun cancel() {
         scope.launch {
+            transcriptionGeneration++
+            transcriptionJob?.cancel()
+            transcriptionJob = null
             _isListening.value = false
             _isTranscribing.value = false
 
@@ -667,6 +702,7 @@ class WhisperVoiceService(
             initJob?.cancel()
             recordJob?.cancel()
             autoStopJob?.cancel()
+            transcriptionJob?.cancel()
 
             try {
                 vad?.release()
