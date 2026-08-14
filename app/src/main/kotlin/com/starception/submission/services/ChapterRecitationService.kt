@@ -158,9 +158,14 @@ class ChapterRecitationService : Service() {
             stopProgressUpdates()
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
             stopForeground(STOP_FOREGROUND_REMOVE)
-            // Signal a natural finish so listeners (the Dua screen) can auto-play the
-            // next dua in the chapter.
-            ChapterRecitationState.onCompletion?.invoke()
+            // Route natural completion to the active content type. Hadith details
+            // advance their own numbered sequence; Fortress playback keeps its
+            // existing chapter/dua playlist behavior.
+            if (currentTitle.startsWith("Hadith #")) {
+                ChapterRecitationState.onHadithCompletion?.invoke()
+            } else {
+                ChapterRecitationState.onCompletion?.invoke()
+            }
         }
         player.setOnErrorListener { _, what, extra ->
             Log.e(TAG, "MediaPlayer error what=$what extra=$extra")
@@ -352,6 +357,8 @@ object ChapterRecitationState {
     var onProgressChanged: ((Int, Int) -> Unit)? = null
     /** Fired when a recitation finishes on its own (not a pause/stop) — drives dua auto-advance. */
     var onCompletion: (() -> Unit)? = null
+    /** Fired when a downloaded Hadith recording naturally finishes. */
+    var onHadithCompletion: (() -> Unit)? = null
 
     // Last-known snapshot so the UI can re-sync on app resume even if the process/Activity was
     // recreated while the service kept playing (e.g. user closed and reopened the app).

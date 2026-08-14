@@ -64,7 +64,6 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FloatingActionButton
@@ -143,6 +142,8 @@ import androidx.compose.animation.scaleIn
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.settings.components.TtsVoiceSelectionSheet
+import com.starception.submission.settings.components.isTtsVoiceModelAvailable
 import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.download.AssetDownloadManager
 import dagger.hilt.android.EntryPointAccessors
@@ -296,6 +297,8 @@ fun HadithDetailScreen(
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsInitialized by remember { mutableStateOf(false) }
+    // Invalidates late TTS completion callbacks after stop or manual navigation.
+    var playbackGeneration by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // When on, hitting the end of a hadith auto-advances to the next one.
     var autoAdvance by remember { mutableStateOf(false) }
 
@@ -342,6 +345,7 @@ fun HadithDetailScreen(
     // down the old audio silently, then auto-resume on the freshly loaded hadith.
     androidx.compose.runtime.LaunchedEffect(hadithNumber) {
         if (prevHadithNumberRef != hadithNumber) {
+            playbackGeneration += 1
             // Auto-resume if the user was playing OR if continuous-play toggle is on.
             // Continuous-play covers the natural-end case where isPlaying is already
             // false by the time onCompletionListener bumps the hadith number.
@@ -521,6 +525,42 @@ fun HadithDetailScreen(
     // doesn't get a dispose/remount cycle.
     val handleSkipNext: () -> Unit = { hadithNumber += 1 }
     val handleSkipPrev: () -> Unit = { if (hadithNumber > 1) hadithNumber -= 1 }
+    val currentAutoAdvance by androidx.compose.runtime.rememberUpdatedState(autoAdvance)
+    val handlePlaybackCompleted: () -> Unit = {
+        val shouldAdvance = currentAutoAdvance
+        if (shouldAdvance) {
+            // Keep the mini-player visible while the next hadith is loading.
+            suppressStopNotification = true
+            shouldAutoPlayAfterLoad = true
+        }
+        isPlaying = false
+        if (shouldAdvance) {
+            android.util.Log.d(
+                "HadithAutoAdvance",
+                "Hadith #$hadithNumber completed; advancing to #${hadithNumber + 1}",
+            )
+            handleSkipNext()
+        }
+    }
+    val currentPlaybackCompleted by androidx.compose.runtime.rememberUpdatedState(
+        handlePlaybackCompleted,
+    )
+
+    // Downloaded Bengali recordings play in the foreground recitation service,
+    // so their natural-completion event must be bridged back to this screen.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val completionCallback: () -> Unit = { currentPlaybackCompleted() }
+        com.starception.submission.services.ChapterRecitationState.onHadithCompletion =
+            completionCallback
+        onDispose {
+            if (
+                com.starception.submission.services.ChapterRecitationState.onHadithCompletion ===
+                completionCallback
+            ) {
+                com.starception.submission.services.ChapterRecitationState.onHadithCompletion = null
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -632,6 +672,7 @@ fun HadithDetailScreen(
                 hadith != null -> {
                     val handlePlayClick: () -> Unit = {
                             if (isPlaying) {
+                                playbackGeneration += 1
                                 // Stop playback (local player, TTS, and the recitation service)
                                 mediaPlayer?.stop()
                                 mediaPlayer?.release()
@@ -642,6 +683,13 @@ fun HadithDetailScreen(
                                 isPlaying = false
                             } else {
                                 // Start playback
+                                playbackGeneration += 1
+                                val playbackId = playbackGeneration
+                                val completeCurrentPlayback: () -> Unit = {
+                                    if (playbackGeneration == playbackId) {
+                                        handlePlaybackCompleted()
+                                    }
+                                }
                                 val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
 
                                 // For Bengali language and Bukhari, use audio files (CDN → SD card → download → TTS fallback)
@@ -671,7 +719,8 @@ fun HadithDetailScreen(
                                                 hadithNumber = hadithNumber,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
-                                                onPlayingChanged = { isPlaying = it }
+                                                onPlayingChanged = { isPlaying = it },
+                                                onPlaybackCompleted = completeCurrentPlayback,
                                             )
                                         }
                                     } else {
@@ -724,7 +773,8 @@ fun HadithDetailScreen(
                                                                 hadithNumber = hadithNumber,
                                                                 selectedVoice = selectedVoice,
                                                                 speakerId = selectedSpeakerId,
-                                                                onPlayingChanged = { isPlaying = it }
+                                                                onPlayingChanged = { isPlaying = it },
+                                                                onPlaybackCompleted = completeCurrentPlayback,
                                                             )
                                                         }
                                                     }
@@ -736,7 +786,8 @@ fun HadithDetailScreen(
                                                             hadithNumber = hadithNumber,
                                                             selectedVoice = selectedVoice,
                                                             speakerId = selectedSpeakerId,
-                                                            onPlayingChanged = { isPlaying = it }
+                                                            onPlayingChanged = { isPlaying = it },
+                                                            onPlaybackCompleted = completeCurrentPlayback,
                                                         )
                                                     }
                                                     else -> {
@@ -747,7 +798,8 @@ fun HadithDetailScreen(
                                                             hadithNumber = hadithNumber,
                                                             selectedVoice = selectedVoice,
                                                             speakerId = selectedSpeakerId,
-                                                            onPlayingChanged = { isPlaying = it }
+                                                            onPlayingChanged = { isPlaying = it },
+                                                            onPlaybackCompleted = completeCurrentPlayback,
                                                         )
                                                     }
                                                 }
@@ -762,7 +814,8 @@ fun HadithDetailScreen(
                                                     hadithNumber = hadithNumber,
                                                     selectedVoice = selectedVoice,
                                                     speakerId = selectedSpeakerId,
-                                                    onPlayingChanged = { isPlaying = it }
+                                                    onPlayingChanged = { isPlaying = it },
+                                                    onPlaybackCompleted = completeCurrentPlayback,
                                                 )
                                             }
                                         }
@@ -785,7 +838,8 @@ fun HadithDetailScreen(
                                                 hadithNumber = hadithNumber,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
-                                                onPlayingChanged = { isPlaying = it }
+                                                onPlayingChanged = { isPlaying = it },
+                                                onPlaybackCompleted = completeCurrentPlayback,
                                             )
                                         }
                                     } else {
@@ -797,7 +851,8 @@ fun HadithDetailScreen(
                                             language = selectedLanguage,
                                             tts = textToSpeech,
                                             onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
-                                            onPlayingChanged = { isPlaying = it }
+                                            onPlayingChanged = { isPlaying = it },
+                                            onPlaybackCompleted = completeCurrentPlayback,
                                         )
                                     }
                                 }
@@ -925,9 +980,11 @@ fun HadithDetailScreen(
     // Voice-selection bottom sheet (toolbar ⋮) — same slide-up minimal style
     // as the Surah page's options sheet. Persists to the prefs Settings uses.
     if (showVoiceSheet) {
-        VoiceSelectionSheet(
+        TtsVoiceSelectionSheet(
             selectedVoice = selectedVoice,
             selectedSpeakerId = selectedSpeakerId,
+            supportingText = "Used when reading this hadith aloud in English",
+            ttsService = sherpaOnnxTts,
             isVoiceAvailable = { isTtsVoiceModelAvailable(context, it) },
             onVoiceSelected = { voice ->
                 if (voice.name != selectedVoiceName) {
@@ -1550,7 +1607,8 @@ private fun playWithTts(
     language: String,
     tts: TextToSpeech?,
     onTtsCreated: (TextToSpeech) -> Unit,
-    onPlayingChanged: (Boolean) -> Unit
+    onPlayingChanged: (Boolean) -> Unit,
+    onPlaybackCompleted: () -> Unit,
 ) {
     val locale = when (language) {
         "en" -> java.util.Locale.US
@@ -1589,7 +1647,7 @@ private fun playWithTts(
                 onPlayingChanged(true)
             }
             override fun onDone(utteranceId: String?) {
-                onPlayingChanged(false)
+                onPlaybackCompleted()
             }
             override fun onError(utteranceId: String?) {
                 onPlayingChanged(false)
@@ -1610,7 +1668,7 @@ private fun playWithTts(
                             onPlayingChanged(true)
                         }
                         override fun onDone(utteranceId: String?) {
-                            onPlayingChanged(false)
+                            onPlaybackCompleted()
                         }
                         override fun onError(utteranceId: String?) {
                             onPlayingChanged(false)
@@ -1638,7 +1696,8 @@ private fun playWithSherpaOnnxTts(
     hadithNumber: Int,
     selectedVoice: TtsVoice,
     speakerId: Int,
-    onPlayingChanged: (Boolean) -> Unit
+    onPlayingChanged: (Boolean) -> Unit,
+    onPlaybackCompleted: () -> Unit,
 ) {
     // IMPORTANT: Use same intro format as DrivingAudioService for cache compatibility
     val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
@@ -1661,7 +1720,7 @@ private fun playWithSherpaOnnxTts(
                 text = fullText,
                 speakerId = speakerId,
                 onComplete = {
-                    onPlayingChanged(false)
+                    onPlaybackCompleted()
                 }
             )
 
@@ -2533,177 +2592,6 @@ private fun HadithPlayerControls(
                 )
             }
         }
-    }
-}
-
-/**
- * Voice-selection bottom sheet opened from the toolbar's ⋮ — same slide-up
- * minimal style as the Surah page's options sheet: plain rows, selection via
- * primary color, no boxed chips. Speaker stepper appears for the multi-speaker
- * voices; all changes persist immediately via the callbacks.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VoiceSelectionSheet(
-    selectedVoice: TtsVoice,
-    selectedSpeakerId: Int,
-    isVoiceAvailable: (TtsVoice) -> Boolean,
-    onVoiceSelected: (TtsVoice) -> Unit,
-    onSpeakerChanged: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
-        shape = NiaBottomSheetDefaults.FloatingShape,
-        containerColor = Color.Transparent,
-        contentColor = NiaBottomSheetDefaults.contentColor(),
-        scrimColor = NiaBottomSheetDefaults.scrimColor(),
-        tonalElevation = 0.dp,
-        dragHandle = null,
-    ) {
-        NiaBottomSheetTheme {
-            NiaBottomSheetFrame {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                ) {
-                    Text(
-                        text = "Voice",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "Used when reading this hadith aloud in English",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    TtsVoice.entries.forEach { voice ->
-                        val selected = voice == selectedVoice
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onVoiceSelected(voice) }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = voice.icon,
-                                contentDescription = null,
-                                tint = if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier.size(22.dp),
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = voice.displayName,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                )
-                                Text(
-                                    text = if (isVoiceAvailable(voice)) {
-                                        voice.description
-                                    } else {
-                                        "Not downloaded — tap play to download"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            if (selected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
-
-                    if (selectedVoice.isMultiSpeaker) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Speaker",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                                Text(
-                                    text = "${selectedVoice.totalSpeakers} voices available",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            val total = selectedVoice.totalSpeakers
-                            IconButton(
-                                onClick = { onSpeakerChanged((selectedSpeakerId - 1 + total) % total) },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronLeft,
-                                    contentDescription = "Previous speaker",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Text(
-                                text = "$selectedSpeakerId",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            IconButton(
-                                onClick = { onSpeakerChanged((selectedSpeakerId + 1) % total) },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Next speaker",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * True when the selected Sherpa TTS voice's model is on disk (extracted cache,
- * CDN download, or bundled asset) — mirrors UnifiedSettingsViewModel's check so
- * the play button and Settings > Text-to-Speech agree on availability.
- */
-private fun isTtsVoiceModelAvailable(context: android.content.Context, voice: TtsVoice): Boolean {
-    val modelFile = voice.modelFile
-    return try {
-        val extractedFile = java.io.File(java.io.File(context.filesDir, "tts_model"), modelFile)
-        if (extractedFile.exists() && extractedFile.length() > 1024) return true
-
-        val cdnFile = java.io.File(java.io.File(context.filesDir, "cdn_assets"), "models/tts/$modelFile")
-        if (cdnFile.exists() && cdnFile.length() > 1024) return true
-
-        context.assets.open("tts/$modelFile").use { it.available() > 0 }
-    } catch (e: Exception) {
-        false
     }
 }
 

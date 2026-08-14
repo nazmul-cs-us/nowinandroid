@@ -13,7 +13,6 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.IconCompat
 import androidx.annotation.RequiresApi
 import com.starception.submission.R
 import com.google.android.gms.location.ActivityRecognition
@@ -34,6 +33,8 @@ import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.util.PrayerNotificationManager
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationTrackerIcon
 import com.starception.submission.util.GoogleSampleNotificationManager
 import com.starception.submission.util.AnrPreventionConfig
 import com.starception.submission.util.ActivityTracker
@@ -493,7 +494,7 @@ class PrayerNotificationService : Service() {
             .setLocalOnly(false)
             .setTimeoutAfter(0)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-        
+
         // Add prayer phase color based on progress
         if (progress > 0) {
             val phaseColor = when {
@@ -506,7 +507,7 @@ class PrayerNotificationService : Service() {
             
             // Add Live Update ProgressStyle
             try {
-                val progressStyle = createLiveUpdateProgressStyle(progress)
+                val progressStyle = createLiveUpdateProgressStyle(progress, detailedMessage)
                 builder.setStyle(progressStyle)
                 Log.d(TAG, "✨ Applied Live Update ProgressStyle with segments")
             } catch (e: Exception) {
@@ -523,7 +524,10 @@ class PrayerNotificationService : Service() {
         }
         
         // Add activity icon as large icon (shows in top right corner)
-        val activityIcon = getActivityIconBitmap()
+        val activityIcon = prayerWeatherNotificationBitmap(
+            context = this,
+            summary = detailedMessage,
+        ) ?: getActivityIconBitmap()
         if (activityIcon != null) {
             builder.setLargeIcon(activityIcon)
             Log.d(TAG, "🏃 Added activity icon: ${ActivityTracker.getCurrentActivity()}")
@@ -594,10 +598,11 @@ class PrayerNotificationService : Service() {
      * Create Live Update ProgressStyle (matching Google sample structure)
      */
     @RequiresApi(35)
-    private fun createLiveUpdateProgressStyle(progress: Int): NotificationCompat.ProgressStyle {
+    private fun createLiveUpdateProgressStyle(
+        progress: Int,
+        weatherSummary: String = "",
+    ): NotificationCompat.ProgressStyle {
         // Colors matching Google sample format
-        val pointColor = Color.valueOf(236f / 255f, 183f / 255f, 255f / 255f, 1f).toArgb()
-        
         return NotificationCompat.ProgressStyle()
             .setProgressSegments(
                 listOf(
@@ -606,15 +611,9 @@ class PrayerNotificationService : Service() {
                     NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FBBF24"))  // Yellow
                 )
             )
-            .setProgressPoints(
-                listOf(
-                    NotificationCompat.ProgressStyle.Point(20).setColor(pointColor),
-                    NotificationCompat.ProgressStyle.Point(60).setColor(pointColor)
-                )
-            )
             .setProgress(progress)
             .setProgressTrackerIcon(
-                IconCompat.createWithResource(this, R.drawable.ic_prayer)
+                prayerWeatherNotificationTrackerIcon(this, weatherSummary)
             )
     }
     
@@ -885,7 +884,8 @@ class PrayerNotificationService : Service() {
                                 prayerPhase = prayerPhase,
                                 prayerName = prayerName,
                                 prayerTime = prayerTime,
-                                nextPrayerCountdown = detailedMessage.trim() // Pass countdown for status chip
+                                nextPrayerCountdown = detailedMessage.trim(), // Pass countdown for status chip
+                                weatherSummary = detailedMessage,
                             )
 
                             // Use startForeground() to update notification while maintaining foreground service priority

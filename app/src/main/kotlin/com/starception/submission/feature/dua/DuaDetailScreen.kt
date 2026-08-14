@@ -204,6 +204,11 @@ import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
 import com.starception.submission.core.ui.getSkyColors
+import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.settings.components.TtsVoiceSelectionSheet
+import com.starception.submission.settings.components.isTtsVoiceModelAvailable
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
@@ -926,6 +931,29 @@ fun DuaDetailScreen(
 
     val context = LocalContext.current
     val viewModel = remember { DuaDetailViewModel(context) }
+    val ttsEntryPoint = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java,
+        )
+    }
+    val sherpaOnnxTts = remember { ttsEntryPoint.sherpaOnnxTtsService() }
+    val ttsPrefs = remember {
+        context.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+    }
+    var selectedVoiceName by remember {
+        mutableStateOf(
+            ttsPrefs.getString("selected_voice", TtsVoice.KOKORO_EN.name)
+                ?: TtsVoice.KOKORO_EN.name,
+        )
+    }
+    var selectedSpeakerId by remember {
+        mutableStateOf(ttsPrefs.getInt("selected_speaker_id", 0))
+    }
+    val selectedVoice = remember(selectedVoiceName) {
+        runCatching { TtsVoice.valueOf(selectedVoiceName) }
+            .getOrDefault(TtsVoice.KOKORO_EN)
+    }
     val selectedFont by viewModel.selectedArabicFont.collectAsState()
     val selectedTranslation by viewModel.selectedTranslation.collectAsState()
     val showTajweed by viewModel.showTajweed.collectAsState()
@@ -969,6 +997,7 @@ fun DuaDetailScreen(
     // Toolbar language/font icons open focused modal sheets rather than popups.
     var toolbarPicker by remember { mutableStateOf<DuaToolbarPicker?>(null) }
     var showFloatingToolbar by remember { mutableStateOf(false) }
+    var showVoiceSheet by remember { mutableStateOf(false) }
 
     // Font size state for toolbar controls
     var arabicFontSize by remember { mutableStateOf(32f) }
@@ -2508,6 +2537,39 @@ fun DuaDetailScreen(
                             )
                         }
 
+                        // TTS narration — opens the same model/speaker picker used by
+                        // Hadith details while keeping the reading controls in this sheet.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showFloatingToolbar = false
+                                    showVoiceSheet = true
+                                }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Narration voice",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = "${selectedVoice.displayName} · $selectedSpeakerId",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(12.dp),
+                            )
+                        }
+
                         // Arabic font — value + chevron row.
                         Row(
                             modifier = Modifier
@@ -2990,6 +3052,34 @@ fun DuaDetailScreen(
                 }
             }
         }
+    }
+
+    if (showVoiceSheet) {
+        TtsVoiceSelectionSheet(
+            selectedVoice = selectedVoice,
+            selectedSpeakerId = selectedSpeakerId,
+            supportingText = "Used for the spoken introduction before each dua recitation",
+            ttsService = sherpaOnnxTts,
+            isVoiceAvailable = { isTtsVoiceModelAvailable(context, it) },
+            onVoiceSelected = { voice ->
+                if (voice.name != selectedVoiceName) {
+                    selectedVoiceName = voice.name
+                    selectedSpeakerId = 0
+                    ttsPrefs.edit()
+                        .putString("selected_voice", voice.name)
+                        .putInt("selected_speaker_id", 0)
+                        .apply()
+                    sherpaOnnxTts.clearCache()
+                    sherpaOnnxTts.setVoice(voice)
+                }
+            },
+            onSpeakerChanged = { speakerId ->
+                selectedSpeakerId = speakerId
+                ttsPrefs.edit().putInt("selected_speaker_id", speakerId).apply()
+                sherpaOnnxTts.clearCache()
+            },
+            onDismiss = { showVoiceSheet = false },
+        )
     }
 
     toolbarPicker?.let { picker ->

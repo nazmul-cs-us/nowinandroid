@@ -1,0 +1,456 @@
+package com.starception.submission.feature.prayertimes.weather
+
+import android.provider.Settings
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
+import androidx.annotation.DrawableRes
+import androidx.annotation.RawRes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.drawable.IconCompat
+import com.airbnb.lottie.LottieProperty
+import com.airbnb.lottie.SimpleColorFilter
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieDynamicProperties
+import com.airbnb.lottie.compose.rememberLottieDynamicProperty
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.LottieCompositionFactory
+import com.airbnb.lottie.LottieDrawable
+import com.starception.submission.R
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.roundToInt
+
+internal enum class PrayerWeatherVisual {
+    Rain,
+    Heat,
+    Humidity,
+}
+
+internal enum class WeatherThresholdLevel {
+    Normal,
+    Alert,
+    Severe,
+}
+
+internal enum class MeteoconStyle {
+    Fill,
+    Flat,
+    Monochrome,
+}
+
+private enum class CurrentWeatherVisual {
+    ClearDay,
+    ClearNight,
+    PartlyCloudyDay,
+    PartlyCloudyNight,
+    OvercastDay,
+    OvercastNight,
+    FogDay,
+    FogNight,
+    Drizzle,
+    Rain,
+    Snow,
+    ThunderstormsDay,
+    ThunderstormsNight,
+    Cloudy,
+}
+
+/**
+ * Chooses one calm, meaningful visual when several forecast thresholds are active.
+ * Rain takes priority because it changes preparation, followed by heat and humidity.
+ */
+internal fun primaryPrayerWeatherVisual(summary: String?): PrayerWeatherVisual? {
+    if (summary.isNullOrBlank()) return null
+    return when {
+        summary.contains("rain", ignoreCase = true) -> PrayerWeatherVisual.Rain
+        summary.contains("hot", ignoreCase = true) || '°' in summary -> PrayerWeatherVisual.Heat
+        summary.contains("humidity", ignoreCase = true) -> PrayerWeatherVisual.Humidity
+        else -> null
+    }
+}
+
+internal fun temperatureThresholdLevel(
+    value: Double,
+    threshold: Int,
+): WeatherThresholdLevel = thresholdLevel(value, threshold, severeDelta = 5)
+
+internal fun humidityThresholdLevel(
+    value: Int,
+    threshold: Int,
+): WeatherThresholdLevel = thresholdLevel(value.toDouble(), threshold, severeDelta = 15)
+
+internal fun rainThresholdLevel(
+    value: Int,
+    threshold: Int,
+): WeatherThresholdLevel = thresholdLevel(value.toDouble(), threshold, severeDelta = 30)
+
+/** Visual feedback for the threshold value currently being edited in settings. */
+internal fun weatherThresholdPreviewLevel(
+    visual: PrayerWeatherVisual,
+    value: Int,
+): WeatherThresholdLevel = when (visual) {
+    PrayerWeatherVisual.Rain -> when {
+        value >= 60 -> WeatherThresholdLevel.Severe
+        value >= 30 -> WeatherThresholdLevel.Alert
+        else -> WeatherThresholdLevel.Normal
+    }
+    PrayerWeatherVisual.Humidity -> when {
+        value >= 75 -> WeatherThresholdLevel.Severe
+        value >= 50 -> WeatherThresholdLevel.Alert
+        else -> WeatherThresholdLevel.Normal
+    }
+    PrayerWeatherVisual.Heat -> when {
+        value >= 38 -> WeatherThresholdLevel.Severe
+        value >= 30 -> WeatherThresholdLevel.Alert
+        else -> WeatherThresholdLevel.Normal
+    }
+}
+
+internal fun prayerWeatherThresholdLevel(
+    summary: String?,
+    thresholds: PrayerWeatherThresholds,
+): WeatherThresholdLevel {
+    if (summary.isNullOrBlank()) return WeatherThresholdLevel.Normal
+    val conditions = summary.split('·').map(String::trim)
+    return when (primaryPrayerWeatherVisual(summary)) {
+        PrayerWeatherVisual.Rain -> conditions
+            .firstOrNull { it.contains("rain", ignoreCase = true) }
+            ?.firstNumber()
+            ?.let { rainThresholdLevel(it.toInt(), thresholds.rainProbability) }
+        PrayerWeatherVisual.Heat -> conditions
+            .firstOrNull { it.contains("hot", ignoreCase = true) || '°' in it }
+            ?.firstNumber()
+            ?.let { temperatureThresholdLevel(it, thresholds.temperatureCelsius) }
+        PrayerWeatherVisual.Humidity -> conditions
+            .firstOrNull { it.contains("humidity", ignoreCase = true) }
+            ?.firstNumber()
+            ?.let { humidityThresholdLevel(it.toInt(), thresholds.humidity) }
+        null -> null
+    } ?: WeatherThresholdLevel.Normal
+}
+
+private fun thresholdLevel(
+    value: Double,
+    threshold: Int,
+    severeDelta: Int,
+): WeatherThresholdLevel = when {
+    value >= threshold + severeDelta -> WeatherThresholdLevel.Severe
+    value >= threshold -> WeatherThresholdLevel.Alert
+    else -> WeatherThresholdLevel.Normal
+}
+
+private fun String.firstNumber(): Double? = Regex("""\d+(?:\.\d+)?""")
+    .find(this)
+    ?.value
+    ?.toDoubleOrNull()
+
+@Composable
+internal fun AnimatedPrayerWeatherIcon(
+    visual: PrayerWeatherVisual,
+    level: WeatherThresholdLevel = WeatherThresholdLevel.Alert,
+    preferFlat: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val useMonochrome = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val style = when {
+        useMonochrome -> MeteoconStyle.Monochrome
+        preferFlat -> MeteoconStyle.Flat
+        else -> MeteoconStyle.Fill
+    }
+    AnimatedMeteocon(
+        animationResource = visual.animationResource(level, style),
+        monochromeTint = if (useMonochrome) MaterialTheme.colorScheme.onSurface else null,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun AnimatedCurrentWeatherIcon(
+    weather: CurrentWeather,
+    modifier: Modifier = Modifier,
+) {
+    val useMonochrome = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    AnimatedMeteocon(
+        animationResource = weather.currentWeatherVisual().animationResource(
+            if (useMonochrome) MeteoconStyle.Monochrome else MeteoconStyle.Fill,
+        ),
+        monochromeTint = if (useMonochrome) MaterialTheme.colorScheme.onSurface else null,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun AnimatedMeteocon(
+    @RawRes animationResource: Int,
+    monochromeTint: ComposeColor?,
+    modifier: Modifier,
+) {
+    val context = LocalContext.current
+    val animationsEnabled = remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+    val composition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(animationResource),
+    )
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        isPlaying = animationsEnabled,
+        iterations = LottieConstants.IterateForever,
+        speed = 0.72f,
+        restartOnPlay = false,
+    )
+
+    if (monochromeTint != null) {
+        val dynamicProperties = rememberLottieDynamicProperties(
+            rememberLottieDynamicProperty(
+                property = LottieProperty.COLOR_FILTER,
+                value = SimpleColorFilter(monochromeTint.toArgb()),
+                keyPath = arrayOf("**"),
+            ),
+        )
+        LottieAnimation(
+            composition = composition,
+            progress = { if (animationsEnabled) progress else 0.45f },
+            modifier = modifier,
+            dynamicProperties = dynamicProperties,
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        LottieAnimation(
+            composition = composition,
+            progress = { if (animationsEnabled) progress else 0.45f },
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@RawRes
+internal fun PrayerWeatherVisual.animationResource(
+    level: WeatherThresholdLevel = WeatherThresholdLevel.Alert,
+    style: MeteoconStyle = MeteoconStyle.Flat,
+): Int = when (style) {
+    MeteoconStyle.Monochrome -> when (this) {
+        PrayerWeatherVisual.Rain -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_mono_raindrop
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_mono_rain
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_mono_extreme_rain
+        }
+        PrayerWeatherVisual.Heat -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_mono_thermometer
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_mono_thermometer_warmer
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_mono_thermometer_sun
+        }
+        PrayerWeatherVisual.Humidity -> when (level) {
+            WeatherThresholdLevel.Normal,
+            WeatherThresholdLevel.Alert,
+            -> R.raw.meteocon_mono_raindrop_measure
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_mono_humidity
+        }
+    }
+    MeteoconStyle.Fill -> when (this) {
+        PrayerWeatherVisual.Rain -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_fill_raindrop
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_fill_rain
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_fill_extreme_rain
+        }
+        PrayerWeatherVisual.Heat -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_fill_thermometer
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_fill_thermometer_warmer
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_fill_thermometer_sun
+        }
+        PrayerWeatherVisual.Humidity -> when (level) {
+            WeatherThresholdLevel.Normal,
+            WeatherThresholdLevel.Alert,
+            -> R.raw.meteocon_fill_raindrop_measure
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_fill_humidity
+        }
+    }
+    MeteoconStyle.Flat -> when (this) {
+        PrayerWeatherVisual.Rain -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_raindrop
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_rain
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_extreme_rain
+        }
+        PrayerWeatherVisual.Heat -> when (level) {
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_thermometer
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_thermometer_warmer
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_thermometer_sun
+        }
+        PrayerWeatherVisual.Humidity -> when (level) {
+            // The measuring-drop artwork is deliberately used for the everyday
+            // humidity states so it cannot be mistaken for the rain droplet beside it.
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_raindrop_measure
+            WeatherThresholdLevel.Alert -> R.raw.meteocon_raindrop_measure
+            WeatherThresholdLevel.Severe -> R.raw.meteocon_humidity
+        }
+    }
+}
+
+private fun CurrentWeather.currentWeatherVisual(): CurrentWeatherVisual = when (weatherCode) {
+    0 -> if (isDay) CurrentWeatherVisual.ClearDay else CurrentWeatherVisual.ClearNight
+    1, 2 -> if (isDay) {
+        CurrentWeatherVisual.PartlyCloudyDay
+    } else {
+        CurrentWeatherVisual.PartlyCloudyNight
+    }
+    3 -> if (isDay) CurrentWeatherVisual.OvercastDay else CurrentWeatherVisual.OvercastNight
+    45, 48 -> if (isDay) CurrentWeatherVisual.FogDay else CurrentWeatherVisual.FogNight
+    in 51..57 -> CurrentWeatherVisual.Drizzle
+    in 61..67, in 80..82 -> CurrentWeatherVisual.Rain
+    in 71..77, 85, 86 -> CurrentWeatherVisual.Snow
+    in 95..99 -> if (isDay) {
+        CurrentWeatherVisual.ThunderstormsDay
+    } else {
+        CurrentWeatherVisual.ThunderstormsNight
+    }
+    else -> CurrentWeatherVisual.Cloudy
+}
+
+@RawRes
+private fun CurrentWeatherVisual.animationResource(style: MeteoconStyle): Int =
+    when (style) {
+        MeteoconStyle.Monochrome -> when (this) {
+        CurrentWeatherVisual.ClearDay -> R.raw.meteocon_mono_clear_day
+        CurrentWeatherVisual.ClearNight -> R.raw.meteocon_mono_clear_night
+        CurrentWeatherVisual.PartlyCloudyDay -> R.raw.meteocon_mono_partly_cloudy_day
+        CurrentWeatherVisual.PartlyCloudyNight -> R.raw.meteocon_mono_partly_cloudy_night
+        CurrentWeatherVisual.OvercastDay -> R.raw.meteocon_mono_overcast_day
+        CurrentWeatherVisual.OvercastNight -> R.raw.meteocon_mono_overcast_night
+        CurrentWeatherVisual.FogDay -> R.raw.meteocon_mono_fog_day
+        CurrentWeatherVisual.FogNight -> R.raw.meteocon_mono_fog_night
+        CurrentWeatherVisual.Drizzle -> R.raw.meteocon_mono_drizzle
+        CurrentWeatherVisual.Rain -> R.raw.meteocon_mono_rain
+        CurrentWeatherVisual.Snow -> R.raw.meteocon_mono_snow
+        CurrentWeatherVisual.ThunderstormsDay -> R.raw.meteocon_mono_thunderstorms_day
+        CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_mono_thunderstorms_night
+        CurrentWeatherVisual.Cloudy -> R.raw.meteocon_mono_cloudy
+        }
+        MeteoconStyle.Fill -> when (this) {
+            CurrentWeatherVisual.ClearDay -> R.raw.meteocon_fill_clear_day
+            CurrentWeatherVisual.ClearNight -> R.raw.meteocon_fill_clear_night
+            CurrentWeatherVisual.PartlyCloudyDay -> R.raw.meteocon_fill_partly_cloudy_day
+            CurrentWeatherVisual.PartlyCloudyNight -> R.raw.meteocon_fill_partly_cloudy_night
+            CurrentWeatherVisual.OvercastDay -> R.raw.meteocon_fill_overcast_day
+            CurrentWeatherVisual.OvercastNight -> R.raw.meteocon_fill_overcast_night
+            CurrentWeatherVisual.FogDay -> R.raw.meteocon_fill_fog_day
+            CurrentWeatherVisual.FogNight -> R.raw.meteocon_fill_fog_night
+            CurrentWeatherVisual.Drizzle -> R.raw.meteocon_fill_drizzle
+            CurrentWeatherVisual.Rain -> R.raw.meteocon_fill_rain
+            CurrentWeatherVisual.Snow -> R.raw.meteocon_fill_snow
+            CurrentWeatherVisual.ThunderstormsDay -> R.raw.meteocon_fill_thunderstorms_day
+            CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_fill_thunderstorms_night
+            CurrentWeatherVisual.Cloudy -> R.raw.meteocon_fill_cloudy
+        }
+        MeteoconStyle.Flat -> when (this) {
+            CurrentWeatherVisual.ClearDay -> R.raw.meteocon_clear_day
+            CurrentWeatherVisual.ClearNight -> R.raw.meteocon_clear_night
+            CurrentWeatherVisual.PartlyCloudyDay -> R.raw.meteocon_partly_cloudy_day
+            CurrentWeatherVisual.PartlyCloudyNight -> R.raw.meteocon_partly_cloudy_night
+            CurrentWeatherVisual.OvercastDay -> R.raw.meteocon_overcast_day
+            CurrentWeatherVisual.OvercastNight -> R.raw.meteocon_overcast_night
+            CurrentWeatherVisual.FogDay -> R.raw.meteocon_fog_day
+            CurrentWeatherVisual.FogNight -> R.raw.meteocon_fog_night
+            CurrentWeatherVisual.Drizzle -> R.raw.meteocon_drizzle
+            CurrentWeatherVisual.Rain -> R.raw.meteocon_rain
+            CurrentWeatherVisual.Snow -> R.raw.meteocon_snow
+            CurrentWeatherVisual.ThunderstormsDay -> R.raw.meteocon_thunderstorms_day
+            CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_thunderstorms_night
+            CurrentWeatherVisual.Cloudy -> R.raw.meteocon_cloudy
+        }
+}
+
+private val notificationIconCache = ConcurrentHashMap<String, Bitmap>()
+
+/**
+ * System notifications cannot host a running Lottie composition. Render one exact monochrome
+ * Meteocon frame and invert it to a white-on-transparent system glyph. Pixel lock-screen and
+ * notification cards can use a dark surface even when the app reports a light configuration,
+ * so app theme detection is not reliable for this system-owned surface.
+ */
+internal fun prayerWeatherNotificationBitmap(
+    context: Context,
+    summary: String?,
+): Bitmap? {
+    val visual = primaryPrayerWeatherVisual(summary) ?: return null
+    val level = prayerWeatherThresholdLevel(
+        summary = summary,
+        thresholds = PrayerWeatherThresholdStore.load(context),
+    )
+    val sizePx = (48f * context.resources.displayMetrics.density).roundToInt().coerceAtLeast(1)
+    val cacheKey = "${visual.name}:${level.name}:monochrome-white:$sizePx"
+    return notificationIconCache[cacheKey] ?: run {
+        val composition = LottieCompositionFactory
+            .fromRawResSync(
+                context,
+                visual.animationResource(level, MeteoconStyle.Monochrome),
+            )
+            .value
+            ?: return null
+        val sourceBitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        LottieDrawable().apply {
+            setComposition(composition)
+            setBounds(0, 0, sizePx, sizePx)
+            progress = 0.45f
+            draw(Canvas(sourceBitmap))
+        }
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val whiteGlyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            colorFilter = ColorMatrixColorFilter(
+                floatArrayOf(
+                    -1f, 0f, 0f, 0f, 255f,
+                    0f, -1f, 0f, 0f, 255f,
+                    0f, 0f, -1f, 0f, 255f,
+                    0f, 0f, 0f, 1f, 0f,
+                ),
+            )
+        }
+        Canvas(bitmap).drawBitmap(sourceBitmap, 0f, 0f, whiteGlyphPaint)
+        sourceBitmap.recycle()
+        notificationIconCache.putIfAbsent(cacheKey, bitmap) ?: bitmap
+    }
+}
+
+/**
+ * A compiled, high-contrast Meteocon for the Live Update progress tracker.
+ *
+ * The notification small icon remains [R.drawable.ic_prayer], so the status chip keeps the
+ * prayer identity. A white tint keeps the tracker legible on Pixel's black AOD surface.
+ */
+internal fun prayerWeatherNotificationTrackerIcon(
+    context: Context,
+    summary: String?,
+): IconCompat {
+    val weatherResource = prayerWeatherNotificationTrackerResource(summary)
+    return IconCompat.createWithResource(context, weatherResource ?: R.drawable.ic_prayer).apply {
+        if (weatherResource != null) setTint(Color.WHITE)
+    }
+}
+
+@DrawableRes
+private fun prayerWeatherNotificationTrackerResource(summary: String?): Int? =
+    when (primaryPrayerWeatherVisual(summary)) {
+        PrayerWeatherVisual.Rain -> R.drawable.ic_notif_weather_rain
+        PrayerWeatherVisual.Heat -> R.drawable.ic_notif_weather_heat
+        PrayerWeatherVisual.Humidity -> R.drawable.ic_notif_weather_humidity
+        null -> null
+    }

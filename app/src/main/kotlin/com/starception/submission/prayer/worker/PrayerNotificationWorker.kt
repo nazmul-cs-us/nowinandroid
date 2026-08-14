@@ -18,6 +18,7 @@ import android.net.Uri
 import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -175,7 +176,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
         )
 
         // Create large icon from app launcher icon
-        val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
+        val largeIcon = prayerWeatherNotificationBitmap(
+            context = applicationContext,
+            summary = weatherInsight?.summary,
+        ) ?: ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
         // Get the URI for the adhan sound
         val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
@@ -253,7 +257,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
         )
 
         // Create large icon from app launcher icon
-        val largeIcon = ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
+        val largeIcon = prayerWeatherNotificationBitmap(
+            context = applicationContext,
+            summary = weatherInsight?.summary,
+        ) ?: ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
         val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
             .setContentTitle("$displayName in $priorMinutes min")

@@ -23,6 +23,7 @@ private const val BRAND_GUIDELINES_URL = "https://developer.android.com/distribu
 private const val FEEDBACK_URL = "https://goo.gle/nia-app-feedback"
 private const val FLATICON_URL = "https://www.flaticon.com/uicons"
 private const val OPEN_METEO_URL = "https://open-meteo.com/"
+private const val METEOCONS_URL = "https://meteocons.com/"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -55,7 +56,8 @@ fun AboutSection(
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "Interface, location, and weather PNG icons by Flaticon creators. Weather data by Open-Meteo.",
+            text = "Interface, location, and weather PNG icons by Flaticon creators. " +
+                "Animated weather icons by Meteocons. Weather data by Open-Meteo.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -105,6 +107,12 @@ fun AboutSection(
                 onClick = { uriHandler.openUri(OPEN_METEO_URL) }
             ) {
                 Text(text = "Weather by Open-Meteo")
+            }
+
+            TextButton(
+                onClick = { uriHandler.openUri(METEOCONS_URL) }
+            ) {
+                Text(text = "Animations by Meteocons")
             }
         }
     }

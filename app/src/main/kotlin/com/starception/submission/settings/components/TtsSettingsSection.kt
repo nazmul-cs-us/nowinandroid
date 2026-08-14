@@ -64,6 +64,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.ui.FlaticonIcon
@@ -174,12 +175,12 @@ fun TtsSettingsSection(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Voice model selection section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Voice Model",
+                text = "Voice",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
@@ -219,7 +220,7 @@ fun TtsSettingsSection(
             if (state.selectedVoice.isMultiSpeaker) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Speaker Voice",
+                        text = "Speaker",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary
@@ -239,19 +240,34 @@ fun TtsSettingsSection(
             // Test TTS section
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Test Voice Output",
+                    text = "Preview",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                ModernTtsTestCard(
-                    testState = state.testState,
-                    testError = state.testError,
-                    amplitude = state.amplitude,
-                    onTestTts = onTestTts,
-                    onStopTts = onStopTts
+                TtsVoicePreviewButton(
+                    isPreparing = state.testState == TtsTestState.INITIALIZING,
+                    isPlaying = state.testState == TtsTestState.SPEAKING,
+                    isVoiceAvailable = !state.needsDownload,
+                    onClick = {
+                        if (
+                            state.testState == TtsTestState.INITIALIZING ||
+                            state.testState == TtsTestState.SPEAKING
+                        ) {
+                            onStopTts()
+                        } else {
+                            onTestTts()
+                        }
+                    },
                 )
+                if (state.testState == TtsTestState.ERROR && state.testError != null) {
+                    Text(
+                        text = state.testError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }
@@ -287,7 +303,7 @@ private fun ModernVoiceCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .border(
-                width = 2.dp,
+                width = 1.dp,
                 color = borderColor,
                 shape = RoundedCornerShape(16.dp)
             )
@@ -302,25 +318,20 @@ private fun ModernVoiceCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Icon with gradient background
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(
-                        brush = Brush.linearGradient(
-                            colors = if (isSelected) listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                            ) else listOf(
-                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
-                        )
+                        if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -331,63 +342,37 @@ private fun ModernVoiceCard(
                         MaterialTheme.colorScheme.onPrimary
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                 )
             }
 
-            // Text content
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = voice.displayName,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                    // Speaker count badge
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer
-                    ) {
-                        Text(
-                            text = "${voice.totalSpeakers} voices",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = voice.description,
+                    text = voice.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+                Text(
+                    text = "${voice.totalSpeakers} voices · ${voice.description}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            // Selection indicator
             if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    FlaticonIcon(
-                        glyph = FlaticonIcons.CHECK,
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 16.sp,
-                    )
-                }
+                FlaticonIcon(
+                    glyph = FlaticonIcons.CHECK,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    fontSize = 20.sp,
+                )
             }
         }
     }
@@ -412,28 +397,32 @@ private fun ModernSpeakerSelector(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Header with chevron navigation
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Select Speaker",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Column {
+                    Text(
+                        text = "Speaker ${selectedSpeaker + 1}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "${selectedSpeaker + 1} of $totalSpeakers voices",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-                // Navigation row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Previous button
                     Surface(
                         modifier = Modifier
                             .size(32.dp)
@@ -466,21 +455,6 @@ private fun ModernSpeakerSelector(
                         }
                     }
 
-                    // Speaker badge
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Text(
-                            text = "Speaker ${selectedSpeaker + 1}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-
-                    // Next button
                     Surface(
                         modifier = Modifier
                             .size(32.dp)
@@ -515,7 +489,6 @@ private fun ModernSpeakerSelector(
                 }
             }
 
-            // Slider
             Slider(
                 value = selectedSpeaker.toFloat(),
                 onValueChange = { newValue ->
@@ -535,188 +508,6 @@ private fun ModernSpeakerSelector(
                 )
             )
 
-            // Range labels
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "1",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "$totalSpeakers",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/**
- * Mirrored waveform visualization for TTS - bars extend up and down from center
- * Responds to real audio amplitude, with fallback animation when no amplitude data
- */
-@Composable
-private fun EqualizerVisualization(
-    amplitude: Float,  // 0.0 to 1.0 based on actual audio
-    isPlaying: Boolean = false,  // Fallback for when no amplitude data
-    modifier: Modifier = Modifier
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val numBars = 50
-
-    // Pre-calculated random offsets for natural variation
-    val barOffsets = remember {
-        val random = Random(42)
-        List(numBars) { index ->
-            // Create natural variation pattern
-            val edgeFactor = 1f - kotlin.math.abs(index - numBars / 2f) / (numBars / 2f)
-            val randomVariation = 0.4f + random.nextFloat() * 0.6f
-            Pair(edgeFactor, randomVariation)
-        }
-    }
-
-    // Fallback animation when playing but no amplitude
-    val infiniteTransition = rememberInfiniteTransition(label = "waveformFallback")
-    val animPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "animPhase"
-    )
-
-    // Smooth the amplitude for visual appeal
-    val smoothedAmplitude by animateFloatAsState(
-        targetValue = amplitude,
-        animationSpec = tween(durationMillis = 50, easing = LinearEasing),
-        label = "smoothAmplitude"
-    )
-
-    Canvas(modifier = modifier.fillMaxSize()) {
-        val centerY = size.height / 2
-        val barWidth = size.width / (numBars * 1.6f)
-        val gap = (size.width - barWidth * numBars) / (numBars + 1)
-        val maxBarHeight = size.height * 0.45f
-        val minBarHeight = size.height * 0.03f
-        val cornerRadius = barWidth / 2
-
-        val hasAmplitude = smoothedAmplitude > 0.01f
-        val isActive = hasAmplitude || isPlaying
-
-        for (i in 0 until numBars) {
-            val x = gap + i * (barWidth + gap)
-            val (edgeFactor, randomVariation) = barOffsets[i]
-            val normalizedPos = i.toFloat() / numBars
-
-            val heightMultiplier = when {
-                hasAmplitude -> {
-                    // Use real amplitude data
-                    val baseHeight = smoothedAmplitude * edgeFactor * randomVariation
-                    (0.1f + baseHeight * 0.9f).coerceIn(0.05f, 1f)
-                }
-                isPlaying -> {
-                    // Fallback animated wave when playing without amplitude
-                    val wave1 = sin(normalizedPos * PI.toFloat() * 3 + animPhase)
-                    val wave2 = sin(normalizedPos * PI.toFloat() * 5 + animPhase * 1.3f) * 0.4f
-                    ((wave1 + wave2 + 1.4f) / 2.8f * edgeFactor * randomVariation).coerceIn(0.1f, 0.9f)
-                }
-                else -> {
-                    // Static idle pattern
-                    (edgeFactor * randomVariation * 0.5f).coerceIn(0.08f, 0.5f)
-                }
-            }
-
-            val halfBarHeight = (minBarHeight + (maxBarHeight - minBarHeight) * heightMultiplier)
-                .coerceIn(minBarHeight, maxBarHeight)
-
-            val barAlpha = if (isActive) 0.85f else 0.5f
-
-            // Draw mirrored bar (extends both up and down from center)
-            drawRoundRect(
-                color = primaryColor.copy(alpha = barAlpha),
-                topLeft = Offset(x, centerY - halfBarHeight),
-                size = androidx.compose.ui.geometry.Size(barWidth, halfBarHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
-            )
-
-            drawRoundRect(
-                color = primaryColor.copy(alpha = barAlpha),
-                topLeft = Offset(x, centerY),
-                size = androidx.compose.ui.geometry.Size(barWidth, halfBarHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModernTtsTestCard(
-    testState: TtsTestState,
-    testError: String?,
-    amplitude: Float,
-    onTestTts: () -> Unit,
-    onStopTts: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isActive = testState == TtsTestState.INITIALIZING || testState == TtsTestState.SPEAKING
-    val haptic = LocalHapticFeedback.current
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary)
-            ) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (isActive) onStopTts() else onTestTts()
-            },
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Play/Pause button
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                FlaticonIcon(
-                    glyph = if (isActive) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
-                    contentDescription = if (isActive) "Stop" else "Play",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    fontSize = 28.sp,
-                )
-            }
-
-            // Waveform visualization - responds to actual audio amplitude
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                EqualizerVisualization(
-                    amplitude = amplitude,
-                    isPlaying = isActive,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
         }
     }
 }

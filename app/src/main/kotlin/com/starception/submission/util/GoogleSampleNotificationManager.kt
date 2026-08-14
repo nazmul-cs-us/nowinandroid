@@ -36,6 +36,8 @@ import androidx.core.graphics.drawable.IconCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationTrackerIcon
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -340,7 +342,7 @@ object GoogleSampleNotificationManager {
      * @return The built Notification object ready for startForeground()
      */
     @RequiresApi(35) // Android 16+ (BAKLAVA = 35)
-    fun buildPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "", nextPrayerCountdown: String = ""): android.app.Notification {
+    fun buildPrayerNotification(title: String, content: String, detailedMessage: String = "", progress: Int, prayerPhase: String = "", prayerName: String = "", prayerTime: String = "", nextPrayerCountdown: String = "", weatherSummary: String = ""): android.app.Notification {
         android.util.Log.d("GoogleSampleNotificationManager", "Building Progress-Centric prayer notification (for startForeground)...")
         
         // Store current prayer information for action buttons
@@ -415,10 +417,6 @@ object GoogleSampleNotificationManager {
         val graySegmentColor = Color.valueOf(189f / 255f, 189f / 255f, 189f / 255f, 1f).toArgb()    // Gray - Pending/Inactive
         
         // Define distinct milestone colors for clear visual hierarchy
-        val mosquePhaseColor = Color.valueOf(46f / 255f, 125f / 255f, 50f / 255f, 1f).toArgb()    // Green for Go to Mosque
-        val bestTimeColor = Color.valueOf(255f / 255f, 193f / 255f, 7f / 255f, 1f).toArgb()        // Amber for Best Time
-        val makeTimeColor = Color.valueOf(244f / 255f, 67f / 255f, 54f / 255f, 1f).toArgb()        // Red for Make Time
-        
         // Android 16 Progress-Centric: Fixed segment colors for prayer urgency progression
         // Each segment always has its designated color: Green → Yellow → Red
         val segments = listOf(
@@ -427,18 +425,14 @@ object GoogleSampleNotificationManager {
             ProgressStyle.Segment(40).setColor(redSegmentColor)       // Segment 3: Make Time (Red)
         )
 
-        // Android 16 Progress-Centric: Create meaningful progress points with proper milestone colors
-        // Tracker positioned at exact progress point (no icon on tracker)
+        // The colored segments already communicate each phase boundary. Extra milestone points can
+        // cover the weather tracker when progress is near 20% or 60%, especially on AOD.
         val progressStyle = NotificationCompat.ProgressStyle()
-            .setProgressPoints(
-                listOf(
-                    ProgressStyle.Point(20).setColor(mosquePhaseColor),   // Go to Mosque milestone (0-20%)
-                    ProgressStyle.Point(60).setColor(bestTimeColor),     // Best Time milestone (20-60%)
-                    ProgressStyle.Point(100).setColor(makeTimeColor)     // Make Time milestone (60-100%)
-                )
-            )
             .setProgressSegments(segments)  // Dynamic segment coloring
             .setProgress(progress)  // Tracker positioned at exact progress point
+            .setProgressTrackerIcon(
+                prayerWeatherNotificationTrackerIcon(appContext, weatherSummary),
+            )
         
         val phaseName = when (newPhase) {
             0 -> "Go to Mosque"
@@ -545,7 +539,10 @@ object GoogleSampleNotificationManager {
         }
 
         // Get activity icon for notification large icon (top right corner)
-        val activityIconBitmap = getActivityIconBitmap()
+        val activityIconBitmap = prayerWeatherNotificationBitmap(
+            context = appContext,
+            summary = weatherSummary,
+        ) ?: getActivityIconBitmap()
 
         // Create PendingIntent to open app when notification is tapped
         val openAppIntent = Intent(appContext, MainActivity::class.java).apply {

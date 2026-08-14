@@ -277,27 +277,22 @@ fun PullToSyncContainer(
     val targetHoldFraction =
         (targetHoldHeightDp.value / maxRevealDpForBanners).coerceIn(0f, 1f)
 
-    // Animatable keeps the page attached to the banner as rows appear/disappear.
-    // Sync/download preparation still snaps immediately to avoid a one-frame gap.
+    // Keep the page, banner, and responsive Insights sizing on one continuous
+    // progress value. Opening used to snap for sync/download/TTS, while closing
+    // used a spring; that discontinuity made the large cards visibly jump. Key
+    // this only to the requested height as well, so swapping one status for
+    // another at the same height does not cancel and restart the transition.
     val refreshingOffset = remember { Animatable(0f) }
-    LaunchedEffect(targetHoldFraction, isRefreshing, isDownloading, isTtsPreparing, mediaState.isVisible) {
-        val snapToHold = !mediaState.isVisible &&
-            (isRefreshing || isDownloading || isTtsPreparing)
-        if (snapToHold) {
-            refreshingOffset.snapTo(targetHoldFraction)
-        } else {
-            refreshingOffset.animateTo(
-                targetValue = targetHoldFraction,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = if (targetHoldFraction == 0f) {
-                        Spring.StiffnessMedium
-                    } else {
-                        Spring.StiffnessMediumLow
-                    },
-                ),
-            )
-        }
+    LaunchedEffect(targetHoldFraction) {
+        refreshingOffset.animateTo(
+            targetValue = targetHoldFraction,
+            animationSpec = spring(
+                // A nearly critical spring keeps its velocity when the banner
+                // changes direction, but settles cleanly without a visible bounce.
+                dampingRatio = 0.92f,
+                stiffness = 260f,
+            ),
+        )
     }
 
     // Animated download progress for smooth horizontal fill

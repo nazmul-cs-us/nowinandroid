@@ -170,9 +170,13 @@ import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherInsight
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
+import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherThresholdLevel
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
@@ -1303,7 +1307,16 @@ fun SwipeableBigTiles(
     }
     val (_, totalPrayers) = getPrayerProgress()
     val prayedCount = getPrayed().coerceIn(0, totalPrayers)
-    val prayerRecap = remember(prayedPrayers, currentTime) {
+    val prayerRecap = remember(prayedPrayers, currentTime, prayerTimes) {
+        val prayerStartTimes = prayerTimes?.let { times ->
+            mapOf(
+                "Fajr" to times.fajr,
+                "Dhuhr" to times.dhuhr,
+                "Asr" to times.asr,
+                "Maghrib" to times.maghrib,
+                "Isha" to times.isha,
+            )
+        }.orEmpty()
         listOf(
             "Fajr" to "F",
             "Dhuhr" to "D",
@@ -1315,6 +1328,9 @@ fun SwipeableBigTiles(
                 name = name,
                 initial = initial,
                 isPrayed = name in prayedPrayers,
+                isAvailable = prayerStartTimes[name]?.let { prayerTime ->
+                    !currentTime.isBefore(prayerTime)
+                } ?: false,
             )
         }
     }
@@ -1534,18 +1550,20 @@ fun SwipeableBigTiles(
                             title = prayerPrediction?.title ?: prayerTitle,
                             supportingText = prayerPrediction?.content
                                 ?: getTimeUntilNextPrayer().takeIf { it.isNotBlank() },
-                            footerText = prayerPrediction?.nextPrayerInfo
+                            statusText = prayerPrediction?.nextPrayerInfo
                                 .orEmpty()
                                 .let { nextPrayerInfo ->
-                                    listOfNotNull(
-                                        nextPrayerInfo.takeIf { it.isNotBlank() }
-                                            ?: listOf(nextPrayerName, nextPrayerTime)
-                                                .filter { it.isNotBlank() }
-                                                .joinToString(" · ")
-                                                .takeIf { it.isNotBlank() },
-                                        prayerWeatherInsight?.tileText,
-                                    ).joinToString("\n")
+                                    nextPrayerInfo.takeIf { it.isNotBlank() }
+                                        ?: listOf(nextPrayerName, nextPrayerTime)
+                                            .filter { it.isNotBlank() }
+                                            .joinToString(" · ")
+                                            .takeIf { it.isNotBlank() }
                                 },
+                            // Keep every threshold condition. Taking only the text
+                            // after the last separator dropped humidity whenever a
+                            // later condition (usually heat) was also active.
+                            statusMetaText = prayerWeatherInsight?.summary,
+                            weatherThresholds = weatherThresholds,
                             backgroundPainterRes = R.drawable.insight_salah,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
@@ -1562,30 +1580,47 @@ fun SwipeableBigTiles(
 
                         1 -> InsightPreviewCard(
                             label = "Today's salah",
-                            title = "$prayedCount of $totalPrayers complete",
-                            supportingText = when {
-                                prayersRemaining == 0 -> "All prayers marked for today"
-                                nextUnmarkedPrayer != null -> "$prayersRemaining remaining · Next $nextUnmarkedPrayer"
-                                else -> "$prayersRemaining remaining"
+                            title = when {
+                                prayedCount == totalPrayers -> "All prayers complete"
+                                prayedCount == 1 -> "1 prayer complete"
+                                else -> "$prayedCount prayers complete"
                             },
-                            footerText = "Completed prayers stay highlighted",
+                            supportingText = when {
+                                prayersRemaining == 0 -> "All five marked for today"
+                                prayersRemaining == 1 && nextUnmarkedPrayer != null ->
+                                    "$nextUnmarkedPrayer remains today"
+                                nextUnmarkedPrayer != null ->
+                                    "$prayersRemaining remain · $nextUnmarkedPrayer is next"
+                                else -> "$prayersRemaining prayers remain today"
+                            },
                             backgroundPainterRes = R.drawable.insight_prayer,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
                             ambientProgress = autoAdvanceProgress.value,
                             prayerRecap = prayerRecap,
                             onPrayerToggle = { prayerName ->
-                                interactionEpoch++
-                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                onTogglePrayer(prayerName)
-                                pendingPrayerUndo = PrayerUndoState(prayerName)
+                                prayerRecap.firstOrNull { it.name == prayerName }?.let { prayer ->
+                                    if (prayer.isAvailable || prayer.isPrayed) {
+                                        interactionEpoch++
+                                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                        onTogglePrayer(prayerName)
+                                        pendingPrayerUndo = if (prayer.isAvailable) {
+                                            PrayerUndoState(prayerName)
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                }
                             },
                             undoPrayerName = pendingPrayerUndo?.prayerName,
                             onPrayerUndo = {
                                 pendingPrayerUndo?.let { undo ->
-                                    interactionEpoch++
-                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    onTogglePrayer(undo.prayerName)
+                                    val prayer = prayerRecap.firstOrNull { it.name == undo.prayerName }
+                                    if (prayer?.isAvailable == true) {
+                                        interactionEpoch++
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        onTogglePrayer(undo.prayerName)
+                                    }
                                     pendingPrayerUndo = null
                                 }
                             },
@@ -1870,6 +1905,7 @@ private data class PrayerRecapIndicator(
     val name: String,
     val initial: String,
     val isPrayed: Boolean,
+    val isAvailable: Boolean,
 )
 
 /**
@@ -1928,6 +1964,74 @@ private data class ContinuousCornerShape(
     }
 }
 
+/** Converts threshold warnings into a compact, value-first forecast line. */
+internal fun formatPrayerForecastMetrics(summary: String?): String? {
+    val conditions = summary
+        ?.split('·')
+        ?.map(String::trim)
+        ?.filter(String::isNotBlank)
+        .orEmpty()
+    if (conditions.isEmpty()) return null
+
+    fun percentage(condition: String): String? = condition
+        .split(' ')
+        .firstOrNull { token -> token.trimEnd(',', '.').endsWith('%') }
+        ?.trimEnd(',', '.')
+
+    val temperature = conditions
+        .asSequence()
+        .flatMap { it.split(' ').asSequence() }
+        .firstOrNull { '°' in it }
+        ?.trimEnd(',', '.')
+    val humidity = conditions
+        .firstOrNull { it.contains("humidity", ignoreCase = true) }
+        ?.let(::percentage)
+        ?.let { "$it RH" }
+    val rain = conditions
+        .firstOrNull { it.contains("rain", ignoreCase = true) }
+        ?.let(::percentage)
+        ?.let { "$it rain" }
+
+    return listOfNotNull(temperature, humidity, rain)
+        .distinct()
+        .joinToString(" · ")
+        .takeIf(String::isNotBlank)
+}
+
+/**
+ * Returns the single most actionable forecast value for space-constrained cards.
+ * The animated icon supplies the condition, so repeating "rain" or "RH" here
+ * would spend width without adding meaning.
+ */
+internal fun formatPrimaryPrayerForecastMetric(summary: String?): String? {
+    val conditions = summary
+        ?.split('·')
+        ?.map(String::trim)
+        ?.filter(String::isNotBlank)
+        .orEmpty()
+    if (conditions.isEmpty()) return null
+
+    fun percentage(condition: String): String? = condition
+        .split(' ')
+        .firstOrNull { token -> token.trimEnd(',', '.').endsWith('%') }
+        ?.trimEnd(',', '.')
+
+    return when (primaryPrayerWeatherVisual(summary)) {
+        PrayerWeatherVisual.Rain -> conditions
+            .firstOrNull { it.contains("rain", ignoreCase = true) }
+            ?.let(::percentage)
+        PrayerWeatherVisual.Heat -> conditions
+            .asSequence()
+            .flatMap { it.split(' ').asSequence() }
+            .firstOrNull { '°' in it }
+            ?.trimEnd(',', '.')
+        PrayerWeatherVisual.Humidity -> conditions
+            .firstOrNull { it.contains("humidity", ignoreCase = true) }
+            ?.let(::percentage)
+        null -> null
+    }
+}
+
 @Composable
 private fun InsightPreviewCard(
     label: String,
@@ -1937,6 +2041,9 @@ private fun InsightPreviewCard(
     isFocused: Boolean = false,
     ambientProgress: Float = 0f,
     supportingText: String? = null,
+    statusText: String? = null,
+    statusMetaText: String? = null,
+    weatherThresholds: PrayerWeatherThresholds = PrayerWeatherThresholds(),
     footerText: String? = null,
     timelineProgress: Float? = null,
     prayerRecap: List<PrayerRecapIndicator> = emptyList(),
@@ -1954,6 +2061,8 @@ private fun InsightPreviewCard(
     onClick: (() -> Unit)? = null,
 ) {
     val hasPrayerContext = !supportingText.isNullOrBlank() ||
+        !statusText.isNullOrBlank() ||
+        !statusMetaText.isNullOrBlank() ||
         !footerText.isNullOrBlank() ||
         prayerRecap.isNotEmpty()
     val cornerExtent = (26f - (8f * compactProgress)).dp
@@ -2051,9 +2160,12 @@ private fun InsightPreviewCard(
                     ),
             )
 
+            val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null
+            val useCompactReadingHeader = isReadingHeader &&
+                (compactProgress >= 0.08f || maxWidth < 240.dp)
+            val displayLabel = if (useCompactReadingHeader) "Reading" else label
             val showHeaderActions = compactProgress < 0.5f &&
                 (onClick != null || onReadingPlayPause != null || directionalHintBearing != null || onPrayerUndo != null)
-            val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null
 
             Row(
                 modifier = Modifier
@@ -2067,7 +2179,7 @@ private fun InsightPreviewCard(
                     onClick = onClick ?: {},
                 ) {
                     Text(
-                        text = label,
+                        text = displayLabel,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = labelFontSize,
                             letterSpacing = 0.sp,
@@ -2116,7 +2228,7 @@ private fun InsightPreviewCard(
                             shape = CircleShape,
                             color = Color.Black.copy(alpha = 0.42f),
                             shadowElevation = 0.dp,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(if (useCompactReadingHeader) 36.dp else 40.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 when {
@@ -2125,7 +2237,7 @@ private fun InsightPreviewCard(
                                             progress = { readingPlayback.downloadProgress.coerceIn(0.02f, 1f) },
                                             color = Color.White,
                                             strokeWidth = 2.dp,
-                                            modifier = Modifier.size(22.dp),
+                                            modifier = Modifier.size(if (useCompactReadingHeader) 20.dp else 22.dp),
                                         )
                                     }
 
@@ -2133,7 +2245,7 @@ private fun InsightPreviewCard(
                                         CircularProgressIndicator(
                                             color = Color.White,
                                             strokeWidth = 2.dp,
-                                            modifier = Modifier.size(22.dp),
+                                            modifier = Modifier.size(if (useCompactReadingHeader) 20.dp else 22.dp),
                                         )
                                     }
 
@@ -2142,7 +2254,7 @@ private fun InsightPreviewCard(
                                             imageVector = Icons.Default.Refresh,
                                             contentDescription = "Retry daily Surah audio",
                                             tint = Color.White,
-                                            modifier = Modifier.size(20.dp),
+                                            modifier = Modifier.size(if (useCompactReadingHeader) 18.dp else 20.dp),
                                         )
                                     }
 
@@ -2151,7 +2263,7 @@ private fun InsightPreviewCard(
                                             imageVector = Icons.Default.Pause,
                                             contentDescription = "Pause daily Surah",
                                             tint = Color.White,
-                                            modifier = Modifier.size(20.dp),
+                                            modifier = Modifier.size(if (useCompactReadingHeader) 18.dp else 20.dp),
                                         )
                                     }
 
@@ -2160,7 +2272,7 @@ private fun InsightPreviewCard(
                                             imageVector = Icons.Default.PlayArrow,
                                             contentDescription = "Listen to daily Surah",
                                             tint = Color.White,
-                                            modifier = Modifier.size(21.dp),
+                                            modifier = Modifier.size(if (useCompactReadingHeader) 19.dp else 21.dp),
                                         )
                                     }
                                 }
@@ -2200,7 +2312,10 @@ private fun InsightPreviewCard(
                                 )
                             }
                         }
-                    } else if (onClick != null) {
+                    // The reading card itself is the standard "Read" target. Keeping
+                    // a second text button here crowded the header and wrapped during
+                    // pull-to-sync, so reading exposes only its distinct Play action.
+                    } else if (onClick != null && !isReadingHeader) {
                         Surface(
                             modifier = (if (actionLabel != null) {
                                 Modifier.height(40.dp)
@@ -2271,62 +2386,100 @@ private fun InsightPreviewCard(
                         prayerRecap.forEach { prayer ->
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    // Divide the available row evenly instead of
+                                    // reserving five fixed 40dp slots. The fixed
+                                    // widths overflowed when pull-to-sync narrowed
+                                    // the card and visually squeezed the indicators.
+                                    .weight(1f)
+                                    .height(42.dp)
                                     .semantics {
-                                        contentDescription = if (prayer.isPrayed) {
-                                            "${prayer.name} completed. Tap to unmark"
-                                        } else {
-                                            "${prayer.name} not completed. Tap to mark"
+                                        contentDescription = when {
+                                            prayer.isPrayed ->
+                                                "${prayer.name} completed. Tap to unmark"
+                                            prayer.isAvailable ->
+                                                "${prayer.name} not completed. Tap to mark"
+                                            else ->
+                                                "${prayer.name} prayer time has not arrived"
                                         }
                                         selected = prayer.isPrayed
                                     }
                                     .then(
-                                        if (onPrayerToggle != null) {
+                                        if (
+                                            onPrayerToggle != null &&
+                                            (prayer.isAvailable || prayer.isPrayed)
+                                        ) {
                                             Modifier.clickable { onPrayerToggle(prayer.name) }
                                         } else {
                                             Modifier
                                         },
                                     ),
-                                contentAlignment = Alignment.Center,
+                                contentAlignment = Alignment.TopCenter,
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(recapIndicatorSize)
-                                        .background(
-                                            color = if (prayer.isPrayed) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                Color.Black.copy(alpha = 0.28f)
-                                            },
-                                            shape = CircleShape,
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (prayer.isPrayed) {
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                                            } else {
-                                                Color.White.copy(alpha = 0.48f)
-                                            },
-                                            shape = CircleShape,
-                                        ),
-                                    contentAlignment = Alignment.Center,
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(recapIndicatorSize)
+                                            .background(
+                                                color = when {
+                                                    prayer.isPrayed -> MaterialTheme.colorScheme.primary
+                                                    prayer.isAvailable -> Color.Black.copy(alpha = 0.28f)
+                                                    else -> Color.Black.copy(alpha = 0.14f)
+                                                },
+                                                shape = CircleShape,
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = when {
+                                                    prayer.isPrayed ->
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                                    prayer.isAvailable -> Color.White.copy(alpha = 0.48f)
+                                                    else -> Color.White.copy(alpha = 0.24f)
+                                                },
+                                                shape = CircleShape,
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = if (prayer.isPrayed) "✓" else prayer.initial,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = recapFontSize,
+                                                lineHeight = recapFontSize,
+                                                platformStyle = PlatformTextStyle(
+                                                    includeFontPadding = false,
+                                                ),
+                                            ),
+                                            color = when {
+                                                prayer.isPrayed -> MaterialTheme.colorScheme.onPrimary
+                                                prayer.isAvailable -> Color.White.copy(alpha = 0.78f)
+                                                else -> Color.White.copy(alpha = 0.38f)
+                                            },
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                        )
+                                    }
                                     Text(
-                                        text = if (prayer.isPrayed) "✓" else prayer.initial,
+                                        text = prayer.name,
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = recapFontSize,
-                                            lineHeight = recapFontSize,
+                                            fontSize = (8.5f - (1.5f * compactProgress)).sp,
+                                            lineHeight = (9.5f - compactProgress).sp,
+                                            letterSpacing = 0.sp,
                                             platformStyle = PlatformTextStyle(
                                                 includeFontPadding = false,
                                             ),
                                         ),
-                                        color = if (prayer.isPrayed) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            Color.White.copy(alpha = 0.78f)
-                                        },
-                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White.copy(
+                                            alpha = if (prayer.isAvailable || prayer.isPrayed) {
+                                                0.72f
+                                            } else {
+                                                0.40f
+                                            },
+                                        ),
+                                        fontWeight = FontWeight.Medium,
                                         maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -2380,7 +2533,154 @@ private fun InsightPreviewCard(
                     }
                 }
 
-                footerText?.takeIf { it.isNotBlank() }?.let { text ->
+                statusText?.takeIf { it.isNotBlank() }?.let { text ->
+                    val statusDetail = text
+                        .substringAfter('•', text)
+                        .removePrefix("Next")
+                        .trimStart(' ', '·', '•')
+                    val nextPrayerName = statusDetail.substringBefore(" in ").trim()
+                    val nextPrayerCountdown = statusDetail
+                        .substringAfter(" in ", missingDelimiterValue = "")
+                        .trim()
+                    val forecastMetrics = formatPrayerForecastMetrics(statusMetaText)
+                    val forecastVisual = primaryPrayerWeatherVisual(statusMetaText)
+                    val forecastLevel = prayerWeatherThresholdLevel(
+                        summary = statusMetaText,
+                        thresholds = weatherThresholds,
+                    )
+                    val useCompactForecast = nextPrayerName.length > 6 || compactProgress >= 0.08f
+                    val displayedForecastMetrics = if (useCompactForecast) {
+                        formatPrimaryPrayerForecastMetric(statusMetaText)
+                    } else {
+                        forecastMetrics
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            if (useCompactForecast) 6.dp else 10.dp,
+                        ),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1.2f),
+                            verticalArrangement = Arrangement.spacedBy(1.dp),
+                        ) {
+                            Text(
+                                text = "Next prayer",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = (10f - (1.5f * compactProgress)).sp,
+                                    lineHeight = (12f - (2f * compactProgress)).sp,
+                                    letterSpacing = 0.1.sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.72f),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    if (useCompactForecast) 4.dp else 7.dp,
+                                ),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = nextPrayerName,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = footerFontSize,
+                                        lineHeight = footerLineHeight,
+                                        letterSpacing = 0.sp,
+                                    ),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                )
+                                if (nextPrayerCountdown.isNotBlank()) {
+                                    Text(
+                                        text = "in $nextPrayerCountdown",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = (footerFontSize.value - 1f).sp,
+                                            lineHeight = footerLineHeight,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = Color.White.copy(alpha = 0.76f),
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+
+                        if (displayedForecastMetrics != null) {
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height((footerLineHeight.value + 9f).dp)
+                                    .background(Color.White.copy(alpha = 0.22f)),
+                            )
+                            Column(
+                                modifier = Modifier.weight(0.8f),
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(1.dp),
+                            ) {
+                                Text(
+                                    text = if (useCompactForecast) {
+                                        "Forecast"
+                                    } else {
+                                        "$nextPrayerName forecast"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = (10f - (1.5f * compactProgress)).sp,
+                                        lineHeight = (12f - (2f * compactProgress)).sp,
+                                        letterSpacing = 0.1.sp,
+                                    ),
+                                    color = Color.White.copy(alpha = 0.62f),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    forecastVisual?.let { visual ->
+                                        AnimatedPrayerWeatherIcon(
+                                            visual = visual,
+                                            level = forecastLevel,
+                                            preferFlat = true,
+                                            modifier = Modifier.size(
+                                                if (useCompactForecast) 15.dp else 17.dp,
+                                            ),
+                                        )
+                                    }
+                                    Text(
+                                        text = displayedForecastMetrics,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = (
+                                                footerFontSize.value -
+                                                    if (displayedForecastMetrics.length > 13) 1f else 0f
+                                                ).sp,
+                                            lineHeight = footerLineHeight,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                footerText
+                    ?.takeIf {
+                        it.isNotBlank() &&
+                            // The recap explanation is optional context. Reclaim its
+                            // line while pull-to-sync compacts Today's Salah, keeping
+                            // the prayer indicators and remaining-count legible.
+                            !(prayerRecap.isNotEmpty() && compactProgress >= 0.08f)
+                    }
+                    ?.let { text ->
                     Text(
                         text = text,
                         style = MaterialTheme.typography.labelMedium.copy(

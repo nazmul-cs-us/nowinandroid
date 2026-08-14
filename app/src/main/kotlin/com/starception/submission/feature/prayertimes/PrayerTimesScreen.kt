@@ -58,6 +58,8 @@ import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
@@ -236,6 +238,14 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
+import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
+import com.starception.submission.feature.prayertimes.weather.AnimatedCurrentWeatherIcon
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherVisual
+import com.starception.submission.feature.prayertimes.weather.WeatherThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.temperatureThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.humidityThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.rainThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.weatherThresholdPreviewLevel
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
 import androidx.compose.ui.graphics.lerp
@@ -1304,13 +1314,40 @@ fun PrayerTimesScreen(
                     }
                 }
                 val tileColor = if (isDarkTheme) {
-                    MaterialTheme.colorScheme.surfaceContainerLow
+                    // surfaceContainerLow is nearly identical to this screen's
+                    // dark background, which erased the card silhouette. Lift the
+                    // neutral cards one surface step and tint only status cards.
+                    when (prayerStatus) {
+                        "Current" -> lerp(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            MaterialTheme.colorScheme.tertiary,
+                            0.12f,
+                        )
+                        "Next" -> lerp(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            MaterialTheme.colorScheme.primary,
+                            0.10f,
+                        )
+                        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    }
                 } else {
                     when (prayerStatus) {
                         "Current" -> lerp(PrayerReferenceCard, PrayerReferenceRust, 0.12f)
                         "Next" -> lerp(PrayerReferenceCard, PrayerReferenceBlue, 0.11f)
                         else -> PrayerReferenceCard
                     }
+                }
+                val tileBorder = if (isDarkTheme) {
+                    BorderStroke(
+                        width = 1.dp,
+                        color = when (prayerStatus) {
+                            "Current" -> accentColor.copy(alpha = 0.38f)
+                            "Next" -> accentColor.copy(alpha = 0.32f)
+                            else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+                        },
+                    )
+                } else {
+                    null
                 }
                 val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else PrayerReferenceInk
                 val supportingColor = if (isDarkTheme) {
@@ -1321,7 +1358,8 @@ fun PrayerTimesScreen(
                 Surface(
                     shape = RoundedCornerShape(if (compactTile) 20.dp else 28.dp),
                     color = tileColor,
-                    tonalElevation = 0.dp,
+                    border = tileBorder,
+                    tonalElevation = if (isDarkTheme) 1.dp else 0.dp,
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(prayerName, currentOffset, prayerTimeEditMode) {
@@ -1360,7 +1398,7 @@ fun PrayerTimesScreen(
                             .fillMaxSize()
                             .drawBehind {
                                 drawCircle(
-                                    color = accentColor.copy(alpha = if (isDarkTheme) 0.08f else 0.065f),
+                                    color = accentColor.copy(alpha = if (isDarkTheme) 0.13f else 0.065f),
                                     radius = size.minDimension * 0.42f,
                                     center = Offset(size.width * 0.96f, size.height * 0.98f),
                                 )
@@ -1369,14 +1407,18 @@ fun PrayerTimesScreen(
                                 start = if (compactTile) 11.dp else 14.dp,
                                 end = if (compactTile) 11.dp else 14.dp,
                                 top = if (compactTile) 5.dp else 8.dp,
-                                bottom = if (compactTile) 6.dp else 10.dp,
+                                bottom = if (compactTile) 6.dp else 8.dp,
                             ),
-                        verticalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        // Top section: Prayer names with notification bell
+                        // Keep names and time in the same vertical layout. The
+                        // selected Arabic font can paint outside its nominal line
+                        // box, so independently pinning this group and the time to
+                        // opposite Box edges allowed their visible glyphs to cross.
                         Column(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.Start,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            verticalArrangement = Arrangement.spacedBy(1.dp),
                         ) {
                             // Prayer name with notification bell icon
                             Row(
@@ -1410,7 +1452,7 @@ fun PrayerTimesScreen(
                                             onNotificationToggle(!notificationEnabled)
                                             android.util.Log.d("PrayerCard", "🔔 Notification toggled for $prayerName: ${!notificationEnabled}")
                                         },
-                                        modifier = Modifier.size(if (compactTile) 22.dp else 28.dp)
+                                        modifier = Modifier.size(if (compactTile) 22.dp else 24.dp)
                                     ) {
                                         FlaticonIcon(
                                             glyph = if (notificationEnabled) {
@@ -1440,15 +1482,14 @@ fun PrayerTimesScreen(
                             if (!compactTile) {
                                 Text(
                                     text = getPrayerNameInLocalLanguage(prayerName, prayerTimes?.location?.countryCode),
-                                    // The Arabic fonts carry very tall ascent/descent, so an
-                                    // unconstrained line box here eats the 112dp expanded tile's
-                                    // height budget and the time row below gets clipped. Pin the
-                                    // line box like the time text does.
+                                    // PDMS Saleem has tall marks and descenders. A slightly
+                                    // tighter measured line leaves a real visual safety gap
+                                    // above the time without making the Arabic hard to read.
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         fontFamily = getSelectedArabicFontFamily(screenContext),
-                                        fontSize = 16.sp,
+                                        fontSize = 15.sp,
                                         letterSpacing = 0.4.sp,
-                                        lineHeight = 22.sp,
+                                        lineHeight = 20.sp,
                                         platformStyle = PlatformTextStyle(includeFontPadding = false),
                                     ),
                                     color = supportingColor,
@@ -1459,10 +1500,9 @@ fun PrayerTimesScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Bottom section: Time display with separated AM/PM
+                        // Bottom section: Time display with separated AM/PM.
                         Column(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.End,
                             verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
@@ -1814,6 +1854,15 @@ fun PrayerTimesScreen(
                 .coerceAtLeast(0.dp)
                 .coerceAtMost(syncState.heldContentInsetTop)
             val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
+            // The expanded prayer list needs the full bottom clearance as scroll runway.
+            // Reclaiming it while expanded clamps animateScrollBy before the location
+            // tile reaches its intended position above the floating navigation.
+            val effectiveSyncBottomClearanceReclaim =
+                if (showAllPrayers || keepExpansionScrollEnabled) {
+                    0.dp
+                } else {
+                    syncBottomClearanceReclaim
+                }
             val syncContentCompression =
                 (syncState.heldContentInsetTop - syncTopInsetReclaim)
                     .coerceAtLeast(0.dp)
@@ -1923,6 +1972,7 @@ fun PrayerTimesScreen(
                         LandscapeLocationWeatherTile(
                             locationString = location,
                             locationData = prayerTimes?.location,
+                            thresholds = prayerWeatherThresholds,
                             onLongPress = { showWeatherThresholds = true },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -2745,8 +2795,19 @@ fun PrayerTimesScreen(
                         }
 
                         currentWeather?.let { weather ->
-                            val conditionIconRes = weatherIconRes(weather)
                             val conditionLabel = weatherConditionLabel(weather)
+                            val temperatureLevel = temperatureThresholdLevel(
+                                value = weather.temperatureCelsius,
+                                threshold = prayerWeatherThresholds.temperatureCelsius,
+                            )
+                            val humidityLevel = humidityThresholdLevel(
+                                value = weather.relativeHumidity,
+                                threshold = prayerWeatherThresholds.humidity,
+                            )
+                            val rainLevel = rainThresholdLevel(
+                                value = weather.precipitationProbability,
+                                threshold = prayerWeatherThresholds.rainProbability,
+                            )
                             val precipitationLabel = if (weather.precipitationProbability == 0) {
                                 "No rain"
                             } else {
@@ -2773,12 +2834,18 @@ fun PrayerTimesScreen(
                                         color = locationTileContent,
                                         maxLines = 1,
                                     )
-                                    Image(
-                                        painter = painterResource(conditionIconRes),
-                                        contentDescription = conditionLabel,
-                                        contentScale = ContentScale.Fit,
-                                        modifier = Modifier.size(16.dp),
-                                    )
+                                    if (temperatureLevel == WeatherThresholdLevel.Normal) {
+                                        AnimatedCurrentWeatherIcon(
+                                            weather = weather,
+                                            modifier = Modifier.size(26.dp),
+                                        )
+                                    } else {
+                                        AnimatedPrayerWeatherIcon(
+                                            visual = PrayerWeatherVisual.Heat,
+                                            level = temperatureLevel,
+                                            modifier = Modifier.size(26.dp),
+                                        )
+                                    }
                                     Text(
                                         text = "${weather.temperatureCelsius.roundToInt()}°",
                                         style = MaterialTheme.typography.titleMedium.copy(
@@ -2790,16 +2857,49 @@ fun PrayerTimesScreen(
                                         maxLines = 1,
                                     )
                                 }
-                                Text(
-                                    text = "${weather.relativeHumidity}% Humidity · $precipitationLabel",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        letterSpacing = 0.sp,
-                                    ),
-                                    color = locationTileSupporting,
-                                    maxLines = 1,
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    AnimatedPrayerWeatherIcon(
+                                        visual = PrayerWeatherVisual.Humidity,
+                                        level = humidityLevel,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                    Text(
+                                        // The gauge already communicates humidity;
+                                        // keeping only the value makes room for the
+                                        // larger, more legible Meteocon.
+                                        text = "${weather.relativeHumidity}%",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.5.sp,
+                                            lineHeight = 14.sp,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = locationTileSupporting,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        text = "·",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = locationTileSupporting,
+                                    )
+                                    AnimatedPrayerWeatherIcon(
+                                        visual = PrayerWeatherVisual.Rain,
+                                        level = rainLevel,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                    Text(
+                                        text = precipitationLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.5.sp,
+                                            lineHeight = 14.sp,
+                                            letterSpacing = 0.sp,
+                                        ),
+                                        color = locationTileSupporting,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.width(3.dp))
@@ -2815,7 +2915,7 @@ fun PrayerTimesScreen(
 
                 Spacer(
                     modifier = Modifier.height(
-                        FloatingNavClearance + 10.dp - syncBottomClearanceReclaim,
+                        FloatingNavClearance + 10.dp - effectiveSyncBottomClearanceReclaim,
                     ),
                 )
             }
@@ -3204,21 +3304,6 @@ private fun PrayerHeaderAction(
     }
 }
 
-@Composable
-private fun weatherIconRes(weather: CurrentWeather): Int = when (weather.weatherCode) {
-    0 -> if (weather.isDay) {
-        R.drawable.flaticon_weather_clear
-    } else {
-        R.drawable.flaticon_weather_moon
-    }
-    1, 2 -> R.drawable.flaticon_weather_partly_cloudy
-    3, 45, 48 -> R.drawable.flaticon_weather_cloudy
-    in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
-    in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
-    in 95..99 -> R.drawable.flaticon_weather_storm
-    else -> R.drawable.flaticon_weather_cloudy
-}
-
 private fun weatherConditionLabel(weather: CurrentWeather): String = when (weather.weatherCode) {
     0 -> if (weather.isDay) "Clear" else "Clear night"
     1 -> "Mostly clear"
@@ -3238,6 +3323,7 @@ private fun weatherConditionLabel(weather: CurrentWeather): String = when (weath
 private fun LandscapeLocationWeatherTile(
     locationString: String,
     locationData: com.starception.submission.prayer.model.Location?,
+    thresholds: PrayerWeatherThresholds,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -3333,15 +3419,59 @@ private fun LandscapeLocationWeatherTile(
 
                 weather?.let { current ->
                     val conditionLabel = weatherConditionLabel(current)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    val humidityLevel = humidityThresholdLevel(
+                        value = current.relativeHumidity,
+                        threshold = thresholds.humidity,
+                    )
+                    val rainLevel = rainThresholdLevel(
+                        value = current.precipitationProbability,
+                        threshold = thresholds.rainProbability,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         Text(
-                            text = "$conditionLabel · ${current.precipitationProbability}% rain" +
-                                " · Humidity ${current.relativeHumidity}%",
+                            text = "$conditionLabel ·",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 10.sp,
                                 lineHeight = 13.sp,
                                 letterSpacing = 0.sp,
                                 platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            ),
+                            color = supportingColor,
+                            maxLines = 1,
+                        )
+                        AnimatedPrayerWeatherIcon(
+                            visual = PrayerWeatherVisual.Humidity,
+                            level = humidityLevel,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "${current.relativeHumidity}% ·",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp,
+                                letterSpacing = 0.sp,
+                            ),
+                            color = supportingColor,
+                            maxLines = 1,
+                        )
+                        AnimatedPrayerWeatherIcon(
+                            visual = PrayerWeatherVisual.Rain,
+                            level = rainLevel,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = if (current.precipitationProbability == 0) {
+                                "No rain"
+                            } else {
+                                "${current.precipitationProbability}% rain"
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp,
+                                letterSpacing = 0.sp,
                             ),
                             color = supportingColor,
                             maxLines = 1,
@@ -3362,6 +3492,10 @@ private fun LandscapeLocationWeatherTile(
             }
 
             weather?.let { current ->
+                val temperatureLevel = temperatureThresholdLevel(
+                    value = current.temperatureCelsius,
+                    threshold = thresholds.temperatureCelsius,
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Row(
                     modifier = Modifier
@@ -3381,15 +3515,24 @@ private fun LandscapeLocationWeatherTile(
                         modifier = Modifier
                             .offset(y = 2.dp),
                     )
-                    Image(
-                        painter = painterResource(weatherIconRes(current)),
-                        contentDescription = weatherConditionLabel(current),
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .align(Alignment.Top)
-                            .size(14.dp)
-                            .offset(x = (-2).dp, y = 1.dp),
-                    )
+                    if (temperatureLevel == WeatherThresholdLevel.Normal) {
+                        AnimatedCurrentWeatherIcon(
+                            weather = current,
+                            modifier = Modifier
+                                .align(Alignment.Top)
+                                .size(24.dp)
+                                .offset(x = (-2).dp, y = 1.dp),
+                        )
+                    } else {
+                        AnimatedPrayerWeatherIcon(
+                            visual = PrayerWeatherVisual.Heat,
+                            level = temperatureLevel,
+                            modifier = Modifier
+                                .align(Alignment.Top)
+                                .size(24.dp)
+                                .offset(x = (-2).dp, y = 1.dp),
+                        )
+                    }
                 }
             }
         }
@@ -3440,13 +3583,24 @@ private fun PrayerWeatherThresholdSheet(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "Set the conditions that should add guidance to prayer alerts.",
+                        text = "Choose when forecast guidance should appear with an upcoming prayer.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp),
                     )
 
                     Spacer(Modifier.height(20.dp))
+                    Text(
+                        text = "Alert thresholds",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Guidance appears when any threshold is reached.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
+                    )
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -3456,34 +3610,43 @@ private fun PrayerWeatherThresholdSheet(
                             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
                         ),
                     ) {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            WeatherThresholdRow(
-                                iconRes = rainThresholdIconRes(rain),
+                        Column {
+                            WeatherThresholdControl(
+                                weatherVisual = PrayerWeatherVisual.Rain,
                                 label = "Rain chance",
-                                description = "$rain% or higher",
+                                helperText = "Alert at or above",
                                 value = rain,
                                 valueText = "$rain%",
-                                range = 0f..100f,
+                                range = 0..100,
+                                step = 5,
                                 onValueChange = { rain = it },
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            WeatherThresholdRow(
-                                iconRes = humidityThresholdIconRes(humidity),
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 76.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                            )
+                            WeatherThresholdControl(
+                                weatherVisual = PrayerWeatherVisual.Humidity,
                                 label = "Humidity",
-                                description = "Higher than $humidity%",
+                                helperText = "Alert at or above",
                                 value = humidity,
                                 valueText = "$humidity%",
-                                range = 0f..99f,
+                                range = 0..99,
+                                step = 5,
                                 onValueChange = { humidity = it },
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            WeatherThresholdRow(
-                                iconRes = temperatureThresholdIconRes(temperature),
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 76.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                            )
+                            WeatherThresholdControl(
+                                weatherVisual = PrayerWeatherVisual.Heat,
                                 label = "Temperature",
-                                description = "$temperature°C or higher",
+                                helperText = "Alert at or above",
                                 value = temperature,
                                 valueText = "$temperature°C",
-                                range = 20f..50f,
+                                range = 20..50,
+                                step = 1,
                                 onValueChange = { temperature = it },
                             )
                         }
@@ -3521,68 +3684,70 @@ private fun PrayerWeatherThresholdSheet(
     }
 }
 
-private fun rainThresholdIconRes(value: Int): Int = when {
-    value < 20 -> R.drawable.flaticon_weather_cloudy
-    value < 60 -> R.drawable.flaticon_weather_rain
-    else -> R.drawable.flaticon_weather_storm
-}
-
-private fun humidityThresholdIconRes(value: Int): Int = when {
-    value < 40 -> R.drawable.flaticon_precipitation
-    value < 70 -> R.drawable.flaticon_weather_cloudy
-    else -> R.drawable.flaticon_weather_rain
-}
-
-private fun temperatureThresholdIconRes(value: Int): Int = when {
-    value < 26 -> R.drawable.flaticon_weather_partly_cloudy
-    else -> R.drawable.flaticon_weather_clear
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WeatherThresholdRow(
-    iconRes: Int,
+private fun WeatherThresholdControl(
+    weatherVisual: PrayerWeatherVisual,
     label: String,
-    description: String,
+    helperText: String,
     value: Int,
     valueText: String,
-    range: ClosedFloatingPointRange<Float>,
+    range: IntRange,
+    step: Int,
     onValueChange: (Int) -> Unit,
 ) {
-        Column(modifier = Modifier.padding(vertical = 14.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedPrayerWeatherIcon(
+            visual = weatherVisual,
+            level = weatherThresholdPreviewLevel(weatherVisual, value),
+            // Meteocons include breathing room in their animation canvas. A
+            // 48dp host gives the visible artwork the same presence as the
+            // 42dp threshold control without making the row feel oversized.
+            modifier = Modifier.size(48.dp),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 10.dp, end = 8.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = helperText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            tonalElevation = 0.dp,
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.height(42.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AnimatedContent(
-                    targetState = iconRes,
-                    transitionSpec = {
-                        fadeIn(tween(140)) togetherWith fadeOut(tween(100))
+                IconButton(
+                    onClick = {
+                        val updated = value.minus(step).coerceAtLeast(range.first)
+                        onValueChange(updated)
                     },
-                    label = "thresholdWeatherIcon",
-                    modifier = Modifier.size(32.dp),
-                ) { currentIconRes ->
-                    Image(
-                        painter = painterResource(currentIconRes),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 14.dp, end = 10.dp),
+                    enabled = value > range.first,
+                    modifier = Modifier.size(40.dp),
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Decrease $label",
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Text(
@@ -3590,33 +3755,26 @@ private fun WeatherThresholdRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(52.dp),
                 )
+                IconButton(
+                    onClick = {
+                        val updated = value.plus(step).coerceAtMost(range.last)
+                        onValueChange(updated)
+                    },
+                    enabled = value < range.last,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Increase $label",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
-            Slider(
-                value = value.toFloat(),
-                onValueChange = { onValueChange(it.roundToInt()) },
-                valueRange = range,
-                steps = 0,
-                modifier = Modifier.padding(top = 6.dp),
-                thumb = {
-                    Surface(
-                        modifier = Modifier.size(22.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        border = BorderStroke(
-                            width = 3.dp,
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        ),
-                    ) {}
-                },
-                colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                    inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    activeTickColor = Color.Transparent,
-                    inactiveTickColor = Color.Transparent,
-                ),
-            )
         }
+    }
 }
 
 /**

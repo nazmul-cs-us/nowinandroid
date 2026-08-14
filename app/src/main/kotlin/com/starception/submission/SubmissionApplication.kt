@@ -17,6 +17,7 @@
 package com.starception.submission
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy.Builder
@@ -205,8 +206,38 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     lastAnnouncedChapter = chapter
                     try {
                         kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                            // The Fortress player lives at the application level, so it does
+                            // not observe the Settings screen's Compose state. Resolve the
+                            // persisted selection for every announcement; this also makes a
+                            // newly selected speaker take effect without restarting playback
+                            // or recreating the application.
+                            val ttsPrefs = appCtx.getSharedPreferences(
+                                "tts_settings",
+                                Context.MODE_PRIVATE,
+                            )
+                            val selectedVoice = runCatching {
+                                com.starception.submission.settings.components.TtsVoice.valueOf(
+                                    ttsPrefs.getString(
+                                        "selected_voice",
+                                        com.starception.submission.settings.components.TtsVoice
+                                            .KOKORO_EN.name,
+                                    ) ?: com.starception.submission.settings.components.TtsVoice
+                                        .KOKORO_EN.name,
+                                )
+                            }.getOrDefault(
+                                com.starception.submission.settings.components.TtsVoice.KOKORO_EN,
+                            )
+                            val selectedSpeakerId = ttsPrefs
+                                .getInt("selected_speaker_id", 0)
+                                .coerceIn(0, (selectedVoice.totalSpeakers - 1).coerceAtLeast(0))
+
+                            fortressTtsService.setVoice(selectedVoice)
                             val done = kotlinx.coroutines.CompletableDeferred<Unit>()
-                            val started = fortressTtsService.speak(announcement) { done.complete(Unit) }
+                            val started = fortressTtsService.speak(
+                                text = announcement,
+                                speakerId = selectedSpeakerId,
+                                onComplete = { done.complete(Unit) },
+                            )
                             if (started) done.await() // speak() invokes onComplete itself on failure
                         }
                     } catch (e: Exception) {

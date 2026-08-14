@@ -135,6 +135,7 @@ dependencies {
 
     // Compose-native Google Filament renderer for Salah training visualization.
     implementation(libs.sceneview)
+    implementation(libs.lottie.compose)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
