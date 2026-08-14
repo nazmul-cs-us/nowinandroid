@@ -2,11 +2,17 @@ package com.starception.submission.feature.prayertimes.weather
 
 import android.provider.Settings
 import android.content.Context
+import android.graphics.BlendMode
+import android.graphics.BlendModeColorFilter
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.annotation.RawRes
 import androidx.compose.material3.MaterialTheme
@@ -14,14 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.IconCompat
 import com.airbnb.lottie.LottieProperty
-import com.airbnb.lottie.SimpleColorFilter
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -166,15 +170,22 @@ internal fun AnimatedPrayerWeatherIcon(
     preferFlat: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val useMonochrome = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val style = when {
-        useMonochrome -> MeteoconStyle.Monochrome
         preferFlat -> MeteoconStyle.Flat
+        useDarkPalette -> MeteoconStyle.Flat
         else -> MeteoconStyle.Fill
+    }
+    val paletteColor = when (visual) {
+        PrayerWeatherVisual.Rain -> MaterialTheme.colorScheme.primary
+        PrayerWeatherVisual.Humidity -> MaterialTheme.colorScheme.tertiary
+        PrayerWeatherVisual.Heat -> MaterialTheme.colorScheme.secondary
     }
     AnimatedMeteocon(
         animationResource = visual.animationResource(level, style),
-        monochromeTint = if (useMonochrome) MaterialTheme.colorScheme.onSurface else null,
+        paletteColorFilter = remember(paletteColor) {
+            themedMeteoconColorFilter(paletteColor.toArgb())
+        },
         modifier = modifier,
     )
 }
@@ -184,20 +195,35 @@ internal fun AnimatedCurrentWeatherIcon(
     weather: CurrentWeather,
     modifier: Modifier = Modifier,
 ) {
-    val useMonochrome = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val paletteColor = MaterialTheme.colorScheme.primary
     AnimatedMeteocon(
         animationResource = weather.currentWeatherVisual().animationResource(
-            if (useMonochrome) MeteoconStyle.Monochrome else MeteoconStyle.Fill,
+            if (useDarkPalette) MeteoconStyle.Flat else MeteoconStyle.Fill,
         ),
-        monochromeTint = if (useMonochrome) MaterialTheme.colorScheme.onSurface else null,
+        paletteColorFilter = remember(paletteColor) {
+            themedMeteoconColorFilter(paletteColor.toArgb())
+        },
         modifier = modifier,
     )
 }
 
+/**
+ * Retains the authored Meteocon shading while harmonizing its hue and saturation with the
+ * selected Default, Android, Coastal, Royal, or Custom app palette.
+ */
+private fun themedMeteoconColorFilter(paletteColor: Int): ColorFilter =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        BlendModeColorFilter(paletteColor, BlendMode.COLOR)
+    } else {
+        @Suppress("DEPRECATION")
+        PorterDuffColorFilter(paletteColor, PorterDuff.Mode.MULTIPLY)
+    }
+
 @Composable
 private fun AnimatedMeteocon(
     @RawRes animationResource: Int,
-    monochromeTint: ComposeColor?,
+    paletteColorFilter: ColorFilter?,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -219,11 +245,11 @@ private fun AnimatedMeteocon(
         restartOnPlay = false,
     )
 
-    if (monochromeTint != null) {
+    if (paletteColorFilter != null) {
         val dynamicProperties = rememberLottieDynamicProperties(
             rememberLottieDynamicProperty(
                 property = LottieProperty.COLOR_FILTER,
-                value = SimpleColorFilter(monochromeTint.toArgb()),
+                value = paletteColorFilter,
                 keyPath = arrayOf("**"),
             ),
         )
@@ -263,8 +289,8 @@ internal fun PrayerWeatherVisual.animationResource(
         PrayerWeatherVisual.Humidity -> when (level) {
             WeatherThresholdLevel.Normal,
             WeatherThresholdLevel.Alert,
-            -> R.raw.meteocon_mono_raindrop_measure
-            WeatherThresholdLevel.Severe -> R.raw.meteocon_mono_humidity
+            WeatherThresholdLevel.Severe,
+            -> R.raw.meteocon_mono_humidity
         }
     }
     MeteoconStyle.Fill -> when (this) {
@@ -281,8 +307,8 @@ internal fun PrayerWeatherVisual.animationResource(
         PrayerWeatherVisual.Humidity -> when (level) {
             WeatherThresholdLevel.Normal,
             WeatherThresholdLevel.Alert,
-            -> R.raw.meteocon_fill_raindrop_measure
-            WeatherThresholdLevel.Severe -> R.raw.meteocon_fill_humidity
+            WeatherThresholdLevel.Severe,
+            -> R.raw.meteocon_fill_humidity
         }
     }
     MeteoconStyle.Flat -> when (this) {
@@ -297,11 +323,12 @@ internal fun PrayerWeatherVisual.animationResource(
             WeatherThresholdLevel.Severe -> R.raw.meteocon_thermometer_sun
         }
         PrayerWeatherVisual.Humidity -> when (level) {
-            // The measuring-drop artwork is deliberately used for the everyday
-            // humidity states so it cannot be mistaken for the rain droplet beside it.
-            WeatherThresholdLevel.Normal -> R.raw.meteocon_raindrop_measure
-            WeatherThresholdLevel.Alert -> R.raw.meteocon_raindrop_measure
-            WeatherThresholdLevel.Severe -> R.raw.meteocon_humidity
+            // The percentage cutout stays distinct from the neighboring rain drop at
+            // compact location-card sizes; threshold severity is carried by surrounding UI.
+            WeatherThresholdLevel.Normal,
+            WeatherThresholdLevel.Alert,
+            WeatherThresholdLevel.Severe,
+            -> R.raw.meteocon_humidity
         }
     }
 }

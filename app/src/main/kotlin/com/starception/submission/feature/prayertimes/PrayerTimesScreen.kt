@@ -2814,7 +2814,7 @@ fun PrayerTimesScreen(
                                 "${weather.precipitationProbability}% rain"
                             }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
 
                             Column(
                                 horizontalAlignment = Alignment.End,
@@ -2822,14 +2822,17 @@ fun PrayerTimesScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
                                     Text(
                                         text = conditionLabel,
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = 11.sp,
-                                            lineHeight = 14.sp,
+                                            fontSize = 10.5.sp,
+                                            lineHeight = 13.sp,
                                             letterSpacing = 0.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
                                         ),
                                         color = locationTileContent,
                                         maxLines = 1,
@@ -2837,21 +2840,28 @@ fun PrayerTimesScreen(
                                     if (temperatureLevel == WeatherThresholdLevel.Normal) {
                                         AnimatedCurrentWeatherIcon(
                                             weather = weather,
-                                            modifier = Modifier.size(26.dp),
+                                            modifier = Modifier
+                                                .size(23.dp)
+                                                .graphicsLayer(scaleX = 1.08f, scaleY = 1.08f),
                                         )
                                     } else {
                                         AnimatedPrayerWeatherIcon(
                                             visual = PrayerWeatherVisual.Heat,
                                             level = temperatureLevel,
-                                            modifier = Modifier.size(26.dp),
+                                            modifier = Modifier
+                                                .size(23.dp)
+                                                .graphicsLayer(scaleX = 1.08f, scaleY = 1.08f),
                                         )
                                     }
                                     Text(
                                         text = "${weather.temperatureCelsius.roundToInt()}°",
                                         style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.SemiBold,
-                                            fontSize = 18.sp,
-                                            lineHeight = 20.sp,
+                                            fontSize = 17.sp,
+                                            lineHeight = 19.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
                                         ),
                                         color = locationTileContent,
                                         maxLines = 1,
@@ -2859,12 +2869,14 @@ fun PrayerTimesScreen(
                                 }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(1.dp),
                                 ) {
                                     AnimatedPrayerWeatherIcon(
                                         visual = PrayerWeatherVisual.Humidity,
                                         level = humidityLevel,
-                                        modifier = Modifier.size(22.dp),
+                                        modifier = Modifier
+                                            .size(19.dp)
+                                            .graphicsLayer(scaleX = 1.16f, scaleY = 1.16f),
                                     )
                                     Text(
                                         // The gauge already communicates humidity;
@@ -2873,28 +2885,32 @@ fun PrayerTimesScreen(
                                         text = "${weather.relativeHumidity}%",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 10.5.sp,
-                                            lineHeight = 14.sp,
+                                            lineHeight = 13.sp,
                                             letterSpacing = 0.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
                                         ),
                                         color = locationTileSupporting,
                                         maxLines = 1,
                                     )
-                                    Text(
-                                        text = "·",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = locationTileSupporting,
-                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     AnimatedPrayerWeatherIcon(
                                         visual = PrayerWeatherVisual.Rain,
                                         level = rainLevel,
-                                        modifier = Modifier.size(22.dp),
+                                        modifier = Modifier
+                                            .size(19.dp)
+                                            .graphicsLayer(scaleX = 1.16f, scaleY = 1.16f),
                                     )
                                     Text(
                                         text = precipitationLabel,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 10.5.sp,
-                                            lineHeight = 14.sp,
+                                            lineHeight = 13.sp,
                                             letterSpacing = 0.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
                                         ),
                                         color = locationTileSupporting,
                                         maxLines = 1,
@@ -2902,12 +2918,12 @@ fun PrayerTimesScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(3.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
                             Icon(
                                 imageVector = Icons.Default.ChevronRight,
                                 contentDescription = "Weather details",
                                 tint = locationTileSupporting,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(17.dp),
                             )
                         }
                     }
@@ -3305,7 +3321,7 @@ private fun PrayerHeaderAction(
 }
 
 private fun weatherConditionLabel(weather: CurrentWeather): String = when (weather.weatherCode) {
-    0 -> if (weather.isDay) "Clear" else "Clear night"
+    0 -> if (weather.isDay) "Clear sky" else "Clear night"
     1 -> "Mostly clear"
     2 -> "Partly cloudy"
     3 -> "Overcast"
