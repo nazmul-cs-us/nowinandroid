@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -122,6 +123,7 @@ fun PullToSyncContainer(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     syncResultText: String? = null,
+    onSyncResultClick: (() -> Unit)? = null,
     onSyncResultDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
     idleContainerColor: Color = Color.Unspecified,
@@ -387,7 +389,8 @@ fun PullToSyncContainer(
                 SyncBarStatus(
                     key = "sync-result:$syncResultText",
                     text = syncResultText.orEmpty(),
-                    icon = SyncBarIcon.Sparkle,
+                    icon = if (onSyncResultClick != null) SyncBarIcon.Retry else SyncBarIcon.Sparkle,
+                    onClick = onSyncResultClick,
                     onDismiss = onSyncResultDismiss,
                 ),
             )
@@ -646,7 +649,7 @@ fun PullToSyncContainer(
 }
 
 /** Leading glyph for a [SyncBarStatus]. */
-private enum class SyncBarIcon { Spinner, Sparkle, DoNotDisturb }
+private enum class SyncBarIcon { Spinner, Sparkle, Retry, DoNotDisturb }
 
 /**
  * One line of information the top strip can show. Several can be live at once;
@@ -754,6 +757,13 @@ private fun SyncBarStatusRow(
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = 15.sp,
                 color = contentColor,
+            )
+
+            SyncBarIcon.Retry -> Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
             )
 
             SyncBarIcon.DoNotDisturb -> Icon(

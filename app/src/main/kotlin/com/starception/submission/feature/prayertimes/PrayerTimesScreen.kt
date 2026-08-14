@@ -257,6 +257,33 @@ private val PrayerReferenceBlue = Color(0xFF4F779D)
 private val PrayerReferenceRust = Color(0xFF99593C)
 private val PrayerReferenceGold = Color(0xFFD8AB59)
 
+private sealed interface CurrentWeatherLoadState {
+    data object Loading : CurrentWeatherLoadState
+    data object Unavailable : CurrentWeatherLoadState
+    data class Available(val weather: CurrentWeather) : CurrentWeatherLoadState
+}
+
+@Composable
+private fun rememberCurrentWeatherLoadState(
+    location: com.starception.submission.prayer.model.Location?,
+): State<CurrentWeatherLoadState> = produceState<CurrentWeatherLoadState>(
+    initialValue = CurrentWeatherLoadState.Loading,
+    key1 = location?.latitude,
+    key2 = location?.longitude,
+) {
+    value = CurrentWeatherLoadState.Loading
+    val validLocation = location?.takeIf { it.isValid() }
+    value = if (validLocation == null) {
+        CurrentWeatherLoadState.Unavailable
+    } else {
+        CurrentWeatherRepository.get(
+            latitude = validLocation.latitude,
+            longitude = validLocation.longitude,
+        )?.let { CurrentWeatherLoadState.Available(it) }
+            ?: CurrentWeatherLoadState.Unavailable
+    }
+}
+
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
  * 
@@ -427,6 +454,8 @@ fun PrayerTimesScreen(
         mutableStateOf(PrayerWeatherThresholdStore.load(screenContext))
     }
     var syncWeatherResult by remember { mutableStateOf<String?>(null) }
+    val voiceFeedback by com.starception.submission.ui.search.SearchPrefillBus.voiceFeedback
+        .collectAsStateWithLifecycle()
 
     LaunchedEffect(syncWeatherResult) {
         if (syncWeatherResult != null) {
@@ -1706,8 +1735,20 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
-                syncResultText = syncWeatherResult,
-                onSyncResultDismiss = { syncWeatherResult = null },
+                syncResultText = voiceFeedback ?: syncWeatherResult,
+                onSyncResultClick = voiceFeedback?.let {
+                    {
+                        com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
+                        com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch()
+                    }
+                },
+                onSyncResultDismiss = {
+                    if (voiceFeedback != null) {
+                        com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
+                    } else {
+                        syncWeatherResult = null
+                    }
+                },
                 idleContainerColor = Color.Transparent,
                 idleContainerBrush = mainPageBackgroundBrush(),
                 downloadProgress = downloadProgress,
@@ -2734,20 +2775,7 @@ fun PrayerTimesScreen(
                             null
                         }
 
-                        val currentWeather by produceState<CurrentWeather?>(
-                            initialValue = null,
-                            key1 = locationData?.latitude,
-                            key2 = locationData?.longitude,
-                        ) {
-                            value = locationData
-                                ?.takeIf { it.isValid() }
-                                ?.let {
-                                    CurrentWeatherRepository.get(
-                                        latitude = it.latitude,
-                                        longitude = it.longitude,
-                                    )
-                                }
-                        }
+                        val currentWeatherState by rememberCurrentWeatherLoadState(locationData)
 
                         val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
                             ?: countryCode.orEmpty()
@@ -2794,7 +2822,12 @@ fun PrayerTimesScreen(
                             }
                         }
 
-                        currentWeather?.let { weather ->
+                        when (val weatherState = currentWeatherState) {
+                            CurrentWeatherLoadState.Loading -> {
+                                PortraitWeatherLoadingPlaceholder()
+                            }
+                            is CurrentWeatherLoadState.Available -> {
+                            val weather = weatherState.weather
                             val conditionLabel = weatherConditionLabel(weather)
                             val temperatureLevel = temperatureThresholdLevel(
                                 value = weather.temperatureCelsius,
@@ -2931,6 +2964,8 @@ fun PrayerTimesScreen(
                                 tint = locationTileSupporting,
                                 modifier = Modifier.size(17.dp),
                             )
+                            }
+                            CurrentWeatherLoadState.Unavailable -> Unit
                         }
                     }
                 }
@@ -3342,6 +3377,111 @@ private fun weatherConditionLabel(weather: CurrentWeather): String = when (weath
 }
 
 @Composable
+private fun weatherPlaceholderBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "weatherPlaceholder")
+    val shimmerOffset by transition.animateFloat(
+        initialValue = -180f,
+        targetValue = 520f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_150, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "weatherPlaceholderOffset",
+    )
+    val placeholder = MaterialTheme.colorScheme.onSurfaceVariant
+    return Brush.linearGradient(
+        colors = listOf(
+            placeholder.copy(alpha = 0.08f),
+            placeholder.copy(alpha = 0.20f),
+            placeholder.copy(alpha = 0.08f),
+        ),
+        start = Offset(shimmerOffset - 110f, 0f),
+        end = Offset(shimmerOffset, 48f),
+    )
+}
+
+@Composable
+private fun WeatherPlaceholderBlock(
+    modifier: Modifier,
+    brush: Brush,
+    cornerRadius: androidx.compose.ui.unit.Dp = 50.dp,
+) {
+    Box(
+        modifier = modifier.background(
+            brush = brush,
+            shape = RoundedCornerShape(cornerRadius),
+        ),
+    )
+}
+
+@Composable
+private fun PortraitWeatherLoadingPlaceholder() {
+    val brush = weatherPlaceholderBrush()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(6.dp))
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                WeatherPlaceholderBlock(Modifier.size(width = 52.dp, height = 8.dp), brush)
+                WeatherPlaceholderBlock(Modifier.size(19.dp), brush)
+                WeatherPlaceholderBlock(Modifier.size(width = 27.dp, height = 14.dp), brush)
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                WeatherPlaceholderBlock(Modifier.size(16.dp), brush)
+                WeatherPlaceholderBlock(Modifier.size(width = 22.dp, height = 7.dp), brush)
+                Spacer(modifier = Modifier.width(2.dp))
+                WeatherPlaceholderBlock(Modifier.size(16.dp), brush)
+                WeatherPlaceholderBlock(Modifier.size(width = 36.dp, height = 7.dp), brush)
+            }
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        WeatherPlaceholderBlock(
+            modifier = Modifier.size(width = 7.dp, height = 14.dp),
+            brush = brush,
+            cornerRadius = 4.dp,
+        )
+    }
+}
+
+@Composable
+private fun LandscapeWeatherLineLoadingPlaceholder() {
+    val brush = weatherPlaceholderBrush()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        WeatherPlaceholderBlock(Modifier.size(width = 48.dp, height = 7.dp), brush)
+        WeatherPlaceholderBlock(Modifier.size(15.dp), brush)
+        WeatherPlaceholderBlock(Modifier.size(width = 21.dp, height = 7.dp), brush)
+        WeatherPlaceholderBlock(Modifier.size(15.dp), brush)
+        WeatherPlaceholderBlock(Modifier.size(width = 34.dp, height = 7.dp), brush)
+    }
+}
+
+@Composable
+private fun LandscapeTemperatureLoadingPlaceholder() {
+    val brush = weatherPlaceholderBrush()
+    Row(
+        modifier = Modifier.height(32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        WeatherPlaceholderBlock(Modifier.size(width = 25.dp, height = 15.dp), brush)
+        WeatherPlaceholderBlock(Modifier.size(22.dp), brush)
+    }
+}
+
+@Composable
 private fun LandscapeLocationWeatherTile(
     locationString: String,
     locationData: com.starception.submission.prayer.model.Location?,
@@ -3377,20 +3517,7 @@ private fun LandscapeLocationWeatherTile(
         ?.takeIf { it.length in 2..3 }
         ?: locationData?.country?.trim().orEmpty()
 
-    val weather by produceState<CurrentWeather?>(
-        initialValue = null,
-        key1 = locationData?.latitude,
-        key2 = locationData?.longitude,
-    ) {
-        value = locationData
-            ?.takeIf { it.isValid() }
-            ?.let {
-                CurrentWeatherRepository.get(
-                    latitude = it.latitude,
-                    longitude = it.longitude,
-                )
-            }
-    }
+    val weatherState by rememberCurrentWeatherLoadState(locationData)
 
     Surface(
         modifier = modifier
@@ -3439,7 +3566,12 @@ private fun LandscapeLocationWeatherTile(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                weather?.let { current ->
+                when (val state = weatherState) {
+                    CurrentWeatherLoadState.Loading -> {
+                        LandscapeWeatherLineLoadingPlaceholder()
+                    }
+                    is CurrentWeatherLoadState.Available -> {
+                    val current = state.weather
                     val conditionLabel = weatherConditionLabel(current)
                     val humidityLevel = humidityThresholdLevel(
                         value = current.relativeHumidity,
@@ -3500,20 +3632,28 @@ private fun LandscapeLocationWeatherTile(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                } ?: Text(
-                    text = fallbackDetail,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        lineHeight = 13.sp,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    ),
-                    color = supportingColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                    }
+                    CurrentWeatherLoadState.Unavailable -> Text(
+                        text = fallbackDetail,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        ),
+                        color = supportingColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
-            weather?.let { current ->
+            when (val state = weatherState) {
+                CurrentWeatherLoadState.Loading -> {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    LandscapeTemperatureLoadingPlaceholder()
+                }
+                is CurrentWeatherLoadState.Available -> {
+                val current = state.weather
                 val temperatureLevel = temperatureThresholdLevel(
                     value = current.temperatureCelsius,
                     threshold = thresholds.temperatureCelsius,
@@ -3556,6 +3696,8 @@ private fun LandscapeLocationWeatherTile(
                         )
                     }
                 }
+                }
+                CurrentWeatherLoadState.Unavailable -> Unit
             }
         }
     }

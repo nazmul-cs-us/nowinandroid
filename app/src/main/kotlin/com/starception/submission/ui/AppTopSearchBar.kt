@@ -1691,7 +1691,7 @@ private fun startVoiceCapture(
     }
 
     // The same floating button that starts capture becomes the stop control
-    // while its processing Lottie is visible.
+    // while its five-bar processing ripple is visible.
     if (whisper.isTranscribing.value) {
         if (whisper.cancelTranscription()) {
             Toast.makeText(ctx, "Voice processing cancelled", Toast.LENGTH_SHORT).show()
@@ -1711,13 +1711,14 @@ private fun startVoiceCapture(
         return
     }
 
-    Toast.makeText(ctx, "Listening…", Toast.LENGTH_SHORT).show()
+    com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
 
     val handleResult: (VoiceSearchService.VoiceSearchResult) -> Unit = { result ->
         when (result) {
             is VoiceSearchService.VoiceSearchResult.Success -> {
                 val text = result.text.trim()
                 if (text.isNotEmpty()) {
+                    com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
                     // Mic always opens the in-place SearchView with the transcribed
                     // text so the user sees our suggestion UI (recents + popular
                     // verses filtered by the query) instead of being pushed to the
@@ -1734,7 +1735,7 @@ private fun startVoiceCapture(
                 Toast.makeText(ctx, result.message, Toast.LENGTH_SHORT).show()
             }
             VoiceSearchService.VoiceSearchResult.Cancelled -> {
-                Toast.makeText(ctx, "Didn't catch that — try again", Toast.LENGTH_SHORT).show()
+                com.starception.submission.ui.search.SearchPrefillBus.showVoiceRetryPrompt()
             }
         }
     }

@@ -84,17 +84,24 @@ import com.starception.submission.auth.ProfileSheet
 import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
 import com.starception.submission.usersettings.ui.CountrySwitchViewModel
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -112,10 +119,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
@@ -151,15 +157,6 @@ import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
-import com.airbnb.lottie.LottieProperty
-import com.airbnb.lottie.SimpleColorFilter
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.airbnb.lottie.compose.rememberLottieDynamicProperties
-import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import com.starception.submission.feature.settings.R as settingsR
 
 /** Unwraps the hosting [Activity] from a Compose [Context], needed for Firebase OAuth flows. */
@@ -648,11 +645,12 @@ private fun NiaFloatingBottomBar(
 }
 
 /**
- * Voice-assistant button: the circular button beside the floating nav. It idles
- * as the five-bar graphic-eq mark. Listening and processing use a related pair
- * of traced, Face-ID-inspired Lottie loops; mic [level] still drives the button's
- * breathing scale. Tapping toggles capture, and taps during processing cancel
- * transcription through the shared bus.
+ * Voice-assistant button: one five-bar unit across idle, listening, and
+ * transcribing. Listening uses a mic-responsive traveling ripple. When capture
+ * ends, those same straight paths progressively bend into five independent
+ * curved dashes. The full-size dashes spiral inward at staggered depths without
+ * joining into a circle or propeller. Keeping the paths continuous makes the
+ * state change feel intentional, while tapping during processing cancels it.
  */
 @Composable
 private fun VoiceAssistantButton(
@@ -662,83 +660,60 @@ private fun VoiceAssistantButton(
     buttonSize: Dp = 60.dp,
     onClick: () -> Unit,
 ) {
-    // Eased state 0 (idle) → 1 (listening); a light spring gives an organic
-    // wake-up / settle rather than a hard switch.
-    val progress by animateFloatAsState(
+    val listeningBlend by animateFloatAsState(
         targetValue = if (listening) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-        label = "assistantProgress",
+        label = "assistantListeningBlend",
     )
-    // Smoothed mic amplitude; folded with progress so it only drives the bars
-    // while actually listening (and never lingers after stop).
+    val processingBlend by animateFloatAsState(
+        targetValue = if (processing) 1f else 0f,
+        animationSpec = tween(durationMillis = 440, easing = FastOutSlowInEasing),
+        label = "assistantProcessingBlend",
+    )
     val amp by animateFloatAsState(
         targetValue = (level * 14f).coerceIn(0f, 1f),
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 400f),
         label = "assistantAmp",
     )
-    val ampActive = amp * progress
+    val ampActive = amp * listeningBlend
+    val barMotion = rememberInfiniteTransition(label = "assistantBarMotion")
+    val wavePhase by barMotion.animateFloat(
+        initialValue = 0f,
+        targetValue = (Math.PI * 2.0).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 920, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "assistantBarWave",
+    )
+    val swirlPhase by barMotion.animateFloat(
+        initialValue = 0f,
+        targetValue = (Math.PI * 2.0).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_320, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "assistantProcessingSwirl",
+    )
 
     val container = MaterialTheme.colorScheme.onSurface
     val barColor = MaterialTheme.colorScheme.surface
-    val preferredVoiceAccent = if (container.luminance() < 0.5f) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    // Keep the exported Face-ID orbit tied to the selected app palette while
-    // retaining enough contrast on the inverted floating button.
-    val voiceAccent = if (
-        abs(preferredVoiceAccent.luminance() - container.luminance()) >= 0.35f
-    ) {
-        preferredVoiceAccent
-    } else {
-        barColor
-    }
-    val listeningComposition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(R.raw.voice_search_listening),
-    )
-    val listeningProgress by animateLottieCompositionAsState(
-        composition = listeningComposition,
-        isPlaying = listening,
-        iterations = LottieConstants.IterateForever,
-        // Speech energy makes the trace feel responsive without tying its
-        // geometry to noisy frame-by-frame amplitude values.
-        speed = 0.72f + (ampActive * 0.24f),
-        restartOnPlay = true,
-    )
-    val processingComposition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(R.raw.voice_search_processing),
-    )
-    val processingProgress by animateLottieCompositionAsState(
-        composition = processingComposition,
-        isPlaying = processing,
-        iterations = LottieConstants.IterateForever,
-        speed = 0.78f,
-        restartOnPlay = true,
-    )
-    val voiceLottieTint = voiceAccent.toArgb()
-    val voiceLottieDynamicProperties = rememberLottieDynamicProperties(
-        rememberLottieDynamicProperty(
-            property = LottieProperty.COLOR_FILTER,
-            value = SimpleColorFilter(voiceLottieTint),
-            keyPath = arrayOf("**"),
-        ),
-    )
-    val visualPhase = when {
-        processing -> 2
-        listening -> 1
-        else -> 0
-    }
 
     Surface(
-        // During processing the same tap routes back to Whisper and cancels
-        // transcription; the Lottie therefore doubles as a visible stop target.
+        // During processing the same tap routes back to Whisper and cancels it.
         onClick = onClick,
         shape = CircleShape,
         color = container,
         shadowElevation = 2.dp,
         modifier = Modifier
             .size(buttonSize)
+            .semantics {
+                contentDescription = when {
+                    processing -> "Cancel voice processing"
+                    listening -> "Finish listening"
+                    else -> "Start voice search"
+                }
+            }
             .graphicsLayer {
                 val s = 1f + 0.06f * ampActive
                 scaleX = s
@@ -746,46 +721,129 @@ private fun VoiceAssistantButton(
             },
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Crossfade(
-                targetState = visualPhase,
-                animationSpec = tween(durationMillis = 220),
-                label = "voiceAssistantPhase",
-            ) { phase ->
-                when (phase) {
-                    2 -> LottieAnimation(
-                        composition = processingComposition,
-                        progress = { processingProgress },
-                        dynamicProperties = voiceLottieDynamicProperties,
-                        modifier = Modifier.size(if (buttonSize < 56.dp) 29.dp else 34.dp),
+            Canvas(
+                modifier = Modifier
+                    .size(if (buttonSize < 56.dp) 25.dp else 30.dp)
+                    .graphicsLayer {
+                        val processingScale = 1f + 0.25f * processingBlend
+                        scaleX = processingScale
+                        scaleY = processingScale
+                    },
+            ) {
+                val rest = floatArrayOf(0.40f, 0.62f, 1f, 0.62f, 0.40f)
+                val barCount = rest.size
+                val slot = size.width / barCount
+                val barWidth = slot * 0.46f
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
+                val swirlInnerRadius = size.minDimension * 0.16f
+                val swirlOuterRadius = size.minDimension * 0.45f
+                val processingBarLength = size.minDimension * 0.17f
+                val fullTurn = (Math.PI * 2.0).toFloat()
+                val segmentStep = fullTurn / barCount
+
+                for (index in 0 until barCount) {
+                    // The former processing ripple now communicates active
+                    // capture. Mic energy gives louder speech a little more
+                    // presence without making the whole button bounce wildly.
+                    val captureWave = (
+                        kotlin.math.sin((wavePhase - (index * 1.05f)).toDouble()).toFloat() + 1f
+                        ) / 2f
+                    val captureHeight = (
+                        0.28f +
+                            captureWave * (0.60f + ampActive * 0.12f) +
+                            ampActive * rest[index] * 0.08f
+                        ).coerceIn(0.24f, 1f)
+                    val captureAlpha = 0.58f + captureWave * 0.42f
+                    val barHeightFraction = rest[index] +
+                        (captureHeight - rest[index]) * listeningBlend
+                    val barAlpha = 1f + (captureAlpha - 1f) * listeningBlend
+
+                    val rowX = slot * index + slot / 2f
+                    val barHeight = size.height * barHeightFraction
+                    val lineHalfLength = ((barHeight - barWidth) / 2f).coerceAtLeast(0f)
+                    val lineStart = Offset(rowX, centerY - lineHalfLength)
+                    val lineEnd = Offset(rowX, centerY + lineHalfLength)
+                    val lineLength = lineHalfLength * 2f
+                    val lineControl1 = Offset(rowX, lineStart.y + lineLength / 3f)
+                    val lineControl2 = Offset(rowX, lineStart.y + lineLength * 2f / 3f)
+
+                    // Each dash advances from the outer orbit toward the centre.
+                    // Its centre-line length and stroke width stay constant;
+                    // only its radius, curvature, angle, and edge fade change.
+                    val inwardProgress = (
+                        swirlPhase / fullTurn + index.toFloat() / barCount
+                        ) % 1f
+                    val easedInward = inwardProgress * inwardProgress *
+                        (3f - 2f * inwardProgress)
+                    val dashRadius = swirlOuterRadius -
+                        (swirlOuterRadius - swirlInnerRadius) * easedInward
+                    val dashCenterAngle = swirlPhase - (Math.PI / 2.0).toFloat() +
+                        index * segmentStep + easedInward * segmentStep * 0.72f
+                    val dashSweep = (processingBarLength / dashRadius).coerceAtMost(1.42f)
+                    val dashStartAngle = dashCenterAngle - dashSweep / 2f
+                    val dashEndAngle = dashCenterAngle + dashSweep / 2f
+                    fun circlePoint(angle: Float) = Offset(
+                        x = centerX +
+                            kotlin.math.cos(angle.toDouble()).toFloat() * dashRadius,
+                        y = centerY +
+                            kotlin.math.sin(angle.toDouble()).toFloat() * dashRadius,
                     )
-                    1 -> LottieAnimation(
-                        composition = listeningComposition,
-                        progress = { listeningProgress },
-                        dynamicProperties = voiceLottieDynamicProperties,
-                        modifier = Modifier.size(if (buttonSize < 56.dp) 29.dp else 34.dp),
+                    val dashStart = circlePoint(dashStartAngle)
+                    val dashEnd = circlePoint(dashEndAngle)
+                    // Cubic Bézier approximation of the short circular arc.
+                    val controlDistance = 4f / 3f *
+                        kotlin.math.tan((dashSweep / 4f).toDouble()).toFloat() * dashRadius
+                    val dashControl1 = Offset(
+                        dashStart.x -
+                            kotlin.math.sin(dashStartAngle.toDouble()).toFloat() * controlDistance,
+                        dashStart.y +
+                            kotlin.math.cos(dashStartAngle.toDouble()).toFloat() * controlDistance,
                     )
-                    else -> Canvas(
-                        modifier = Modifier.size(if (buttonSize < 56.dp) 21.dp else 24.dp),
-                    ) {
-                        // Stable resting mark before voice capture begins.
-                        val rest = floatArrayOf(0.4f, 0.6f, 1f, 0.6f, 0.4f)
-                        val bars = rest.size
-                        val slot = size.width / bars
-                        val barW = slot * 0.5f
-                        val cy = size.height / 2f
-                        val maxH = size.height
-                        for (i in 0 until bars) {
-                            val h = (maxH * rest[i]).coerceAtLeast(barW)
-                            val x = slot * i + slot / 2f
-                            drawLine(
-                                color = barColor,
-                                start = Offset(x, cy - h / 2f),
-                                end = Offset(x, cy + h / 2f),
-                                strokeWidth = barW,
-                                cap = StrokeCap.Round,
-                            )
-                        }
+                    val dashControl2 = Offset(
+                        dashEnd.x +
+                            kotlin.math.sin(dashEndAngle.toDouble()).toFloat() * controlDistance,
+                        dashEnd.y -
+                            kotlin.math.cos(dashEndAngle.toDouble()).toFloat() * controlDistance,
+                    )
+                    fun morph(from: Offset, to: Offset) = Offset(
+                        from.x + (to.x - from.x) * processingBlend,
+                        from.y + (to.y - from.y) * processingBlend,
+                    )
+
+                    val pathStart = morph(lineStart, dashStart)
+                    val pathControl1 = morph(lineControl1, dashControl1)
+                    val pathControl2 = morph(lineControl2, dashControl2)
+                    val pathEnd = morph(lineEnd, dashEnd)
+                    val bentPath = Path().apply {
+                        moveTo(pathStart.x, pathStart.y)
+                        cubicTo(
+                            pathControl1.x,
+                            pathControl1.y,
+                            pathControl2.x,
+                            pathControl2.y,
+                            pathEnd.x,
+                            pathEnd.y,
+                        )
                     }
+
+                    val edgeFade = minOf(
+                        (inwardProgress / 0.14f).coerceIn(0f, 1f),
+                        ((1f - inwardProgress) / 0.20f).coerceIn(0f, 1f),
+                    )
+                    val dashAlpha = 0.12f + edgeFade * 0.88f
+                    val alpha = barAlpha + (dashAlpha - barAlpha) * processingBlend
+                    val strokeWidth = barWidth
+
+                    drawPath(
+                        path = bentPath,
+                        color = barColor.copy(alpha = alpha),
+                        style = Stroke(
+                            width = strokeWidth,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round,
+                        ),
+                    )
                 }
             }
         }
@@ -967,6 +1025,9 @@ private fun NiaMainContent(
         // Home renders its own PullToSyncContainer — suppress the app-level
         // strip there like media/prayer alerts, or two strips stack.
         val isTtsPreparing = if (isOnHome) false else rawTtsPreparing
+        val rawVoiceFeedback by com.starception.submission.ui.search.SearchPrefillBus.voiceFeedback
+            .collectAsStateWithLifecycle()
+        val appLevelVoiceFeedback = if (isOnHome) null else rawVoiceFeedback
         PullToSyncContainer(
             // Suppress the outer visual on Home (the inner container in
             // PrayerTimesScreen renders it there). When the user navigates away
@@ -974,6 +1035,16 @@ private fun NiaMainContent(
             // still-true VM state, so the banner persists across the transition.
             isRefreshing = if (isOnHome) false else isRefreshing,
             onRefresh = { mainViewModel?.setSyncing(true) },
+            syncResultText = appLevelVoiceFeedback,
+            onSyncResultClick = appLevelVoiceFeedback?.let {
+                {
+                    com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
+                    com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch()
+                }
+            },
+            onSyncResultDismiss = {
+                com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
+            },
             idleContainerColor = Color.Transparent,
             enabled = !isOnHome,
             downloadProgress = downloadProgress,
@@ -1057,14 +1128,11 @@ private fun Modifier.notificationDot(): Modifier =
             drawContent()
             drawCircle(
                 tertiaryColor,
-                radius = 5.dp.toPx(),
-                // This is based on the dimensions of the NavigationBar's "indicator pill";
-                // however, its parameters are private, so we must depend on them implicitly
-                // (NavigationBarTokens.ActiveIndicatorWidth = 64.dp)
-                center = center + Offset(
-                    64.dp.toPx() * .45f,
-                    32.dp.toPx() * -.45f - 6.dp.toPx(),
-                ),
+                radius = 3.5.dp.toPx(),
+                // Anchor to the 24dp icon instead of private Material navigation
+                // indicator dimensions. The old offset pushed the dot into the
+                // rounded cell clip, leaving only a leaf-shaped sliver visible.
+                center = center + Offset(10.dp.toPx(), -10.dp.toPx()),
             )
         }
     }

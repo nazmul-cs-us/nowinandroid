@@ -1,8 +1,14 @@
 package com.starception.submission.ui.search
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 
 /**
  * Process-wide bus for "open the search bar pre-filled with this query" requests.
@@ -18,6 +24,8 @@ import kotlinx.coroutines.flow.asSharedFlow
  * dropped while no collectors are active during a recomposition.
  */
 object SearchPrefillBus {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private val _requests = MutableSharedFlow<String>(
         replay = 0,
         extraBufferCapacity = 1,
@@ -40,6 +48,29 @@ object SearchPrefillBus {
 
     fun requestVoiceSearch() {
         _voiceRequests.tryEmit(Unit)
+    }
+
+    // Recognition feedback belongs in the same persistent top strip as the
+    // other app statuses, rather than in a short-lived Android Toast. The
+    // prompt remains long enough to act on, can be dismissed by the strip, and
+    // expires so it never leaves the page held down indefinitely.
+    private val _voiceFeedback = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val voiceFeedback: kotlinx.coroutines.flow.StateFlow<String?> = _voiceFeedback
+    private var voiceFeedbackDismissJob: Job? = null
+
+    fun showVoiceRetryPrompt() {
+        _voiceFeedback.value = "Didn’t catch that · Try again"
+        voiceFeedbackDismissJob?.cancel()
+        voiceFeedbackDismissJob = scope.launch {
+            delay(10_000L)
+            _voiceFeedback.value = null
+        }
+    }
+
+    fun clearVoiceFeedback() {
+        voiceFeedbackDismissJob?.cancel()
+        voiceFeedbackDismissJob = null
+        _voiceFeedback.value = null
     }
 
     // Whether the search overlay (AppTopSearchBar's SearchView) is currently

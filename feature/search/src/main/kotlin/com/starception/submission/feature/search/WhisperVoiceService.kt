@@ -674,7 +674,7 @@ class WhisperVoiceService(
     /**
      * Cancel listening and transcription
      */
-    fun cancel() {
+    fun cancel(reportEmptyResult: Boolean = true) {
         scope.launch {
             transcriptionGeneration++
             transcriptionJob?.cancel()
@@ -688,8 +688,11 @@ class WhisperVoiceService(
                 Log.w(TAG, "Error stopping recorder during cancel", e)
             }
 
-            currentCallback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
+            val callback = currentCallback
             currentCallback = null
+            if (reportEmptyResult) {
+                callback?.invoke(VoiceSearchService.VoiceSearchResult.Cancelled)
+            }
         }
     }
 
@@ -698,7 +701,9 @@ class WhisperVoiceService(
      */
     fun release() {
         scope.launch {
-            cancel()
+            // Lifecycle cleanup is not a failed recognition attempt and must
+            // not surface the Pull-to-Sync "try again" prompt.
+            cancel(reportEmptyResult = false)
             initJob?.cancel()
             recordJob?.cancel()
             autoStopJob?.cancel()
