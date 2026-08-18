@@ -50,10 +50,11 @@
             <com.google.android.material.search.SearchBar
                 android:id="@+id/app_search_bar"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginVertical="4dp"
                 android:layout_marginStart="12dp"
                 android:layout_marginEnd="8dp"
+                android:minHeight="48dp"
                 android:layout_gravity="center_vertical"
                 android:hint="@string/app_top_bar_search_hint"
                 app:defaultMarginsEnabled="false"

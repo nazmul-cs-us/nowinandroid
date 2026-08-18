@@ -405,7 +405,7 @@ private fun NiaFloatingBottomBar(
         @Composable { sizeModifier: Modifier ->
             val darkTheme = LocalDarkTheme.current
             val colorScheme = MaterialTheme.colorScheme
-            val navBarHeight = if (vertical) 56.dp else 64.dp
+            val navBarHeight = if (vertical) 50.dp else 56.dp
             val capsuleGap = 4.dp
             Surface(
                 shape = RoundedCornerShape(navBarHeight / 2),
@@ -605,7 +605,8 @@ private fun NiaFloatingBottomBar(
             listening = listening,
             processing = processing,
             level = level,
-            buttonSize = if (vertical) 50.dp else 60.dp,
+            // Tracks navBarHeight so the voice button stays proportional to the pill.
+            buttonSize = if (vertical) 44.dp else 52.dp,
             onClick = { com.starception.submission.ui.search.SearchPrefillBus.requestVoiceSearch() },
         )
     }

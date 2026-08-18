@@ -24,4 +24,4 @@ import androidx.compose.ui.unit.dp
  * bottomBar), so every full-height list needs this much bottom contentPadding for
  * its last items to scroll clear.
  */
-val FloatingNavClearance = 100.dp
+val FloatingNavClearance = 92.dp

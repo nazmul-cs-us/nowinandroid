@@ -50,6 +50,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -163,7 +164,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
 import com.starception.submission.core.duadatabase.Dua
-import com.starception.submission.core.designsystem.component.NiaTopicTag
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1133,6 +1133,13 @@ private val INSIGHT_INDICATOR_GAP = 10.dp
 /** Key in `insight_carousel_preferences` holding the chosen indicator style name. */
 private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
 
+/**
+ * Width : height of a resting insight card, from the reference design at
+ * 250x288dp. The carousel sizes cards from the height it is given, so the shape
+ * holds on viewports that cannot afford the reference height.
+ */
+private const val INSIGHT_CARD_ASPECT_RATIO = 250f / 288f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
@@ -1163,7 +1170,6 @@ fun SwipeableBigTiles(
     timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
     isLandscape: Boolean = false,
     portraitStripHeight: Dp = 288.dp,
-    portraitCardScale: Float = 1f,
     compactForExpandedPrayers: Boolean = false,
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
@@ -1488,8 +1494,15 @@ fun SwipeableBigTiles(
                 // left-column canvas in landscape.
                 maxWidth
             } else {
-                val restingCardWidth = (maxWidth * 0.64f).coerceIn(232.dp, 250.dp)
-                restingCardWidth * portraitCardScale.coerceIn(0.6f, 1f)
+                // Proportions follow the measured height. Clamping width and
+                // height against independent constants made the same card render
+                // portrait (0.87) on a 455x1015dp Pixel and landscape (1.12) on a
+                // 384x832dp handset, because each viewport hit the opposite end of
+                // its own clamp. Deriving width from height also covers the
+                // sync-compression case portraitCardScale used to handle by hand.
+                (maxHeight * INSIGHT_CARD_ASPECT_RATIO)
+                    .coerceAtMost(maxWidth * 0.64f)
+                    .coerceAtLeast(140.dp)
             }
             val compactCardWidth = if (isLandscape) {
                 normalCardWidth
@@ -2119,7 +2132,7 @@ private fun InsightPreviewCard(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val cardMaxWidth = maxWidth
-            val tagInset = (16f - (8f * compactProgress)).dp
+            val tagInset = (11f - (5f * compactProgress)).dp
             val labelFontSize = (11f - (3f * compactProgress)).sp
             val titleFontSize = (17f - (5f * compactProgress)).sp
             val titleLineHeight = (22f - (8f * compactProgress)).sp
@@ -2132,7 +2145,7 @@ private fun InsightPreviewCard(
             } else {
                 defaultHorizontalPadding
             }
-            val titleBottomPadding = (22f - (10f * compactProgress)).dp
+            val titleBottomPadding = (16f - (7f * compactProgress)).dp
             val contentSpacing = (7f - (4f * compactProgress)).dp
             val supportingFontSize = (13f - (3f * compactProgress)).sp
             val supportingLineHeight = (17f - (4f * compactProgress)).sp
@@ -2196,20 +2209,35 @@ private fun InsightPreviewCard(
                     .padding(tagInset),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                NiaTopicTag(
-                    followed = false,
+                // This tag sits in the top strip, above where the scrim gradient
+                // starts, so it floats on the raw photo. Theme on-surface colors
+                // have no surface to sit on there; match the header actions to
+                // the right instead — dark scrim pill, white label.
+                Surface(
                     onClick = onClick ?: {},
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.34f),
+                    shadowElevation = 0.dp,
+                    // TextButton, which this replaced, applied these minimums and
+                    // this content padding. Keep them so the pill holds its old
+                    // size and stays aligned with the 40dp actions to the right.
+                    modifier = Modifier.defaultMinSize(minWidth = 58.dp, minHeight = 40.dp),
                 ) {
-                    Text(
-                        text = displayLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = labelFontSize,
-                            letterSpacing = 0.sp,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = displayLabel,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = labelFontSize,
+                                letterSpacing = 0.sp,
+                            ),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    }
                 }
 
                 if (showHeaderActions) {
@@ -2578,13 +2606,18 @@ private fun InsightPreviewCard(
                     } else {
                         forecastMetrics
                     }
+                    // A card sized for a short viewport leaves the metric column
+                    // about 39dp, and "55%" behind a 16dp icon needs 44dp, so the
+                    // value alone was clipping to "5...". Shift a little of the
+                    // row to the metric and trim its icon at that size.
+                    val narrowFooter = cardMaxWidth < 200.dp
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(1.dp),
                         verticalAlignment = Alignment.Bottom,
                     ) {
                         Column(
-                            modifier = Modifier.weight(1.48f),
+                            modifier = Modifier.weight(if (narrowFooter) 1.42f else 1.48f),
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(
@@ -2650,7 +2683,7 @@ private fun InsightPreviewCard(
                                     .background(Color.White.copy(alpha = 0.22f)),
                             )
                             Column(
-                                modifier = Modifier.weight(0.52f),
+                                modifier = Modifier.weight(if (narrowFooter) 0.58f else 0.52f),
                                 horizontalAlignment = Alignment.End,
                                 verticalArrangement = Arrangement.spacedBy(1.dp),
                             ) {
@@ -2676,7 +2709,7 @@ private fun InsightPreviewCard(
                                             preferFlat = true,
                                             animationSpeed = 1f,
                                             paletteColorOverride = heroAccent,
-                                            modifier = Modifier.size(16.dp),
+                                            modifier = Modifier.size(if (narrowFooter) 13.dp else 16.dp),
                                         )
                                     }
                                     Text(

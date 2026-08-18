@@ -25,6 +25,8 @@ data class CurrentWeather(
     val relativeHumidity: Int,
     val weatherCode: Int,
     val isDay: Boolean,
+    /** Null when the provider omits it; the UI drops the "feels like" line then. */
+    val apparentTemperatureCelsius: Double? = null,
 )
 
 data class PrayerWeatherForecast(
@@ -229,8 +231,8 @@ object CurrentWeatherRepository {
                 val endpoint = URL(
                     "https://api.open-meteo.com/v1/forecast" +
                         "?latitude=$latitudeValue&longitude=$longitudeValue" +
-                        "&current=temperature_2m,relative_humidity_2m,is_day,weather_code," +
-                        "precipitation_probability" +
+                        "&current=temperature_2m,apparent_temperature,relative_humidity_2m," +
+                        "is_day,weather_code,precipitation_probability" +
                         "&temperature_unit=celsius",
                 )
                 val connection = endpoint.openConnection() as HttpsURLConnection
@@ -268,6 +270,8 @@ object CurrentWeatherRepository {
                         ?.jsonPrimitive?.intOrNull
                         ?: 0,
                     isDay = current["is_day"]?.jsonPrimitive?.intOrNull != 0,
+                    apparentTemperatureCelsius = current["apparent_temperature"]
+                        ?.jsonPrimitive?.doubleOrNull,
                 )
                 cache = CacheEntry(
                     latitudeBucket = latitudeBucket,

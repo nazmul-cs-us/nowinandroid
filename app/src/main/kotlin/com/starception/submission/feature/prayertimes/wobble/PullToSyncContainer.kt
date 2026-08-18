@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -255,7 +256,17 @@ fun PullToSyncContainer(
     }
     // Sit inside the otherwise unused lower portion of the cutout-safe area
     // while retaining clearance from the camera/status region.
-    val barTopInsetPadding = (bannerTopInsetDp - 20.dp).coerceAtLeast(0.dp)
+    //
+    // The 20dp reclaim assumes the top inset is plain status bar with room to
+    // spare. Where the inset exists *because* of a camera cutout that assumption
+    // is false and the row draws under the punch-hole, so never reclaim past the
+    // cutout itself. Devices without a cutout report 0 here and are unaffected.
+    val cutoutTopDp = with(bannerDensity) {
+        WindowInsets.displayCutout.getTop(this).toDp()
+    }
+    val barTopInsetPadding = (bannerTopInsetDp - 20.dp)
+        .coerceAtLeast(cutoutTopDp)
+        .coerceAtLeast(0.dp)
     val barBottomPadding = 4.dp
     // Fixed row, but still allowed to grow with the user's font scale so long
     // labels never clip.

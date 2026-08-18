@@ -104,6 +104,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -237,6 +238,7 @@ import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.MeteoconStyle
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
 import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.AnimatedCurrentWeatherIcon
@@ -1459,8 +1461,16 @@ fun PrayerTimesScreen(
                                     text = getPrayerDisplayName(prayerName),
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontSize = if (compactTile) 15.sp else 18.sp,
-                                        lineHeight = if (compactTile) 18.sp else 22.sp,
+                                        lineHeight = if (compactTile) 16.sp else 19.sp,
                                         platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        // includeFontPadding = false still reserves the
+                                        // font's own ascent/descent leading, so lowering
+                                        // lineHeight alone did nothing. Trimming it is
+                                        // what closes the gap to the localized name.
+                                        lineHeightStyle = LineHeightStyle(
+                                            alignment = LineHeightStyle.Alignment.Center,
+                                            trim = LineHeightStyle.Trim.Both,
+                                        ),
                                     ),
                                     color = titleColor,
                                     fontWeight = FontWeight.SemiBold,
@@ -1518,13 +1528,26 @@ fun PrayerTimesScreen(
                                         fontFamily = getSelectedArabicFontFamily(screenContext),
                                         fontSize = 15.sp,
                                         letterSpacing = 0.4.sp,
-                                        lineHeight = 20.sp,
+                                        lineHeight = 17.sp,
                                         platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        lineHeightStyle = LineHeightStyle(
+                                            alignment = LineHeightStyle.Alignment.Center,
+                                            trim = LineHeightStyle.Trim.Both,
+                                        ),
                                     ),
                                     color = supportingColor,
                                     fontWeight = FontWeight.Normal,
                                     overflow = TextOverflow.Ellipsis,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    // The name shares its Row with a 24dp IconButton,
+                                    // which is taller than the name's own line box and
+                                    // therefore sets the Row height, centring the name
+                                    // and stranding dead space beneath it. That space
+                                    // belongs to the Row, so no lineHeight or
+                                    // LineHeightStyle on this text can reclaim it —
+                                    // measured pixel-identical when tried. Close the
+                                    // distance to the name it translates directly.
+                                    modifier = Modifier.offset(y = (-6).dp),
                                 )
                             }
                         }
@@ -1880,9 +1903,15 @@ fun PrayerTimesScreen(
             // This keeps Location visible at rest instead of relying on a height
             // tuned for one handset. Larger accessibility text gets extra room too.
             val portraitInsightMaxHeight = if (configuration.screenHeightDp < 1_000) 280.dp else 288.dp
+            // Measured against the real chrome rather than guessed: the prayer rows
+            // gave back 32dp (112 -> 96), the Show All control 8dp, the Prayer times
+            // header 8dp and the location card 6dp, on top of the slack that was
+            // already there while this sat pinned to its 208dp floor. Charge less
+            // than the chrome actually needs and the card slides under the floating
+            // navigation; charge more and dead space collects above it.
             val portraitInsightRestingHeight = (
                 configuration.screenHeightDp.dp -
-                    645.dp -
+                    576.dp -
                     (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
                 ).coerceIn(208.dp, portraitInsightMaxHeight)
             // Keep the location tile at the same screen position while the sync strip
@@ -1909,12 +1938,6 @@ fun PrayerTimesScreen(
                     .coerceAtLeast(0.dp)
             val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
                 .coerceAtLeast(170.dp)
-            val portraitInsightCardScale = if (portraitInsightRestingHeight > 0.dp) {
-                (portraitInsightHeight.value / portraitInsightRestingHeight.value)
-                    .coerceIn(0.6f, 1f)
-            } else {
-                1f
-            }
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
@@ -2193,7 +2216,12 @@ fun PrayerTimesScreen(
                     },
                     label = "prayerTileHeight",
                 ) { expanded ->
-                    if (expanded) 122.dp else 112.dp
+                    // 96dp clipped the time. The full-size tile carries the prayer
+                    // name, the Arabic name and a 24sp time, and the Arabic font
+                    // paints past its line box, so 104dp is the floor that holds the
+                    // design intact. Going lower needs the landscape compact preset,
+                    // and that preset drops the Arabic name.
+                    if (expanded) 116.dp else 106.dp
                 }
                 val tileHeight = baseTileHeight
                 val buttonIconRotation by dashboardTransition.animateFloat(
@@ -2269,7 +2297,6 @@ fun PrayerTimesScreen(
                     },
                     timeOffsets = storedOffsets,
                     portraitStripHeight = portraitInsightHeight,
-                    portraitCardScale = portraitInsightCardScale,
                     onSurahClick = onSurahClick,
                     onSurahClickWithAyah = onSurahClickWithAyah,
                     onFortressDuaClick = onFortressDuaClick,
@@ -2285,7 +2312,7 @@ fun PrayerTimesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 8.dp),
+                        .padding(top = 4.dp, bottom = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -2677,6 +2704,10 @@ fun PrayerTimesScreen(
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary,
                         ),
+                        // Default 40dp min-height around a 14dp label; the carousel
+                        // uses the difference.
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.ExpandMore,
@@ -2705,7 +2736,11 @@ fun PrayerTimesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(58.dp)
+                        // The clearance Spacer below sits after this card in a
+                        // top-aligned column, so it cannot push the card up: the only
+                        // way to keep the card off the floating nav is to keep the
+                        // card short. 42dp of conditions stack plus breathing room.
+                        .height(52.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .combinedClickable(
                             onClick = { showWeatherThresholds = true },
@@ -2716,11 +2751,19 @@ fun PrayerTimesScreen(
                         ),
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
-                    ),
-                    shadowElevation = 0.dp,
+                    // Follows the prayer tiles: outlined only in dark, where a card
+                    // needs an edge to separate from the background. In light it was
+                    // the one outlined card on the screen, and primary at 20% renders
+                    // a cool blue hairline against these warm surfaces.
+                    border = if (LocalDarkTheme.current) {
+                        BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                        )
+                    } else {
+                        null
+                    },
+                    shadowElevation = if (LocalDarkTheme.current) 0.dp else 1.dp,
                 ) {
                     Row(
                         modifier = Modifier
@@ -2780,6 +2823,14 @@ fun PrayerTimesScreen(
                         val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
                             ?: countryCode.orEmpty()
 
+                        // Marker, name and chevron travel together and claim the row's
+                        // spare width as a group. A weighted Spacer alongside the name
+                        // column split that space evenly instead, which is what
+                        // truncated the name to "Al Safouh Se...".
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                         Image(
                             painter = locationMarkerPainter,
                             contentDescription = "Prayer location",
@@ -2790,7 +2841,7 @@ fun PrayerTimesScreen(
                         Spacer(modifier = Modifier.width(10.dp))
 
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f, fill = false),
                             verticalArrangement = Arrangement.Center,
                         ) {
                             Text(
@@ -2822,6 +2873,19 @@ fun PrayerTimesScreen(
                             }
                         }
 
+                        // Sits directly against the location text: the column above
+                        // uses fill = false, so it reports only the width it needs and
+                        // this lands right after it rather than at the row's far edge.
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Weather details",
+                            tint = locationTileSupporting.copy(alpha = 0.7f),
+                            modifier = Modifier
+                                .padding(start = 2.dp)
+                                .size(16.dp),
+                        )
+                        }
+
                         when (val weatherState = currentWeatherState) {
                             CurrentWeatherLoadState.Loading -> {
                                 PortraitWeatherLoadingPlaceholder()
@@ -2847,81 +2911,89 @@ fun PrayerTimesScreen(
                                 "${weather.precipitationProbability}% rain"
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
 
-                            Column(
-                                horizontalAlignment = Alignment.End,
-                                // The Meteocon canvases have a little internal air.
-                                // Slightly overlap the row bounds so the condition and
-                                // humidity/rain lines read as one compact weather block.
-                                verticalArrangement = Arrangement.spacedBy(
-                                    space = (-2).dp,
-                                    alignment = Alignment.CenterVertically,
-                                ),
+                            // Rule separating location identity from conditions, as
+                            // in the dashboard reference.
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(30.dp)
+                                    .background(
+                                        // outline renders warm here and fought the
+                                        // navy palette; match the card's own border.
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                                    ),
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    Text(
-                                        text = conditionLabel,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = 10.5.sp,
-                                            lineHeight = 13.sp,
-                                            letterSpacing = 0.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
-                                            ),
-                                        ),
-                                        color = locationTileContent,
-                                        maxLines = 1,
+                                // Monochrome takes the palette tint fully, so it reads
+                                // at this size against a pale card the way the location
+                                // pin beside it does. Fill and Flat are both light
+                                // artwork and washed out here, which is what the tinted
+                                // disc was previously compensating for.
+                                if (temperatureLevel == WeatherThresholdLevel.Normal) {
+                                    AnimatedCurrentWeatherIcon(
+                                        weather = weather,
+                                        styleOverride = MeteoconStyle.Monochrome,
+                                        modifier = Modifier.size(36.dp),
                                     )
-                                    if (temperatureLevel == WeatherThresholdLevel.Normal) {
-                                        AnimatedCurrentWeatherIcon(
-                                            weather = weather,
-                                            modifier = Modifier
-                                                .size(23.dp)
-                                                .graphicsLayer(scaleX = 1.08f, scaleY = 1.08f),
-                                        )
-                                    } else {
-                                        AnimatedPrayerWeatherIcon(
-                                            visual = PrayerWeatherVisual.Heat,
-                                            level = temperatureLevel,
-                                            modifier = Modifier
-                                                .size(23.dp)
-                                                .graphicsLayer(scaleX = 1.08f, scaleY = 1.08f),
-                                        )
-                                    }
-                                    Text(
-                                        text = "${weather.temperatureCelsius.roundToInt()}°",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 17.sp,
-                                            lineHeight = 19.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
-                                            ),
-                                        ),
-                                        color = locationTileContent,
-                                        maxLines = 1,
+                                } else {
+                                    AnimatedPrayerWeatherIcon(
+                                        visual = PrayerWeatherVisual.Heat,
+                                        level = temperatureLevel,
+                                        modifier = Modifier.size(36.dp),
                                     )
                                 }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                                Column(
+                                    horizontalAlignment = Alignment.Start,
+                                    verticalArrangement = Arrangement.Center,
                                 ) {
-                                    AnimatedPrayerWeatherIcon(
-                                        visual = PrayerWeatherVisual.Humidity,
-                                        level = humidityLevel,
-                                        modifier = Modifier
-                                            .size(19.dp)
-                                            .graphicsLayer(scaleX = 1.16f, scaleY = 1.16f),
+                                    // Keep these stacked. Setting temperature and
+                                    // condition on one line widened this block to
+                                    // ~135dp, and because it is unweighted it claims
+                                    // that width first — which truncated the location
+                                    // name to "Al Safo...". Stacked, the widest line
+                                    // is ~68dp and the location keeps its room.
+                                    Text(
+                                        text = "${weather.temperatureCelsius.roundToInt()}°",
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 15.sp,
+                                            lineHeight = 18.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
+                                        ),
+                                        color = locationTileContent,
+                                        maxLines = 1,
                                     )
                                     Text(
-                                        // The gauge already communicates humidity;
-                                        // keeping only the value makes room for the
-                                        // larger, more legible Meteocon.
-                                        text = "${weather.relativeHumidity}%",
+                                        text = conditionLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.5.sp,
+                                            lineHeight = 13.sp,
+                                            letterSpacing = 0.sp,
+                                            platformStyle = PlatformTextStyle(
+                                                includeFontPadding = false,
+                                            ),
+                                        ),
+                                        color = locationTileContent,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    val feelsLike = weather.apparentTemperatureCelsius
+                                    Text(
+                                        text = if (feelsLike != null) {
+                                            "Feels like ${feelsLike.roundToInt()}°"
+                                        } else {
+                                            "${weather.relativeHumidity}% · $precipitationLabel"
+                                        },
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 10.5.sp,
                                             lineHeight = 13.sp,
@@ -2932,38 +3004,10 @@ fun PrayerTimesScreen(
                                         ),
                                         color = locationTileSupporting,
                                         maxLines = 1,
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    AnimatedPrayerWeatherIcon(
-                                        visual = PrayerWeatherVisual.Rain,
-                                        level = rainLevel,
-                                        modifier = Modifier
-                                            .size(19.dp)
-                                            .graphicsLayer(scaleX = 1.16f, scaleY = 1.16f),
-                                    )
-                                    Text(
-                                        text = precipitationLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 10.5.sp,
-                                            lineHeight = 13.sp,
-                                            letterSpacing = 0.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
-                                            ),
-                                        ),
-                                        color = locationTileSupporting,
-                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Weather details",
-                                tint = locationTileSupporting,
-                                modifier = Modifier.size(17.dp),
-                            )
                             }
                             CurrentWeatherLoadState.Unavailable -> Unit
                         }

@@ -198,12 +198,16 @@ internal fun AnimatedPrayerWeatherIcon(
 internal fun AnimatedCurrentWeatherIcon(
     weather: CurrentWeather,
     modifier: Modifier = Modifier,
+    // Fill is glossy, near-white artwork. Because the tint below is BlendMode.COLOR,
+    // which keeps the source luminosity, that style disappears against a pale
+    // surface. Callers sitting on one can ask for a style that holds its own.
+    styleOverride: MeteoconStyle? = null,
 ) {
     val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val paletteColor = MaterialTheme.colorScheme.primary
     AnimatedMeteocon(
         animationResource = weather.currentWeatherVisual().animationResource(
-            if (useDarkPalette) MeteoconStyle.Flat else MeteoconStyle.Fill,
+            styleOverride ?: if (useDarkPalette) MeteoconStyle.Flat else MeteoconStyle.Fill,
         ),
         paletteColorFilter = remember(paletteColor) {
             themedMeteoconColorFilter(paletteColor.toArgb())
