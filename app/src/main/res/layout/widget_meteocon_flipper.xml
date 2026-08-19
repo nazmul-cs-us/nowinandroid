@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Animated Meteocon for a home-screen widget.
+
+     A widget's content is RemoteViews, drawn by the launcher's process from a
+     serialised description: there is no Lottie there and no frame loop to drive it, so
+     the animated icon used on the prayer screen cannot be embedded directly. ViewFlipper
+     is the exception — it carries @RemoteView, so RemoteViews accepts it, and with
+     autoStart it advances its children on its own inside the launcher with no help from
+     us. Each child is filled at runtime with one rasterised Lottie frame.
+
+     flipInterval x child count sets the loop duration; 450ms x 6 gives ~2.7s, close to
+     the source animation's own pace without the payload of a full 60fps sample.
+-->
+<ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/meteocon_flipper"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:autoStart="true"
+    android:flipInterval="450"
+    android:measureAllChildren="true">
+
+    <ImageView
+        android:id="@+id/meteocon_frame_0"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_3"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_4"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_5"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+</ViewFlipper>

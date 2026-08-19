@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glance requires API 26+. The app's minSdk is 28, so the ported receivers are always
+     enabled; the bool is kept because the upstream provider XMLs and manifest entries
+     reference it, and dropping it would mean editing every one of them. -->
+<resources>
+    <bool name="glance_appwidget_available">true</bool>
+</resources>

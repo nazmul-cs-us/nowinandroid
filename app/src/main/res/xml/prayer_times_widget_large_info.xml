@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Prayer times widget, 4x3 entry.
+
+     One of five provider entries so the picker lists every size. They all render the
+     same responsive layouts and stay freely resizable (minResize stays at a 2x1, max
+     well beyond a 5x4); the only thing this file decides is where the widget lands
+     when it is first dropped.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/prayer_widget_description"
+    android:initialLayout="@layout/prayer_widget_loading"
+    android:minWidth="250dp"
+    android:minHeight="180dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeWidth="400dp"
+    android:maxResizeHeight="320dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:previewImage="@mipmap/ic_launcher"
+    android:previewLayout="@layout/prayer_widget_preview_large"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen|keyguard" />

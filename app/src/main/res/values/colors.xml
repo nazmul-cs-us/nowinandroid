@@ -18,5 +18,24 @@
   <color name="cat_music_player_primary">@android:color/white</color>
   <color name="cat_music_player_secondary">@android:color/black</color>
   <color name="cat_music_player_on_secondary">@android:color/white</color>
+
+  <!-- Prayer widget picker preview and loading placeholder.
+
+       Sampled pixel-for-pixel out of platform-samples' own preview assets
+       (drawable-nodpi/sample_check_list_preview.png) so our picker entries sit beside
+       the ported widgets in the same palette.
+
+       These are deliberately fixed rather than Material You. Pointing them at
+       @android:color/system_* was tried: it makes the preview track the wallpaper and
+       so match the *placed* widget, but it then stops matching the ported widgets,
+       whose previews are baked PNGs frozen in this navy. platform-samples' own approach
+       is exactly this pair — a fixed preview and a dynamic placed widget — so matching
+       it means matching the fixed preview too. -->
+  <color name="prayer_widget_background">#FFECF0FF</color>
+  <color name="prayer_widget_on_background">#FF1A1B20</color>
+  <color name="prayer_widget_muted">#FF44474F</color>
+  <color name="prayer_widget_accent">#FF445E91</color>
+  <color name="prayer_widget_card">#FFDCE2F9</color>
+  <color name="prayer_widget_on_card">#FF141B2C</color>
 </resources>
 

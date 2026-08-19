@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background for the widget's loading placeholder and picker preview. The live
+     widget draws its own Glance surface, so this is only ever visible for the moment
+     before the first composition lands. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <solid android:color="@color/prayer_widget_background" />
+</shape>

@@ -315,6 +315,42 @@ object CurrentWeatherRepository {
         PrayerWeatherIntelligence.create(prayerName, nearest, thresholds)
     }
 
+    /**
+     * Forecast for the hour nearest each of [times], keyed by prayer name.
+     *
+     * [getPrayerInsight] answers "is anything noteworthy about this prayer's weather",
+     * which is the wrong question for a display that wants an icon and a temperature
+     * for every prayer regardless of whether it crosses a threshold. This returns the
+     * raw hourly reading instead, and does it in a single fetch for all five prayers
+     * rather than one round trip each.
+     *
+     * A prayer is omitted when no forecast hour lands within an hour of it, which is
+     * how yesterday's cached window degrades rather than reporting a wrong sky.
+     */
+    suspend fun getPrayerForecasts(
+        latitude: Double,
+        longitude: Double,
+        date: LocalDate,
+        times: Map<String, LocalTime>,
+    ): Map<String, PrayerWeatherForecast> = withContext(Dispatchers.IO) {
+        val forecasts = getHourlyForecast(latitude, longitude, forceRefresh = false)
+            ?: return@withContext emptyMap()
+
+        times.mapNotNull { (name, time) ->
+            val target = LocalDateTime.of(date, time)
+            forecasts
+                .minByOrNull {
+                    kotlin.math.abs(java.time.Duration.between(target, it.dateTime).toMinutes())
+                }
+                ?.takeIf {
+                    kotlin.math.abs(
+                        java.time.Duration.between(target, it.dateTime).toMinutes(),
+                    ) <= 60
+                }
+                ?.let { name to it }
+        }.toMap()
+    }
+
     private fun getHourlyForecast(
         latitude: Double,
         longitude: Double,

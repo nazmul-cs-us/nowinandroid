@@ -1,0 +1,15 @@
+<!--
+  Material Symbols glyph, drawn to match the canonical widget layouts' own icons
+  (24dp viewport, tint-driven fill). Authored here rather than imported so the app
+  carries no third-party icon-licence attribution obligation.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="#000000"
+    android:viewportHeight="24"
+    android:viewportWidth="24">
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M6,17h3l2,-4V7H5v6h3zM14,17h3l2,-4V7h-6v6h3z" />
+</vector>

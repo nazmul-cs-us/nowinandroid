@@ -20,5 +20,89 @@
   <dimen name="cat_music_player_button_size">56dp</dimen>
   <dimen name="cat_music_player_control_button_margin">36dp</dimen>
   <dimen name="cat_music_player_volume_button_margin">48dp</dimen>
+
+  <dimen name="sample_expressive_toolbar_widget_min_width">120dp</dimen>
+  <dimen name="sample_expressive_toolbar_widget_min_height">115dp</dimen>
+  <dimen name="sample_expressive_toolbar_widget_min_resize_width">56dp</dimen>
+  <dimen name="sample_expressive_toolbar_widget_min_resize_height">56dp</dimen>
+  <dimen name="sample_expressive_toolbar_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_expressive_toolbar_widget_max_resize_height">200dp</dimen>
+  <dimen name="sample_toolbar_widget_min_width">256dp</dimen>
+  <dimen name="sample_toolbar_widget_min_height">48dp</dimen>
+  <dimen name="sample_toolbar_widget_min_resize_width">48dp</dimen>
+  <dimen name="sample_toolbar_widget_min_resize_height">48dp</dimen>
+  <dimen name="sample_toolbar_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_toolbar_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_search_toolbar_widget_min_width">120dp</dimen>
+  <dimen name="sample_search_toolbar_widget_min_height">115dp</dimen>
+  <dimen name="sample_search_toolbar_widget_min_resize_width">48dp</dimen>
+  <dimen name="sample_search_toolbar_widget_min_resize_height">48dp</dimen>
+  <dimen name="sample_search_toolbar_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_search_toolbar_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_long_text_widget_min_width">120dp</dimen>
+  <dimen name="sample_long_text_widget_min_height">115dp</dimen>
+  <dimen name="sample_long_text_min_resize_width">120dp</dimen>
+  <dimen name="sample_long_text_min_resize_height">115dp</dimen>
+  <dimen name="sample_long_text_max_resize_width">624dp</dimen>
+  <dimen name="sample_long_text_max_resize_height">276dp</dimen>
+  <dimen name="sample_text_with_image_widget_min_width">256dp</dimen>
+  <dimen name="sample_text_with_image_widget_min_height">115dp</dimen>
+  <dimen name="sample_text_with_image_widget_min_resize_width">120dp</dimen>
+  <dimen name="sample_text_with_image_widget_min_resize_height">115dp</dimen>
+  <dimen name="sample_text_with_image_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_text_with_image_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_text_with_image_list_widget_min_width">256dp</dimen>
+  <dimen name="sample_text_with_image_list_widget_min_height">115dp</dimen>
+  <dimen name="sample_text_with_image_widget_list_min_resize_width">120dp</dimen>
+  <dimen name="sample_text_with_image_list_widget_min_resize_height">115dp</dimen>
+  <dimen name="sample_text_with_image_list_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_text_with_image_list_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_check_list_widget_min_width">120dp</dimen>
+  <dimen name="sample_check_list_widget_min_height">115dp</dimen>
+  <dimen name="sample_check_list_widget_min_resize_width">120dp</dimen>
+  <dimen name="sample_check_list_widget_min_resize_height">115dp</dimen>
+  <dimen name="sample_check_list_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_check_list_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_action_list_widget_min_width">256dp</dimen>
+  <dimen name="sample_action_list_widget_min_height">115dp</dimen>
+  <dimen name="sample_action_list_widget_min_resize_width">120dp</dimen>
+  <dimen name="sample_action_list_widget_min_resize_height">115dp</dimen>
+  <dimen name="sample_action_list_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_action_list_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_image_grid_widget_min_width">256dp</dimen>
+  <dimen name="sample_image_grid_widget_min_height">185dp</dimen>
+  <dimen name="sample_image_grid_widget_min_resize_width">120dp</dimen>
+  <dimen name="sample_image_grid_widget_min_resize_height">115dp</dimen>
+  <dimen name="sample_image_grid_widget_max_resize_width">624dp</dimen>
+  <dimen name="sample_image_grid_widget_max_resize_height">422dp</dimen>
+  <dimen name="sample_full_bleed_image_widget_min_width">120dp</dimen>
+  <dimen name="sample_full_bleed_image_widget_min_height">48dp</dimen>
+  <dimen name="sample_full_bleed_image_widget_min_resize_width">120dp</dimen>
+  <dimen name="sample_full_bleed_image_widget_min_resize_height">48dp</dimen>
+
+  <!-- targetCellWidth/Height for the ported widgets. These MUST have a default
+       (non-qualified) value: they only existed under values-xlarge before, so on a
+       phone the appwidget-provider XML failed to parse and every widget registered
+       with min=0 and widgetCategory=0, which makes the launcher hide it entirely. -->
+  <integer name="sample_expressive_toolbar_target_cell_width">2</integer>
+  <integer name="sample_expressive_toolbar_target_cell_height">2</integer>
+  <integer name="sample_toolbar_target_cell_width">4</integer>
+  <integer name="sample_toolbar_target_cell_height">1</integer>
+  <integer name="sample_search_toolbar_target_cell_width">2</integer>
+  <integer name="sample_search_toolbar_target_cell_height">2</integer>
+  <integer name="sample_long_text_target_cell_width">2</integer>
+  <integer name="sample_long_text_target_cell_height">2</integer>
+  <integer name="sample_text_with_image_target_cell_width">4</integer>
+  <integer name="sample_text_with_image_target_cell_height">2</integer>
+  <integer name="sample_text_with_image_list_target_cell_width">4</integer>
+  <integer name="sample_text_with_image_list_target_cell_height">2</integer>
+  <integer name="sample_check_list_target_cell_width">2</integer>
+  <integer name="sample_check_list_target_cell_height">2</integer>
+  <integer name="sample_action_list_target_cell_width">4</integer>
+  <integer name="sample_action_list_target_cell_height">2</integer>
+  <integer name="sample_image_grid_target_cell_width">4</integer>
+  <integer name="sample_image_grid_target_cell_height">3</integer>
+  <integer name="sample_full_bleed_image_target_cell_width">2</integer>
+  <integer name="sample_full_bleed_image_target_cell_height">2</integer>
 </resources>
 

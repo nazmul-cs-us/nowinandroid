@@ -57,4 +57,38 @@
   <string name="app_search_section_recent">RECENT</string>
   <string name="app_search_section_popular_verses">POPULAR VERSES</string>
   <string name="app_search_section_popular_searches">POPULAR SEARCHES</string>
+
+  <!-- Home-screen prayer times widget. One label per picker entry; the launcher
+       appends the cell size ("4x2") under the name on its own. -->
+  <string name="prayer_widget_label_tiny">Next Prayer</string>
+  <string name="prayer_widget_label_small">Next Prayer Card</string>
+  <string name="prayer_widget_label">Prayer Times</string>
+  <string name="prayer_widget_label_large">Prayer Times &amp; Location</string>
+  <string name="prayer_widget_label_full">Prayer Times (Full Day)</string>
+  <string name="prayer_widget_description">Next prayer and today\'s full schedule, at any widget size.</string>
+  <string name="prayer_widget_loading">Prayer times</string>
+
+  <!-- Strings for the canonical widget layouts ported from platform-samples.
+       Kept under the sample_ prefix they arrived with so they stay recognisable
+       as upstream and cannot collide with the app's own names. -->
+  <string name="sample_app_name">Prayer</string>
+  <string name="sample_action_list_settings_label">Settings</string>
+  <string name="sample_refresh_icon_button_label">Refresh</string>
+  <string name="sample_no_data_text">Open the app to load prayer times</string>
+  <string name="sample_long_text_app_widget_name">Daily Reminder</string>
+  <string name="sample_text_with_image_app_widget_name">Prayer Insight</string>
+  <string name="sample_text_and_image_app_widget_name">Prayer Insight</string>
+  <string name="sample_text_and_image_list_app_widget_name">Quran Surahs</string>
+  <string name="sample_check_list_app_widget_name">Prayer Checklist</string>
+  <string name="sample_action_list_app_widget_name">Prayer Settings</string>
+  <string name="sample_image_grid_app_widget_name">Quran Grid</string>
+  <string name="sample_expressive_toolbar_app_widget_name">Quick Actions</string>
+  <string name="sample_toolbar_app_widget_name">Prayer Toolbar</string>
+  <string name="sample_search_toolbar_app_widget_name">Search Quran</string>
+  <string name="sample_add_button_text">Add</string>
+  <string name="sample_learn_more_button_text">Learn more</string>
+  <string name="sample_see_more_button_label">See more</string>
+  <string name="sample_search_button_label">Search</string>
+  <string name="sample_mark_done_button_content_description">sample_mark_done</string>
+  <string name="sample_full_bleed_image_app_widget_name">Full Bleed Snap Scrolling</string>
 </resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tonal container for the next-prayer block in the picker previews, matching the
+     filled surface the live Glance layout draws with primaryContainer. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <solid android:color="@color/prayer_widget_card" />
+</shape>

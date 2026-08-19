@@ -144,6 +144,238 @@
             android:enabled="true"
             android:exported="false" />
             
+        <!-- Home-screen prayer times widgets (Glance).
+
+             Five receivers, one per size, because the launcher binds widgets by provider
+             component: a single receiver can only ever produce a single picker entry.
+             They all render the same responsive layouts and all stay resizable — the
+             only difference is the footprint each one lands at when dropped.
+
+             Exported because the launcher process is what delivers APPWIDGET_UPDATE. The
+             clock actions are on each filter rather than in a separate receiver so a
+             timezone or manual clock change redraws the wall-clock prayer times
+             immediately instead of waiting out the 30-minute updatePeriodMillis. -->
+        <receiver
+            android:name=".widget.PrayerTimesTinyWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_tiny">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_times_widget_tiny_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerTimesSmallWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_small">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_times_widget_small_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerTimesWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_times_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerTimesLargeWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_large">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_times_widget_large_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerTimesFullWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_full">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_times_widget_full_info" />
+        </receiver>
+
+
+        <!-- Canonical widget layouts ported from platform-samples. Each is its own
+             provider so the picker lists them separately, exactly as upstream does.
+             LOCALE_CHANGED is on every filter because these layouts render localised
+             strings that a language change would otherwise leave stale. -->
+        <receiver
+            android:name=".widget.samples.toolbars.ExpressiveToolbarAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_expressive_toolbar_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_expressive_toolbar_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.toolbars.ToolBarAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_toolbar_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_toolbar_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.toolbars.SearchToolBarAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_search_toolbar_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_search_toolbar_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.text.LongTextAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_long_text_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_long_text_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.text.TextWithImageAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_text_and_image_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_text_with_image_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.collections.ImageTextListAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_text_and_image_list_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_image_text_list_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.collections.CheckListAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_check_list_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_check_list_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.collections.ActionListAppWidgetAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_action_list_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_action_list_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.samples.collections.ImageGridAppWidgetReceiver"
+            android:enabled="@bool/glance_appwidget_available"
+            android:exported="true"
+            android:label="@string/sample_image_grid_app_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sample_image_grid_widget_info" />
+        </receiver>
+        <!-- Debug receiver to place a prayer widget from adb. A widget only composes
+             once placed, so without this there is no way to verify render-time behaviour
+             (the animated Meteocon) except by dragging one out of the picker by hand. -->
+        <receiver
+            android:name=".widget.DebugPinWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_PIN_WIDGET" />
+            </intent-filter>
+        </receiver>
+
         <!-- Debug receiver to simulate driving detection via adb -->
         <receiver
             android:name=".util.DebugDrivingReceiver"

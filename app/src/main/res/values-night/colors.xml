@@ -17,5 +17,14 @@
 <resources>
   <color name="cat_music_player_secondary">@android:color/white</color>
   <color name="cat_music_player_on_secondary">@android:color/black</color>
+
+  <!-- Sampled from platform-samples' drawable-night-nodpi/sample_check_list_preview.png
+       so our picker entries match the ported widgets exactly in dark mode. -->
+  <color name="prayer_widget_background">#FF283041</color>
+  <color name="prayer_widget_on_background">#FFE2E2E9</color>
+  <color name="prayer_widget_muted">#FFC4C6CF</color>
+  <color name="prayer_widget_accent">#FFB0C6FF</color>
+  <color name="prayer_widget_card">#FF3B4664</color>
+  <color name="prayer_widget_on_card">#FFDCE2F9</color>
 </resources>
 

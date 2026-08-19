@@ -2757,7 +2757,13 @@ private fun InsightPreviewCard(
     }
 }
 
-private fun prayerWindowProgress(
+/**
+ * How far the clock has travelled between the last prayer and the next, 0..1.
+ *
+ * Internal rather than private because the home-screen widget draws the same bar, and
+ * a second copy of this arithmetic would be free to drift out of step with the tile.
+ */
+internal fun prayerWindowProgress(
     prayerTimes: DayPrayerTimes?,
     currentTime: LocalTime,
 ): Float? {

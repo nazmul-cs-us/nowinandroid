@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.starception.submission.prayer.model.*
 import com.starception.submission.usersettings.UserSettingsStore
+import com.starception.submission.widget.PrayerWidgetUpdater
 import java.time.LocalDateTime
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -2689,11 +2690,51 @@ class PrayerSettingsRepository @Inject constructor(
         Log.i(TAG, "✅ PRAYER TIMES CACHE: Successfully cached all data to preferences")
         Log.i(TAG, "📈 Cache Performance: Fast app startup enabled for ${prayerTimes.date.toLocalDate()}")
         Log.i(TAG, "")
+
+        // This is the single point where a fresh calculation becomes the app's persisted
+        // truth, so it is also where the home-screen widget has to be told to redraw —
+        // a settings, location or date change would otherwise leave it showing yesterday's
+        // schedule until updatePeriodMillis next fired. Fire-and-forget; no widget placed
+        // makes it a no-op.
+        PrayerWidgetUpdater.refresh(context)
     }
     
     /**
+     * CACHED LOCATION RETRIEVAL: Gets the last location prayer times were calculated for.
+     *
+     * Unlike [getCachedPrayerTimes] this has no date validity check, so it keeps working
+     * the morning after the cached times go stale. That is what makes it the right entry
+     * point for headless callers (the home-screen widget) that must recalculate today's
+     * times without waking GPS: cached location + stored settings is enough input for
+     * [com.starception.submission.prayer.service.PrayerTimeCalculatorService].
+     *
+     * Returns null only when prayer times have never been cached on this install.
+     */
+    fun getCachedLocation(): Location? {
+        if (!prefs.contains(KEY_CACHED_LOCATION_LAT)) return null
+
+        return try {
+            Location(
+                latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble(),
+                longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble(),
+                timeZoneOffset = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble(),
+                city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: "",
+                country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: "",
+                countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: "",
+                area = prefs.getString(KEY_CACHED_LOCATION_AREA, "") ?: "",
+                subLocality = prefs.getString(KEY_CACHED_LOCATION_SUB_LOCALITY, "") ?: "",
+                thoroughfare = prefs.getString(KEY_CACHED_LOCATION_THOROUGHFARE, "") ?: "",
+                administrativeArea = prefs.getString(KEY_CACHED_LOCATION_ADMIN_AREA, "") ?: "",
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to read cached location", e)
+            null
+        }
+    }
+
+    /**
      * CACHED PRAYER TIMES RETRIEVAL: Gets stored prayer times for instant display
-     * 
+     *
      * This enables instant app startup by showing cached prayer times immediately.
      * 
      * VALIDATION PROCESS:

@@ -484,6 +484,13 @@ class PrayerTimesCalculator(private val context: Context) {
             if (finalCalculatedTimes != null) {
                 try {
                     cache.cachePrayerTimes(finalCalculatedTimes, today, locationName)
+                    // The line above only fills the in-memory LocationCache, which dies with
+                    // the process. Persist the same result so anything running outside the
+                    // app's lifetime — the home-screen widget above all — has today's times
+                    // to read instead of recalculating from scratch on every update. This
+                    // also fires the widget redraw, since cachePrayerTimes is the single
+                    // point where a calculation becomes persisted truth.
+                    settingsRepository.cachePrayerTimes(finalCalculatedTimes)
                     android.util.Log.d("PrayerCalculation", "✓ Prayer times cached successfully for instant future access")
                     // This cached data will be returned immediately on next app launch
                 } catch (e: Exception) {

@@ -183,6 +183,12 @@ dependencies {
     implementation(libs.androidx.work.ktx)
     implementation(libs.hilt.ext.work)
 
+    // Glance for the home-screen prayer times app widget. Glance composables are a
+    // separate runtime from the app's Compose UI — they render to RemoteViews, so the
+    // widget cannot reuse any screen composable and lives entirely under widget/.
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
     // Room Database for Quran
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
