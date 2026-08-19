@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Debug-only additions. Nothing declared here reaches a release build, which is the
+     point: an earlier version of this receiver lived in src/main and shipped exported to
+     every app on the device.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Renders a chosen size bucket in an already-placed widget by rewriting its
+             size options. Glance picks its layout from the size the host reports, and
+             there is no adb command to place or resize a widget, so without this a 2x1
+             layout can only be seen by dragging a 2x1 out of the picker by hand. -->
+        <receiver
+            android:name="com.starception.submission.widget.DebugResizeWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_RESIZE_WIDGET" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

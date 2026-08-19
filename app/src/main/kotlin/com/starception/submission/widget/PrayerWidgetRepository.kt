@@ -181,7 +181,26 @@ internal data class PrayerInsight(
     val title: String,
     val elapsed: String,
     val nextPrayerInfo: String,
-)
+) {
+    /**
+     * [title] without the prayer name it ends with.
+     *
+     * The full phrases — "Best Time to Pray Asr", "Go to Mosque for Fajr" — are 20+
+     * characters and wrap on any narrow widget, stranding the prayer name alone on a
+     * second line. Dropping it loses nothing: [elapsed] already names the same prayer
+     * on the line directly beneath ("24 minutes since Asr").
+     */
+    /** Prayer this insight is about, e.g. "Asr" — the last word of [elapsed]. */
+    val caption: String
+        get() = elapsed.substringAfterLast(' ')
+
+    val shortTitle: String
+        get() = title
+            .removeSuffix(elapsed.substringAfterLast(' '))
+            .trim()
+            .removeSuffix(" for")
+            .trim()
+}
 
 private data class WidgetWeather(
     val icon: Bitmap?,
@@ -217,7 +236,7 @@ private suspend fun recalculateForToday(
  * Reuses the prayer screen's own content generator so the widget and the "Prayer now"
  * tile can never word the same moment differently.
  */
-private fun DayPrayerTimes.toInsight(repository: PrayerSettingsRepository): PrayerInsight? {
+internal fun DayPrayerTimes.toInsight(repository: PrayerSettingsRepository): PrayerInsight? {
     val notifications = repository.getNotificationPreferences()
 
     return SmartContentUtils.getNotificationSyncContent(
@@ -318,3 +337,22 @@ private fun countdownTo(target: LocalTime, now: LocalTime): String {
 private fun Location.shortLabel(): String = listOf(area, subLocality, city, administrativeArea, country)
     .firstOrNull { it.isNotBlank() }
     ?: "Prayer times"
+
+
+/**
+ * The current prayer insight, for widgets that render through the ported sample layouts.
+ *
+ * Those layouts load their own data rather than receiving [PrayerWidgetState], so this
+ * gives them the same generator the prayer screen and the hero widget use. Returns null
+ * when no prayer is being tracked, and callers should fall back to their own copy.
+ */
+internal suspend fun livePrayerInsight(context: Context): PrayerInsight? = try {
+    val repository = EntryPointAccessors
+        .fromApplication(context.applicationContext, PrayerWidgetEntryPoint::class.java)
+        .prayerSettingsRepository()
+
+    repository.getCachedPrayerTimes()?.toInsight(repository)
+} catch (e: Exception) {
+    Log.w(TAG, "Live prayer insight unavailable", e)
+    null
+}

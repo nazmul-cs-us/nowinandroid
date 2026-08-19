@@ -2566,21 +2566,22 @@ private fun InsightPreviewCard(
                 }
 
                 timelineProgress?.let { progress ->
-                    val boundedProgress = progress.coerceIn(0f, 1f)
-                    Box(
+                    // Material 3 Expressive linear indicator: rounded caps on both the
+                    // active segment and the track, separated by gapSize, with the stop
+                    // indicator at the end. Previously a hand-rolled track and fill —
+                    // square-ended, no gap — which predates gapSize landing in Material3.
+                    // The home-screen widget draws the same shape from primitives, since
+                    // RemoteViews cannot host this component.
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.22f)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(boundedProgress)
-                                .fillMaxHeight()
-                                .background(heroAccent.copy(alpha = 0.92f)),
-                        )
-                    }
+                            .height(6.dp),
+                        color = heroAccent.copy(alpha = 0.92f),
+                        trackColor = Color.White.copy(alpha = 0.22f),
+                        strokeCap = StrokeCap.Round,
+                        gapSize = 4.dp,
+                    )
                 }
 
                 statusText?.takeIf { it.isNotBlank() }?.let { text ->

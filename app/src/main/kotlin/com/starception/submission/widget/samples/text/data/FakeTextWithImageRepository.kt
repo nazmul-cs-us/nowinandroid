@@ -45,12 +45,19 @@ class FakeTextWithImageRepository {
       contentDescription = item.imageContentDescription
     )
 
+    // Headline and caption come from the app's own generator so the card describes the
+    // prayer that is actually current — the canned text said "Fajr" at Asr time. The
+    // imagery stays as authored; only the words are ours.
+    val live = com.starception.submission.widget.livePrayerInsight(context)
+
     data.value = TextWithImageData(
       textData = TextData(
         key = "$itemIndex",
-        primary = item.primary,
-        secondary = item.secondary,
-        caption = item.caption
+        primary = live?.title ?: item.primary,
+        // The layout gives this a narrow column and clips it; the sample's copy ran to
+        // three lines and lost its last word to an ellipsis.
+        secondary = live?.let { "${it.elapsed}. ${it.nextPrayerInfo}" } ?: item.secondary,
+        caption = live?.caption ?: item.caption
       ),
       imageData = mappedImageData
     )
