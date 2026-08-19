@@ -365,16 +365,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/sample_image_grid_widget_info" />
         </receiver>
-        <!-- Debug receiver to place a prayer widget from adb. A widget only composes
-             once placed, so without this there is no way to verify render-time behaviour
-             (the animated Meteocon) except by dragging one out of the picker by hand. -->
-        <receiver
-            android:name=".widget.DebugPinWidgetReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.starception.submission.DEBUG_PIN_WIDGET" />
-            </intent-filter>
-        </receiver>
 
         <!-- Debug receiver to simulate driving detection via adb -->
         <receiver

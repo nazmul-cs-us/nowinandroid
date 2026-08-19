@@ -108,7 +108,7 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
                         // leaves room for neither. They keep the compact hero, which is
                         // the only thing that fits there.
                         TINY -> BareSurface { TinyContent(state) }
-                        SMALL -> BareSurface(Alignment.Vertical.Top) { SmallContent(state) }
+                        SMALL -> BareSurface(Alignment.Vertical.CenterVertically) { SmallContent(state) }
                         // Everything with room renders through the layout ported from
                         // platform-samples, so it is identical to the sample widgets by
                         // construction rather than by imitation.
@@ -239,18 +239,17 @@ private fun TinyContent(state: PrayerWidgetState.Available) {
 private fun ColumnScope.SmallContent(state: PrayerWidgetState.Available) {
     val insight = state.insight
 
-    // Type is sized to fill the card rather than sit in it. Earlier passes moved a block
-    // of empty space around — centred left gaps top and bottom, top-anchored left 45% at
-    // the bottom, a weighted spacer left 51% in the middle — because four short lines at
-    // 10-12sp cannot fill a 2x2 wherever they are placed. The fix is the type, not the
-    // alignment: at these sizes the content occupies the card and stays legible at arm's
-    // length, which is the distance a home-screen widget is actually read from.
+    // No weighted spacer. Pushing two short blocks to opposite ends only relocated the
+    // empty space — centred left gaps at both ends, top-anchored left one at the bottom,
+    // weighted left a 32% band through the middle. Five lines at this type size nearly
+    // fill the card on their own, so an evenly spaced group centred as a whole leaves
+    // small equal margins instead of one hole.
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        AnimatedMeteocon(prayer = state.nextPrayer, size = 26.dp)
-        Spacer(modifier = GlanceModifier.width(7.dp))
+        AnimatedMeteocon(prayer = state.nextPrayer, size = 22.dp)
+        Spacer(modifier = GlanceModifier.width(8.dp))
         Text(
             text = insight?.title ?: "Next prayer",
             style = TextStyle(
@@ -263,6 +262,7 @@ private fun ColumnScope.SmallContent(state: PrayerWidgetState.Available) {
     }
 
     if (insight != null) {
+        Spacer(modifier = GlanceModifier.height(3.dp))
         Text(
             text = insight.elapsed,
             style = TextStyle(
@@ -273,22 +273,19 @@ private fun ColumnScope.SmallContent(state: PrayerWidgetState.Available) {
         )
     }
 
-    Spacer(modifier = GlanceModifier.defaultWeight())
-
-    // The timeline the "Prayer now" tile draws: how far the clock has travelled from the
-    // last prayer to the next. Lifting only the tile's text left the card with a hole in
-    // the middle that no amount of alignment could close — four short lines cannot fill a
-    // 2x2. This is the element that gives the tile its body, and it is real information
-    // rather than padding.
+    // Sits directly beneath the line it measures. Floating in the middle of the card it
+    // read as a divider rather than as the elapsed time made visible.
     state.windowProgress?.let { progress ->
+        Spacer(modifier = GlanceModifier.height(6.dp))
         LinearProgressIndicator(
             progress = progress,
             modifier = GlanceModifier.fillMaxWidth().height(4.dp),
             color = GlanceTheme.colors.primary,
             backgroundColor = GlanceTheme.colors.surfaceVariant,
         )
-        Spacer(modifier = GlanceModifier.height(10.dp))
     }
+
+    Spacer(modifier = GlanceModifier.height(14.dp))
 
     // The next prayer carries its own name, so the large time is unambiguous — an
     // earlier version put "Make Time for Dhuhr" above a large Asr time with nothing
@@ -306,7 +303,7 @@ private fun ColumnScope.SmallContent(state: PrayerWidgetState.Available) {
         text = state.nextPrayer.time,
         style = TextStyle(
             color = GlanceTheme.colors.onSurface,
-            fontSize = 30.sp,
+            fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
         ),
         maxLines = 1,

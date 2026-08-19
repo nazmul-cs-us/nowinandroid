@@ -19,6 +19,7 @@ package com.starception.submission.widget
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.util.Log
 import androidx.annotation.RawRes
 import com.airbnb.lottie.LottieCompositionFactory
@@ -95,6 +96,8 @@ internal object WidgetMeteocons {
                 setComposition(composition)
                 setBounds(0, 0, ANIMATED_ICON_PX, ANIMATED_ICON_PX)
             }
+            // Every frame is trimmed to the same box (computed from the fullest frame)
+            // so the glyph does not jitter as the animation advances.
             List(FRAME_COUNT) { index ->
                 // Stop short of 1f: the last frame of a loop is the same image as the
                 // first, and holding it twice makes the animation visibly stutter.
@@ -104,6 +107,11 @@ internal object WidgetMeteocons {
                     ANIMATED_ICON_PX,
                     Bitmap.Config.ARGB_8888,
                 ).also { drawable.draw(Canvas(it)) }
+            }.let { frames ->
+                val box = frames.fold(null as Rect?) { acc, f ->
+                    f.opaqueBounds()?.let { b -> acc?.apply { union(b) } ?: Rect(b) } ?: acc
+                } ?: return@let frames
+                frames.map { Bitmap.createBitmap(it, box.left, box.top, box.width(), box.height()) }
             }
         }
     } catch (e: Exception) {
@@ -128,13 +136,45 @@ internal object WidgetMeteocons {
                 progress = REPRESENTATIVE_FRAME
                 setBounds(0, 0, ICON_PX, ICON_PX)
             }
-            Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888).also { bitmap ->
-                drawable.draw(Canvas(bitmap))
-            }
+            Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888)
+                .also { drawable.draw(Canvas(it)) }
+                .trimTransparentBorder()
         }
     } catch (e: Exception) {
         Log.w(TAG, "Meteocon $resource could not be rendered", e)
         null
+    }
+
+    /**
+     * Bounding box of everything that is not fully transparent, or null if nothing is.
+     *
+     * Meteocons are authored on a square canvas with generous margins, so the rendered
+     * bitmap is mostly empty space. Left untrimmed, an Image sized to 26dp draws a glyph
+     * roughly half that, and the text beside it starts wherever the empty margin ends.
+     */
+    private fun Bitmap.opaqueBounds(): Rect? {
+        var left = width
+        var top = height
+        var right = -1
+        var bottom = -1
+        val row = IntArray(width)
+        for (y in 0 until height) {
+            getPixels(row, 0, width, 0, y, width, 1)
+            for (x in 0 until width) {
+                if (row[x] ushr 24 > 8) {
+                    if (x < left) left = x
+                    if (x > right) right = x
+                    if (y < top) top = y
+                    if (y > bottom) bottom = y
+                }
+            }
+        }
+        return if (right < left || bottom < top) null else Rect(left, top, right + 1, bottom + 1)
+    }
+
+    private fun Bitmap.trimTransparentBorder(): Bitmap {
+        val box = opaqueBounds() ?: return this
+        return Bitmap.createBitmap(this, box.left, box.top, box.width(), box.height())
     }
 
     /**
