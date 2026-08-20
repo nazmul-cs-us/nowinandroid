@@ -78,6 +78,38 @@ fun NiaNavHost(
     val navController = appState.navController
     val context = LocalContext.current
     val quranRepository = remember { QuranRepository(context) }
+
+    // A tap on the Daily Reminder widget lands here. MainActivity reads the hadith or dua
+    // off the launch intent and posts it; this is the first place in the tree that holds a
+    // NavController, so it is where the tap can finally be acted on.
+    //
+    // The bus buffers one request, which matters because the usual case is a cold start:
+    // MainActivity posts during onCreate, well before this composable exists to collect.
+    val widgetTarget by com.starception.submission.widget.WidgetNavigationBus.pending
+        .collectAsStateWithLifecycle()
+    LaunchedEffect(widgetTarget) {
+        when (val target = widgetTarget) {
+            null -> Unit
+
+            is com.starception.submission.widget.WidgetNavigationTarget.Hadith -> {
+                navController.navigateToHadithDetail(
+                    collectionName = target.collectionName.ifBlank { "Sahih Bukhari" },
+                    hadithNumber = target.hadithNumber,
+                    databaseFile = target.databaseFile,
+                )
+                com.starception.submission.widget.WidgetNavigationBus.consumed(target)
+            }
+
+            is com.starception.submission.widget.WidgetNavigationTarget.Dua -> {
+                navController.navigateToDuaDetail(
+                    title = target.title,
+                    content = target.content,
+                    duaNumber = target.duaNumber,
+                )
+                com.starception.submission.widget.WidgetNavigationBus.consumed(target)
+            }
+        }
+    }
     // Home renders its own PullToSyncContainer instead of the app-level one, so it needs
     // the same fallback to AppTaskProgressBus — otherwise a long non-download task
     // (e.g. preparing guided voice) loses its banner the moment the user opens Home.

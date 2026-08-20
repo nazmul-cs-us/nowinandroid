@@ -28,7 +28,22 @@ import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import com.starception.submission.widget.WidgetText
+import com.starception.submission.widget.WidgetTextAlign
+import com.starception.submission.widget.WidgetFontWeight
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.height
+import androidx.glance.layout.Row
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.wrapContentWidth
+import androidx.glance.layout.wrapContentHeight
+import androidx.glance.text.TextAlign
+import androidx.glance.ColorFilter
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.action.Action
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.itemsIndexed
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
@@ -72,7 +87,7 @@ fun LongTextLayout(
   @DrawableRes titleIconRes: Int,
   @DrawableRes titleBarActionIconRes: Int? = null,
   titleBarActionIconContentDescription: String? = null,
-  titleBarAction: (() -> Unit)? = null,
+  titleBarAction: Action? = null,
   data: LongTextLayoutData,
   action: Action? = null,
 ) {
@@ -87,7 +102,6 @@ fun LongTextLayout(
     backgroundColor = GlanceTheme.colors.widgetBackground,
     horizontalPadding = widgetPadding,
     modifier = GlanceModifier
-      .maybeClickable(action)
       .padding(
         bottom = widgetPadding,
         top = scaffoldTopPadding
@@ -108,7 +122,8 @@ fun LongTextLayout(
       data = data,
       verticalAlignment = if (showTitleBar) {
         Alignment.Bottom
-      } else Alignment.CenterVertically
+      } else Alignment.CenterVertically,
+      action = action,
     )
   }
 }
@@ -117,59 +132,139 @@ fun LongTextLayout(
 private fun TitleBarContent(
   titleIconRes: Int,
   title: String,
-  titleBarAction: (() -> Unit)?,
+  titleBarAction: Action?,
   titleBarActionIconRes: Int?,
   titleBarActionIconContentDescription: String?,
 ) {
-  TitleBar(
-    startIcon = ImageProvider(titleIconRes),
-    title = title.takeIf { showTitle() } ?: "",
-    iconColor = GlanceTheme.colors.primary,
-    textColor = GlanceTheme.colors.onSurface,
-    actions = {
-      if (titleBarAction != null && titleBarActionIconRes != null) {
-        CircleIconButton(
-          imageProvider = ImageProvider(titleBarActionIconRes),
-          contentDescription = titleBarActionIconContentDescription,
-          contentColor = GlanceTheme.colors.secondary,
-          backgroundColor = null, // transparent
-          onClick = titleBarAction
-        )
-      }
+  // Glance's TitleBar is not used here, for the same reason the prayer widget stopped
+  // using it: its title is a Glance Text, which cannot carry the bundled Ubuntu Sans. The
+  // two widgets sat on the same home screen with their headers in different typefaces.
+  // This is the arrangement TitleBar draws — start icon, title, trailing action — rebuilt
+  // so the title is a WidgetText.
+  Row(
+    modifier = GlanceModifier
+      .fillMaxWidth()
+      .padding(start = widgetPadding, end = 4.dp, top = 4.dp, bottom = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    // Fully qualified: this file declares its own private Image() further down.
+    androidx.glance.Image(
+      provider = ImageProvider(titleIconRes),
+      contentDescription = null,
+      colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+      modifier = GlanceModifier.size(22.dp),
+    )
+    Spacer(modifier = GlanceModifier.width(8.dp))
+    WidgetText(
+      text = title.takeIf { showTitle() } ?: "",
+      size = 15.sp,
+      color = GlanceTheme.colors.onSurface,
+      weight = WidgetFontWeight.Medium,
+      modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+    )
+    if (titleBarAction != null && titleBarActionIconRes != null) {
+      CircleIconButton(
+        imageProvider = ImageProvider(titleBarActionIconRes),
+        contentDescription = titleBarActionIconContentDescription,
+        contentColor = GlanceTheme.colors.secondary,
+        backgroundColor = null, // transparent
+        onClick = titleBarAction
+      )
     }
-  )
+  }
 }
 
 @Composable
 private fun TextStack(
   data: LongTextLayoutData,
   verticalAlignment: Alignment.Vertical,
+  action: Action?,
 ) {
-  Column(
-    modifier = GlanceModifier.fillMaxSize(),
-    verticalAlignment = verticalAlignment
-  ) {
-    val primaryTextFontSizeAndMaxLines = primaryTextFontSizeAndMaxLines(data.text)
-    val captionFontSizeAndMaxLines =
-      captionFontSizeAndMaxLines(primaryTextFontSizeAndMaxLines.first)
-    // Caption
-    Text(
-      text = data.caption,
-      style = TextStyle(
-        fontSize = captionFontSizeAndMaxLines.first,
-        color = GlanceTheme.colors.secondary
-      ),
-      maxLines = captionFontSizeAndMaxLines.second
-    )
-    // Primary text
-    Text(
-      text = data.text,
-      style = TextStyle(
-        color = GlanceTheme.colors.onSurface,
-        fontSize = primaryTextFontSizeAndMaxLines.first
-      ),
-      maxLines = primaryTextFontSizeAndMaxLines.second
-    )
+  // Sized from the card, not from the text.
+  //
+  // The sample sized the body by shrinking it until the whole string fitted, which made
+  // the type a function of content length: a short dua rendered large and a long hadith
+  // small, so the same widget changed its typography every time it refreshed. That is
+  // defensible when the text must fit a fixed box, and pointless now that it scrolls.
+  val width = LocalSize.current.width
+  // The body leads the card. It was one step smaller than the header above it, which put
+  // the least important text on the card in the largest type — the prayer widget beside it
+  // opens with its content at ~20sp, and these two should read as the same family.
+  val bodySize = when {
+    width >= 300.dp -> 19.sp
+    width >= 220.dp -> 17.sp
+    else -> 15.sp
+  }
+  val captionSize = 12.sp
+
+  // LazyColumn, not Column, because the content is no longer a sample string of known
+  // length: a Bukhari hadith or a Fortress dua can run to a paragraph, and a Column simply
+  // truncated it — the reader got an ellipsis and no way to see the rest without opening
+  // the app. A LazyColumn is the one scrollable container RemoteViews accepts, so it is
+  // what lets the card show all of it.
+  //
+  // maxLines goes with it. It existed to stop overflow in a fixed-height Column; keeping
+  // it here would cap the text at the same place while giving it somewhere to scroll to,
+  // which is the worst of both.
+  Column(modifier = GlanceModifier.fillMaxSize()) {
+    // The list takes the space the footer does not, so the reference stays pinned to the
+    // bottom of the card while the text scrolls behind it. Putting the footer inside the
+    // list would scroll it out of sight, which for a citation is the one place it must
+    // not be.
+    LazyColumn(modifier = GlanceModifier.defaultWeight()) {
+    item {
+      Column(modifier = GlanceModifier.maybeClickable(action)) {
+        // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
+        // prayer widget beside it. Glance cannot carry a bundled font — see
+        // widget_text_regular.xml — so the two cards were in different typefaces on the
+        // same home screen, which reads as an unfinished app rather than a design.
+        WidgetText(
+          text = data.caption,
+          size = captionSize,
+          color = GlanceTheme.colors.secondary,
+          weight = WidgetFontWeight.Medium,
+        )
+        Spacer(modifier = GlanceModifier.height(6.dp))
+        WidgetText(
+          text = data.text,
+          size = bodySize,
+          color = GlanceTheme.colors.onSurface,
+          weight = WidgetFontWeight.Regular,
+          // The whole point of the scrolling container: let it run.
+          maxLines = 100,
+        )
+      }
+    }
+    }
+
+    if (data.sourceName != null || data.sourceDetail != null) {
+      Spacer(modifier = GlanceModifier.height(8.dp))
+      Row(
+        modifier = GlanceModifier.fillMaxWidth().maybeClickable(action),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        WidgetText(
+          text = data.sourceName.orEmpty(),
+          size = 11.sp,
+          color = GlanceTheme.colors.outline,
+          weight = WidgetFontWeight.Medium,
+          modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+        )
+        Spacer(modifier = GlanceModifier.defaultWeight())
+        if (data.sourceDetail != null) {
+          WidgetText(
+            text = data.sourceDetail,
+            size = 11.sp,
+            color = GlanceTheme.colors.outline,
+            weight = WidgetFontWeight.Medium,
+            // The chapter title a dua cites can be a full sentence; it gives way to the
+            // book name rather than pushing it off the card.
+            modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+            align = WidgetTextAlign.End,
+          )
+        }
+      }
+    }
   }
 }
 
@@ -217,6 +312,10 @@ data class LongTextLayoutData(
   val key: String,
   val text: String,
   val caption: String,
+  /** Book the text came from, shown in the footer's left corner. */
+  val sourceName: String? = null,
+  /** Where in that book, shown in the footer's right corner. */
+  val sourceDetail: String? = null,
 )
 
 internal object WidgetTextDimensions {
@@ -307,7 +406,7 @@ private fun LongTextLayoutPreview(text: String, caption: String) {
     titleBarActionIconContentDescription = context.getString(
       R.string.sample_refresh_icon_button_label
     ),
-    titleBarAction = {},
+    titleBarAction = null,
     data = LongTextLayoutData(
       key = "1",
       text = text,

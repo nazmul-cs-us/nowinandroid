@@ -62,6 +62,7 @@ import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.ui.LocalTimeZone
 import com.starception.submission.ui.NiaApp
+import com.starception.submission.widget.WidgetNavigationBus
 import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
@@ -226,6 +227,12 @@ class MainActivity : FragmentActivity() {
         val downloadViewModel: AssetDownloadViewModel by viewModels()
         // Handle deep link for course sharing
         val deepLinkCourseId = handleCourseDeepLink(intent)
+
+        // A tap on the Daily Reminder widget names the hadith or dua it was showing.
+        // Posted to a bus rather than threaded down as another parameter: the
+        // NavController that can act on it is several composables below here, and
+        // deepLinkCourseId already shows what that plumbing costs.
+        WidgetNavigationBus.consume(intent)?.let(WidgetNavigationBus::request)
 
         // GOOGLE SAMPLE LIVE UPDATE - Initialize for prayer notifications
         if (Build.VERSION.SDK_INT >= 35) { // Android 16+ (BAKLAVA = 35)
@@ -540,6 +547,19 @@ class MainActivity : FragmentActivity() {
         } catch (e: Exception) {
             Log.w("MainActivity", "Auto-detection failed: ${e.message}")
         }
+    }
+
+    /**
+     * A widget tap that arrives while the app is already running.
+     *
+     * onCreate only sees the launch intent, so without this a tap on the reminder while
+     * the app sits in the background would bring it forward on whatever screen it was
+     * last on and ignore the hadith entirely.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        WidgetNavigationBus.consume(intent)?.let(WidgetNavigationBus::request)
     }
 
     /**
