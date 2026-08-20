@@ -11,11 +11,19 @@
 
      flipInterval x child count sets the loop duration; 450ms x 6 gives ~2.7s, close to
      the source animation's own pace without the payload of a full 60fps sample.
+
+     match_parent on both axes, not wrap_content, and the distinction is load-bearing:
+     every child here is match_parent, and FrameLayout — which ViewFlipper extends —
+     derives a wrap_content size from its non-match_parent children only. With none, the
+     flipper collapsed onto the child's own measured size, which for an ImageView under
+     an AT_MOST spec is the bitmap's intrinsic size. The frames are trimmed to their
+     opaque bounds (~28px), so a 20dp icon drew at ~7dp with fitCenter having nothing to
+     scale up to. Filling the box Glance sized gives fitCenter a target again.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/meteocon_flipper"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:autoStart="true"
     android:flipInterval="450"
     android:measureAllChildren="true">

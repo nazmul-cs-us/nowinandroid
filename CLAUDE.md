@@ -15,10 +15,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./gradlew installDemoDebug` - Install demo debug APK on connected device
 - `./gradlew installDemoDebug && adb shell monkey -p com.starception.submission.demo.debug -c android.intent.category.LAUNCHER 1` - Install and auto-launch app
 - `./install_and_run.sh` - Build, install and auto-launch app (recommended)
-- `adb -s 4B221FDAP002T6 install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install APK on Pixel 9 Pro device
+- `adb -s R5GYC5FPXWT install -r app/build/outputs/apk/demo/debug/app-demo-debug.apk` - Install APK on the Galaxy S25 Ultra
 - `adb devices` - List connected Android devices
 
-**Note**: Always install on Pixel device (4B221FDAP002T6) when multiple devices are connected.
+**Note**: The test device is the Samsung Galaxy S25 Ultra (`R5GYC5FPXWT`, SM-S948U). Always target it explicitly with `-s` when multiple devices are connected.
 
 ### Testing
 - `./gradlew testDemoDebug` - Run unit tests for demo debug variant

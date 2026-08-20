@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One line of widget text in Ubuntu Sans bold.
+
+  Glance cannot carry a custom font: its TextStyle.fontFamily becomes a TypefaceSpan, and
+  TypefaceSpan parcels only the family *name*, which the launcher resolves against system
+  fonts — an app font is not registered there, so it silently falls back. A layout inflated
+  through RemoteViews is different: the launcher inflates it against this package's own
+  resources, as it does the meteocon flipper, so @font here resolves to the bundled face.
+
+  One layout per weight because TextView.setTypeface is not a remotable method, so weight
+  cannot be applied at runtime the way text, size and colour can.
+
+  match_parent width, so the line wraps inside the column it is placed in. As wrap_content
+  the TextView measured itself against the whole unwrapped string and ran off the edge of
+  the card, taking the rest of the layout with it.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/ubuntu_sans_bold"
+    android:includeFontPadding="false"
+    android:ellipsize="end" />

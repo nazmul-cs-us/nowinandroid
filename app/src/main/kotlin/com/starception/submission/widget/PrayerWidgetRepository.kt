@@ -182,24 +182,9 @@ internal data class PrayerInsight(
     val elapsed: String,
     val nextPrayerInfo: String,
 ) {
-    /**
-     * [title] without the prayer name it ends with.
-     *
-     * The full phrases — "Best Time to Pray Asr", "Go to Mosque for Fajr" — are 20+
-     * characters and wrap on any narrow widget, stranding the prayer name alone on a
-     * second line. Dropping it loses nothing: [elapsed] already names the same prayer
-     * on the line directly beneath ("24 minutes since Asr").
-     */
     /** Prayer this insight is about, e.g. "Asr" — the last word of [elapsed]. */
     val caption: String
         get() = elapsed.substringAfterLast(' ')
-
-    val shortTitle: String
-        get() = title
-            .removeSuffix(elapsed.substringAfterLast(' '))
-            .trim()
-            .removeSuffix(" for")
-            .trim()
 }
 
 private data class WidgetWeather(

@@ -17,11 +17,16 @@
 package com.starception.submission.widget
 
 import android.content.Context
-import android.appwidget.AppWidgetManager
+import android.util.TypedValue
+import androidx.annotation.LayoutRes
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.toArgb
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -29,17 +34,18 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import android.widget.RemoteViews
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
+import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
-import androidx.glance.appwidget.components.TitleBar
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -55,6 +61,8 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.layout.wrapContentHeight
+import androidx.glance.layout.wrapContentWidth
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -63,23 +71,34 @@ import androidx.glance.unit.ColorProvider
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 
-// Launcher cells resolve to (70 * n - 30) dp, so these are the real 2x1, 2x2, 4x2, 4x3
-// and 5x4 footprints. Glance picks the largest bucket that still fits, which means an
-// in-between drop (a 3x2, say) lands on the 2x2 layout and simply has room to spare
-// rather than overflowing.
 /** Matches the ported layouts' own widgetPadding so the two sit consistently. */
 private val WIDGET_PADDING = 16.dp
 
-internal val TINY = DpSize(110.dp, 40.dp)
-internal val SMALL = DpSize(110.dp, 110.dp)
-// Without this bucket everything from 110dp to 249dp wide fell back to SMALL, because
-// Glance picks the largest declared size that fits and WIDE needs a full 250dp. A 3x3
-// (213x179dp on One UI) therefore rendered the 2x2 hero stretched across twice the area
-// it was drawn for, which is what made it look sparse and under-sized.
-internal val MEDIUM = DpSize(180.dp, 170.dp)
-internal val WIDE = DpSize(250.dp, 110.dp)
-internal val LARGE = DpSize(250.dp, 180.dp)
-internal val XLARGE = DpSize(320.dp, 250.dp)
+// Glance's TitleBar lays out a 48dp icon box inside 4dp of vertical padding and sets no
+// height of its own, so it occupies 56dp whatever the title says. The hero below sizes
+// its type against the height it is given, so this has to come off that budget: without
+// it a titled card computed its type from the full card height, overflowed the title
+// bar's share, and clipped its last line.
+private val TITLE_BAR_HEIGHT = 56.dp
+
+/** Floor for the hero's internal gaps, before any leftover height is shared out. */
+private val GROUP_GAP_MIN = 10.dp
+
+/** The single-line layout's own inset — tighter than [WIDGET_PADDING], which it cannot afford. */
+private val TINY_PADDING = 10.dp
+
+
+/** [ExpressiveProgressBar]'s drawn height, which the height budget has to account for. */
+private const val PROGRESS_BAR_HEIGHT = 6f
+
+/** The meteocon plus its gap, as the single-line layout has to budget for it. */
+private const val ICON_ROOM = 28f
+
+// The least *content* height — card height already less the surrounding surface's insets
+// — that the hero is worth drawing in: its six lines at the smallest type it accepts
+// (18sp), plus the progress bar and the two minimum gaps. Below this the single-line
+// layout is used instead, because the hero would only clip.
+private val HERO_MIN_HEIGHT = 100.dp
 
 /**
  * Home-screen prayer times widget.
@@ -87,9 +106,9 @@ internal val XLARGE = DpSize(320.dp, 250.dp)
  * Glance renders to RemoteViews, so none of the app's screen composables can be reused
  * here — every layout below is written against the Glance layout primitives, which have
  * no `Modifier.weight` on the cross axis, no intrinsic measurement, and no text
- * auto-sizing. That is why each size bucket gets a hand-written layout rather than one
- * elastic layout: shrinking a single design across a 2x1 strip and a 5x4 panel would
- * either clip the prayer list or leave the small sizes unreadable.
+ * auto-sizing. With no auto-sizing to lean on, the layout derives its own type scale
+ * from the granted footprint (see [PrayerHeroContent]); the 2x1 is the one size that
+ * cannot carry that layout at all, so it keeps a hand-written single line.
  *
  * Every subclass renders the identical layouts and stays freely resizable; they exist
  * only so the widget picker lists one entry per size, each landing at its own footprint.
@@ -99,60 +118,70 @@ internal val XLARGE = DpSize(320.dp, 250.dp)
  */
 abstract class BasePrayerTimesWidget : GlanceAppWidget() {
 
-    override val sizeMode: SizeMode = SizeMode.Responsive(
-        setOf(TINY, SMALL, MEDIUM, WIDE, LARGE, XLARGE),
-    )
+    // Exact, not Responsive, and for the same reason the ported widgets use it: with
+    // Responsive, Glance composes once per declared bucket and the host picks the
+    // nearest, so a 125dp card and a 179dp card both render the identical SMALL
+    // composition and nothing adapts in between. Exact composes for the size actually
+    // granted, which makes LocalSize the real footprint and lets the layout scale
+    // continuously with the launcher's grid. It also keeps one RemoteViews in the host's
+    // memory rather than one per bucket.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Loaded before provideContent so the data read happens once per update rather
-        // than once per size bucket — Responsive mode composes the content for every
-        // declared size to build its RemoteViews set.
+        // Loaded outside provideContent so the data read is not tied to recomposition.
         val state = loadPrayerWidgetState(context)
-
-        // LocalSize reports the *declared* bucket, not what the launcher granted: a card
-        // occupying 125x180dp still reports SMALL's 110x110dp. Sizing type or gating
-        // content on LocalSize therefore silently under-fills every card that lands
-        // between two buckets. The options bundle carries the real footprint.
-        val granted = grantedSize(context, id)
 
         provideContent {
             GlanceTheme(colors = PrayerWidgetColors) {
                 when (state) {
                     PrayerWidgetState.Unavailable -> BareSurface { UnavailableContent() }
-                    is PrayerWidgetState.Available -> when (LocalSize.current) {
-                        // The two smallest sizes cannot carry the canonical layout: it
-                        // opens with a title bar and a scrolling list, which at a 2x1
-                        // leaves room for neither. They keep the compact hero, which is
-                        // the only thing that fits there.
-                        TINY -> BareSurface(padding = 10.dp) { TinyContent(state) }
-                        SMALL -> BareSurface(Alignment.Vertical.Top) { SmallContent(state, granted) }
-                        // Tall enough for the canonical list, which fills the height
-                        // with real rows rather than stretching five short lines.
-                        MEDIUM -> PrayerActionListContent(state)
-                        // Everything with room renders through the layout ported from
-                        // platform-samples, so it is identical to the sample widgets by
-                        // construction rather than by imitation.
-                        else -> PrayerActionListContent(state)
+                    is PrayerWidgetState.Available -> {
+                        val size = LocalSize.current
+                        // Each surface insets the card by a different amount, so what the
+                        // hero actually gets is worked out here — the hero cannot see
+                        // which surface wrapped it. Deciding the layout from the same two
+                        // figures that are then handed to it is what keeps the choice and
+                        // the sizing from disagreeing.
+                        val innerWidth = size.width - (WIDGET_PADDING * 2)
+                        // The Scaffold pads the sides and the bottom; the title bar
+                        // stands in for the top.
+                        val titledHeight = size.height - TITLE_BAR_HEIGHT - WIDGET_PADDING
+                        val bareHeight = size.height - (WIDGET_PADDING * 2)
+                        when {
+                            // Any single-row card, whatever its width. The hero stacks six
+                            // lines and one row cannot carry them at a readable size, so a
+                            // 4x1 gets the same single line a 2x1 does rather than a
+                            // squeezed copy of the hero.
+                            bareHeight < HERO_MIN_HEIGHT ->
+                                BareSurface(padding = TINY_PADDING) {
+                                    TinyContent(state, size.width - (TINY_PADDING * 2))
+                                }
+
+                            // Everything taller renders the same hero. Only the surface
+                            // around it differs: the title bar has to earn its 56dp, so it
+                            // needs both the width to show a title and enough height left
+                            // afterwards for the hero to still fit. Gating on width alone
+                            // handed a 4x1 a title bar over a zero-height content box.
+                            size.width >= 230.dp && titledHeight >= HERO_MIN_HEIGHT ->
+                                TitledSurface(state) {
+                                    PrayerHeroContent(
+                                        state = state,
+                                        contentSize = DpSize(innerWidth, titledHeight),
+                                    )
+                                }
+
+                            else -> BareSurface(Alignment.Vertical.Top) {
+                                PrayerHeroContent(
+                                    state = state,
+                                    contentSize = DpSize(innerWidth, bareHeight),
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
-}
-
-/**
- * The footprint the launcher actually gave this widget, or null if it has not reported
- * one yet. Falls back to LocalSize at the call site in that case.
- */
-private fun grantedSize(context: Context, id: GlanceId): DpSize? = try {
-    val manager = AppWidgetManager.getInstance(context)
-    val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-    val options = manager.getAppWidgetOptions(appWidgetId)
-    val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0)
-    val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
-    if (width > 0 && height > 0) DpSize(width.dp, height.dp) else null
-} catch (e: Exception) {
-    null
 }
 
 /** Picker entry "Next Prayer" — drops at 2x1. */
@@ -206,6 +235,140 @@ private fun BareSurface(
 }
 
 
+/**
+ * Titled surface matching the ported layouts.
+ *
+ * Uses the same Scaffold and TitleBar components those layouts do rather than a
+ * reproduction, so the header — icon colour, title weight, action button, spacing — can
+ * only ever match. The title carries the place name, which is what the widget's own
+ * heading would otherwise waste a line repeating.
+ */
+@Composable
+private fun TitledSurface(
+    state: PrayerWidgetState.Available,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Scaffold(
+        backgroundColor = GlanceTheme.colors.widgetBackground,
+        horizontalPadding = WIDGET_PADDING,
+        // Scaffold pads the sides only; the ported layouts add the bottom themselves, so
+        // without this the last line of content sits against the card's edge. No top
+        // padding — the title bar already stands off the top.
+        modifier = GlanceModifier
+            .padding(bottom = WIDGET_PADDING)
+            .clickable(actionStartActivity<MainActivity>()),
+        titleBar = {
+            // Glance's own TitleBar is not used here, and only for one reason: its title
+            // is a Glance Text, which cannot carry the bundled Ubuntu Sans (see
+            // widget_text_regular.xml). Leaving it in place put the place name in the
+            // system font directly above four lines in the app's own face, which read as
+            // a mistake rather than a hierarchy. The arrangement below is the one it
+            // draws — start icon, title, trailing action — rebuilt so the title is a
+            // WidgetText.
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(vertical = 8.dp),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                // A pin, because the title beside it is the place name. The prayer
+                // monochrome icon that was here draws its paths in a ~90-unit space
+                // inside a 0.023 scale group, so it resolved to about two units of a
+                // 24dp viewport — present, but too small to see.
+                Image(
+                    provider = ImageProvider(R.drawable.ic_location_pin),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+                    modifier = GlanceModifier.size(22.dp),
+                )
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                WidgetText(
+                    text = state.place,
+                    size = 15.sp,
+                    color = GlanceTheme.colors.onSurface,
+                    weight = WidgetFontWeight.Medium,
+                    modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+                )
+                // Same button the ported layouts put here — transparent background,
+                // secondary tint — so the prayer card's header and the sample cards'
+                // headers stay indistinguishable.
+                CircleIconButton(
+                    imageProvider = ImageProvider(R.drawable.sample_refresh_icon),
+                    contentDescription = "Refresh prayer times",
+                    contentColor = GlanceTheme.colors.secondary,
+                    backgroundColor = null,
+                    onClick = actionRunCallback<RefreshPrayerWidgetAction>(),
+                )
+            }
+        },
+    ) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            content()
+        }
+    }
+}
+
+/**
+ * A line of widget text in the app's own typeface.
+ *
+ * Glance's own [Text] cannot carry a bundled font — see widget_text_regular.xml — so the
+ * line is a RemoteViews TextView inflated from this package's resources instead. Text,
+ * size and colour are set here; weight selects the layout, because TextView.setTypeface is
+ * not remotable.
+ *
+ * [WidgetTypography] measures against the same faces, so the sizes it chooses are the
+ * sizes these lines actually render at.
+ */
+@Composable
+private fun WidgetText(
+    text: String,
+    size: TextUnit,
+    color: ColorProvider,
+    weight: WidgetFontWeight,
+    maxLines: Int = 1,
+    // Width is claimed by default: the TextView inside is match_parent, so it needs a
+    // bounded box to wrap against. Callers laying text out in a Row pass wrapContentWidth
+    // instead, so the runs sit next to each other rather than each taking the whole line.
+    //
+    // Height must be wrapped explicitly. An AndroidRemoteViews left unconstrained inside a
+    // fillMaxSize Column took the entire height, and every line after the first was pushed
+    // off the card — the title rendered alone on an otherwise empty surface.
+    modifier: GlanceModifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
+) {
+    val context = LocalContext.current
+    val remoteViews = RemoteViews(context.packageName, weight.layout).apply {
+        setTextViewText(R.id.widget_text, text)
+        setTextViewTextSize(R.id.widget_text, TypedValue.COMPLEX_UNIT_SP, size.value)
+        setTextColor(R.id.widget_text, color.getColor(context).toArgb())
+        setInt(R.id.widget_text, "setMaxLines", maxLines)
+    }
+    AndroidRemoteViews(remoteViews = remoteViews, modifier = modifier)
+}
+
+/** The three weights the widget draws in, each backed by its own one-TextView layout. */
+private enum class WidgetFontWeight(@LayoutRes val layout: Int) {
+    Regular(R.layout.widget_text_regular),
+    Medium(R.layout.widget_text_medium),
+    Bold(R.layout.widget_text_bold),
+}
+
+/**
+ * Title-bar refresh.
+ *
+ * Recomputes rather than fetches: prayer times are derived from cached location and
+ * settings, so this re-runs the same load a scheduled update does. It goes through
+ * [PrayerWidgetUpdater] rather than updating this widget alone because the sizes are
+ * separate GlanceAppWidget classes — refreshing only the tapped one would leave every
+ * other placed size on the stale reading it was already showing.
+ */
+class RefreshPrayerWidgetAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters,
+    ) {
+        PrayerWidgetUpdater.refresh(context)
+    }
+}
+
 @Composable
 private fun UnavailableContent() {
     Column(
@@ -240,180 +403,229 @@ private fun UnavailableContent() {
 
 /** 2x1 — one line. Only the next prayer fits, so nothing else is shown. */
 @Composable
-private fun TinyContent(state: PrayerWidgetState.Available) {
+private fun TinyContent(state: PrayerWidgetState.Available, contentWidth: Dp) {
     // One line, and it answers the question the widget is named after. The previous
     // version showed the current prayer's phase headline over its elapsed time and never
     // named the next prayer at all — two stacked lines needing ~37dp inside a 2x1 that
     // has roughly 28dp of usable height, so it also clipped.
+    //
+    // It now reads "Asr in 3h 58m", the same phrase the hero ends on, rather than adding
+    // the absolute clock time. That is both consistent and what makes it fit: a Glance Row
+    // does not shrink its children, so anything past the edge is simply cut off — at 150dp
+    // wide the old row wanted ~165dp of content in ~130dp and lost the end of the
+    // countdown. Dropping the clock time takes ~60dp out of the line.
+    val context = LocalContext.current
+    val width = contentWidth.value
+    val countdown = state.countdown.removePrefix("in ").trim()
+    val line = "${state.nextPrayer.name} in $countdown"
+
+    // The meteocon is the first thing to go, not the last: at this size it is a ~7dp
+    // smudge whose absence costs nothing, while the 28dp it occupies is a quarter of the
+    // line on the narrowest card. It is kept only when the text does not need that room.
+    val fitsWithIcon = WidgetTypography.fittingSize(context, line, width - ICON_ROOM) >= 13f
+    val textRoom = width - (if (fitsWithIcon) ICON_ROOM else 0f)
+
+    // Measured against the real sentence, bold, since the widest of the three runs sets
+    // the line. Capped at the ramp's lower rungs — this is a supporting size by role, and
+    // letting it grow to fill a wide 4x1 would out-shout the hero on the card beside it.
+    val textSize = WidgetTypography
+        .fittingSize(context, line, textRoom, bold = true)
+        .coerceIn(11f, 18f)
+        .sp
+
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
-        Spacer(modifier = GlanceModifier.width(8.dp))
+        if (fitsWithIcon) {
+            AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
+            Spacer(modifier = GlanceModifier.width(8.dp))
+        }
+        // Weighted the same three ways the hero weights its own next-prayer line, so the
+        // two sizes read as the same sentence rather than two different summaries.
         Text(
             text = state.nextPrayer.name,
             style = TextStyle(
-                color = GlanceTheme.colors.primary,
-                fontSize = 14.sp,
+                color = GlanceTheme.colors.onSurface,
+                fontSize = textSize,
                 fontWeight = FontWeight.Bold,
             ),
             maxLines = 1,
         )
-        Spacer(modifier = GlanceModifier.width(6.dp))
         Text(
-            text = state.nextPrayer.time,
+            text = " in ",
             style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
-                fontSize = 14.sp,
+                color = GlanceTheme.colors.onSurfaceVariant,
+                fontSize = textSize,
                 fontWeight = FontWeight.Medium,
             ),
             maxLines = 1,
         )
-        Spacer(modifier = GlanceModifier.defaultWeight())
         Text(
-            text = state.countdown,
+            text = countdown,
             style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 12.sp,
+                color = GlanceTheme.colors.primary,
+                fontSize = textSize,
+                fontWeight = FontWeight.Bold,
             ),
             maxLines = 1,
         )
     }
 }
 
-/** 2x2 — the next prayer as a hero block, no list. */
+/**
+ * The next prayer as a hero block, sized to whatever room it is handed.
+ *
+ * [contentSize] is the space left after the surrounding surface's own insets, not the
+ * card footprint — see the call site.
+ */
 @Composable
-private fun ColumnScope.SmallContent(
+private fun ColumnScope.PrayerHeroContent(
     state: PrayerWidgetState.Available,
-    granted: DpSize?,
+    contentSize: DpSize,
 ) {
     val insight = state.insight
 
-    // SMALL serves every width from 110dp up to 180dp, so no fixed type scale fits it:
-    // 36sp was tuned against a 173dp card and truncated "6:51 PM" to "6:51 P..." on the
-    // 125dp card the launcher actually granted. Deriving the size from the width really
-    // available ends that guessing.
+    // Hierarchy copied from the "Prayer now" tile actually on the home screen — the phase
+    // title leads at full size, the elapsed reading follows smaller and dimmer, then the
+    // next prayer under its own label. See the tile at SwipeableBigTiles.kt:2540 onward.
+    // (There is a second, unused PrayerTextContent further down that file which inverts
+    // these two; matching it instead is what made this widget read upside-down against
+    // the tile it is meant to mirror.)
     //
-    // A digit in this face occupies roughly 0.58em and the longest time string is eight
-    // characters ("12:23 PM"), so the largest size that still fits is
-    // contentWidth / (8 * 0.58), clamped to stay readable at either end.
-    val cardSize = granted ?: LocalSize.current
-    val contentWidth = cardSize.width - (WIDGET_PADDING * 2)
-    val timeSize = (contentWidth.value / (8 * 0.58f)).coerceIn(20f, 34f).sp
-    val headlineSize = (timeSize.value * 0.44f).coerceIn(12f, 16f).sp
-    val supportingSize = (timeSize.value * 0.38f).coerceIn(10f, 13f).sp
+    val context = LocalContext.current
+    val contentWidth = contentSize.width
+    val contentHeight = contentSize.height
+    val width = contentWidth.value
 
-    Text(
-        text = insight?.shortTitle ?: "Next prayer",
-        style = TextStyle(
-            color = GlanceTheme.colors.primary,
-            fontSize = headlineSize,
-            fontWeight = FontWeight.Bold,
-        ),
+    val titleText = insight?.title ?: "Next prayer"
+    val elapsedText = insight?.elapsed ?: state.nextPrayer.time
+
+    // The largest rung of the ramp whose four lines all fit, measured rather than
+    // estimated — both across the card and down it.
+    //
+    // Height is checked against the rung's own line count: the title is allowed to wrap to
+    // two lines, so a rung that would wrap has to pay for the extra line box before it can
+    // be accepted. That is the whole reason this is a search rather than a formula — the
+    // number of lines depends on the size, and the size depends on the number of lines.
+    // Walking the ladder downwards resolves it without either assumption being made up
+    // front, which is what previously left wide cards reserving a second line they never
+    // used and shrinking every size on the card to pay for it.
+    val lineHeight = WidgetTypography.lineHeightPerSp(context)
+    val step = WidgetTypography.STEPS.lastOrNull { candidate ->
+        val titleLines = WidgetTypography.lineCount(context, titleText, width, candidate.title)
+        // Line box height comes from the font's own metrics; the bar and the two group
+        // gaps are fixed, and GROUP_GAP_MIN is the floor for each gap.
+        val needed = lineHeight * (
+            candidate.title * titleLines +
+                candidate.elapsed +
+                candidate.label +
+                candidate.next
+            ) + PROGRESS_BAR_HEIGHT + (GROUP_GAP_MIN.value * 2)
+        val fitsDown = needed <= contentHeight.value
+        // A wrapped title is fine; a wrapped supporting line is not, since those are
+        // single-line by design and would be truncated rather than flowed.
+        val fitsAcross =
+            WidgetTypography.fittingSize(context, elapsedText, width) >= candidate.elapsed
+        fitsDown && fitsAcross
+    } ?: WidgetTypography.STEPS.first()
+
+    val titleSize = step.title.sp
+    val elapsedSize = step.elapsed.sp
+    val labelSize = step.label.sp
+    val nextSize = step.next.sp
+
+    // Full title, prayer name included ("Make Time for Fajr"). It was trimmed to "Make
+    // Time" back when it had to survive a 110dp bucket; the layout now sizes its own type,
+    // so the phrase no longer has to be shortened to fit.
+    WidgetText(
+        text = titleText,
+        size = titleSize,
+        color = GlanceTheme.colors.onSurface,
+        weight = WidgetFontWeight.Medium,
         maxLines = 2,
     )
 
-    if (insight != null) {
-        Text(
-            text = insight.elapsed,
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = supportingSize,
-            ),
-            maxLines = 1,
-        )
-    }
+    WidgetText(
+        text = elapsedText,
+        size = elapsedSize,
+        color = GlanceTheme.colors.onSurfaceVariant,
+        weight = WidgetFontWeight.Regular,
+    )
 
+    // The two gaps are a fixed minimum plus a weighted spacer, so the height the type
+    // estimate above did not claim is spread between the groups by the layout itself.
+    //
+    // Computing the gaps from that estimate instead cannot work: the estimate is what
+    // caps heroSize, so on any card where height is the binding axis the leftover it
+    // reports is identically zero, while the real content — shorter than the deliberately
+    // generous estimate — leaves a band of dead space above the bottom edge. A weight
+    // absorbs whatever is actually left without having to predict it.
+    // A fixed spacer and a weighted one rather than both modifiers on a single spacer:
+    // Glance's translator resolves a weight to layout_weight with a zero base dimension,
+    // so a height on the same modifier chain would not survive as a floor.
     state.windowProgress?.let { progress ->
-        Spacer(modifier = GlanceModifier.height(8.dp))
+        Spacer(modifier = GlanceModifier.height(GROUP_GAP_MIN))
+        Spacer(modifier = GlanceModifier.defaultWeight())
         ExpressiveProgressBar(progress = progress, width = contentWidth)
     }
 
-    Spacer(modifier = GlanceModifier.height(10.dp))
+    Spacer(modifier = GlanceModifier.height(GROUP_GAP_MIN))
+    Spacer(modifier = GlanceModifier.defaultWeight())
+
+    WidgetText(
+        // Title case, accented — the tile's own label, not a shouted version of it.
+        text = "Next Prayer",
+        size = labelSize,
+        color = GlanceTheme.colors.primary,
+        weight = WidgetFontWeight.Bold,
+    )
+
+    // The generator words this as "Next • Dhuhr in 2h 15m"; the bullet and its lead-in are
+    // what the label above already says, so only the tail is kept — the same slice the
+    // tile takes. Falls back to the widget's own fields when no insight is being tracked,
+    // which is the one case the generator returns null.
+    val nextDetail = insight?.nextPrayerInfo
+        ?.substringAfter('•')
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: "${state.nextPrayer.name} in ${state.countdown.removePrefix("in ")}"
+    val nextName = nextDetail.substringBefore(" in ").trim()
+    val nextCountdown = nextDetail.substringAfter(" in ", missingDelimiterValue = "").trim()
 
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        Text(
-            text = state.nextPrayer.name.uppercase(),
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = supportingSize,
-                fontWeight = FontWeight.Medium,
-            ),
-            maxLines = 1,
+        // Three runs rather than one string, because the tile weights them differently —
+        // the prayer name and its countdown both carry, the "in" between them does not.
+        // Each run is its own view, so what the tile does with spans inside a single
+        // AnnotatedString is three siblings here.
+        WidgetText(
+            text = nextName,
+            size = nextSize,
+            color = GlanceTheme.colors.onSurface,
+            weight = WidgetFontWeight.Bold,
+            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
         )
+        if (nextCountdown.isNotEmpty()) {
+            WidgetText(
+                text = " in ",
+                size = nextSize,
+                color = GlanceTheme.colors.onSurfaceVariant,
+                weight = WidgetFontWeight.Regular,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+            WidgetText(
+                text = nextCountdown,
+                size = nextSize,
+                color = GlanceTheme.colors.primary,
+                weight = WidgetFontWeight.Bold,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+        }
         Spacer(modifier = GlanceModifier.defaultWeight())
         AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
-    }
-    Text(
-        text = state.nextPrayer.time,
-        style = TextStyle(
-            color = GlanceTheme.colors.onSurface,
-            fontSize = timeSize,
-            fontWeight = FontWeight.Bold,
-        ),
-        maxLines = 1,
-    )
-    Text(
-        text = state.countdown,
-        style = TextStyle(
-            color = GlanceTheme.colors.primary,
-            fontSize = supportingSize,
-            fontWeight = FontWeight.Medium,
-        ),
-        maxLines = 1,
-    )
-
-    // The prayers after the next one. At 125x180dp the width clamp caps the headline at
-    // ~20sp, leaving roughly half the height spare — no alignment can fill that, only
-    // content can. These rows are dropped when the card is short enough not to need them.
-    // Wrapping past the end of the day keeps this at two rows. Taking only what is left
-    // today meant that after Maghrib just one prayer remained, and the weighted spacer
-    // stranded that single row against the bottom edge. The wrapped entries are
-    // tomorrow's, which is what "upcoming" means once the day's prayers are done.
-    // Row count is derived from the height that is actually left rather than fixed at
-    // two. The hero alone is ~107dp; a 166dp card has ~134dp usable, so two rows (~42dp)
-    // overflowed and the second was clipped against the bottom edge.
-    val afterNext = state.prayers.dropWhile { !it.isNext }.drop(1)
-    val upcomingRows = when {
-        cardSize.height >= 210.dp -> 3
-        cardSize.height >= 180.dp -> 2
-        cardSize.height >= 150.dp -> 1
-        else -> 0
-    }
-    val upcoming = (afterNext + state.prayers).take(upcomingRows)
-
-    if (upcoming.isNotEmpty()) {
-        // A weighted spacer here pinned the rows to the bottom edge, so any overflow was
-        // clipped rather than visible. A fixed gap lets them sit under the countdown.
-        Spacer(modifier = GlanceModifier.height(10.dp))
-        upcoming.forEach { prayer ->
-            Row(
-                modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
-                verticalAlignment = Alignment.Vertical.CenterVertically,
-            ) {
-                Text(
-                    text = prayer.name,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.outline,
-                        fontSize = supportingSize,
-                    ),
-                    maxLines = 1,
-                )
-                Spacer(modifier = GlanceModifier.defaultWeight())
-                Text(
-                    text = prayer.time,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.outline,
-                        fontSize = supportingSize,
-                    ),
-                    maxLines = 1,
-                )
-            }
-        }
     }
 }
 
@@ -480,20 +692,33 @@ private fun ExpressiveProgressBar(progress: Float, width: androidx.compose.ui.un
 @Composable
 private fun AnimatedMeteocon(prayer: WidgetPrayer, size: androidx.compose.ui.unit.Dp) {
     val frames = prayer.weatherFrames
+    val context = LocalContext.current
+
+    // The artwork is now the Mono set — one black silhouette — so it has to be tinted to
+    // be anything but a black smudge on a light card. Tinted to the same accent the
+    // countdown beside it uses, so the row reads as one thing.
+    val tint = GlanceTheme.colors.primary
 
     if (frames.size < 2) {
         prayer.weatherIcon?.let {
             Image(
                 provider = ImageProvider(it),
                 contentDescription = null,
+                colorFilter = ColorFilter.tint(tint),
                 modifier = GlanceModifier.size(size),
             )
         }
         return
     }
 
+    // setColorFilter over setImageViewBitmap rather than recolouring the bitmaps: the
+    // frames are cached per weather code and shared by every widget, so tinting them at
+    // render time would bake one theme's colour into the cache. ImageView.setColorFilter
+    // is remotable and applies SRC_ATOP, which recolours the glyph and leaves its alpha —
+    // exactly what a solid silhouette needs.
+    val tintArgb = tint.getColor(context).toArgb()
     val remoteViews = RemoteViews(
-        LocalContext.current.packageName,
+        context.packageName,
         R.layout.widget_meteocon_flipper,
     ).apply {
         FRAME_VIEW_IDS.forEachIndexed { index, viewId ->
@@ -501,6 +726,7 @@ private fun AnimatedMeteocon(prayer: WidgetPrayer, size: androidx.compose.ui.uni
             // them so a short render still fills every slot rather than leaving blanks
             // that would read as a stutter.
             setImageViewBitmap(viewId, frames[index % frames.size])
+            setInt(viewId, "setColorFilter", tintArgb)
         }
     }
 

@@ -144,6 +144,26 @@
             android:enabled="true"
             android:exported="false" />
             
+        <!-- Drives the prayer widget's own refresh cadence.
+
+             A widget's updatePeriodMillis is floored at 30 minutes by the framework,
+             which is far too coarse for a card showing "16 minutes since Dhuhr" — it
+             was seen 6 minutes out. This receiver takes a self-re-arming alarm, and
+             also refreshes on unlock, since Doze is entitled to hold the alarm while
+             the screen is off and the card would otherwise be stale exactly when the
+             user first looks at it.
+
+             Not exported: the alarm PendingIntent and the USER_PRESENT broadcast are
+             both delivered by the system, neither needs another app to reach it. -->
+        <receiver
+            android:name=".widget.PrayerWidgetRefreshReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
         <!-- Home-screen prayer times widgets (Glance).
 
              Five receivers, one per size, because the launcher binds widgets by provider

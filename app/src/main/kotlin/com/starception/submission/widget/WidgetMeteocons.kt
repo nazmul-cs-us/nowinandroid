@@ -62,6 +62,15 @@ internal object WidgetMeteocons {
     /** 56px x 6 frames is ~75 KB per animated icon; 96px would nearly double that. */
     private const val ANIMATED_ICON_PX = 56
 
+    /**
+     * Where the sampled loop starts, for the same reason [REPRESENTATIVE_FRAME] is not 0:
+     * a Meteocon opens on a near-empty canvas. Sampling from 0 put that blank frame into
+     * the flipper, so the icon vanished for 450ms out of every 2.7s — a blink, not an
+     * animation. Starting past the entrance costs the drift-in, which at 20dp was never
+     * legible anyway, and keeps all six frames on artwork that is actually drawn.
+     */
+    private const val FRAME_WINDOW_START = 0.25f
+
     private val cache = HashMap<Int, Bitmap?>()
     private val frameCache = HashMap<Int, List<Bitmap>>()
 
@@ -99,9 +108,11 @@ internal object WidgetMeteocons {
             // Every frame is trimmed to the same box (computed from the fullest frame)
             // so the glyph does not jitter as the animation advances.
             List(FRAME_COUNT) { index ->
-                // Stop short of 1f: the last frame of a loop is the same image as the
-                // first, and holding it twice makes the animation visibly stutter.
-                drawable.progress = index.toFloat() / FRAME_COUNT
+                // Spread over [FRAME_WINDOW_START, 1f), stopping short of 1f: the last
+                // frame of a loop is the same image as the first, and holding it twice
+                // makes the animation visibly stutter.
+                drawable.progress = FRAME_WINDOW_START +
+                    index.toFloat() * (1f - FRAME_WINDOW_START) / FRAME_COUNT
                 Bitmap.createBitmap(
                     ANIMATED_ICON_PX,
                     ANIMATED_ICON_PX,
@@ -181,28 +192,34 @@ internal object WidgetMeteocons {
      * Open-Meteo WMO weather code to Meteocon artwork.
      *
      * Mirrors the mapping the prayer screen uses so the widget never disagrees with the
-     * app about the same hour's sky. The Fill style is used throughout: the widget has
-     * no palette tinting of its own, and Fill is the variant that stays legible on both
-     * a light and a dark launcher wallpaper.
+     * app about the same hour's sky.
+     *
+     * The Mono style, not Fill, and the reason is contrast rather than taste. Fill draws
+     * its clouds in near-white with the weather picked out in colour: on a photographic
+     * launcher wallpaper that reads, but this icon sits on the widget's own light surface,
+     * where a white cloud all but disappeared — a rain icon measured about 9% ink against
+     * the card, and only its two blue drops were visible at all. Mono is a single black
+     * silhouette, which the caller tints to a theme colour, so it carries the same weight
+     * as the type beside it whatever the weather.
      */
     @RawRes
     private fun meteoconResource(weatherCode: Int, isDay: Boolean): Int = when (weatherCode) {
-        0 -> if (isDay) R.raw.meteocon_fill_clear_day else R.raw.meteocon_fill_clear_night
+        0 -> if (isDay) R.raw.meteocon_mono_clear_day else R.raw.meteocon_mono_clear_night
         1, 2 -> if (isDay) {
-            R.raw.meteocon_fill_partly_cloudy_day
+            R.raw.meteocon_mono_partly_cloudy_day
         } else {
-            R.raw.meteocon_fill_partly_cloudy_night
+            R.raw.meteocon_mono_partly_cloudy_night
         }
-        3 -> if (isDay) R.raw.meteocon_fill_overcast_day else R.raw.meteocon_fill_overcast_night
-        45, 48 -> if (isDay) R.raw.meteocon_fill_fog_day else R.raw.meteocon_fill_fog_night
-        in 51..57 -> R.raw.meteocon_fill_drizzle
-        in 61..67, in 80..82 -> R.raw.meteocon_fill_rain
-        in 71..77, 85, 86 -> R.raw.meteocon_fill_snow
+        3 -> if (isDay) R.raw.meteocon_mono_overcast_day else R.raw.meteocon_mono_overcast_night
+        45, 48 -> if (isDay) R.raw.meteocon_mono_fog_day else R.raw.meteocon_mono_fog_night
+        in 51..57 -> R.raw.meteocon_mono_drizzle
+        in 61..67, in 80..82 -> R.raw.meteocon_mono_rain
+        in 71..77, 85, 86 -> R.raw.meteocon_mono_snow
         in 95..99 -> if (isDay) {
-            R.raw.meteocon_fill_thunderstorms_day
+            R.raw.meteocon_mono_thunderstorms_day
         } else {
-            R.raw.meteocon_fill_thunderstorms_night
+            R.raw.meteocon_mono_thunderstorms_night
         }
-        else -> R.raw.meteocon_fill_cloudy
+        else -> R.raw.meteocon_mono_cloudy
     }
 }

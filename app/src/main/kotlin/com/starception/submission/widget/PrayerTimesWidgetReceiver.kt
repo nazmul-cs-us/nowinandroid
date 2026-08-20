@@ -16,6 +16,7 @@
 
 package com.starception.submission.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -46,6 +47,37 @@ abstract class BasePrayerWidgetReceiver : GlanceAppWidgetReceiver() {
         if (intent.action in CLOCK_CHANGE_ACTIONS) {
             PrayerWidgetUpdater.refresh(context)
         }
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        // First widget of this size placed — start the cadence that keeps its countdown
+        // honest. Safe to call repeatedly; the alarm replaces itself.
+        PrayerWidgetRefreshScheduler.schedule(context)
+    }
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray,
+    ) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Also here, not just onEnabled: onEnabled fires only for the *first* widget of a
+        // size ever placed, so a widget that already existed before this code shipped — or
+        // one that outlives a cancelled alarm — would never arm the cadence and would sit
+        // on the launcher's 30-minute period forever. onUpdate runs on install, on reboot
+        // and on every period, which makes it the reliable place to re-arm.
+        PrayerWidgetRefreshScheduler.schedule(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        // Last widget of this size removed. The alarm is shared by every size, so it is
+        // only really spent once nothing is left on any home screen — cancelling here
+        // would stop refreshing the other sizes too. Re-scheduling instead keeps the
+        // cadence alive for whatever remains, and the alarm costs nothing if the
+        // redraw finds no widgets: Glance treats an empty widget set as a no-op.
+        PrayerWidgetRefreshScheduler.schedule(context)
     }
 
     private companion object {
@@ -92,19 +124,29 @@ object PrayerWidgetUpdater {
 
     fun refresh(context: Context) {
         val appContext = context.applicationContext
-        scope.launch {
-            listOf(
-                PrayerTimesTinyWidget(),
-                PrayerTimesSmallWidget(),
-                PrayerTimesWidget(),
-                PrayerTimesLargeWidget(),
-                PrayerTimesFullWidget(),
-            ).forEach { widget ->
-                try {
-                    widget.updateAll(appContext)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Widget refresh failed for ${widget.javaClass.simpleName}", e)
-                }
+        scope.launch { refreshNow(appContext) }
+    }
+
+    /**
+     * The same redraw, awaited.
+     *
+     * A BroadcastReceiver may have its process torn down the moment onReceive returns, so
+     * a receiver holding a goAsync() token needs something it can wait on before finishing
+     * — [refresh] returns immediately and would race that teardown.
+     */
+    suspend fun refreshNow(context: Context) {
+        val appContext = context.applicationContext
+        listOf(
+            PrayerTimesTinyWidget(),
+            PrayerTimesSmallWidget(),
+            PrayerTimesWidget(),
+            PrayerTimesLargeWidget(),
+            PrayerTimesFullWidget(),
+        ).forEach { widget ->
+            try {
+                widget.updateAll(appContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Widget refresh failed for ${widget.javaClass.simpleName}", e)
             }
         }
     }

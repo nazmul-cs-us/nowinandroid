@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Location pin, for the prayer widget's title bar beside the place name.
+
+  MingCute "location-fill" (Apache-2.0, github.com/Richard9394/MingCute) — the same
+  licence as the Material Symbols already in this project, so it carries no attribution
+  obligation of its own.
+
+  Filled and single-path, because Glance tints a title bar icon with a ColorFilter over
+  the whole image: only a shape that reads by its silhouette survives that at 24dp. The
+  earlier ic_go_to_mosque_pin draws hairline 0.8-1.5dp strokes that disappear at this
+  size, and Material's own location_on is drawn noticeably more slender, so it read as
+  thin next to the bolder type this title bar sits above.
+
+  The trailing subpath is the inner circle. It is wound opposite to the body, so the
+  default nonZero fill rule punches it out as a hole rather than filling it — do not
+  "tidy" its sweep flags.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2a9,9 0,0 1,9 9c0,3.074 -1.676,5.59 -3.441,7.395c-1.776,1.815 -3.759,3.033 -4.632,3.526a1.87,1.87 0,0 1,-1.854 0c-0.873,-0.493 -2.856,-1.71 -4.632,-3.526C4.676,16.589 3,14.074 3,11a9,9 0,0 1,9 -9m0,6a3,3 0,1 0,0 6a3,3 0,0 0,0 -6" />
+</vector>
