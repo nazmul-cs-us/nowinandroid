@@ -30,6 +30,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
+import com.starception.submission.widget.arabicFontFor
 import com.starception.submission.widget.WidgetFontWeight
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
@@ -41,6 +42,7 @@ import androidx.glance.text.TextAlign
 import androidx.glance.ColorFilter
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import com.starception.submission.widget.WidgetTypography
 import androidx.glance.action.Action
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.itemsIndexed
@@ -56,6 +58,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.captionFontSizeAndMaxLines
+import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.contentSize
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.widgetPadding
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.primaryTextFontSizeAndMaxLines
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
@@ -195,7 +198,30 @@ private fun TextStack(
     width >= 220.dp -> 17.sp
     else -> 15.sp
   }
-  val captionSize = 12.sp
+  val captionSize = 15.sp
+  // Set against the app's own Arabic, not against the Latin body beside it. The reader
+  // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
+  // 1.15x the body this came out around 22sp — the same face, but visibly smaller and
+  // tighter than the app, which is what made the widget's Arabic look like a different
+  // font. A widget card cannot carry 34sp, so this takes the ratio rather than the value.
+  val arabicSize = (bodySize.value * 1.45f).sp
+
+  // Whether the Arabic earns its place: what the card can show without scrolling, less
+  // what the translation already needs. Measured rather than guessed from string length,
+  // and pessimistic by a line — being wrong towards "no Arabic" costs a nicety, being
+  // wrong the other way pushes the translation out of view.
+  val lineHeightPerSp = WidgetTypography.lineHeightPerSp(LocalContext.current)
+  val bodyLines = WidgetTypography.linesNeeded(
+    LocalContext.current, data.text, contentSize.width.value, bodySize.value,
+  )
+  val arabicLines = data.arabic?.let {
+    WidgetTypography.linesNeeded(
+      LocalContext.current, it, contentSize.width.value, arabicSize.value,
+    )
+  } ?: 0
+  val usedByBody = lineHeightPerSp * (captionSize.value + bodyLines * bodySize.value) + 24f
+  val neededByArabic = lineHeightPerSp * (arabicLines + 1) * arabicSize.value + 12f
+  val arabic = data.arabic?.takeIf { usedByBody + neededByArabic <= contentSize.height.value }
 
   // LazyColumn, not Column, because the content is no longer a sample string of known
   // length: a Bukhari hadith or a Fortress dua can run to a paragraph, and a Column simply
@@ -218,11 +244,15 @@ private fun TextStack(
         // prayer widget beside it. Glance cannot carry a bundled font — see
         // widget_text_regular.xml — so the two cards were in different typefaces on the
         // same home screen, which reads as an unfinished app rather than a design.
+        // The same treatment the prayer card gives "Next Prayer": accent colour, bold. In
+        // muted secondary at Medium it read as a caption on the text rather than a label
+        // for it, and at a glance the card did not say whether it was showing a hadith or
+        // a dua — which is the first thing it should answer.
         WidgetText(
           text = data.caption,
           size = captionSize,
-          color = GlanceTheme.colors.secondary,
-          weight = WidgetFontWeight.Medium,
+          color = GlanceTheme.colors.primary,
+          weight = WidgetFontWeight.Bold,
         )
         Spacer(modifier = GlanceModifier.height(6.dp))
         WidgetText(
@@ -233,12 +263,35 @@ private fun TextStack(
           // The whole point of the scrolling container: let it run.
           maxLines = 100,
         )
+
+        // The Arabic, but only when the translation has left room for it.
+        //
+        // A short dua leaves most of a 4-row card empty, and the original is the thing
+        // worth putting there — it is what would actually be recited. A long hadith fills
+        // the card on its own, and appending more would push the translation the reader
+        // came for below the fold, so it is dropped rather than made scrollable-to.
+        if (arabic != null) {
+          Spacer(modifier = GlanceModifier.height(12.dp))
+          WidgetText(
+            text = arabic,
+            size = arabicSize,
+            color = GlanceTheme.colors.onSurfaceVariant,
+            weight = arabicFontFor(LocalContext.current),
+            maxLines = 100,
+            // Centred, as the app centres its Arabic blocks. End-aligned it read as a
+            // footnote to the translation rather than the original it is quoting.
+            align = WidgetTextAlign.Center,
+          )
+        }
       }
     }
     }
 
     if (data.sourceName != null || data.sourceDetail != null) {
-      Spacer(modifier = GlanceModifier.height(8.dp))
+      // Clearance, because the list's bottom edge cuts through whatever line happens to be
+      // there. Without it a half-sliced line of the hadith sat directly on the citation and
+      // read as a rendering fault rather than as text continuing below the fold.
+      Spacer(modifier = GlanceModifier.height(12.dp))
       Row(
         modifier = GlanceModifier.fillMaxWidth().maybeClickable(action),
         verticalAlignment = Alignment.CenterVertically,
@@ -312,6 +365,8 @@ data class LongTextLayoutData(
   val key: String,
   val text: String,
   val caption: String,
+  /** Arabic original, rendered under the text when the card has height to spare. */
+  val arabic: String? = null,
   /** Book the text came from, shown in the footer's left corner. */
   val sourceName: String? = null,
   /** Where in that book, shown in the footer's right corner. */

@@ -49,6 +49,13 @@ internal data class DailyReminder(
     val sourceName: String? = null,
     /** Where in that book, for the footer's right corner — "#156". */
     val sourceDetail: String? = null,
+    /**
+     * The Arabic, shown only when the card has room left after the translation.
+     *
+     * Carried always and used conditionally, because whether it fits is a question about
+     * the widget's size, which this layer cannot see.
+     */
+    val arabic: String? = null,
 )
 
 /**
@@ -120,7 +127,7 @@ internal object DailyReminderRepository {
             // Moving on would make the selection depend on database health; stopping lets
             // the caller fall through to the dua, which is honest and still deterministic.
             if (hadith == null) break
-            val text = hadith.textPlain?.trim() ?: continue
+            val text = hadith.textPlain?.let(::reflow)?.takeIf { it.isNotBlank() } ?: continue
             if (!isSelfContained(text)) continue
 
             val collection = hadith.collectionName.takeIf { it.isNotBlank() } ?: "Sahih Bukhari"
@@ -136,6 +143,9 @@ internal object DailyReminderRepository {
                 caption = "Hadith",
                 sourceName = collection,
                 sourceDetail = "#$number",
+                // Hadith carry their Arabic too, and a short one leaves the same empty
+                // card a short dua does. Same rule decides whether it is shown.
+                arabic = hadith.textArabic.let(::reflow).takeIf { it.isNotBlank() },
                 target = WidgetNavigationTarget.Hadith(
                     databaseFile = BUKHARI_DB,
                     hadithNumber = number,
@@ -149,6 +159,28 @@ internal object DailyReminderRepository {
         Log.w(TAG, "Bukhari hadith unavailable for the widget", e)
         null
     }
+
+    /**
+     * Reflows text that arrives hard-wrapped.
+     *
+     * The hadith database stores Bukhari wrapped at roughly sixty characters, with some
+     * lines indented, which is how it reads as a book. A widget is a different width from
+     * whatever that wrapping assumed, so honouring those breaks produces ragged short
+     * lines and stray indents that look like broken formatting rather than a quotation.
+     *
+     * Single newlines are joined — they are wrapping, not meaning. Blank lines are kept as
+     * paragraph breaks, because in these texts they separate the narration chain from what
+     * was actually said.
+     */
+    private fun reflow(text: String): String = text
+        .split(PARAGRAPH_BREAK)
+        .joinToString("\n\n") { paragraph ->
+            paragraph.split('\n').joinToString(" ") { it.trim() }.replace(REPEATED_SPACE, " ").trim()
+        }
+        .trim()
+
+    private val PARAGRAPH_BREAK = Regex("""\n\s*\n""")
+    private val REPEATED_SPACE = Regex("""\s{2,}""")
 
     /**
      * Whether a hadith says something on its own.
@@ -215,7 +247,7 @@ internal object DailyReminderRepository {
             // The translation, not the Arabic: the widget's typeface is Ubuntu Sans and
             // the card is a few lines tall, neither of which serves an Arabic text well.
             // The detail screen this opens shows the Arabic properly.
-            val text = dua.translation?.takeIf { it.isNotBlank() } ?: return@let null
+            val text = dua.translation?.let(::reflow)?.takeIf { it.isNotBlank() } ?: return@let null
             DailyReminder(
                 key = "dua-${dua.id}",
                 text = text,
@@ -227,8 +259,14 @@ internal object DailyReminderRepository {
                 // The category the app already groups these by ("Health & Sickness") is
                 // short, stable and is the same label the user sees elsewhere in the app.
                 sourceDetail = topicFor(dua.chapterTitle),
+                arabic = dua.arabic?.let(::reflow)?.takeIf { it.isNotBlank() },
                 target = WidgetNavigationTarget.Dua(
-                    title = dua.chapterTitle,
+                    // "{Chapter}: Dua N", which is the contract DuaDetailScreen documents
+                    // and detects with `title.contains(": Dua ")`. Sent as a bare chapter
+                    // title the screen classified it as a Quranic dua instead, fell through
+                    // to id-matching, found nothing and opened page 1 of 291 — "Accept from
+                    // us" — rather than the dua the widget was showing.
+                    title = "${dua.chapterTitle}: Dua ${dua.position}",
                     content = text,
                     duaNumber = dua.position,
                 ),

@@ -111,6 +111,20 @@ internal object WidgetTypography {
         return usable / perSp
     }
 
+    /**
+     * Lines [text] needs at [sizeSp] within [maxWidthDp], for deciding what else fits.
+     *
+     * Deliberately an estimate from total width rather than a real line-break simulation:
+     * word wrapping leaves each line short of the full measure, so this rounds up and adds
+     * a line of slack. It is used to decide whether *more* content will fit, where being
+     * pessimistic costs a feature and being optimistic costs a clipped card.
+     */
+    fun linesNeeded(context: Context, text: String, maxWidthDp: Float, sizeSp: Float): Int {
+        if (text.isBlank() || maxWidthDp <= 0f) return 0
+        val total = widthPerSp(context, text, bold = false) * sizeSp
+        return kotlin.math.ceil(total / (maxWidthDp * WRAP_EFFICIENCY)).toInt().coerceAtLeast(1)
+    }
+
     /** How many lines [text] needs at [sizeSp] within [maxWidthDp]. */
     fun lineCount(context: Context, text: String, maxWidthDp: Float, sizeSp: Float): Int {
         val needed = widthPerSp(context, text, bold = false) * sizeSp

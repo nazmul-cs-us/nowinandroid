@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Arabic widget text in thabit_quran.
+
+  One layout per Arabic face, for the same reason there is one per Latin weight:
+  TextView.setTypeface is not a remotable method, so the font has to be named in XML and
+  chosen by picking a layout. The set mirrors getArabicFontResId() in SurahDetailScreen —
+  keep the two in sync.
+
+  Larger line spacing than the Latin layouts: Quranic faces set their diacritics well above
+  and below the baseline, and at default spacing consecutive lines collide.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/thabit_quran"
+    android:includeFontPadding="true"
+    android:lineSpacingMultiplier="1.35"
+    android:textDirection="rtl"
+    android:ellipsize="end" />

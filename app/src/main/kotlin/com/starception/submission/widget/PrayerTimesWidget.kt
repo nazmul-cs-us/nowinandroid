@@ -16,6 +16,8 @@
 
 package com.starception.submission.widget
 
+import android.os.Build
+import android.content.res.Configuration
 import android.content.Context
 import android.util.TypedValue
 import androidx.annotation.LayoutRes
@@ -385,16 +387,75 @@ internal fun WidgetText(
     val remoteViews = RemoteViews(context.packageName, weight.layout).apply {
         setTextViewText(R.id.widget_text, text)
         setTextViewTextSize(R.id.widget_text, TypedValue.COMPLEX_UNIT_SP, size.value)
-        setTextColor(R.id.widget_text, color.getColor(context).toArgb())
+        // Both colours, not one. getColor() resolves a ColorProvider against the context
+        // it is given, so setTextColor bakes a fixed ARGB into the RemoteViews at
+        // composition time — and the launcher, which does re-resolve Glance's own
+        // backgrounds when the system theme flips, has no way to re-resolve this. The
+        // result was a prayer card whose background followed a switch to light mode while
+        // its text stayed the light-on-light of dark mode, effectively invisible.
+        //
+        // setColorInt hands the launcher both values and lets it pick per its own
+        // configuration, so the text follows the theme without the widget recomposing.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            setColorInt(
+                R.id.widget_text,
+                "setTextColor",
+                color.getColor(context.withNightMode(night = false)).toArgb(),
+                color.getColor(context.withNightMode(night = true)).toArgb(),
+            )
+        } else {
+            // Below S there is no two-colour setter. A widget on those versions redraws on
+            // the next update anyway, which is the behaviour this used to have everywhere.
+            setTextColor(R.id.widget_text, color.getColor(context).toArgb())
+        }
         setInt(R.id.widget_text, "setMaxLines", maxLines)
         setInt(R.id.widget_text, "setGravity", align.gravity)
     }
     AndroidRemoteViews(remoteViews = remoteViews, modifier = modifier)
 }
 
+/**
+ * The Arabic face the reader has chosen in the app.
+ *
+ * The widget used to hardcode one, which is why its Arabic could look nothing like the
+ * same text inside the app: these are not interchangeable styles but different Mushaf
+ * traditions, and the app lets the reader pick between them. Read from the same
+ * `quran_prefs`/`arabic_font` the Surah and Dua screens write, with the same default, so
+ * changing it in the app changes it here.
+ *
+ * Mirrors getArabicFontResId() in SurahDetailScreen — keep the two in sync.
+ */
+internal fun arabicFontFor(context: Context): WidgetFontWeight {
+    val selected = context
+        .getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
+        .getString("arabic_font", "pdms_saleem")
+    return when (selected) {
+        "noor_e_hidayat" -> WidgetFontWeight.ArabicNoor
+        "thabit" -> WidgetFontWeight.ArabicThabit
+        "uthmani_script" -> WidgetFontWeight.ArabicUthmani
+        "indopak_script" -> WidgetFontWeight.ArabicIndoPak
+        else -> WidgetFontWeight.ArabicPdms
+    }
+}
+
+/**
+ * The same context with night mode forced one way, for resolving a colour in both.
+ *
+ * Only the UI_MODE_NIGHT bits are touched; everything else — density, locale, size — is
+ * inherited, so a colour resolved through this differs from the caller's only in the one
+ * dimension being asked about.
+ */
+private fun Context.withNightMode(night: Boolean): Context {
+    val configuration = Configuration(resources.configuration)
+    configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+        if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+    return createConfigurationContext(configuration)
+}
+
 /** Horizontal alignment for [WidgetText], as a Gravity value. */
 internal enum class WidgetTextAlign(val gravity: Int) {
     Start(android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL),
+    Center(android.view.Gravity.CENTER),
     End(android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL),
 }
 
@@ -403,6 +464,14 @@ internal enum class WidgetFontWeight(@LayoutRes val layout: Int) {
     Regular(R.layout.widget_text_regular),
     Medium(R.layout.widget_text_medium),
     Bold(R.layout.widget_text_bold),
+
+    // The Arabic faces the app offers. Ubuntu Sans has no Arabic coverage at all, and
+    // which of these to use is the reader's choice, not ours — see [arabicFontFor].
+    ArabicPdms(R.layout.widget_text_arabic_pdms),
+    ArabicNoor(R.layout.widget_text_arabic_noor),
+    ArabicThabit(R.layout.widget_text_arabic_thabit),
+    ArabicUthmani(R.layout.widget_text_arabic_uthmani),
+    ArabicIndoPak(R.layout.widget_text_arabic_indopak),
 }
 
 /**
@@ -460,18 +529,114 @@ private fun UnavailableContent() {
 /**
  * The single-row layouts — anything too short for the hero stack.
  *
- * One row, but not one fixed row: a 2x1 has room for a countdown and nothing else, while
- * a 5x1 is three times as wide and was spending that width on empty card. Each element is
- * admitted only once it has been measured to fit, so the same composable serves the strip
- * at every width instead of a 2x1 layout stretched across a 5x1.
+ * One row, but not one fixed row. A 2x1 has space for a countdown and nothing else; a 5x1
+ * is three times as wide, and spending that on the same single sentence left most of the
+ * card empty. So the strip has two shapes, and takes the richer one whenever it measures
+ * as fitting:
  *
- * The order things are dropped is the order they are worth least: the phase title first
- * (the countdown implies it), then the clock time (the countdown says the same thing
- * relatively), then the icon. The prayer name and its countdown are never dropped —
- * without them the widget answers nothing.
+ *  - **The day**, when five columns of name-over-time fit. A wide strip is the one place
+ *    the whole schedule can be shown at a glance, which is more use on a home screen than
+ *    a restatement of the next prayer the card above it already leads with.
+ *  - **The next prayer**, otherwise — phase title, countdown, and the clock time when
+ *    there is room for it.
+ *
+ * Everything is admitted only after being measured, so the same composable serves every
+ * width rather than one width's layout being stretched across the others.
  */
 @Composable
 private fun TinyContent(state: PrayerWidgetState.Available, contentSize: DpSize) {
+    val context = LocalContext.current
+    val width = contentSize.width.value
+    val height = contentSize.height.value
+    val lineHeight = WidgetTypography.lineHeightPerSp(context)
+
+    val prayers = state.prayers
+    // The widest of each, because a column grid is only as narrow as its worst case —
+    // sizing on "Asr" would clip "Maghrib" two columns over.
+    val widestName = prayers.maxByOrNull { it.name.length }?.name.orEmpty()
+    val widestTime = prayers.maxByOrNull { it.time.length }?.time.orEmpty()
+    val column = if (prayers.isEmpty()) 0f else (width / prayers.size) - DAY_COLUMN_GAP
+
+    // Capped, because a 1-row card has far more height than two small lines need — the
+    // strip is width-bound, and without a ceiling a very wide 5x1 would set the times
+    // larger than the hero on the card above it.
+    val nameSize = WidgetTypography.fittingSize(context, widestName, column).coerceAtMost(14f)
+    val timeSize = WidgetTypography
+        .fittingSize(context, widestTime, column, bold = true)
+        .coerceAtMost(18f)
+    // Two stacked lines have to clear the strip's height as well as its width, and below
+    // ~9sp the names stop being readable at arm's length — at that point the next-prayer
+    // line says more with the same pixels.
+    val showsDay = prayers.size >= 2 &&
+        nameSize >= 9f &&
+        timeSize >= 11f &&
+        lineHeight * (nameSize + timeSize) <= height
+
+    if (showsDay) {
+        DayStripContent(prayers = prayers, nameSize = nameSize, timeSize = timeSize)
+    } else {
+        NextPrayerStripContent(state = state, contentSize = contentSize)
+    }
+}
+
+/** Clearance between the day strip's columns, so adjacent times never touch. */
+private const val DAY_COLUMN_GAP = 8f
+
+/** Every prayer of the day, name over time, with the next one picked out. */
+@Composable
+private fun DayStripContent(
+    prayers: List<WidgetPrayer>,
+    nameSize: Float,
+    timeSize: Float,
+) {
+    Row(
+        modifier = GlanceModifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+    ) {
+        prayers.forEach { prayer ->
+            // Three states, because "which one is next" is the question the strip exists to
+            // answer and it has to survive being read in a glance: the next prayer takes
+            // the accent and the weight, the ones already prayed recede, the rest sit in
+            // between. Colour alone would not carry it at 12sp.
+            val nameColor = when {
+                prayer.isNext -> GlanceTheme.colors.primary
+                prayer.isPast -> GlanceTheme.colors.outline
+                else -> GlanceTheme.colors.onSurfaceVariant
+            }
+            val timeColor = when {
+                prayer.isNext -> GlanceTheme.colors.primary
+                prayer.isPast -> GlanceTheme.colors.outline
+                else -> GlanceTheme.colors.onSurface
+            }
+            Column(
+                modifier = GlanceModifier.defaultWeight(),
+                horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+            ) {
+                WidgetText(
+                    text = prayer.name,
+                    size = nameSize.sp,
+                    color = nameColor,
+                    weight = if (prayer.isNext) WidgetFontWeight.Bold else WidgetFontWeight.Regular,
+                    align = WidgetTextAlign.Center,
+                )
+                WidgetText(
+                    text = prayer.time,
+                    size = timeSize.sp,
+                    color = timeColor,
+                    weight = if (prayer.isNext) WidgetFontWeight.Bold else WidgetFontWeight.Medium,
+                    align = WidgetTextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/** The next prayer alone, for strips too narrow to carry the whole day. */
+@Composable
+private fun NextPrayerStripContent(
+    state: PrayerWidgetState.Available,
+    contentSize: DpSize,
+) {
     val context = LocalContext.current
     val width = contentSize.width.value
     val height = contentSize.height.value
@@ -483,30 +648,24 @@ private fun TinyContent(state: PrayerWidgetState.Available, contentSize: DpSize)
     val clock = state.nextPrayer.time
     val phase = state.insight?.title
 
-    // The meteocon is the first thing to go, not the last: at this size it is a ~7dp
-    // smudge whose absence costs nothing, while the 28dp it occupies is a quarter of the
-    // line on the narrowest card. It is kept only when the text does not need that room.
+    // The meteocon is the first thing to go, not the last: at this size it is a small glyph
+    // whose absence costs nothing, while the 28dp it occupies is a quarter of the line on
+    // the narrowest card. It is kept only when the text does not need that room.
     val fitsWithIcon = WidgetTypography.fittingSize(context, mainLine, width - ICON_ROOM) >= 13f
     val iconRoom = if (fitsWithIcon) ICON_ROOM else 0f
 
-    // Measured against the real sentence, bold, since the widest of the three runs sets
-    // the line. Capped at the ramp's lower rungs — this is a supporting size by role, and
-    // letting it grow to fill a wide 5x1 would out-shout the hero on the card beside it.
     val mainSize = WidgetTypography
         .fittingSize(context, mainLine, width - iconRoom, bold = true)
         .coerceIn(11f, 18f)
 
     // What the row has left once the sentence and the icon have taken their share. The
-    // clock time earns a place only if it fits in that remainder with a real gap before
-    // it, rather than crowding the countdown it sits beside.
+    // clock time earns a place only if it fits in that remainder with a real gap before it,
+    // rather than crowding the countdown it sits beside.
     val mainWidth = WidgetTypography.widthPerSp(context, mainLine, bold = true) * mainSize
     val clockSize = (mainSize * 0.92f).coerceAtLeast(11f)
     val clockWidth = WidgetTypography.widthPerSp(context, clock, bold = true) * clockSize
     val showClock = width - iconRoom - mainWidth - TINY_GROUP_GAP >= clockWidth
 
-    // A second line, when the strip is tall enough to carry one without either line
-    // clipping. A 1-row card is ~62dp of content on this launcher, which two small lines
-    // fit inside comfortably; a shorter host would fail this and stay on one line.
     val phaseSize = (mainSize * 0.78f).coerceIn(10f, 14f)
     val twoLines = phase != null &&
         height >= lineHeight * (mainSize + phaseSize) &&
@@ -530,8 +689,6 @@ private fun TinyContent(state: PrayerWidgetState.Available, contentSize: DpSize)
                 )
             }
             Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                // Weighted the same three ways the hero weights its own next-prayer line,
-                // so the two sizes read as the same sentence rather than two summaries.
                 WidgetText(
                     text = name,
                     size = mainSize.sp,

@@ -119,6 +119,7 @@ class LongTextAppWidget : GlanceAppWidget() {
         caption = reminder.caption,
         sourceName = reminder.sourceName,
         sourceDetail = reminder.sourceDetail,
+        arabic = reminder.arabic,
       ),
       action = reminder.openAction(context),
     )
