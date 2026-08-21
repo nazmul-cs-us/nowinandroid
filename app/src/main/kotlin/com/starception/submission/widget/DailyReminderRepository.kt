@@ -21,6 +21,7 @@ import android.util.Log
 import com.starception.submission.core.duadatabase.DuaCategory
 import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.model.data.BukhariBooks
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -131,6 +132,7 @@ internal object DailyReminderRepository {
             if (!isSelfContained(text)) continue
 
             val collection = hadith.collectionName.takeIf { it.isNotBlank() } ?: "Sahih Bukhari"
+            val category = BukhariBooks.findByHadithId(number)?.nameEnglish
             found = DailyReminder(
                 key = "hadith-$number",
                 text = text,
@@ -142,7 +144,10 @@ internal object DailyReminderRepository {
                 // matters — it is what the tap opens.
                 caption = "Hadith",
                 sourceName = collection,
-                sourceDetail = "#$number",
+                sourceDetail = buildString {
+                    append("#$number")
+                    if (category != null) append(" · $category")
+                },
                 // Hadith carry their Arabic too, and a short one leaves the same empty
                 // card a short dua does. Same rule decides whether it is shown.
                 arabic = hadith.textArabic.let(::reflow).takeIf { it.isNotBlank() },
@@ -168,19 +173,25 @@ internal object DailyReminderRepository {
      * whatever that wrapping assumed, so honouring those breaks produces ragged short
      * lines and stray indents that look like broken formatting rather than a quotation.
      *
-     * Single newlines are joined — they are wrapping, not meaning. Blank lines are kept as
-     * paragraph breaks, because in these texts they separate the narration chain from what
-     * was actually said.
+     * Single newlines are joined — they are wrapping, not meaning. Blank lines become a
+     * single visual break: that still separates a narration chain from what was said,
+     * without spending a full empty line in the compact widget.
      */
     private fun reflow(text: String): String = text
         .split(PARAGRAPH_BREAK)
-        .joinToString("\n\n") { paragraph ->
-            paragraph.split('\n').joinToString(" ") { it.trim() }.replace(REPEATED_SPACE, " ").trim()
+        .joinToString("\n") { paragraph ->
+            paragraph
+                .split('\n')
+                .joinToString(" ") { it.trim() }
+                .replace(REPEATED_SPACE, " ")
+                .replace(SPACE_BEFORE_PUNCTUATION, "$1")
+                .trim()
         }
         .trim()
 
     private val PARAGRAPH_BREAK = Regex("""\n\s*\n""")
     private val REPEATED_SPACE = Regex("""\s{2,}""")
+    private val SPACE_BEFORE_PUNCTUATION = Regex("""\s+([,.;:!?،؛؟])""")
 
     /**
      * Whether a hadith says something on its own.

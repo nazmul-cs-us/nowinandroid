@@ -44,6 +44,8 @@ fun NavGraphBuilder.topicScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBukhariBookClick: (Int) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     composable<TopicRoute>(
@@ -60,6 +62,8 @@ fun NavGraphBuilder.topicScreen(
             onSurahClick = onSurahClick,
             onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, id) },
             onHadithClick = onHadithClick,
+            onBukhariBookClick = onBukhariBookClick,
+            onBukhariBookPlayClick = onBukhariBookPlayClick,
             belowHeaderContent = belowHeaderContent,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,

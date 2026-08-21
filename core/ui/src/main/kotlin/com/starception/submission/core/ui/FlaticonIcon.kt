@@ -1,19 +1,25 @@
 package com.starception.submission.core.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.R
+import com.starception.submission.core.ui.R
 
 /**
  * UIcons Regular Rounded glyphs bundled with the app. Keep this catalog semantic so
@@ -108,4 +114,50 @@ fun FlaticonIcon(
             lineHeight = fontSize,
         )
     }
+}
+
+/** The dedicated magnifying-glass asset selected from Flaticon's web catalog. */
+@Composable
+fun FlaticonSearchIcon(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+    iconSize: Dp = 22.dp,
+) {
+    Image(
+        painter = painterResource(R.drawable.flaticon_search_152536),
+        contentDescription = contentDescription,
+        modifier = modifier.size(iconSize),
+        colorFilter = ColorFilter.tint(tint),
+    )
+}
+
+/** The circular play asset selected from Flaticon's web catalog. */
+@Composable
+fun FlaticonPlayIcon(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+    iconSize: Dp = 22.dp,
+) {
+    Image(
+        painter = painterResource(R.drawable.flaticon_play_702132),
+        contentDescription = contentDescription,
+        modifier = modifier.size(iconSize),
+        colorFilter = ColorFilter.tint(tint),
+    )
+}
+
+/** The magic-book asset selected from Flaticon's web catalog. */
+@Composable
+fun FlaticonBookIcon(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 24.dp,
+) {
+    Image(
+        painter = painterResource(R.drawable.flaticon_magic_book_9061096),
+        contentDescription = contentDescription,
+        modifier = modifier.size(iconSize),
+    )
 }

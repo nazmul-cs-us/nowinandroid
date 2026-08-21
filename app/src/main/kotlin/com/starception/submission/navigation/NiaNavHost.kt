@@ -46,6 +46,9 @@ import com.starception.submission.feature.surah.navigation.surahScreen
 import com.starception.submission.feature.dua.duaDetailScreen
 import com.starception.submission.feature.dua.navigateToDuaDetail
 import com.starception.submission.feature.hadith.hadithDetailScreen
+import com.starception.submission.feature.hadith.bukhariBookScreen
+import com.starception.submission.feature.hadith.navigateToBukhariBook
+import com.starception.submission.feature.hadith.navigateToBukhariBookPlayback
 import com.starception.submission.feature.hadith.navigateToHadithDetail
 import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
 import com.starception.submission.feature.salah.datacollection.navigateToSalahLiveRecording
@@ -308,6 +311,8 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
+            onBukhariBookClick = navController::navigateToBukhariBook,
+            onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
             // Show a download card under the header for content-backed topics (Quran/Bukhari)
             // whose database isn't downloaded yet.
             belowHeaderContent = { topicName ->
@@ -426,6 +431,8 @@ fun NiaNavHost(
                     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
                 navController.navigateToHadithDetail(collectionName, hadithNumber, databaseFile)
             },
+            onBukhariBookClick = navController::navigateToBukhariBook,
+            onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
         )
         prayerTimesScreen(
             onSearchClick = { appState.navigateToSearch() },
@@ -503,6 +510,17 @@ fun NiaNavHost(
         // Prayer review & labeling screen
         salahPrayerReviewScreen(
             onBackClick = navController::popBackStack
+        )
+        bukhariBookScreen(
+            onBackClick = navController::popBackStack,
+            onHadithClick = { hadithNumber ->
+                navController.navigateToHadithDetail(
+                    collectionName = "Sahih Bukhari",
+                    hadithNumber = hadithNumber,
+                    databaseFile = "sahih_bukhari.db",
+                )
+            },
+            onPlayAllClick = navController::navigateToBukhariBookPlayback,
         )
         // Hadith detail screen
         hadithDetailScreen(

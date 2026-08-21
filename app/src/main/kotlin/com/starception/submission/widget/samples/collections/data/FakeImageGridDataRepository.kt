@@ -21,11 +21,12 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Log
+import androidx.annotation.DrawableRes
 import androidx.glance.GlanceId
 import coil.ImageLoader
-import coil.request.CachePolicy
 import coil.request.ErrorResult
 import coil.request.ImageRequest
+import com.starception.submission.feature.quran.surahArtworkRes
 import com.starception.submission.widget.samples.utils.AspectRatio
 import com.starception.submission.widget.samples.utils.AspectRatio.Companion.asDouble
 import com.starception.submission.widget.samples.collections.layout.ImageGridItemData
@@ -57,7 +58,8 @@ class FakeImageGridDataRepository {
   fun data(): Flow<List<ImageGridItemData>> = data
 
   suspend fun refresh(context: Context) {
-    items = items.shuffled()
+    // Pick a fresh set from all chapters instead of only reordering the eight already shown.
+    items = demoItems.shuffled().take(MAX_ITEMS_PER_WIDGET)
 
     this.load(context)
   }
@@ -98,9 +100,8 @@ class FakeImageGridDataRepository {
 
           val result = ImageLoader(context).execute(
             ImageRequest.Builder(context)
-              .data(item.imageUrl)
+              .data(item.imageRes)
               .size(width, height)
-              .networkCachePolicy(CachePolicy.ENABLED)
               .target { res: Drawable ->
                 bitmap = (res as BitmapDrawable).bitmap
               }.build()
@@ -116,7 +117,7 @@ class FakeImageGridDataRepository {
             supportingText = item.supportingText,
             image = bitmap,
             imageContentDescription = item.imageContentDescription,
-            surahNumber = surahNumberFor(item.title),
+            surahNumber = item.key.toIntOrNull(),
           )
         }
       }.awaitAll()
@@ -125,23 +126,9 @@ class FakeImageGridDataRepository {
     return mappedItems
   }
 
-  /**
-   * The surah a tile stands for, resolved from its title.
-   *
-   * The demo list names real surahs but carries no numbers, and a number is what the app
-   * navigates by. Matching against QuranData rather than hardcoding a second table means
-   * the widget cannot drift from the surah list the rest of the app uses, and a title that
-   * stops matching resolves to null and simply falls back to the sample's own click
-   * behaviour rather than opening the wrong surah.
-   */
-  private fun surahNumberFor(title: String?): Int? {
-    val name = title?.removePrefix("Surah ")?.trim()?.lowercase() ?: return null
-    return QuranData.surahs.firstOrNull { it.nameEnglish.trim().lowercase() == name }?.number
-  }
-
   private data class ImageGridItemBackendData(
     val key: String,
-    val imageUrl: String,
+    @DrawableRes val imageRes: Int,
     val imageContentDescription: String?,
     val title: String? = null,
     val supportingText: String? = null,
@@ -150,66 +137,29 @@ class FakeImageGridDataRepository {
     companion object {
         private val repositories = mutableMapOf<GlanceId, FakeImageGridDataRepository>()
 
-        // Courtesy of https://unsplash.com/@iamliam
-        // 16:9 images
-        private val demoItems = listOf(
-            ImageGridItemBackendData(
-                key = "1",
-                imageUrl = "https://images.unsplash.com/photo-1531306760863-7fb02a41db12",
-                imageContentDescription = "Flowers at a wedding reception",
-                title = "Surah Al-Fatihah",
-                supportingText = "33,822 views"
-            ),
-            ImageGridItemBackendData(
-                key = "2",
-                imageUrl = "https://images.unsplash.com/photo-1566964423430-3e52903303a5",
-                imageContentDescription = "An up-close look at a Blushing Bride Protea flower.",
-                title = "Surah Al-Baqarah",
-                supportingText = "31,072 views"
-            ),
-            ImageGridItemBackendData(
-                key = "3",
-                imageUrl = "https://images.unsplash.com/photo-1685540466252-8c21e7c37624",
-                imageContentDescription = "A single water droplet rests in a budding red pansy.",
-                title = "Surah Al-Kahf",
-                supportingText = "193 views"
-            ),
-            ImageGridItemBackendData(
-                key = "4",
-                imageUrl = "https://images.unsplash.com/photo-1582817954171-c3533fffde89",
-                imageContentDescription = "Blossom, petal, flower",
-                title = "Surah Yasin",
-                supportingText = "23,815 views",
-            ),
-            ImageGridItemBackendData(
-                key = "5",
-                imageUrl = "https://images.unsplash.com/photo-1565314912546-0d18918fdc8f",
-                imageContentDescription = "Green plant, sky and flowers",
-                title = "Surah Al-Muzzammil",
-                supportingText = "99,467 views"
-            ),
-            ImageGridItemBackendData(
-                key = "6",
-                imageUrl = "https://images.unsplash.com/photo-1671525784444-392a8f8daa3f",
-                imageContentDescription = "A snow-shoer walking up Strelapass",
-                title = "Surah Al-Insan",
-                supportingText = "3,033 views",
-            ),
-            ImageGridItemBackendData(
-                key = "7",
-                imageUrl = "https://images.unsplash.com/photo-1671525737370-1d490286372e",
-                imageContentDescription = "Davos at sunrise, viewed from Schatzalp",
-                title = "Surah An-Naba",
-                supportingText = "4,054 views",
-            ),
-            ImageGridItemBackendData(
-                key = "8",
-                imageUrl = "https://images.unsplash.com/photo-1629027272726-2eed15f90e8e",
-                imageContentDescription = "Nasturtium plants",
-                title = "Surah Al-Ala",
-                supportingText = "975 views",
-            )
+        // Chapter-specific, bundled 16:9 artwork. Keeping the images local makes the
+        // Quran widget deterministic offline and avoids replacing meaningful scenes with
+        // whichever remote photo happened to remain cached by the launcher.
+
+        private val ayahCounts = intArrayOf(
+            7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99,
+            128, 111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60,
+            34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38,
+            29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18,
+            12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29,
+            19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8,
+            11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6,
         )
+
+        private val demoItems = QuranData.surahs.mapIndexed { index, surah ->
+            ImageGridItemBackendData(
+                key = surah.number.toString(),
+                imageRes = surahArtworkRes(surah.number),
+                imageContentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
+                title = "Surah ${surah.nameEnglish}",
+                supportingText = "${ayahCounts[index]} ayahs · ${surah.revelationType}",
+            )
+        }
     /**
      * Returns the repository instance for the given widget represented by [glanceId].
      */

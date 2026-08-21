@@ -25,6 +25,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,8 +76,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.starception.submission.core.designsystem.R.drawable
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
 import com.starception.submission.core.designsystem.component.NiaTopicTag
@@ -109,6 +110,24 @@ fun NewsResourceCardExpanded(
     searchQuery: String = "",
 ) {
     val clickActionLabel = stringResource(R.string.core_ui_card_tap_action)
+    val surahNumber = remember(
+        userNewsResource.title,
+        userNewsResource.url,
+        userNewsResource.type,
+    ) {
+        extractSurahNumber(
+            title = userNewsResource.title,
+            url = userNewsResource.url,
+            type = userNewsResource.type,
+        )
+    }
+    val headerImageUrl = remember(userNewsResource.headerImageUrl, surahNumber) {
+        if (surahNumber != null && surahNumber in 1..114) {
+            "drawable://surah_%03d".format(Locale.US, surahNumber)
+        } else {
+            userNewsResource.headerImageUrl
+        }
+    }
 
     Card(
         onClick = onClick,
@@ -125,7 +144,7 @@ fun NewsResourceCardExpanded(
         Column {
             Row {
                 NewsResourceHeaderImage(
-                    headerImageUrl = userNewsResource.headerImageUrl
+                    headerImageUrl = headerImageUrl,
                 )
             }
             Box(
@@ -165,18 +184,7 @@ fun NewsResourceCardExpanded(
                     // Per-Surah reading-progress badge (hidden for non-Surah cards
                     // or when the user has not opened this Surah yet).
                     val cardContext = androidx.compose.ui.platform.LocalContext.current
-                    val surahNumberForProgress = remember(
-                        userNewsResource.title,
-                        userNewsResource.url,
-                        userNewsResource.type,
-                    ) {
-                        extractSurahNumber(
-                            title = userNewsResource.title,
-                            url = userNewsResource.url,
-                            type = userNewsResource.type,
-                        )
-                    }
-                    val surahProgress = surahNumberForProgress?.let { sn ->
+                    val surahProgress = surahNumber?.let { sn ->
                         SurahReadingProgressRepository.progressFor(cardContext, sn)
                     }
                     if (surahProgress != null && surahProgress.totalAyahs > 0) {
@@ -253,40 +261,61 @@ fun NewsResourceHeaderImage(
     headerImageUrl: String?,
 ) {
     val hasValidUrl = !headerImageUrl.isNullOrEmpty()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val containerHeightDp = 240f
 
-    // Check if this is a drawable resource reference
     val isDrawableResource = headerImageUrl?.startsWith("drawable://") == true
-    val drawableResId = if (isDrawableResource) {
-        when (headerImageUrl?.substringAfter("drawable://")) {
-            "masjid_al_haram" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_haram
-            "masjid_al_nawabi" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_nawabi
-            else -> null
+    val drawableResId = remember(headerImageUrl) {
+        if (isDrawableResource) {
+            val drawableName = headerImageUrl?.substringAfter("drawable://").orEmpty()
+            context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+                .takeIf { it != 0 }
+                ?: when (drawableName) {
+                    "masjid_al_haram" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_haram
+                    "masjid_al_nawabi" -> com.starception.submission.core.designsystem.R.drawable.masjid_al_nawabi
+                    else -> null
+                }
+        } else {
+            null
         }
-    } else null
+    }
 
-    var isLoading by remember { mutableStateOf(hasValidUrl && !isDrawableResource) }
-    var isError by remember { mutableStateOf(false) }
+    // Decode at the rendered card size instead of materializing each 2560x1440
+    // master bitmap on the main thread. Coil performs this work off-thread and
+    // caches the downsampled result for subsequent cards/scrolls.
+    val targetWidthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
+    val targetHeightPx = with(density) { containerHeightDp.dp.roundToPx() }
+    val imageRequest = remember(
+        headerImageUrl,
+        drawableResId,
+        targetWidthPx,
+        targetHeightPx,
+    ) {
+        val model = if (isDrawableResource) drawableResId else headerImageUrl
+        model?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .size(targetWidthPx, targetHeightPx)
+                .placeholder(drawable.core_designsystem_ic_placeholder_default)
+                .error(drawable.core_designsystem_ic_placeholder_default)
+                .crossfade(false)
+                .build()
+        }
+    }
     val imageLoader = rememberAsyncImagePainter(
-        model = if (isDrawableResource) null else headerImageUrl,
-        onState = { state ->
-            isLoading = state is AsyncImagePainter.State.Loading
-            isError = state is AsyncImagePainter.State.Error
-        },
+        model = imageRequest,
     )
     val isLocalInspection = LocalInspectionMode.current
 
     // Track the card's position for parallax effect
     var cardYPosition by remember { mutableStateOf(0f) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-    // Professional parallax configuration:
-    // - Show 100% of image initially
-    // - Create parallax ILLUSION using scale and subtle translation
-    // - Scale: 1.0 -> 1.08 (zoom in as user scrolls)
-    // - Translation: subtle vertical shift for depth perception
-    val containerHeightDp = 240f
+    // Keep enough overscan around the image for its parallax translation.
+    // Without a baseline scale, moving an edge-positioned card exposed the
+    // white Card surface above the bitmap.
 
     // Smooth easing function for professional feel
     fun easeInOutCubic(x: Float): Float {
@@ -309,40 +338,34 @@ fun NewsResourceHeaderImage(
     ) {
         // Removed loading spinner - images fade in smoothly instead
 
-        // Calculate parallax progress based on screen position
-        val normalizedPosition = (cardYPosition / screenHeightPx).coerceIn(0f, 1f)
-        // Convert to -1 to +1 range centered at middle of screen
-        val centeredProgress = (normalizedPosition - 0.5f) * 2f
-        val easedProgress = easeInOutCubic(kotlin.math.abs(centeredProgress)) * kotlin.math.sign(centeredProgress)
-
         Image(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(containerHeightDp.dp)
+                .fillMaxSize()
                 .graphicsLayer {
-                    // Parallax ILLUSION effects:
+                    // Read position inside the layer so scrolling invalidates
+                    // only this GPU transform instead of recomposing the card.
+                    val normalizedPosition =
+                        (cardYPosition / screenHeightPx).coerceIn(0f, 1f)
+                    val centeredProgress = (normalizedPosition - 0.5f) * 2f
+                    val easedProgress =
+                        easeInOutCubic(kotlin.math.abs(centeredProgress)) *
+                            kotlin.math.sign(centeredProgress)
 
-                    // 1. Scale effect: zoom in as card moves toward center of screen
-                    // At edges: 1.0, at center: 1.08 (8% zoom)
-                    val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
+                    // A permanent 16% overscan safely covers the full 15dp
+                    // translation; add a subtle extra zoom near screen center.
+                    val scaleValue = 1.16f +
+                        (1f - kotlin.math.abs(centeredProgress)) * 0.04f
                     scaleX = scaleValue
                     scaleY = scaleValue
 
-                    // 2. Subtle vertical translation for depth (moves opposite to scroll)
-                    // Creates illusion of layers moving at different speeds
                     val maxTranslation = with(density) { 15.dp.toPx() }
                     translationY = -easedProgress * maxTranslation
 
-                    // 3. Subtle alpha variation for atmospheric depth
-                    alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
-
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                 },
-            contentScale = ContentScale.FillWidth,
+            contentScale = ContentScale.Crop,
             alignment = Alignment.Center,
-            painter = if (isDrawableResource && drawableResId != null) {
-                painterResource(drawableResId)
-            } else if (hasValidUrl && isError.not() && !isLocalInspection) {
+            painter = if (imageRequest != null && !isLocalInspection) {
                 imageLoader
             } else {
                 painterResource(drawable.core_designsystem_ic_placeholder_default)

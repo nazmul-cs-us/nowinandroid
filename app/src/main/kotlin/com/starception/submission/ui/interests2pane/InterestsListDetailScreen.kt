@@ -74,6 +74,8 @@ fun NavGraphBuilder.interestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBukhariBookClick: (Int) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
     onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<InterestsRoute> {
@@ -87,6 +89,8 @@ fun NavGraphBuilder.interestsListDetailScreen(
                 onSurahClick = onSurahClick,
                 onDuaClick = onDuaClick,
                 onHadithClick = onHadithClick,
+                onBukhariBookClick = onBukhariBookClick,
+                onBukhariBookPlayClick = onBukhariBookPlayClick,
             )
         }
     }
@@ -99,6 +103,8 @@ internal fun InterestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBukhariBookClick: (Int) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
@@ -108,6 +114,8 @@ internal fun InterestsListDetailScreen(
         onSurahClick = onSurahClick,
         onDuaClick = onDuaClick,
         onHadithClick = onHadithClick,
+        onBukhariBookClick = onBukhariBookClick,
+        onBukhariBookPlayClick = onBukhariBookPlayClick,
     )
 }
 
@@ -120,6 +128,8 @@ internal fun InterestsListDetailScreen(
     onSurahClick: (Int, String?) -> Unit = { _, _ -> },
     onDuaClick: (UserNewsResource, String) -> Unit = { _, _ -> },
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
+    onBukhariBookClick: (Int) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -242,6 +252,8 @@ internal fun InterestsListDetailScreen(
                                     onSurahClick = onSurahClick,
                                     onDuaClick = { userNewsResource -> onDuaClick(userNewsResource, route.id) },
                                     onHadithClick = onHadithClick,
+                                    onBukhariBookClick = onBukhariBookClick,
+                                    onBukhariBookPlayClick = onBukhariBookPlayClick,
                                     // Offer to download missing content (Quran/Bukhari) for content-backed topics.
                                     belowHeaderContent = { topicName ->
                                         com.starception.submission.download.TopicMissingContentCard(topicName)

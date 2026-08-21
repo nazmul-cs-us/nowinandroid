@@ -15,8 +15,22 @@
  */
 package com.starception.submission.widget.samples.text.layout
 
+import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.os.Build
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextDirectionHeuristics
+import android.text.TextPaint
+import android.util.TypedValue
+import android.widget.RemoteViews
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
@@ -28,10 +42,14 @@ import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.background
 import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
-import com.starception.submission.widget.arabicFontFor
+import com.starception.submission.widget.arabicFontResourceFor
 import com.starception.submission.widget.WidgetFontWeight
+import androidx.core.content.res.ResourcesCompat
+import androidx.glance.appwidget.AndroidRemoteViews
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
 import androidx.glance.layout.Row
@@ -42,7 +60,6 @@ import androidx.glance.text.TextAlign
 import androidx.glance.ColorFilter
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import com.starception.submission.widget.WidgetTypography
 import androidx.glance.action.Action
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.itemsIndexed
@@ -56,6 +73,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import com.starception.submission.R
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.captionFontSizeAndMaxLines
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.contentSize
@@ -194,11 +212,10 @@ private fun TextStack(
   // the least important text on the card in the largest type — the prayer widget beside it
   // opens with its content at ~20sp, and these two should read as the same family.
   val bodySize = when {
-    width >= 300.dp -> 19.sp
-    width >= 220.dp -> 17.sp
+    width >= 300.dp -> 17.sp
+    width >= 220.dp -> 16.sp
     else -> 15.sp
   }
-  val captionSize = 15.sp
   // Set against the app's own Arabic, not against the Latin body beside it. The reader
   // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
   // 1.15x the body this came out around 22sp — the same face, but visibly smaller and
@@ -206,22 +223,10 @@ private fun TextStack(
   // font. A widget card cannot carry 34sp, so this takes the ratio rather than the value.
   val arabicSize = (bodySize.value * 1.45f).sp
 
-  // Whether the Arabic earns its place: what the card can show without scrolling, less
-  // what the translation already needs. Measured rather than guessed from string length,
-  // and pessimistic by a line — being wrong towards "no Arabic" costs a nicety, being
-  // wrong the other way pushes the translation out of view.
-  val lineHeightPerSp = WidgetTypography.lineHeightPerSp(LocalContext.current)
-  val bodyLines = WidgetTypography.linesNeeded(
-    LocalContext.current, data.text, contentSize.width.value, bodySize.value,
-  )
-  val arabicLines = data.arabic?.let {
-    WidgetTypography.linesNeeded(
-      LocalContext.current, it, contentSize.width.value, arabicSize.value,
-    )
-  } ?: 0
-  val usedByBody = lineHeightPerSp * (captionSize.value + bodyLines * bodySize.value) + 24f
-  val neededByArabic = lineHeightPerSp * (arabicLines + 1) * arabicSize.value + 12f
-  val arabic = data.arabic?.takeIf { usedByBody + neededByArabic <= contentSize.height.value }
+  // Always carry the original after the English translation. The previous fit estimate
+  // could suppress Arabic even when the launcher had ample room for it; the scrollable
+  // content already handles genuinely long reminders without dropping either language.
+  val arabic = data.arabic
 
   // LazyColumn, not Column, because the content is no longer a sample string of known
   // length: a Bukhari hadith or a Fortress dua can run to a paragraph, and a Column simply
@@ -248,13 +253,24 @@ private fun TextStack(
         // muted secondary at Medium it read as a caption on the text rather than a label
         // for it, and at a glance the card did not say whether it was showing a hadith or
         // a dua — which is the first thing it should answer.
-        WidgetText(
-          text = data.caption,
-          size = captionSize,
-          color = GlanceTheme.colors.primary,
-          weight = WidgetFontWeight.Bold,
-        )
-        Spacer(modifier = GlanceModifier.height(6.dp))
+        Row(
+          modifier = GlanceModifier
+            .wrapContentWidth()
+            .height(40.dp)
+            .background(GlanceTheme.colors.primaryContainer)
+            .cornerRadius(50.dp)
+            .padding(horizontal = 12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          WidgetText(
+            text = data.caption.uppercase(),
+            size = 10.sp,
+            color = GlanceTheme.colors.onPrimaryContainer,
+            weight = WidgetFontWeight.Medium,
+            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+          )
+        }
+        Spacer(modifier = GlanceModifier.height(8.dp))
         WidgetText(
           text = data.text,
           size = bodySize,
@@ -263,25 +279,23 @@ private fun TextStack(
           // The whole point of the scrolling container: let it run.
           maxLines = 100,
         )
-
-        // The Arabic, but only when the translation has left room for it.
-        //
-        // A short dua leaves most of a 4-row card empty, and the original is the thing
-        // worth putting there — it is what would actually be recited. A long hadith fills
-        // the card on its own, and appending more would push the translation the reader
-        // came for below the fold, so it is dropped rather than made scrollable-to.
         if (arabic != null) {
           Spacer(modifier = GlanceModifier.height(12.dp))
-          WidgetText(
-            text = arabic,
-            size = arabicSize,
-            color = GlanceTheme.colors.onSurfaceVariant,
-            weight = arabicFontFor(LocalContext.current),
-            maxLines = 100,
-            // Centred, as the app centres its Arabic blocks. End-aligned it read as a
-            // footnote to the translation rather than the original it is quoting.
-            align = WidgetTextAlign.Center,
-          )
+          Column(
+            modifier = GlanceModifier
+              .fillMaxWidth()
+              .background(GlanceTheme.colors.secondaryContainer)
+              .cornerRadius(16.dp)
+              .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+          ) {
+            ArabicWidgetBitmapText(
+              text = arabic,
+              size = arabicSize,
+              width = contentSize.width - 24.dp,
+              color = GlanceTheme.colors.onSecondaryContainer,
+            )
+          }
         }
       }
     }
@@ -291,7 +305,14 @@ private fun TextStack(
       // Clearance, because the list's bottom edge cuts through whatever line happens to be
       // there. Without it a half-sliced line of the hadith sat directly on the citation and
       // read as a rendering fault rather than as text continuing below the fold.
-      Spacer(modifier = GlanceModifier.height(12.dp))
+      Spacer(modifier = GlanceModifier.height(10.dp))
+      Spacer(
+        modifier = GlanceModifier
+          .fillMaxWidth()
+          .height(1.dp)
+          .background(GlanceTheme.colors.surfaceVariant),
+      )
+      Spacer(modifier = GlanceModifier.height(8.dp))
       Row(
         modifier = GlanceModifier.fillMaxWidth().maybeClickable(action),
         verticalAlignment = Alignment.CenterVertically,
@@ -319,6 +340,100 @@ private fun TextStack(
       }
     }
   }
+}
+
+/**
+ * Rasterises Arabic inside the app process so the selected Mushaf face survives the
+ * RemoteViews boundary. Samsung's launcher silently replaces bundled fonts referenced by
+ * a remote TextView with its system Arabic face; an ImageView preserves the shaped glyphs.
+ */
+@Composable
+private fun ArabicWidgetBitmapText(
+  text: String,
+  size: TextUnit,
+  width: Dp,
+  color: ColorProvider,
+) {
+  val context = LocalContext.current
+  val metrics = context.resources.displayMetrics
+  val widthPx = (width.value * metrics.density).toInt().coerceAtLeast(1)
+  val textSizePx = TypedValue.applyDimension(
+    TypedValue.COMPLEX_UNIT_SP,
+    size.value,
+    metrics,
+  )
+  val currentTextColor = color.getColor(context).toArgb()
+  val lightTextColor = color.getColor(context.withNightMode(night = false)).toArgb()
+  val darkTextColor = color.getColor(context.withNightMode(night = true)).toArgb()
+  val fontRes = arabicFontResourceFor(context)
+  val bitmap = remember(text, widthPx, textSizePx, fontRes) {
+    renderArabicBitmap(
+      text = text,
+      widthPx = widthPx,
+      textSizePx = textSizePx,
+      typeface = ResourcesCompat.getFont(context, fontRes),
+      densityDpi = metrics.densityDpi,
+    )
+  }
+  val height = (bitmap.height / metrics.density).dp
+  val remoteViews = remember(bitmap, currentTextColor, lightTextColor, darkTextColor) {
+    RemoteViews(context.packageName, R.layout.widget_arabic_bitmap).apply {
+      setImageViewBitmap(R.id.widget_arabic_image, bitmap)
+      setContentDescription(R.id.widget_arabic_image, text)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        setColorInt(
+          R.id.widget_arabic_image,
+          "setColorFilter",
+          lightTextColor,
+          darkTextColor,
+        )
+      } else {
+        setInt(R.id.widget_arabic_image, "setColorFilter", currentTextColor)
+      }
+    }
+  }
+
+  AndroidRemoteViews(
+    remoteViews = remoteViews,
+    modifier = GlanceModifier.fillMaxWidth().height(height),
+  )
+}
+
+private fun renderArabicBitmap(
+  text: String,
+  widthPx: Int,
+  textSizePx: Float,
+  typeface: android.graphics.Typeface?,
+  densityDpi: Int,
+): Bitmap {
+  val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG or TextPaint.SUBPIXEL_TEXT_FLAG).apply {
+    this.textSize = textSizePx
+    // Keep the glyph bitmap theme-neutral; RemoteViews applies the day/night tint.
+    color = Color.WHITE
+    this.typeface = typeface
+  }
+  val layout = StaticLayout.Builder
+    .obtain(text, 0, text.length, paint, widthPx)
+    .setAlignment(Layout.Alignment.ALIGN_CENTER)
+    .setIncludePad(true)
+    // Indo-Pak reports an unusually tall ascent/descent box around its marks. Even the
+    // nominal 1.0 baseline interval therefore leaves a conspicuous empty band between
+    // lines; tighten that metrics box while retaining clearance for the diacritics.
+    .setLineSpacing(0f, 0.78f)
+    .setTextDirection(TextDirectionHeuristics.RTL)
+    .build()
+  return Bitmap.createBitmap(widthPx, layout.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+    .also { bitmap ->
+      bitmap.density = densityDpi
+      layout.draw(Canvas(bitmap))
+    }
+}
+
+private fun Context.withNightMode(night: Boolean): Context {
+  val configuration = Configuration(resources.configuration)
+  configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+    if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+  return createConfigurationContext(configuration)
 }
 
 private enum class LongTextLayoutSize {

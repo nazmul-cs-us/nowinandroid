@@ -192,7 +192,6 @@ import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.GregorianCalendar
-import kotlin.math.PI
 import kotlin.math.sqrt
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.StrokeCap
@@ -1584,7 +1583,12 @@ fun SwipeableBigTiles(
                             backgroundPainterRes = R.drawable.insight_salah,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
-                            ambientProgress = autoAdvanceProgress.value,
+                            backgroundPageOffset = {
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                            },
+                            luminousAccent = Color(0xFFFFD27A),
+                            luminousAnchor = Offset(0.76f, 0.42f),
                             timelineProgress = prayerWindowProgress(prayerTimes, currentTime),
                             actionLabel = "Compass",
                             actionDescription = "Open prayer compass",
@@ -1613,7 +1617,12 @@ fun SwipeableBigTiles(
                             backgroundPainterRes = R.drawable.insight_prayer,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
-                            ambientProgress = autoAdvanceProgress.value,
+                            backgroundPageOffset = {
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                            },
+                            luminousAccent = Color(0xFFFFE2A8),
+                            luminousAnchor = Offset(0.80f, 0.24f),
                             prayerRecap = prayerRecap,
                             onPrayerToggle = { prayerName ->
                                 prayerRecap.firstOrNull { it.name == prayerName }?.let { prayer ->
@@ -1651,7 +1660,12 @@ fun SwipeableBigTiles(
                             backgroundPainterRes = R.drawable.insight_quran,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
-                            ambientProgress = autoAdvanceProgress.value,
+                            backgroundPageOffset = {
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                            },
+                            luminousAccent = Color(0xFF8FE3C0),
+                            luminousAnchor = Offset(0.52f, 0.42f),
                             readingSurahIndex = dailySurah.number - 1,
                             readingPlayback = dailyReadingPlayback,
                             onReadingPlayPause = {
@@ -1681,7 +1695,12 @@ fun SwipeableBigTiles(
                             backgroundPainterRes = R.drawable.insight_qibla,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
-                            ambientProgress = autoAdvanceProgress.value,
+                            backgroundPageOffset = {
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                            },
+                            luminousAccent = Color(0xFFFFCE78),
+                            luminousAnchor = Offset(0.54f, 0.43f),
                             directionalHintBearing = qiblaBearing,
                             deviceHeadingDegrees = liveQiblaHeading,
                             actionDescription = "Open Qibla compass",
@@ -1700,7 +1719,12 @@ fun SwipeableBigTiles(
                             backgroundPainterRes = R.drawable.insight_suggestion,
                             compactProgress = compactProgress,
                             isFocused = isFocused,
-                            ambientProgress = autoAdvanceProgress.value,
+                            backgroundPageOffset = {
+                                (pagerState.currentPage - page) +
+                                    pagerState.currentPageOffsetFraction
+                            },
+                            luminousAccent = Color(0xFFFFC978),
+                            luminousAnchor = Offset(0.50f, 0.36f),
                             actionLabel = when (aiRecommendation.target) {
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
@@ -2056,7 +2080,9 @@ private fun InsightPreviewCard(
     backgroundPainterRes: Int,
     compactProgress: Float,
     isFocused: Boolean = false,
-    ambientProgress: Float = 0f,
+    backgroundPageOffset: () -> Float = { 0f },
+    luminousAccent: Color = Color(0xFFFFD27A),
+    luminousAnchor: Offset = Offset(0.72f, 0.32f),
     supportingText: String? = null,
     statusText: String? = null,
     statusMetaText: String? = null,
@@ -2162,6 +2188,45 @@ private fun InsightPreviewCard(
                 // fall back locally instead of sacrificing legibility.
                 Color.White
             }
+            // MaterialTheme's dynamic scheme is derived from the user's wallpaper on
+            // Android 12+. Tint the meaningful card artwork with that palette instead of
+            // trying to read the wallpaper bitmap (which Android 14+ intentionally blocks).
+            // The brush is remembered, so carousel motion changes only a layer alpha and
+            // does not recreate or decode an image while the pager is moving.
+            val wallpaperPrimary = MaterialTheme.colorScheme.primary
+            val wallpaperSecondary = MaterialTheme.colorScheme.secondary
+            val wallpaperTertiary = MaterialTheme.colorScheme.tertiary
+            val wallpaperTintBrush = remember(
+                wallpaperPrimary,
+                wallpaperSecondary,
+                wallpaperTertiary,
+            ) {
+                Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to wallpaperPrimary,
+                        0.52f to wallpaperSecondary,
+                        1f to wallpaperTertiary,
+                    ),
+                )
+            }
+            val ambientMotion by rememberInfiniteTransition(label = "heroBackgroundMotion")
+                .animateFloat(
+                    initialValue = -1f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(
+                            durationMillis = 12_000,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "heroBackgroundDrift",
+                )
+            val focusedMotionStrength by animateFloatAsState(
+                targetValue = if (isFocused) 1f else 0f,
+                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
+                label = "heroBackgroundFocus",
+            )
 
             Image(
                 painter = painterResource(backgroundPainterRes),
@@ -2170,10 +2235,68 @@ private fun InsightPreviewCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        val focusedMotion = if (isFocused) ambientProgress else 0f
-                        val imageScale = 1f + (0.035f * focusedMotion)
+                        // A single decoded still stays on the GPU. Moving it opposite
+                        // the pager creates depth without competing with the swipe for
+                        // animated-image decoding or causing a loop-boundary jump.
+                        val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                        val restingMotion = ambientMotion * focusedMotionStrength
+                        val imageScale = 1.065f + (restingMotion * 0.006f)
                         scaleX = imageScale
                         scaleY = imageScale
+                        translationX = -pageOffset * 18.dp.toPx()
+                        translationY = restingMotion * 4.dp.toPx()
+                    },
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val restingLight = ((ambientMotion + 1f) * 0.5f) * focusedMotionStrength
+                        alpha = 0.13f + (restingLight * 0.05f)
+                    }
+                    .background(wallpaperTintBrush),
+            )
+
+            // A restrained bloom follows the natural light source or subject in
+            // each photograph. The gradient is cached as a render layer; only its
+            // transform and alpha move, so it does not add per-frame image work.
+            val luminousDiameter = minOf(cardMaxWidth, maxHeight) * 0.92f
+            val luminousBrush = remember(luminousAccent) {
+                Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = 0.72f),
+                        0.12f to luminousAccent.copy(alpha = 0.52f),
+                        0.48f to luminousAccent.copy(alpha = 0.18f),
+                        1f to Color.Transparent,
+                    ),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .requiredSize(luminousDiameter)
+                    .offset(
+                        x = (cardMaxWidth * luminousAnchor.x) - (luminousDiameter / 2f),
+                        y = (maxHeight * luminousAnchor.y) - (luminousDiameter / 2f),
+                    )
+                    .graphicsLayer {
+                        val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                        val glowPhase = (ambientMotion + 1f) * 0.5f
+                        alpha = 0.13f +
+                            (focusedMotionStrength * (0.07f + (glowPhase * 0.07f)))
+                        translationX = (ambientMotion * 7.dp.toPx()) -
+                            (pageOffset * 10.dp.toPx())
+                        translationY = ambientMotion * -4.dp.toPx()
+                        val glowScale = 0.96f + (glowPhase * 0.08f)
+                        scaleX = glowScale
+                        scaleY = glowScale
+                    }
+                    .drawBehind {
+                        drawCircle(
+                            brush = luminousBrush,
+                            radius = size.minDimension / 2f,
+                            blendMode = BlendMode.Screen,
+                        )
                     },
             )
 
@@ -2339,7 +2462,7 @@ private fun InsightPreviewCard(
                                 .size(40.dp)
                                 .graphicsLayer {
                                     val pulse = if (isFocused) {
-                                        kotlin.math.sin(ambientProgress * PI.toFloat() * 2f) * 0.05f
+                                        ambientMotion * 0.035f
                                     } else {
                                         0f
                                     }
@@ -2371,9 +2494,13 @@ private fun InsightPreviewCard(
                                 Modifier.height(40.dp)
                             } else {
                                 Modifier.size(40.dp)
-                            })
+                                })
                                 .graphicsLayer {
-                                    val pulse = if (isFocused) ambientProgress * 0.04f else 0f
+                                    val pulse = if (isFocused) {
+                                        ((ambientMotion + 1f) * 0.5f) * 0.025f
+                                    } else {
+                                        0f
+                                    }
                                     scaleX = 1f + pulse
                                     scaleY = 1f + pulse
                                 },

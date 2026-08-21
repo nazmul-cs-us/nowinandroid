@@ -84,6 +84,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,6 +96,7 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -193,6 +195,10 @@ fun HadithDetailScreen(
     onBackClick: () -> Unit,
     onNavigateToPreviousHadith: () -> Unit = {},
     onNavigateToNextHadith: () -> Unit = {},
+    initialAutoPlay: Boolean = false,
+    initialAutoAdvance: Boolean = false,
+    playbackRangeStart: Int? = null,
+    playbackRangeEnd: Int? = null,
     modifier: Modifier = Modifier
 ) {
     // Capture the route-provided value, then shadow with mutable state so navigation
@@ -265,8 +271,12 @@ fun HadithDetailScreen(
     // disk: show the standard missing-content download page for that voice.
     var showTtsModelDownload by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(showTtsModelDownload) { showTtsModelDownload = false }
-    // Toolbar ⋮ opens the voice-selection bottom sheet (like the Surah page's ⋮ sheet).
+    val selectedArabicFont by rememberHadithArabicFont(context)
+    // Toolbar ⋮ opens reading settings; font and narration each have their own picker.
+    var showReadingSettingsSheet by remember { mutableStateOf(false) }
+    var showArabicFontSheet by remember { mutableStateOf(false) }
     var showVoiceSheet by remember { mutableStateOf(false) }
+    val readingSettingsScope = rememberCoroutineScope()
 
     // Per-hadith cache so the AnimatedContent swipe transition can render the
     // exiting page with its original data while the new page slides in with its
@@ -300,7 +310,7 @@ fun HadithDetailScreen(
     // Invalidates late TTS completion callbacks after stop or manual navigation.
     var playbackGeneration by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // When on, hitting the end of a hadith auto-advances to the next one.
-    var autoAdvance by remember { mutableStateOf(false) }
+    var autoAdvance by remember(initialAutoAdvance) { mutableStateOf(initialAutoAdvance) }
 
     // On-demand audio download state
     var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -311,7 +321,7 @@ fun HadithDetailScreen(
     // dismissing during the audio swap, we suppress the "stopped" notification and
     // auto-resume playback on the new hadith.
     var prevHadithNumberRef by remember { mutableStateOf(hadithNumber) }
-    var shouldAutoPlayAfterLoad by remember { mutableStateOf(false) }
+    var shouldAutoPlayAfterLoad by remember(initialAutoPlay) { mutableStateOf(initialAutoPlay) }
     var suppressStopNotification by remember { mutableStateOf(false) }
 
     // Notify global media controller when hadith playback state OR hadith changes
@@ -419,7 +429,12 @@ fun HadithDetailScreen(
     // Preload neighbours so the swipe transition has correct per-page data instantly.
     LaunchedEffect(databaseFile, hadithNumber) {
         listOf(hadithNumber - 1, hadithNumber + 1)
-            .filter { it > 0 && it !in hadithCache }
+            .filter { candidate ->
+                candidate > 0 &&
+                    candidate !in hadithCache &&
+                    (playbackRangeStart == null || candidate >= playbackRangeStart) &&
+                    (playbackRangeEnd == null || candidate <= playbackRangeEnd)
+            }
             .forEach { num ->
                 try {
                     val h = repository.getHadith(databaseFile, num)
@@ -523,11 +538,17 @@ fun HadithDetailScreen(
     // In-place navigation handlers — update internal hadithNumber state instead of
     // popping/pushing the back stack, so the composable stays mounted and the mini-bar
     // doesn't get a dispose/remount cycle.
-    val handleSkipNext: () -> Unit = { hadithNumber += 1 }
-    val handleSkipPrev: () -> Unit = { if (hadithNumber > 1) hadithNumber -= 1 }
+    val handleSkipNext: () -> Unit = {
+        if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) hadithNumber += 1
+    }
+    val handleSkipPrev: () -> Unit = {
+        val firstAllowed = playbackRangeStart ?: 1
+        if (hadithNumber > firstAllowed) hadithNumber -= 1
+    }
     val currentAutoAdvance by androidx.compose.runtime.rememberUpdatedState(autoAdvance)
     val handlePlaybackCompleted: () -> Unit = {
-        val shouldAdvance = currentAutoAdvance
+        val shouldAdvance = currentAutoAdvance &&
+            (playbackRangeEnd == null || hadithNumber < playbackRangeEnd)
         if (shouldAdvance) {
             // Keep the mini-player visible while the next hadith is loading.
             suppressStopNotification = true
@@ -937,7 +958,8 @@ fun HadithDetailScreen(
                                 isTranslating = if (num == hadithNumber) isTranslating else false,
                                 selectedLanguage = selectedLanguage,
                                 onLanguageClick = { showTranslationSheet = true },
-                                onMoreClick = { showVoiceSheet = true },
+                                onMoreClick = { showReadingSettingsSheet = true },
+                                arabicFontFamily = hadithArabicFontFamily(selectedArabicFont),
                                 isLandscape = isLandscape,
                                 isPlaying = if (num == hadithNumber) isPlaying else false,
                                 onPlayClick = handlePlayClick,
@@ -949,6 +971,39 @@ fun HadithDetailScreen(
                 }
             }
         }
+    }
+
+    if (showReadingSettingsSheet) {
+        HadithReadingSettingsSheet(
+            selectedFont = selectedArabicFont,
+            selectedVoice = selectedVoice.displayName,
+            onFontClick = {
+                showReadingSettingsSheet = false
+                // Let the first modal finish leaving before presenting the next one.
+                // Showing two ModalBottomSheets in the same frame is unreliable on
+                // Samsung/Android 16 and can leave both sheets dismissed.
+                readingSettingsScope.launch {
+                    kotlinx.coroutines.delay(300)
+                    showArabicFontSheet = true
+                }
+            },
+            onVoiceClick = {
+                showReadingSettingsSheet = false
+                readingSettingsScope.launch {
+                    kotlinx.coroutines.delay(300)
+                    showVoiceSheet = true
+                }
+            },
+            onDismiss = { showReadingSettingsSheet = false },
+        )
+    }
+
+    if (showArabicFontSheet) {
+        HadithArabicFontSheet(
+            selectedFont = selectedArabicFont,
+            onFontSelected = { font -> saveHadithArabicFont(context, font) },
+            onDismiss = { showArabicFontSheet = false },
+        )
     }
 
     if (showTranslationSheet) {
@@ -1026,6 +1081,7 @@ private fun HadithContent(
     selectedLanguage: String = "en",
     onLanguageClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
+    arabicFontFamily: FontFamily = QuranFonts.PDMSSaleem,
     isLandscape: Boolean = false,
     isPlaying: Boolean = false,
     onPlayClick: () -> Unit = {},
@@ -1373,7 +1429,7 @@ private fun HadithContent(
                                 ) {
                                     Text(
                                         text = hadith.textArabic,
-                                        fontFamily = QuranFonts.PDMSSaleem,
+                                        fontFamily = arabicFontFamily,
                                         fontSize = 26.sp,
                                         lineHeight = 48.sp,
                                         textAlign = TextAlign.Center,

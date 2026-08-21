@@ -11,9 +11,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val BUKHARI_AUDIO_CDN_DIRECTORY = "audio/bukhari/bn"
+private val BUKHARI_AUDIO_EXTENSIONS = listOf("ogg", "mp3")
+private val BUKHARI_AUDIO_KEY_REGEX = Regex(
+    """^audio/bukhari/bn/bukhari_(\d+)\.(?:ogg|mp3)$""",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun bukhariAudioCdnKeyCandidates(hadithNumber: Int): List<String> {
+    val formattedNumber = String.format(Locale.ROOT, "%04d", hadithNumber)
+    return BUKHARI_AUDIO_EXTENSIONS.map { extension ->
+        "$BUKHARI_AUDIO_CDN_DIRECTORY/bukhari_$formattedNumber.$extension"
+    }
+}
+
+internal fun resolveAudioManifestKey(
+    requestedKey: String,
+    availableKeys: Set<String>,
+): String? {
+    if (requestedKey in availableKeys) return requestedKey
+
+    val match = BUKHARI_AUDIO_KEY_REGEX.matchEntire(requestedKey) ?: return null
+    val hadithNumber = match.groupValues[1].toIntOrNull() ?: return null
+    return bukhariAudioCdnKeyCandidates(hadithNumber).firstOrNull(availableKeys::contains)
+}
 
 /**
  * Helper that bridges audio player code with AssetDownloadManager for on-demand downloads.
@@ -184,19 +210,22 @@ class AudioDownloadHelper @Inject constructor(
      */
     fun resolveHadithAudioFile(hadithNumber: Int): File? {
         // 1. Check CDN download location
-        val cdnKey = getHadithCdnKey(hadithNumber)
-        val cdnFile = downloadManager.getAssetFile(cdnKey)
-        if (cdnFile != null) {
-            Log.d(TAG, "Hadith audio found in cdn_assets: $cdnKey")
-            return cdnFile
+        for (cdnKey in bukhariAudioCdnKeyCandidates(hadithNumber)) {
+            val cdnFile = downloadManager.getAssetFile(cdnKey)
+            if (cdnFile != null) {
+                Log.d(TAG, "Hadith audio found in cdn_assets: $cdnKey")
+                return cdnFile
+            }
         }
 
         // 2. Check legacy SD card location
-        val sdFileName = "bukhari_${String.format("%04d", hadithNumber)}.ogg"
-        val sdFile = File(SD_BUKHARI_BN, sdFileName)
-        if (sdFile.exists() && sdFile.length() > 0) {
-            Log.d(TAG, "Hadith audio found on SD card: ${sdFile.absolutePath}")
-            return sdFile
+        val formattedNumber = String.format(Locale.ROOT, "%04d", hadithNumber)
+        for (extension in BUKHARI_AUDIO_EXTENSIONS) {
+            val sdFile = File(SD_BUKHARI_BN, "bukhari_$formattedNumber.$extension")
+            if (sdFile.exists() && sdFile.length() > 0) {
+                Log.d(TAG, "Hadith audio found on SD card: ${sdFile.absolutePath}")
+                return sdFile
+            }
         }
 
         Log.d(TAG, "Hadith audio not found for hadith #$hadithNumber")
@@ -204,10 +233,13 @@ class AudioDownloadHelper @Inject constructor(
     }
 
     /**
-     * Get the CDN key for a Hadith audio file.
+     * Get the CDN key for a Hadith audio file. The Bukhari set contains both OGG and MP3
+     * entries, so prefer whichever extension is present in the cached manifest.
      */
     fun getHadithCdnKey(hadithNumber: Int): String {
-        return "audio/bukhari/bn/bukhari_${String.format("%04d", hadithNumber)}.ogg"
+        val candidates = bukhariAudioCdnKeyCandidates(hadithNumber)
+        val manifestKeys = downloadManager.getCachedManifest()?.assets?.keys
+        return candidates.firstOrNull { it in manifestKeys.orEmpty() } ?: candidates.first()
     }
 
     // ======================== Fortress (chapter dua) Audio ========================
@@ -272,12 +304,16 @@ class AudioDownloadHelper @Inject constructor(
         val manifest = downloadManager.loadManifest()
             ?: return AssetDownloadManager.DownloadState.Failed("Manifest not available")
 
-        if (manifest.assets[cdnKey] == null) {
+        val resolvedCdnKey = resolveAudioManifestKey(cdnKey, manifest.assets.keys)
+        if (resolvedCdnKey == null) {
             return AssetDownloadManager.DownloadState.Failed("Audio not found in manifest: $cdnKey")
         }
 
-        Log.i(TAG, "Starting on-demand download: $cdnKey")
-        return downloadManager.downloadAsset(cdnKey, manifest)
+        if (resolvedCdnKey != cdnKey) {
+            Log.i(TAG, "Resolved audio format from $cdnKey to $resolvedCdnKey")
+        }
+        Log.i(TAG, "Starting on-demand download: $resolvedCdnKey")
+        return downloadManager.downloadAsset(resolvedCdnKey, manifest)
     }
 
     /**

@@ -148,6 +148,7 @@ import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.AudioLanguage
+import com.starception.submission.feature.quran.surahArtworkRes
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.download.AssetDownloadManager
 import dagger.hilt.android.EntryPointAccessors
@@ -172,6 +173,9 @@ import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.feature.course.CourseCompletionInfo
 import com.starception.submission.feature.course.CourseProgressTracker
 import java.util.Locale
+
+private const val SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO = 3f / 2f
+private val SurahArtworkLandscapeHeight = 180.dp
 
 /**
  * Container for surah navigation with drag gesture anywhere on screen.
@@ -788,8 +792,19 @@ fun SurahDetailScreen(
         }
     }
 
-    // Toolbar always shows solid surface background regardless of scroll position
-    val collapseProgress = remember { derivedStateOf { 1f } }
+    // Keep the toolbar transparent over the artwork, then smoothly add its
+    // surface as the header scrolls away.
+    val toolbarCollapseDistancePx = with(LocalDensity.current) { 112.dp.toPx() }
+    val collapseProgress = remember(scrollState, toolbarCollapseDistancePx) {
+        derivedStateOf {
+            if (scrollState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                (scrollState.firstVisibleItemScrollOffset / toolbarCollapseDistancePx)
+                    .coerceIn(0f, 1f)
+            }
+        }
+    }
 
     val isCollapsed = remember {
         derivedStateOf {
@@ -1221,9 +1236,14 @@ fun SurahDetailScreen(
             val localConfig = LocalConfiguration.current
             val localIsLandscape = localConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-            // Calculate positions once (stable values)
-            // Album art is height(160) in landscape, 4/3 (width/height) ratio portrait — height = width * 3/4.
-            val albumHeaderHeight = if (localIsLandscape) 160 else (localConfig.screenWidthDp * 3 / 4)
+            // Keep the floating Surah name anchored to the exact artwork edge.
+            // This must stay in sync with AlbumHeader's dimensions so enlarging
+            // the photograph never creates an empty strip above the info card.
+            val albumHeaderHeight = if (localIsLandscape) {
+                SurahArtworkLandscapeHeight.value.toInt()
+            } else {
+                (localConfig.screenWidthDp / SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO).toInt()
+            }
             // Start floating names higher (12dp) to ensure good separation from translation text below
             val headerYPx = with(density) { (albumHeaderHeight + 12).dp.toPx() }
             val toolbarYPx = with(density) { 21.dp.toPx() }  // Stop at toolbar level (locked position)
@@ -4191,14 +4211,8 @@ private fun AlbumHeader(
     isLandscape: Boolean = false,
     scrollOffset: Int = 0 // Scroll offset for parallax effect
 ) {
-    // Use mosque image based on revelation type
-    val mosqueImage = remember(surah.revelationType) {
-        when (surah.revelationType) {
-            "Meccan" -> R.drawable.masjid_al_haram
-            "Medinan" -> R.drawable.masjid_al_nawabi
-            else -> R.drawable.masjid_al_haram // Default to Makkah
-        }
-    }
+    // Reuse the exact chapter-specific artwork shown by the Quran Grid widget.
+    val artwork = remember(surah.number) { surahArtworkRes(surah.number) }
 
     // Parallax factor - image moves at 0.4x the scroll speed for depth effect
     val parallaxOffset = scrollOffset * 0.4f
@@ -4208,9 +4222,12 @@ private fun AlbumHeader(
             .fillMaxWidth()
             .then(
                 if (isLandscape) {
-                    Modifier.height(160.dp) // Limited height in landscape
+                    Modifier.height(SurahArtworkLandscapeHeight)
                 } else {
-                    Modifier.aspectRatio(4f / 3f) // Shortened portrait album cover (was square)
+                    // A 3:2 photographic canvas gives the chapter artwork more
+                    // presence than the previous shallow 16:9 banner while
+                    // preserving room for the Surah information below.
+                    Modifier.aspectRatio(SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO)
                 }
             )
             .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
@@ -4218,16 +4235,34 @@ private fun AlbumHeader(
     ) {
         // Album cover image with parallax effect
         Image(
-            painter = painterResource(mosqueImage),
-            contentDescription = "Mosque cover for ${surah.nameEnglish} (${surah.revelationType})",
+            painter = painterResource(artwork),
+            contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(1.3f) // Make image taller to allow parallax movement
+                .fillMaxSize()
                 .graphicsLayer {
+                    // Overscan provides enough room for a clearly visible
+                    // slower-moving image layer without revealing an edge.
+                    scaleX = 1.20f
+                    scaleY = 1.20f
                     translationY = parallaxOffset
+                        .coerceAtMost(size.height * 0.085f)
                 },
             contentScale = ContentScale.Crop,
             alignment = Alignment.Center
+        )
+
+        // The toolbar begins over this image, so preserve contrast across both
+        // bright dawn scenes and darker night artwork without altering the asset.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.20f),
+                        0.4f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.08f),
+                    )
+                )
         )
     }
 }
