@@ -31,6 +31,7 @@ import com.starception.submission.widget.samples.utils.AspectRatio.Companion.asD
 import com.starception.submission.widget.samples.collections.layout.ImageGridItemData
 import com.starception.submission.widget.samples.utils.ImageUtils.getMaxPossibleImageSize
 import com.starception.submission.widget.samples.utils.ImageUtils.getMaxWidgetMemoryAllowedSizeInBytes
+import com.starception.submission.feature.quran.QuranData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
@@ -114,13 +115,28 @@ class FakeImageGridDataRepository {
             title = item.title,
             supportingText = item.supportingText,
             image = bitmap,
-            imageContentDescription = item.imageContentDescription
+            imageContentDescription = item.imageContentDescription,
+            surahNumber = surahNumberFor(item.title),
           )
         }
       }.awaitAll()
     }
 
     return mappedItems
+  }
+
+  /**
+   * The surah a tile stands for, resolved from its title.
+   *
+   * The demo list names real surahs but carries no numbers, and a number is what the app
+   * navigates by. Matching against QuranData rather than hardcoding a second table means
+   * the widget cannot drift from the surah list the rest of the app uses, and a title that
+   * stops matching resolves to null and simply falls back to the sample's own click
+   * behaviour rather than opening the wrong surah.
+   */
+  private fun surahNumberFor(title: String?): Int? {
+    val name = title?.removePrefix("Surah ")?.trim()?.lowercase() ?: return null
+    return QuranData.surahs.firstOrNull { it.nameEnglish.trim().lowercase() == name }?.number
   }
 
   private data class ImageGridItemBackendData(

@@ -100,6 +100,11 @@ fun NiaNavHost(
                 com.starception.submission.widget.WidgetNavigationBus.consumed(target)
             }
 
+            is com.starception.submission.widget.WidgetNavigationTarget.Surah -> {
+                navController.navigateToSurah(target.surahNumber)
+                com.starception.submission.widget.WidgetNavigationBus.consumed(target)
+            }
+
             is com.starception.submission.widget.WidgetNavigationTarget.Dua -> {
                 navController.navigateToDuaDetail(
                     title = target.title,

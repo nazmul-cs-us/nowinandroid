@@ -11,9 +11,28 @@
   One layout per weight because TextView.setTypeface is not a remotable method, so weight
   cannot be applied at runtime the way text, size and colour can.
 
+  Justified, and only on this weight. Justification does nothing to a line that does not
+  wrap, so it costs the single-line labels nothing, while the one genuinely multi-line
+  block in either widget — the Daily Reminder's hadith or dua — is set in Regular and is
+  what this is for. The prayer card's heading is Medium and stays ragged-right on purpose:
+  stretching the first line of a two-line title to the full measure reads as a defect.
+
+  Ignored below API 26, where the attribute simply does not exist.
+
   match_parent width, so the line wraps inside the column it is placed in. As wrap_content
   the TextView measured itself against the whole unwrapped string and ran off the edge of
   the card, taking the rest of the layout with it.
+-->
+<!--
+  fallbackLineSpacing is off deliberately.
+
+  Hadith text contains the ligature U+FDFA (ﷺ), which Ubuntu Sans has no glyph for, so it
+  is drawn from a system fallback font with much taller metrics. With the default (true),
+  TextView grows that whole line box to fit the fallback, and the paragraph ends up with
+  visibly uneven leading — lines carrying the ligature spaced far apart, the runs between
+  them cramped. Off, every line uses the primary font's metrics and the block reads evenly.
+
+  Ignored below API 28, which simply keeps the old behaviour there.
 -->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_text"
@@ -21,4 +40,6 @@
     android:layout_height="wrap_content"
     android:fontFamily="@font/ubuntu_sans_regular"
     android:includeFontPadding="false"
+    android:fallbackLineSpacing="false"
+    android:justificationMode="inter_word"
     android:ellipsize="end" />

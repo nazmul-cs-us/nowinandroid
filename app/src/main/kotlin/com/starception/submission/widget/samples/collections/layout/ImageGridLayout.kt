@@ -12,6 +12,13 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import android.content.Context
+import android.content.Intent
+import androidx.glance.action.Action
+import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
+import com.starception.submission.MainActivity
+import com.starception.submission.widget.WidgetNavigationBus
+import com.starception.submission.widget.WidgetNavigationTarget
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
@@ -175,7 +182,14 @@ private fun GridItem(
     VerticalListItem(
       modifier = modifier
         .cornerRadius(itemCornerRadius)
-        .clickable(ActionUtils.actionStartDemoActivity("Item click ${item.title}")),
+        // Opens the surah the tile names. Falls back to the sample's demo action only
+        // when the tile could not be resolved to one, which should not happen for the
+        // Quran grid but keeps the layout usable for any other data source.
+        .clickable(
+          item.surahNumber
+            ?.let { surahOpenAction(LocalContext.current, it) }
+            ?: ActionUtils.actionStartDemoActivity("Item click ${item.title}"),
+        ),
       topContent = { Image() },
       titleContent = { Title(text = item.title) },
       supportingContent = takeComposableIf(item.supportingText != null) {
@@ -200,12 +214,31 @@ private inline fun takeComposableIf(
   } else null
 }
 
+/**
+ * Intent that opens [surahNumber] in the app.
+ *
+ * Extras rather than a deep-link Uri, matching the Daily Reminder's route into
+ * [WidgetNavigationBus]: MainActivity reads them and posts to the bus, which the NavHost
+ * acts on once it exists.
+ */
+private fun surahOpenAction(context: Context, surahNumber: Int): Action {
+  val intent = WidgetNavigationBus.put(
+    Intent(context, MainActivity::class.java).apply {
+      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+    },
+    WidgetNavigationTarget.Surah(surahNumber),
+  )
+  return actionStartIntent(intent)
+}
+
 data class ImageGridItemData(
   val key: String,
   val image: Bitmap?,
   val imageContentDescription: String?,
   val title: String? = null,
   val supportingText: String? = null,
+  /** Surah this tile stands for, so tapping it can open that surah. Null if unknown. */
+  val surahNumber: Int? = null,
 )
 
 /**

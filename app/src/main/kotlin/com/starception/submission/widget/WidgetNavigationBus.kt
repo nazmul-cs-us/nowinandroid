@@ -35,6 +35,8 @@ sealed interface WidgetNavigationTarget {
         val content: String,
         val duaNumber: Int,
     ) : WidgetNavigationTarget
+
+    data class Surah(val surahNumber: Int) : WidgetNavigationTarget
 }
 
 /**
@@ -95,6 +97,11 @@ object WidgetNavigationBus {
                 collectionName = intent.getStringExtra(EXTRA_COLLECTION).orEmpty(),
             )
 
+            KIND_SURAH -> WidgetNavigationTarget.Surah(
+                surahNumber = intent.getIntExtra(EXTRA_SURAH_NUMBER, -1).takeIf { it > 0 }
+                    ?: return null,
+            )
+
             KIND_DUA -> WidgetNavigationTarget.Dua(
                 title = intent.getStringExtra(EXTRA_DUA_TITLE) ?: return null,
                 content = intent.getStringExtra(EXTRA_DUA_CONTENT).orEmpty(),
@@ -113,6 +120,10 @@ object WidgetNavigationBus {
             .putExtra(EXTRA_HADITH_NUMBER, target.hadithNumber)
             .putExtra(EXTRA_COLLECTION, target.collectionName)
 
+        is WidgetNavigationTarget.Surah -> intent
+            .putExtra(EXTRA_KIND, KIND_SURAH)
+            .putExtra(EXTRA_SURAH_NUMBER, target.surahNumber)
+
         is WidgetNavigationTarget.Dua -> intent
             .putExtra(EXTRA_KIND, KIND_DUA)
             .putExtra(EXTRA_DUA_TITLE, target.title)
@@ -129,4 +140,6 @@ object WidgetNavigationBus {
     private const val EXTRA_DUA_NUMBER = "widget_dua_number"
     private const val KIND_HADITH = "hadith"
     private const val KIND_DUA = "dua"
+    private const val KIND_SURAH = "surah"
+    private const val EXTRA_SURAH_NUMBER = "widget_surah_number"
 }

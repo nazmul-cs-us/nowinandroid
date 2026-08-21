@@ -15,10 +15,22 @@
   the TextView measured itself against the whole unwrapped string and ran off the edge of
   the card, taking the rest of the layout with it.
 -->
+<!--
+  fallbackLineSpacing is off deliberately.
+
+  Hadith text contains the ligature U+FDFA (ﷺ), which Ubuntu Sans has no glyph for, so it
+  is drawn from a system fallback font with much taller metrics. With the default (true),
+  TextView grows that whole line box to fit the fallback, and the paragraph ends up with
+  visibly uneven leading — lines carrying the ligature spaced far apart, the runs between
+  them cramped. Off, every line uses the primary font's metrics and the block reads evenly.
+
+  Ignored below API 28, which simply keeps the old behaviour there.
+-->
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_text"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fontFamily="@font/ubuntu_sans_medium"
     android:includeFontPadding="false"
+    android:fallbackLineSpacing="false"
     android:ellipsize="end" />
