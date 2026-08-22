@@ -186,6 +186,26 @@ internal data class PrayerInsight(
     /** Prayer this insight is about, e.g. "Asr" — the last word of [elapsed]. */
     val caption: String
         get() = elapsed.substringAfterLast(' ')
+
+    /**
+     * [nextPrayerInfo] worded the way the home carousel's "Prayer now" tile words it:
+     * "Next • Asr in 42m" → "Next Prayer · Asr in 42m".
+     *
+     * The generator emits the notification's phrasing, where "Next •" is a prefix on a
+     * line of its own. The tile drops that prefix and puts the countdown under a "Next
+     * Prayer" heading instead — see SwipeableBigTiles.kt, which parses the same string
+     * the same way. This keeps the widget reading as the tile's sibling rather than as a
+     * notification that wandered onto the home screen.
+     */
+    val nextPrayerLine: String
+        get() {
+            val detail = nextPrayerInfo
+                .substringAfter('•', nextPrayerInfo)
+                .removePrefix("Next")
+                .trim(' ', '·', '•')
+
+            return if (detail.isBlank()) nextPrayerInfo else "Next Prayer · $detail"
+        }
 }
 
 private data class WidgetWeather(

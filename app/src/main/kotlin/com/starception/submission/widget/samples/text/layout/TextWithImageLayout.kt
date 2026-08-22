@@ -260,9 +260,18 @@ private fun TextStack(
   )
 
   Column(
+    // Bottom-aligned, as the sample is: the stack fills upward from the foot of the
+    // column, so its last line sits level with the bottom edge of the image beside it
+    // however many lines the content runs to. Centring it instead left that line floating
+    // short of the image's edge.
     verticalAlignment = Alignment.Bottom,
     modifier = modifier
   ) {
+    // Eyebrow, headline, then the reading and its follow-up — the sample's order, with
+    // the app's own content filling the same slots: where the article card carries
+    // "33,822 views" above its headline, this one carries how fresh the reading is. The
+    // three lines below the eyebrow are the "Prayer now" tile's, in the tile's order:
+    // phase headline, elapsed reading, next prayer.
     Text(
       text = data.caption,
       maxLines = 1,
@@ -275,6 +284,19 @@ private fun TextStack(
       maxLines = primaryTextMaxLines,
       style = TextWithImageLayoutTextStyles.primary.copy(fontSize = primaryTextFontSize),
     )
+    data.supporting?.takeIf { it.isNotBlank() }?.let { supporting ->
+      Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
+      Text(
+        text = supporting,
+        // Two, not one: this slot's longest reading is "Just started since Maghrib",
+        // which overruns the column at the size the others settle on, and a single line
+        // has nowhere to go but an ellipsis. The stack fills from the bottom, so a second
+        // line costs space that is empty anyway.
+        maxLines = 2,
+        style = TextWithImageLayoutTextStyles.secondary,
+        modifier = GlanceModifier.fillMaxWidth()
+      )
+    }
     if (showSecondaryText) {
       val (secondaryTextFontSize, secondaryTextMaxLines) = secondaryTextFontValues(
         text = data.secondary,
@@ -346,6 +368,12 @@ data class TextData(
   val primary: String,
   val secondary: String,
   val caption: String,
+  /**
+   * Optional line between [primary] and [secondary], for content that carries a reading
+   * as well as a headline and a follow-up. Absent in the sample's article data, where the
+   * headline is followed straight by its body.
+   */
+  val supporting: String? = null,
 )
 
 /**

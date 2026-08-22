@@ -28,6 +28,9 @@ class FakeTextWithImageRepository {
   private var itemIndex = 0
   private var items = demoItems
 
+  /** When this widget's prayer reading was last rebuilt from live data. */
+  private var lastLiveReadingMillis = 0L
+
   fun data(): Flow<TextWithImageData?> = data
 
   suspend fun refresh(context: Context) {
@@ -45,23 +48,55 @@ class FakeTextWithImageRepository {
       contentDescription = item.imageContentDescription
     )
 
-    // Headline and caption come from the app's own generator so the card describes the
-    // prayer that is actually current — the canned text said "Fajr" at Asr time. The
-    // imagery stays as authored; only the words are ours.
+    // The words come from the app's own generator so the card describes the prayer that
+    // is actually current — the canned text said "Fajr" at Asr time. The imagery stays as
+    // authored.
+    //
+    // Same three lines, in the same order, as the "Prayer now" tile in the home
+    // carousel: the phase headline, the elapsed reading under it, then the next prayer.
+    // The card and the tile are the same content in two places, so a reader moving
+    // between them should not have to re-learn the order. See SwipeableBigTiles.kt, which
+    // hands these same three strings to InsightPreviewCard.
     val live = com.starception.submission.widget.livePrayerInsight(context)
+    if (live != null) lastLiveReadingMillis = System.currentTimeMillis()
 
     data.value = TextWithImageData(
       textData = TextData(
         key = "$itemIndex",
         primary = live?.title ?: item.primary,
-        // The layout gives this a narrow column and clips it; the sample's copy ran to
-        // three lines and lost its last word to an ellipsis.
-        secondary = live?.let { "${it.elapsed}. ${it.nextPrayerInfo}" } ?: item.secondary,
-        caption = live?.caption ?: item.caption
+        // The sample's caption slot carries an article's view count; this card's carries
+        // how fresh its reading is, which is the equivalent standing detail for content
+        // that is a countdown rather than an article.
+        caption = live?.let { updatedCaption() } ?: item.caption,
+        supporting = live?.elapsed,
+        secondary = live?.nextPrayerLine ?: item.secondary
       ),
       imageData = mappedImageData
     )
     return data.value
+  }
+
+  /**
+   * How fresh the reading is, for the caption slot the sample fills with a view count.
+   *
+   * A RemoteViews text cannot tick on its own, so this is the age at the moment the card
+   * was built, and it stands still until the next widget update — as does the elapsed
+   * reading beneath it, which is why the two are shown together. In practice that means
+   * "Updated now" on every update, and the older wordings appear only when a build reuses
+   * a reading it could not refresh.
+   */
+  private fun updatedCaption(nowMillis: Long = System.currentTimeMillis()): String {
+    val seconds = ((nowMillis - lastLiveReadingMillis) / 1000L).coerceAtLeast(0L)
+    val minutes = seconds / 60
+    val hours = minutes / 60
+
+    return when {
+      seconds < 45 -> "Updated now"
+      minutes < 2 -> "Updated 1 minute ago"
+      minutes < 60 -> "Updated $minutes minutes ago"
+      hours < 2 -> "Updated 1 hour ago"
+      else -> "Updated $hours hours ago"
+    }
   }
 
   private suspend fun fetchImage(context: Context, url: String): Bitmap? {
