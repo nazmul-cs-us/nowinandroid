@@ -125,6 +125,26 @@ private val EXPANDED_CONTENT_MIN_HEIGHT = 150.dp
 private val FULL_SCHEDULE_MIN_HEIGHT = 290.dp
 
 /**
+ * Extra gap above the last prayer of the day, so it reads as the end of the list rather
+ * than one more evenly spaced row.
+ *
+ * Paid for out of the schedule's height budget at both call sites — the rows above give
+ * up a fraction of a dp each rather than the card overflowing.
+ */
+private val LAST_ROW_NUDGE = 6.dp
+
+/**
+ * Bottom inset under the titled surface's content.
+ *
+ * Deliberately less than [WIDGET_PADDING]: the schedule ends in a line of text, whose own
+ * ascent/descent already stands it off the edge, so the full margin left the last prayer
+ * floating a whole row's height above the card's bottom — measured 60px of dead band
+ * under Isha against a 73px row pitch. The sides keep the full padding, where there is no
+ * such optical inset.
+ */
+private val SURFACE_BOTTOM_PADDING = 6.dp
+
+/**
  * Reads the launcher's current widget bounds without relying on Glance's cached LocalSize.
  *
  * Android's option keys describe the portrait footprint as min-width/max-height and the
@@ -206,7 +226,7 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
                         val innerWidth = size.width - (WIDGET_PADDING * 2)
                         // The Scaffold pads the sides and the bottom; the title bar
                         // stands in for the top.
-                        val titledHeight = size.height - TITLE_BAR_HEIGHT - WIDGET_PADDING
+                        val titledHeight = size.height - TITLE_BAR_HEIGHT - SURFACE_BOTTOM_PADDING
                         val bareHeight = size.height - (WIDGET_PADDING * 2)
                         when {
                             // Any single-row card, whatever its width. It carries the same
@@ -325,8 +345,8 @@ private fun CompactPrayerSurface(
         .fittingSize(context, currentTitle, width * 0.55f, bold = true)
         .coerceAtMost(15f)
     val elapsedSize = WidgetTypography
-        .fittingSize(context, elapsed, width * 0.55f)
-        .coerceAtMost(12.5f)
+        .fittingSize(context, elapsed, width * 0.55f, bold = true)
+        .coerceAtMost(14f)
     val nextSize = WidgetTypography
         .fittingSize(context, next, width * 0.40f, bold = true)
         .coerceAtMost(14.5f)
@@ -385,8 +405,8 @@ private fun CompactPrayerSurface(
                 WidgetText(
                     text = elapsed,
                     size = elapsedSize.sp,
-                    color = GlanceTheme.colors.onSurfaceVariant,
-                    weight = WidgetFontWeight.Regular,
+                    color = GlanceTheme.colors.primary,
+                    weight = WidgetFontWeight.Bold,
                 )
             }
             Spacer(modifier = GlanceModifier.width(10.dp))
@@ -433,7 +453,7 @@ private fun TitledSurface(
         // without this the last line of content sits against the card's edge. No top
         // padding — the title bar already stands off the top.
         modifier = GlanceModifier
-            .padding(bottom = WIDGET_PADDING)
+            .padding(bottom = SURFACE_BOTTOM_PADDING)
             .clickable(actionStartActivity<MainActivity>()),
         titleBar = {
             // Glance's own TitleBar is not used here, and only for one reason: its title
@@ -1087,7 +1107,7 @@ private fun ExpandedPrayerContent(
     // Glance does not reliably distribute defaultWeight() to repeated RemoteViews rows.
     // Budget the remaining height explicitly so every prayer is visible and taller widget
     // sizes naturally spend their extra room on larger, easier-to-scan schedule rows.
-    val scheduleRowHeight = ((contentSize.height.value - 137f) /
+    val scheduleRowHeight = ((contentSize.height.value - 145f) /
         state.prayers.size.coerceAtLeast(1))
         .coerceAtLeast(22f)
         .dp
@@ -1124,7 +1144,7 @@ private fun FullPrayerContent(
     state: PrayerWidgetState.Available,
     contentSize: DpSize,
 ) {
-    val scheduleRowHeight = ((contentSize.height.value - 151f) /
+    val scheduleRowHeight = ((contentSize.height.value - 159f) /
         state.prayers.size.coerceAtLeast(1))
         .coerceAtLeast(25f)
         .dp
@@ -1153,7 +1173,6 @@ private fun FullPrayerContent(
 
 @Composable
 private fun PrayerContextRow(state: PrayerWidgetState.Available) {
-    val context = LocalContext.current
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -1162,7 +1181,7 @@ private fun PrayerContextRow(state: PrayerWidgetState.Available) {
             text = state.dateLabel,
             size = 13.sp,
             color = GlanceTheme.colors.onSurfaceVariant,
-            weight = arabicFontFor(context),
+            weight = WidgetFontWeight.Medium,
             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
         )
         Spacer(modifier = GlanceModifier.defaultWeight())
@@ -1195,10 +1214,10 @@ private fun CompactHeroSummary(
     }
     val titleSize = WidgetTypography
         .fittingSize(context, title, width.value, bold = true)
-        .coerceAtMost(19f * textScale)
+        .coerceAtMost(18f * textScale)
     val nextSize = WidgetTypography
         .fittingSize(context, next, width.value * 0.66f, bold = true)
-        .coerceAtMost(16f * textScale)
+        .coerceAtMost(18f * textScale)
 
     WidgetText(
         text = title,
@@ -1208,9 +1227,9 @@ private fun CompactHeroSummary(
     )
     WidgetText(
         text = elapsed,
-        size = (12f * textScale).sp,
-        color = GlanceTheme.colors.onSurfaceVariant,
-        weight = WidgetFontWeight.Regular,
+        size = (16f * textScale).sp,
+        color = GlanceTheme.colors.primary,
+        weight = WidgetFontWeight.Bold,
     )
     state.windowProgress?.let { progress ->
         Spacer(modifier = GlanceModifier.height(8.dp))
@@ -1223,8 +1242,8 @@ private fun CompactHeroSummary(
     ) {
         WidgetText(
             text = "Next Prayer",
-            size = (11f * textScale).sp,
-            color = GlanceTheme.colors.onSurfaceVariant,
+            size = (14.5f * textScale).sp,
+            color = GlanceTheme.colors.primary,
             weight = WidgetFontWeight.Bold,
             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
         )
@@ -1232,7 +1251,7 @@ private fun CompactHeroSummary(
         WidgetText(
             text = next,
             size = nextSize.sp,
-            color = GlanceTheme.colors.onSurface,
+            color = GlanceTheme.colors.primary,
             weight = WidgetFontWeight.Bold,
             align = WidgetTextAlign.End,
             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -1250,43 +1269,63 @@ private fun PrayerScheduleList(
 ) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         prayers.forEachIndexed { index, prayer ->
-            Row(
-                modifier = GlanceModifier.fillMaxWidth().height(rowHeight),
-                verticalAlignment = Alignment.Vertical.CenterVertically,
-            ) {
-                WidgetText(
-                    text = prayer.name,
-                    size = textSize.sp,
-                    color = when {
-                        prayer.isNext -> GlanceTheme.colors.primary
-                        prayer.isPast -> GlanceTheme.colors.outline
-                        else -> GlanceTheme.colors.onSurface
-                    },
-                    weight = if (prayer.isNext) WidgetFontWeight.Bold else WidgetFontWeight.Medium,
-                    modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-                )
-                prayer.temperature?.takeIf { showTemperature }?.let { temperature ->
+            // Each row is wrapped rather than placed directly so the nudge below the last
+            // divider costs no extra child: Glance truncates a Column after ten of them,
+            // and five rows with four dividers already sits at nine.
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                if (index == prayers.lastIndex) {
+                    // The final row otherwise reads as crowding the card's bottom edge,
+                    // the gap beneath it being the surface padding alone while every row
+                    // above has a full row's breathing space. Reserved in the height
+                    // budgets at both call sites.
+                    Spacer(modifier = GlanceModifier.height(LAST_ROW_NUDGE))
+                }
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth().height(rowHeight),
+                    verticalAlignment = Alignment.Vertical.CenterVertically,
+                ) {
                     WidgetText(
-                        text = temperature,
-                        size = (textSize * 0.78f).sp,
-                        color = GlanceTheme.colors.onSurfaceVariant,
-                        weight = WidgetFontWeight.Regular,
+                        text = prayer.name,
+                        size = textSize.sp,
+                        color = when {
+                            prayer.isNext -> GlanceTheme.colors.primary
+                            prayer.isPast -> GlanceTheme.colors.outline
+                            else -> GlanceTheme.colors.onSurface
+                        },
+                        weight = if (prayer.isNext) {
+                            WidgetFontWeight.Bold
+                        } else {
+                            WidgetFontWeight.Medium
+                        },
+                        modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+                    )
+                    prayer.temperature?.takeIf { showTemperature }?.let { temperature ->
+                        WidgetText(
+                            text = temperature,
+                            size = (textSize * 0.78f).sp,
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            weight = WidgetFontWeight.Regular,
+                            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                        )
+                        Spacer(modifier = GlanceModifier.width(12.dp))
+                    }
+                    WidgetText(
+                        text = prayer.time,
+                        size = textSize.sp,
+                        color = if (prayer.isNext) {
+                            GlanceTheme.colors.primary
+                        } else {
+                            GlanceTheme.colors.onSurface
+                        },
+                        weight = if (prayer.isNext) {
+                            WidgetFontWeight.Bold
+                        } else {
+                            WidgetFontWeight.Medium
+                        },
+                        align = WidgetTextAlign.End,
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
-                    Spacer(modifier = GlanceModifier.width(12.dp))
                 }
-                WidgetText(
-                    text = prayer.time,
-                    size = textSize.sp,
-                    color = if (prayer.isNext) {
-                        GlanceTheme.colors.primary
-                    } else {
-                        GlanceTheme.colors.onSurface
-                    },
-                    weight = if (prayer.isNext) WidgetFontWeight.Bold else WidgetFontWeight.Medium,
-                    align = WidgetTextAlign.End,
-                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                )
             }
             if (showDividers && index != prayers.lastIndex) {
                 Box(
@@ -1352,8 +1391,12 @@ private fun ColumnScope.PrayerHeroContent(
         val fitsDown = needed <= contentHeight.value
         // A wrapped title is fine; a wrapped supporting line is not, since those are
         // single-line by design and would be truncated rather than flowed.
-        val fitsAcross =
-            WidgetTypography.fittingSize(context, elapsedText, width) >= candidate.elapsed
+        val fitsAcross = WidgetTypography.fittingSize(
+            context = context,
+            text = elapsedText,
+            maxWidthDp = width,
+            bold = true,
+        ) >= candidate.elapsed
         // The title has to fit inside the two lines it is allowed, not merely need more
         // than one. On a narrow card a long phrase like "Best Time to Pray Maghrib" runs
         // to three lines well before it runs out of height, and since the view is capped
@@ -1384,8 +1427,8 @@ private fun ColumnScope.PrayerHeroContent(
     WidgetText(
         text = elapsedText,
         size = elapsedSize,
-        color = GlanceTheme.colors.onSurfaceVariant,
-        weight = WidgetFontWeight.Regular,
+        color = GlanceTheme.colors.primary,
+        weight = WidgetFontWeight.Bold,
     )
 
     // The two gaps are a fixed minimum plus a weighted spacer, so the height the type

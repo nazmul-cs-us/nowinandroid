@@ -290,14 +290,17 @@ private fun DayPrayerTimes.toWidgetState(
     )
 }
 
-/** Arabic weekday and Umm al-Qura date used beneath the widget's location header. */
+/** English weekday and Umm al-Qura date used beneath the widget's location header. */
 private fun hijriDateLabel(date: LocalDate): String = runCatching {
     DateTimeFormatter
-        .ofPattern("EEEE، d MMMM yyyy هـ", Locale.forLanguageTag("ar"))
+        // Keep the Islamic calendar, but make its weekday, month and era readable in
+        // English regardless of the device language (for example,
+        // "Saturday, 9 Rabiʻ I 1448 AH").
+        .ofPattern("EEEE, d MMMM yyyy 'AH'", Locale.ENGLISH)
         .withChronology(HijrahChronology.INSTANCE)
         .format(date)
 }.getOrElse {
-    date.format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault()))
+    date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH))
 }
 
 private fun timeFormatter(context: Context): DateTimeFormatter = DateTimeFormatter.ofPattern(

@@ -43,6 +43,7 @@ import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.background
+import androidx.glance.color.ColorProvider as DayNightColorProvider
 import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
@@ -51,6 +52,8 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.Box
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.height
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxWidth
@@ -81,6 +84,11 @@ import com.starception.submission.widget.samples.text.layout.WidgetTextDimension
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.primaryTextFontSizeAndMaxLines
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
 import com.starception.submission.widget.samples.utils.FontUtils.calculateFontSizeAndMaxLines
+
+private val FooterFrostedBackground = DayNightColorProvider(
+  androidx.compose.ui.graphics.Color(0xE6ECF0FF),
+  androidx.compose.ui.graphics.Color(0xE6283041),
+)
 
 /**
  * A layout focused on presenting text only content.
@@ -237,14 +245,19 @@ private fun TextStack(
   // maxLines goes with it. It existed to stop overflow in a fixed-height Column; keeping
   // it here would cap the text at the same place while giving it somewhere to scroll to,
   // which is the worst of both.
-  Column(modifier = GlanceModifier.fillMaxSize()) {
-    // The list takes the space the footer does not, so the reference stays pinned to the
-    // bottom of the card while the text scrolls behind it. Putting the footer inside the
-    // list would scroll it out of sight, which for a citation is the one place it must
-    // not be.
-    LazyColumn(modifier = GlanceModifier.defaultWeight()) {
-    item {
-      Column(modifier = GlanceModifier.maybeClickable(action)) {
+  val hasSource = data.sourceName != null || data.sourceDetail != null
+
+  // Layer the source over the scrolling copy. RemoteViews cannot run a live RenderEffect,
+  // so the translucent surface and soft gradient are the widget-safe equivalent of a
+  // frosted footer: text disappears gradually under it instead of being sliced against a
+  // hard, solid strip.
+  Box(
+    modifier = GlanceModifier.fillMaxSize(),
+    contentAlignment = Alignment.BottomStart,
+  ) {
+    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+      item {
+        Column(modifier = GlanceModifier.maybeClickable(action)) {
         // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
         // prayer widget beside it. Glance cannot carry a bundled font — see
         // widget_text_regular.xml — so the two cards were in different typefaces on the
@@ -297,45 +310,50 @@ private fun TextStack(
             )
           }
         }
+        }
+      }
+      if (hasSource) {
+        // Lets the final line scroll completely above the overlaid citation.
+        item { Spacer(modifier = GlanceModifier.height(56.dp)) }
       }
     }
-    }
 
-    if (data.sourceName != null || data.sourceDetail != null) {
-      // Clearance, because the list's bottom edge cuts through whatever line happens to be
-      // there. Without it a half-sliced line of the hadith sat directly on the citation and
-      // read as a rendering fault rather than as text continuing below the fold.
-      Spacer(modifier = GlanceModifier.height(10.dp))
-      Spacer(
-        modifier = GlanceModifier
-          .fillMaxWidth()
-          .height(1.dp)
-          .background(GlanceTheme.colors.surfaceVariant),
-      )
-      Spacer(modifier = GlanceModifier.height(8.dp))
-      Row(
-        modifier = GlanceModifier.fillMaxWidth().maybeClickable(action),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        WidgetText(
-          text = data.sourceName.orEmpty(),
-          size = 11.sp,
-          color = GlanceTheme.colors.outline,
-          weight = WidgetFontWeight.Medium,
-          modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+    if (hasSource) {
+      Column(modifier = GlanceModifier.fillMaxWidth()) {
+        androidx.glance.Image(
+          provider = ImageProvider(R.drawable.widget_footer_fade),
+          contentDescription = null,
+          contentScale = ContentScale.FillBounds,
+          modifier = GlanceModifier.fillMaxWidth().height(16.dp),
         )
-        Spacer(modifier = GlanceModifier.defaultWeight())
-        if (data.sourceDetail != null) {
+        Row(
+          modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(FooterFrostedBackground)
+            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 2.dp)
+            .maybeClickable(action),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
           WidgetText(
-            text = data.sourceDetail,
+            text = data.sourceName.orEmpty(),
             size = 11.sp,
             color = GlanceTheme.colors.outline,
             weight = WidgetFontWeight.Medium,
-            // The chapter title a dua cites can be a full sentence; it gives way to the
-            // book name rather than pushing it off the card.
-            modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-            align = WidgetTextAlign.End,
+            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
           )
+          Spacer(modifier = GlanceModifier.defaultWeight())
+          if (data.sourceDetail != null) {
+            WidgetText(
+              text = data.sourceDetail,
+              size = 11.sp,
+              color = GlanceTheme.colors.outline,
+              weight = WidgetFontWeight.Medium,
+              // The chapter title a dua cites can be a full sentence; it gives way to the
+              // book name rather than pushing it off the card.
+              modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+              align = WidgetTextAlign.End,
+            )
+          }
         }
       }
     }
