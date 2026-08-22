@@ -977,6 +977,14 @@ fun HadithDetailScreen(
         HadithReadingSettingsSheet(
             selectedFont = selectedArabicFont,
             selectedVoice = selectedVoice.displayName,
+            selectedTranslation = getLanguageName(selectedLanguage),
+            onTranslationClick = {
+                showReadingSettingsSheet = false
+                readingSettingsScope.launch {
+                    kotlinx.coroutines.delay(300)
+                    showTranslationSheet = true
+                }
+            },
             onFontClick = {
                 showReadingSettingsSheet = false
                 // Let the first modal finish leaving before presenting the next one.

@@ -1137,8 +1137,14 @@ fun SurahDetailScreen(
                             // so Room re-copies from the freshly downloaded source.
                             // (Plain clearCache() would reuse the stale empty file Room
                             // created on the previous open.)
+                            //
+                            // Reset the database the state says is missing, NOT the selected
+                            // translation — every layout is built on the Arabic text, so
+                            // reading English can be blocked by the Arabic database. Resetting
+                            // the selected one instead left the broken database cached and
+                            // reloaded straight back into this same download prompt.
                             com.starception.submission.core.qurandatabase.QuranTranslationHelper
-                                .resetTranslationDatabase(context, currentTranslation)
+                                .resetTranslationDatabase(context, state.translationCode)
                             viewModel.loadSurah(surahNumber, currentTranslation)
                         },
                     )

@@ -49,13 +49,10 @@ object QuranTranslationHelper {
         }
 
         // Determine database filename and CDN key
-        val dbFileName = when (translationCode) {
-            "ar" -> "quran.db"
-            else -> "quran_$translationCode.db"
-        }
+        val dbFileName = databaseFileName(translationCode)
 
         val dbAssetPath = "databases/$dbFileName"
-        val cdnKey = "databases/quran/$dbFileName"
+        val cdnKey = cdnKeyFor(translationCode)
 
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
 
@@ -114,10 +111,31 @@ object QuranTranslationHelper {
             }
     }
     
-    /** True when the APK actually ships this asset — most Quran databases are CDN-only. */
+    /** File name of the source database backing [translationCode]. */
+    fun databaseFileName(translationCode: String): String = when (translationCode) {
+        "ar" -> "quran.db"
+        else -> "quran_$translationCode.db"
+    }
+
+    /**
+     * CDN key of the source database backing [translationCode]. Lets callers ask whether the
+     * source is on disk before offering a download for it.
+     */
+    fun cdnKeyFor(translationCode: String): String =
+        "databases/quran/${databaseFileName(translationCode)}"
+
+    /**
+     * True when the APK actually ships this asset *with content* — most Quran databases are
+     * CDN-only.
+     *
+     * The size check is the point. `databases/quran.db` still ships as a 0-byte placeholder
+     * (the real file was untracked from git and now comes from the CDN), and a 0-byte asset
+     * opens perfectly happily. Treating that as "bundled" let Room build the Arabic database
+     * from an empty source, producing a schema-only file that it then never refills — which
+     * is how the Arabic text went missing while every translation still worked.
+     */
     private fun bundledAssetExists(context: Context, assetPath: String): Boolean = try {
-        context.applicationContext.assets.open(assetPath).close()
-        true
+        context.applicationContext.assets.open(assetPath).use { it.available() > 0 }
     } catch (e: Exception) {
         false
     }

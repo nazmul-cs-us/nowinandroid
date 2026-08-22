@@ -174,7 +174,34 @@ class SurahDetailViewModel @Inject constructor(
         return cleanedText
     }
 
+    /**
+     * True when the source database for [translationCode] is on disk (downloaded or bundled).
+     * If it is, an empty result means the Room-managed copy is broken, not that anything is
+     * missing — so the fix is a rebuild, not a download.
+     */
+    private fun isSourceOnDisk(translationCode: String): Boolean =
+        assetRepository.isAvailable(QuranTranslationHelper.cdnKeyFor(translationCode))
+
+    /**
+     * True unless the source database is provably corrupt — in which case it has been deleted
+     * and the screen should offer the download that will actually fix it.
+     *
+     * Worth the full hash here precisely because it only runs once something is already known to
+     * be wrong: rebuilding from a corrupt source would just recreate the empty database and leave
+     * the reader on a blank page with no way out.
+     */
+    private suspend fun isSourceIntact(translationCode: String): Boolean =
+        downloadManager.isChecksumValid(QuranTranslationHelper.cdnKeyFor(translationCode))
+
     fun loadSurah(surahNumber: Int, translationCode: String) {
+        loadSurah(surahNumber, translationCode, allowRebuild = true)
+    }
+
+    /**
+     * [allowRebuild] guards the one self-repair retry, so a database that comes back empty
+     * even after being rebuilt reports NeedsDownload instead of looping.
+     */
+    private fun loadSurah(surahNumber: Int, translationCode: String, allowRebuild: Boolean) {
         viewModelScope.launch {
             try {
                 android.util.Log.d("SurahDetail", "🔍 Loading Surah $surahNumber in translation: $translationCode")
@@ -188,7 +215,8 @@ class SurahDetailViewModel @Inject constructor(
                     _uiState.value = SurahDetailUiState.NeedsDownload(
                         category = category,
                         resourceName = "$translationName Quran Translation",
-                        description = "This translation database needs to be downloaded to view the Quran in $translationName."
+                        description = "This translation database needs to be downloaded to view the Quran in $translationName.",
+                        translationCode = translationCode,
                     )
                     return@launch
                 }
@@ -196,13 +224,26 @@ class SurahDetailViewModel @Inject constructor(
                 val surah = repository.getSurahByNumber(surahNumber)
 
                 if (surah == null) {
+                    // Same empty-shell case as the ayah check below: a downloaded source with
+                    // an empty managed copy. Rebuild once before asking for a download.
+                    if (allowRebuild && isSourceOnDisk(translationCode) && isSourceIntact(translationCode)) {
+                        android.util.Log.w(
+                            "SurahDetail",
+                            "🩹 '$translationCode' database has no surahs but its source is on disk — rebuilding",
+                        )
+                        QuranTranslationHelper.resetTranslationDatabase(context, translationCode)
+                        loadSurah(surahNumber, translationCode, allowRebuild = false)
+                        return@launch
+                    }
+
                     android.util.Log.e("SurahDetail", "❌ Surah $surahNumber not found in translation: $translationCode (database may be empty/corrupt)")
                     val translationName = QuranTranslationHelper.getTranslationName(translationCode)
                     val category = if (translationCode == "ar") "quran_core" else "quran_translation"
                     _uiState.value = SurahDetailUiState.NeedsDownload(
                         category = category,
                         resourceName = "$translationName Quran Translation",
-                        description = "The $translationName translation database appears to be empty or incomplete. Please download it to view the Quran."
+                        description = "The $translationName translation database appears to be empty or incomplete. Please download it to view the Quran.",
+                        translationCode = translationCode,
                     )
                     return@launch
                 }
@@ -224,6 +265,23 @@ class SurahDetailViewModel @Inject constructor(
                 // an empty result here always means missing data, not an empty surah.
                 if (rawAyahs.isEmpty()) {
                     val missingCode = if (translationCode != "ar") "ar" else translationCode
+
+                    // Room copies its prepopulated source only when it creates the managed
+                    // file. An instance first opened before that source was downloadable is
+                    // left as an empty shell, and the in-memory cache hands that shell back
+                    // for the rest of the process — so the on-open repair never gets to run
+                    // and only a force-stop fixed it. When the source is right there on disk
+                    // there is nothing to download: drop the shell and rebuild from it once.
+                    if (allowRebuild && isSourceOnDisk(missingCode) && isSourceIntact(missingCode)) {
+                        android.util.Log.w(
+                            "SurahDetail",
+                            "🩹 '$missingCode' database is empty but its source is on disk — rebuilding",
+                        )
+                        QuranTranslationHelper.resetTranslationDatabase(context, missingCode)
+                        loadSurah(surahNumber, translationCode, allowRebuild = false)
+                        return@launch
+                    }
+
                     android.util.Log.e(
                         "SurahDetail",
                         "❌ No ayahs for surah $surahNumber from '$missingCode' database — treating as missing data",
@@ -234,6 +292,7 @@ class SurahDetailViewModel @Inject constructor(
                         resourceName = "$translationName Quran Text",
                         description = "The $translationName Quran database is missing its verses. " +
                             "Download it to read this surah.",
+                        translationCode = missingCode,
                     )
                     return@launch
                 }
@@ -303,6 +362,7 @@ class SurahDetailViewModel @Inject constructor(
                     category = if (e.translationCode == "ar") "quran_core" else "quran_translation",
                     resourceName = "$translationName Quran Text",
                     description = "The $translationName Quran database has not been downloaded yet.",
+                    translationCode = e.translationCode,
                 )
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetail", "❌ Error loading Surah $surahNumber in translation: $translationCode", e)
@@ -709,5 +769,12 @@ sealed interface SurahDetailUiState {
         val category: String,
         val resourceName: String,
         val description: String,
+        /**
+         * The translation whose database is missing — not necessarily the one being read.
+         * Every layout is built on the Arabic text, so reading an English surah can be
+         * blocked by the *Arabic* database. Callers that reset a database after downloading
+         * must reset this one, not the selected translation.
+         */
+        val translationCode: String,
     ) : SurahDetailUiState
 }

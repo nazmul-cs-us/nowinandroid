@@ -93,11 +93,16 @@ class AssetRepository @Inject constructor(
         else -> cdnKey
     }
 
+    /**
+     * An asset only counts as bundled if it has content. Some entries (e.g.
+     * `databases/quran.db`) still ship as 0-byte placeholders now that the real file comes
+     * from the CDN, and those open without error — reporting them as available hands callers
+     * an empty database instead of sending them to the download.
+     */
     private fun isBundled(cdnKey: String): Boolean {
         val bundledPath = cdnKeyToBundledPath(cdnKey)
         return try {
-            context.assets.open(bundledPath).close()
-            true
+            context.assets.open(bundledPath).use { it.available() > 0 }
         } catch (_: Exception) {
             false
         }
@@ -133,7 +138,16 @@ class AssetRepository @Inject constructor(
                     input.copyTo(output)
                 }
             }
-            targetFile
+            // A 0-byte placeholder extracts "successfully" into a 0-byte file. Handing that
+            // back reads as a real source and callers build empty databases from it, so
+            // report nothing rather than something unusable.
+            if (targetFile.length() > 0) {
+                targetFile
+            } else {
+                targetFile.delete()
+                Log.d(TAG, "Bundled asset is a 0-byte placeholder: $cdnKey")
+                null
+            }
         } catch (_: Exception) {
             Log.d(TAG, "Cannot extract bundled asset: $cdnKey (tried $bundledPath)")
             null

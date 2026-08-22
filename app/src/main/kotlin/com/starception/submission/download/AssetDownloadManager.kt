@@ -51,6 +51,13 @@ class AssetDownloadManager @Inject constructor(
     private val downloadMutexes = mutableMapOf<String, Mutex>()
     private var cachedManifest: AssetManifest? = null
 
+    /**
+     * Assets whose SHA-256 has already matched the manifest in this process. Hashing re-reads the
+     * whole file, so each asset earns its way onto this list once and is then trusted.
+     */
+    private val verifiedChecksums: MutableSet<String> =
+        java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     private fun getOrCreateMutex(cdnKey: String): Mutex =
         synchronized(downloadMutexes) { downloadMutexes.getOrPut(cdnKey) { Mutex() } }
 
@@ -147,7 +154,69 @@ class AssetDownloadManager @Inject constructor(
 
     fun getAssetFile(cdnKey: String): File? {
         val file = File(cdnAssetsDir, cdnKey)
-        return if (file.exists() && file.length() > 0) file else null
+        if (!file.exists() || file.length() == 0L) return null
+        if (!hasExpectedSize(file, cdnKey)) return null
+        return file
+    }
+
+    /**
+     * True when [file] is exactly the size the manifest says it should be.
+     *
+     * Size and checksum are verified as the file lands, then never looked at again — so a file
+     * truncated *after* that (interrupted write, storage pressure, a half-finished copy) stayed
+     * "available" indefinitely and surfaced later as corrupt content, far from the cause.
+     * Comparing [File.length] is free, and truncation is the realistic corruption mode.
+     *
+     * A file whose size is unknown — manifest not fetched yet, or asset not listed in it — is
+     * accepted. Reporting those as missing would make every asset look absent on an offline
+     * launch, which is worse than missing a rare corruption.
+     */
+    private fun hasExpectedSize(file: File, cdnKey: String): Boolean {
+        val expected = cachedManifest?.assets?.get(cdnKey)?.size ?: return true
+        if (file.length() == expected) return true
+        Log.w(
+            TAG,
+            "Size mismatch for $cdnKey: expected $expected bytes, found ${file.length()} — " +
+                "treating as unavailable so it is re-downloaded",
+        )
+        return false
+    }
+
+    /**
+     * Full SHA-256 check of a downloaded asset against the manifest, run at most once per asset
+     * per process. On mismatch the file is deleted so the next download re-fetches it.
+     *
+     * Reads the whole file, so this is for the repair path — when something already looks wrong —
+     * not for routine availability checks. [getAssetFile]'s size comparison is the cheap check
+     * that runs everywhere.
+     *
+     * Returns false only when the asset is *known* to be corrupt. A missing file, a missing
+     * manifest entry, or an unreadable file all return true: none of those are this check's
+     * question to answer, and callers use it to decide whether re-using a file is safe.
+     */
+    suspend fun isChecksumValid(cdnKey: String): Boolean = withContext(Dispatchers.IO) {
+        if (verifiedChecksums.contains(cdnKey)) return@withContext true
+
+        val entry = cachedManifest?.assets?.get(cdnKey) ?: return@withContext true
+        val file = File(cdnAssetsDir, cdnKey)
+        if (!file.exists()) return@withContext true
+
+        val actual = try {
+            sha256(file)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not hash $cdnKey, leaving it alone: ${e.message}")
+            return@withContext true
+        }
+
+        if (actual == entry.sha256) {
+            verifiedChecksums.add(cdnKey)
+            return@withContext true
+        }
+
+        Log.e(TAG, "Checksum mismatch for $cdnKey — deleting so it is re-downloaded")
+        file.delete()
+        getOrCreateStateFlow(cdnKey).value = DownloadState.NotStarted
+        false
     }
 
     fun getAssetDir(cdnKeyPrefix: String): File? {

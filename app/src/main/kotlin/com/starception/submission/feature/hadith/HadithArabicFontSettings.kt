@@ -109,8 +109,11 @@ internal fun saveHadithArabicFont(context: Context, font: String) {
 internal fun HadithReadingSettingsSheet(
     selectedFont: String,
     selectedVoice: String,
+    /** Display name of the current translation language, already resolved by the caller. */
+    selectedTranslation: String,
     onFontClick: () -> Unit,
     onVoiceClick: () -> Unit,
+    onTranslationClick: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -136,11 +139,17 @@ internal fun HadithReadingSettingsSheet(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "Personalize Arabic reading and narration",
+                        text = "Personalize translation, Arabic reading and narration",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(14.dp))
+                    HadithSettingRow(
+                        title = "Translation",
+                        value = selectedTranslation,
+                        onClick = onTranslationClick,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                     HadithSettingRow(
                         title = "Arabic font",
                         value = hadithArabicFontName(selectedFont),
