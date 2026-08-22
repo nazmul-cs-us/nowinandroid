@@ -120,18 +120,17 @@ private const val PROGRESS_BAR_HEIGHT = 6f
 // horizontally reflowed one-row hero is used instead, because the vertical hero would clip.
 private val HERO_MIN_HEIGHT = 100.dp
 
-/** Height at which useful supporting content replaces expanding blank hero space. */
-private val EXPANDED_CONTENT_MIN_HEIGHT = 150.dp
-private val FULL_SCHEDULE_MIN_HEIGHT = 290.dp
-
 /**
- * Extra gap above the last prayer of the day, so it reads as the end of the list rather
- * than one more evenly spaced row.
+ * Height at which useful supporting content replaces expanding blank hero space.
  *
- * Paid for out of the schedule's height budget at both call sites — the rows above give
- * up a fraction of a dp each rather than the card overflowing.
+ * Measured against the content box, so both thresholds carry the 10dp that
+ * [SURFACE_BOTTOM_PADDING] gave back to it — they were tuned when the titled surface
+ * still reserved a full [WIDGET_PADDING] underneath. Without that, a 2-row card came out
+ * at 154dp against the old 150dp gate and began drawing a five-prayer schedule into a box
+ * with room for one, which is a two-row card showing "Today's Prayers" and Fajr alone.
  */
-private val LAST_ROW_NUDGE = 6.dp
+private val EXPANDED_CONTENT_MIN_HEIGHT = 160.dp
+private val FULL_SCHEDULE_MIN_HEIGHT = 300.dp
 
 /**
  * Bottom inset under the titled surface's content.
@@ -1107,7 +1106,7 @@ private fun ExpandedPrayerContent(
     // Glance does not reliably distribute defaultWeight() to repeated RemoteViews rows.
     // Budget the remaining height explicitly so every prayer is visible and taller widget
     // sizes naturally spend their extra room on larger, easier-to-scan schedule rows.
-    val scheduleRowHeight = ((contentSize.height.value - 145f) /
+    val scheduleRowHeight = ((contentSize.height.value - 139f) /
         state.prayers.size.coerceAtLeast(1))
         .coerceAtLeast(22f)
         .dp
@@ -1144,7 +1143,7 @@ private fun FullPrayerContent(
     state: PrayerWidgetState.Available,
     contentSize: DpSize,
 ) {
-    val scheduleRowHeight = ((contentSize.height.value - 159f) /
+    val scheduleRowHeight = ((contentSize.height.value - 153f) /
         state.prayers.size.coerceAtLeast(1))
         .coerceAtLeast(25f)
         .dp
@@ -1273,13 +1272,6 @@ private fun PrayerScheduleList(
             // divider costs no extra child: Glance truncates a Column after ten of them,
             // and five rows with four dividers already sits at nine.
             Column(modifier = GlanceModifier.fillMaxWidth()) {
-                if (index == prayers.lastIndex) {
-                    // The final row otherwise reads as crowding the card's bottom edge,
-                    // the gap beneath it being the surface padding alone while every row
-                    // above has a full row's breathing space. Reserved in the height
-                    // budgets at both call sites.
-                    Spacer(modifier = GlanceModifier.height(LAST_ROW_NUDGE))
-                }
                 Row(
                     modifier = GlanceModifier.fillMaxWidth().height(rowHeight),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
