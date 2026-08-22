@@ -36,6 +36,7 @@ import kotlinx.coroutines.withTimeout
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.chrono.HijrahChronology
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -279,8 +280,7 @@ private fun DayPrayerTimes.toWidgetState(
 
     return PrayerWidgetState.Available(
         place = location.shortLabel(),
-        dateLabel = LocalDate.now()
-            .format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())),
+        dateLabel = hijriDateLabel(LocalDate.now()),
         nextPrayer = next,
         countdown = countdownTo(getActualPrayers().first { it.name == next.name }.time, now),
         sunrise = sunrise.format(formatter),
@@ -288,6 +288,16 @@ private fun DayPrayerTimes.toWidgetState(
         insight = insight,
         windowProgress = prayerWindowProgress(this, now),
     )
+}
+
+/** Arabic weekday and Umm al-Qura date used beneath the widget's location header. */
+private fun hijriDateLabel(date: LocalDate): String = runCatching {
+    DateTimeFormatter
+        .ofPattern("EEEE، d MMMM yyyy هـ", Locale.forLanguageTag("ar"))
+        .withChronology(HijrahChronology.INSTANCE)
+        .format(date)
+}.getOrElse {
+    date.format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault()))
 }
 
 private fun timeFormatter(context: Context): DateTimeFormatter = DateTimeFormatter.ofPattern(
