@@ -143,6 +143,9 @@ private val FULL_SCHEDULE_MIN_HEIGHT = 300.dp
  */
 private val SURFACE_BOTTOM_PADDING = 6.dp
 
+/** Lift under the hero's closing countdown, which sits larger and lower than list type. */
+private val HERO_BOTTOM_CLEARANCE = 2.dp
+
 /**
  * Reads the launcher's current widget bounds without relying on Glance's cached LocalSize.
  *
@@ -1497,6 +1500,13 @@ private fun ColumnScope.PrayerHeroContent(
         Spacer(modifier = GlanceModifier.defaultWeight())
         AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
     }
+
+    // The hero ends on its largest line, which needs more clearance beneath it than the
+    // schedule's small type does. [SURFACE_BOTTOM_PADDING] is tuned for that schedule,
+    // and at 6dp it left this countdown all but touching the card's lower edge. Placed
+    // after the row so the weighted gaps above surrender the space, rather than the
+    // content growing past the card.
+    Spacer(modifier = GlanceModifier.height(HERO_BOTTOM_CLEARANCE))
 }
 
 /**

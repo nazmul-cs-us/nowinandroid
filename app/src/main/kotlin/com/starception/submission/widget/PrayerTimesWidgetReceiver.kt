@@ -23,6 +23,7 @@ import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.updateAll
+import com.starception.submission.widget.samples.text.TextWithImageAppWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,6 +143,11 @@ object PrayerWidgetUpdater {
             PrayerTimesWidget(),
             PrayerTimesLargeWidget(),
             PrayerTimesFullWidget(),
+            // The insight card reads the same generator and carries the same two moving
+            // figures, so it goes stale on the same clock. Left out of this list it had
+            // no cadence at all: its provider declares updatePeriodMillis=0, so nothing
+            // redrew it between taps of its own refresh button.
+            TextWithImageAppWidget(),
         ).forEach { widget ->
             try {
                 widget.updateAll(appContext)

@@ -42,7 +42,11 @@ class FakeTextWithImageRepository {
 
   suspend fun load(context: Context): TextWithImageData? {
     val item = items[itemIndex]
-    val bitmap = fetchImage(context, item.url)
+    // Falling back to the image already on screen, not to null: this card is redrawn on a
+    // five-minute cadence to keep its countdown honest, and a single failed fetch on any
+    // one of those passes would otherwise replace the photograph with the placeholder
+    // until the network came back.
+    val bitmap = fetchImage(context, item.url) ?: data.value?.imageData?.bitmap
     val mappedImageData = ImageData(
       bitmap = bitmap,
       contentDescription = item.imageContentDescription
