@@ -157,23 +157,48 @@ class FieldWeightedIndex<T>(
     /** Per item, per field: the normalized full text. Used for substring + phrase match. */
     private val fieldNormText: List<List<String>>
 
+    /** Indexed tokens in sorted order, so a prefix is a binary-searchable range. */
+    private val sortedTokens: List<String>
+
+    /** Items containing each token, for IDF. A token in every item discriminates nothing. */
+    private val documentFrequency: Map<String, Int>
+
+    /** Word count per item per field, and the per-field mean, for length normalisation. */
+    private val fieldWordCount: List<IntArray>
+    private val averageFieldWordCount: DoubleArray
+
+    private val maxFieldWeight: Double = fields.maxOfOrNull { it.weight } ?: 1.0
+
+    /** Items this index can return. Zero means its source held no rows when it was built. */
+    val size: Int get() = items.size
+
+    fun isEmpty(): Boolean = items.isEmpty()
+
     init {
         val byToken = HashMap<String, MutableList<Posting>>()
         val byTransliterationKey = HashMap<String, MutableList<Posting>>()
         val normText = ArrayList<List<String>>(items.size)
+        val itemsPerToken = HashMap<String, MutableSet<Int>>()
+        val wordCounts = ArrayList<IntArray>(items.size)
+        val fieldWordTotals = DoubleArray(fields.size)
         items.forEachIndexed { itemIdx, item ->
             val row = ArrayList<String>(fields.size)
+            val counts = IntArray(fields.size)
             fields.forEachIndexed { fieldIdx, field ->
                 val norm = SearchTokenizer.normalize(field.getter(item).orEmpty())
                 row.add(norm)
                 if (norm.isBlank()) return@forEachIndexed
-                SearchTokenizer.indexWords(norm).forEachIndexed { wordIdx, word ->
+                val words = SearchTokenizer.indexWords(norm)
+                counts[fieldIdx] = words.size
+                fieldWordTotals[fieldIdx] += words.size
+                words.forEachIndexed { wordIdx, word ->
                     val posting = Posting(
                         itemIndex = itemIdx,
                         fieldIndex = fieldIdx,
                         isStartOfWord = wordIdx == 0,
                     )
                     byToken.getOrPut(word) { ArrayList() }.add(posting)
+                    itemsPerToken.getOrPut(word) { HashSet() }.add(itemIdx)
                     val transliterationKey = SearchTokenizer.transliterationKey(word)
                     if (SearchTokenizer.isLatinSearchKey(transliterationKey)) {
                         byTransliterationKey
@@ -183,7 +208,14 @@ class FieldWeightedIndex<T>(
                 }
             }
             normText.add(row)
+            wordCounts.add(counts)
         }
+        this.documentFrequency = itemsPerToken.mapValues { it.value.size }
+        this.fieldWordCount = wordCounts
+        this.averageFieldWordCount = DoubleArray(fields.size) { fieldIdx ->
+            if (items.isEmpty()) 1.0 else (fieldWordTotals[fieldIdx] / items.size).coerceAtLeast(1.0)
+        }
+        this.sortedTokens = byToken.keys.sorted()
         this.postingsByToken = byToken
         this.postingsByTransliterationKey = byTransliterationKey
         val byTrigram = HashMap<String, MutableSet<String>>()
@@ -200,74 +232,76 @@ class FieldWeightedIndex<T>(
     }
 
     /**
-     * Returns the top [limit] hits ranked by score, descending.
+     * Returns the top [limit] hits, scored 0..1 and ranked descending.
+     *
+     * The score is a normalised BM25F: each matched term contributes its inverse
+     * document frequency, scaled by how good the match was (exact beats prefix beats
+     * transliteration beats fuzzy), by the field's weight, and by how much of the field
+     * the match accounts for. Dividing by the best score the query could have earned
+     * makes the result a confidence rather than an arbitrary magnitude, so hits from
+     * different indices — surahs against duas against chapters — can be compared.
      *
      * @param queryTokens the normalized, stop-word-filtered query tokens
      * @param fullNormalizedQuery the full normalized query (used for phrase boost)
      */
     fun query(queryTokens: List<String>, fullNormalizedQuery: String, limit: Int): List<RankedHit<T>> {
-        if (queryTokens.isEmpty()) return emptyList()
+        if (queryTokens.isEmpty() || items.isEmpty()) return emptyList()
 
-        // [itemIdx] -> [score, tokensMatchedCount]
-        val scores = HashMap<Int, DoubleArray>()
-
-        fun bump(itemIdx: Int, fieldIdx: Int, addScore: Double) {
-            val arr = scores.getOrPut(itemIdx) { doubleArrayOf(0.0, 0.0) }
-            arr[0] += addScore * fields[fieldIdx].weight
-        }
+        val itemScores = HashMap<Int, Double>()
+        val tokensMatched = HashMap<Int, Int>()
+        var idealScore = 0.0
 
         queryTokens.forEachIndexed { tIdx, token ->
             val isLast = tIdx == queryTokens.size - 1
-            val itemsHitThisToken = HashSet<Int>()
+            val idf = inverseDocumentFrequency(token)
+            // What this term would earn from a perfect hit: exact, in the
+            // heaviest field, in a field short enough that the term is most of it.
+            idealScore += idf * START_OF_WORD_BONUS * BEST_LENGTH_NORMALISATION
 
-            // 1. Exact token match
-            postingsByToken[token]?.forEach { p ->
-                val pos = if (p.isStartOfWord) 1.5 else 1.2
-                bump(p.itemIndex, p.fieldIndex, pos)
-                itemsHitThisToken.add(p.itemIndex)
+            // Best match quality per (item, field). A term is credited once per field,
+            // at its strongest reading: an exact hit is never diluted by also having
+            // fuzzily matched the same field.
+            val bestQuality = HashMap<Int, Double>()
+            fun offer(posting: Posting, quality: Double) {
+                val key = posting.itemIndex * fields.size + posting.fieldIndex
+                val positional = if (posting.isStartOfWord) START_OF_WORD_BONUS else 1.0
+                val value = quality * positional
+                if ((bestQuality[key] ?: 0.0) < value) bestQuality[key] = value
             }
 
-            // 2. Prefix match on the LAST token (live autocomplete)
+            // 1. Exact token match.
+            postingsByToken[token]?.forEach { offer(it, QUALITY_EXACT) }
+
+            // 2. Prefix match on the LAST token, for live autocomplete ("im" -> Imran).
+            //    Walked as a range over the sorted vocabulary rather than a scan of it.
             if (isLast && token.length >= 2) {
-                postingsByToken.forEach { (indexedToken, list) ->
-                    if (indexedToken == token) return@forEach
-                    if (!indexedToken.startsWith(token)) return@forEach
-                    list.forEach { p ->
-                        if (p.itemIndex in itemsHitThisToken) return@forEach
-                        val pos = if (p.isStartOfWord) 1.5 else 1.2
-                        bump(p.itemIndex, p.fieldIndex, pos * 0.6)
-                        itemsHitThisToken.add(p.itemIndex)
+                forEachTokenWithPrefix(token) { indexedToken ->
+                    if (indexedToken != token) {
+                        postingsByToken[indexedToken]?.forEach { offer(it, QUALITY_PREFIX) }
                     }
                 }
             }
 
-            // 3. Transliteration-aware fallback. Exact keys catch q/k and
-            //    repeated-vowel variants; key prefixes catch shortened input
-            //    such as "bakar" -> "baqarah".
+            // 3. Transliteration-aware fallback. Exact keys catch q/k and repeated-vowel
+            //    variants; key prefixes catch shortened input such as "bakar" -> "baqarah".
             val transliterationToken = SearchTokenizer.transliterationKey(token)
             if (SearchTokenizer.isLatinSearchKey(transliterationToken)) {
-                postingsByTransliterationKey[transliterationToken]?.forEach { p ->
-                    if (p.itemIndex in itemsHitThisToken) return@forEach
-                    bump(p.itemIndex, p.fieldIndex, 0.78)
-                    itemsHitThisToken.add(p.itemIndex)
-                }
+                postingsByTransliterationKey[transliterationToken]
+                    ?.forEach { offer(it, QUALITY_TRANSLITERATION) }
+
                 if (isLast) {
                     postingsByTransliterationKey.forEach { (indexedKey, list) ->
-                        if (indexedKey == transliterationToken ||
-                            !indexedKey.startsWith(transliterationToken)
-                        ) return@forEach
-                        list.forEach { p ->
-                            if (p.itemIndex in itemsHitThisToken) return@forEach
-                            bump(p.itemIndex, p.fieldIndex, 0.62)
-                            itemsHitThisToken.add(p.itemIndex)
+                        if (indexedKey != transliterationToken &&
+                            indexedKey.startsWith(transliterationToken)
+                        ) {
+                            list.forEach { offer(it, QUALITY_TRANSLITERATION_PREFIX) }
                         }
                     }
                 }
 
-                // Retrieve approximate candidates by shared prefix and character
-                // trigrams, then rank them with a phonetic weighted Damerau
-                // distance. Candidate generation avoids comparing every query
-                // with every indexed word as the content index grows.
+                // Approximate candidates by shared prefix and character trigrams, ranked
+                // by phonetic weighted Damerau distance. Candidate generation avoids
+                // comparing the query against every indexed word as the corpus grows.
                 if (transliterationToken.length >= 4) {
                     val candidateKeys = LinkedHashSet<String>()
                     transliterationKeysByPrefix[transliterationToken.take(2)]
@@ -275,78 +309,116 @@ class FieldWeightedIndex<T>(
                     SearchTokenizer.characterTrigrams(transliterationToken).forEach { trigram ->
                         transliterationKeysByTrigram[trigram]?.let(candidateKeys::addAll)
                     }
-
-                    val bestMatchByItem = HashMap<Int, Pair<Posting, Double>>()
                     candidateKeys.forEach { indexedKey ->
                         if (indexedKey == transliterationToken ||
                             indexedKey.startsWith(transliterationToken)
                         ) return@forEach
-                        val approximateScore = approximateMatchScore(
+                        val approximate = approximateMatchScore(
                             query = transliterationToken,
                             indexed = indexedKey,
                         ) ?: return@forEach
-                        val list = postingsByTransliterationKey[indexedKey].orEmpty()
-                        list.forEach { p ->
-                            if (p.itemIndex in itemsHitThisToken) return@forEach
-                            val weightedScore = approximateScore * fields[p.fieldIndex].weight
-                            val existing = bestMatchByItem[p.itemIndex]
-                            if (existing == null ||
-                                weightedScore > existing.second * fields[existing.first.fieldIndex].weight
-                            ) {
-                                bestMatchByItem[p.itemIndex] = p to approximateScore
-                            }
+                        postingsByTransliterationKey[indexedKey]?.forEach { offer(it, approximate) }
+                    }
+                }
+            }
+
+            // 4. In-word substring fallback ("khlas" -> "ikhlas"). Only when nothing
+            //    above matched: it reads every field of every item, so running it on
+            //    terms that already have hits costs a full corpus scan for nothing.
+            if (bestQuality.isEmpty()) {
+                fieldNormText.forEachIndexed { itemIdx, row ->
+                    row.forEachIndexed { fieldIdx, norm ->
+                        if (norm.contains(token)) {
+                            offer(Posting(itemIdx, fieldIdx, isStartOfWord = false), QUALITY_SUBSTRING)
                         }
                     }
-                    bestMatchByItem.forEach { (itemIndex, match) ->
-                        bump(itemIndex, match.first.fieldIndex, match.second)
-                        itemsHitThisToken.add(itemIndex)
-                    }
                 }
             }
 
-            // 4. In-word substring fallback against the full normalized field
-            //    (catches "khlas" → "ikhlas" without exploding the postings dict)
-            fieldNormText.forEachIndexed { itemIdx, row ->
-                if (itemIdx in itemsHitThisToken) return@forEachIndexed
-                row.forEachIndexed innerLoop@{ fieldIdx, norm ->
-                    if (norm.contains(token)) {
-                        bump(itemIdx, fieldIdx, 0.8)
-                        itemsHitThisToken.add(itemIdx)
-                        return@innerLoop
-                    }
-                }
+            val itemsThisToken = HashSet<Int>()
+            bestQuality.forEach { (key, quality) ->
+                val itemIdx = key / fields.size
+                val fieldIdx = key % fields.size
+                itemScores[itemIdx] = (itemScores[itemIdx] ?: 0.0) +
+                    idf * quality * relativeFieldWeight(fieldIdx) * lengthNormalisation(itemIdx, fieldIdx)
+                itemsThisToken.add(itemIdx)
             }
-
-            // Tally tokensMatched — fuzzy hits count too, so "imran" finds
-            // "Aal-i-Imraan" without being filtered out by the matched==0 check.
-            itemsHitThisToken.forEach { itemIdx ->
-                scores[itemIdx]!![1] += 1.0
-            }
+            itemsThisToken.forEach { tokensMatched.merge(it, 1, Int::plus) }
         }
 
-        // 5. Full-phrase exact substring bonus (e.g., "ayatul kursi")
+        // 5. Full-phrase substring bonus, weighted by how rare the phrase's terms are —
+        //    "ayatul kursi" landing whole is strong evidence; "the of" landing whole is not.
         if (fullNormalizedQuery.length >= 3) {
+            val phraseIdf = queryTokens.sumOf { inverseDocumentFrequency(it) }
             fieldNormText.forEachIndexed { itemIdx, row ->
                 row.forEachIndexed { fieldIdx, norm ->
                     if (norm.contains(fullNormalizedQuery)) {
-                        bump(itemIdx, fieldIdx, 5.0)
+                        itemScores[itemIdx] = (itemScores[itemIdx] ?: 0.0) +
+                            phraseIdf * PHRASE_BONUS * relativeFieldWeight(fieldIdx)
                     }
                 }
             }
         }
 
-        // 6. All-tokens-hit multiplier; require at least one hit to keep the item
+        if (idealScore <= 0.0) return emptyList()
         val tokenCount = queryTokens.size.toDouble()
-        return scores.entries
-            .mapNotNull { (itemIdx, arr) ->
-                val rawScore = arr[0]
-                val matched = arr[1].toInt()
+
+        return itemScores.entries
+            .mapNotNull { (itemIdx, rawScore) ->
+                val matched = tokensMatched[itemIdx] ?: 0
                 if (matched == 0) return@mapNotNull null
-                val finalScore = if (matched >= tokenCount) rawScore * 1.5 else rawScore
-                RankedHit(items[itemIdx], finalScore, matched)
+                // Partial coverage is penalised on a slope rather than a cliff: two of
+                // three terms should sit between one and three, not level with one.
+                val coverage = COVERAGE_FLOOR +
+                    (1.0 - COVERAGE_FLOOR) * (matched / tokenCount)
+                val confidence = ((rawScore / idealScore) * coverage).coerceIn(0.0, 1.0)
+                RankedHit(items[itemIdx], confidence, matched)
             }
             .sortedByDescending { it.score }
             .take(limit)
+    }
+
+    /**
+     * Rarity of a term across the corpus, in the BM25 formulation.
+     *
+     * A term in every item separates nothing and lands near zero; a term in one item
+     * carries the query. Terms absent from the index — which reach here through the
+     * fuzzy and prefix paths — are treated as maximally rare, since whatever they end up
+     * matching is by definition unusual.
+     */
+    private fun inverseDocumentFrequency(token: String): Double {
+        val n = items.size.toDouble()
+        val df = (documentFrequency[token] ?: 1).toDouble().coerceAtMost(n)
+        return kotlin.math.ln(1.0 + (n - df + 0.5) / (df + 0.5))
+    }
+
+    /**
+     * BM25 length normalisation: a term filling a two-word name says more about that
+     * item than the same term buried in a paragraph.
+     */
+    private fun lengthNormalisation(itemIndex: Int, fieldIndex: Int): Double {
+        val length = fieldWordCount[itemIndex][fieldIndex].coerceAtLeast(1).toDouble()
+        val average = averageFieldWordCount[fieldIndex]
+        return (LENGTH_K1 + 1.0) / (1.0 + LENGTH_K1 * (1.0 - LENGTH_B + LENGTH_B * length / average))
+    }
+
+    /** Field weights as a 0..1 fraction, so one index's scale is another's. */
+    private fun relativeFieldWeight(fieldIndex: Int): Double =
+        fields[fieldIndex].weight / maxFieldWeight
+
+    /** Visits every indexed token starting with [prefix], via binary search. */
+    private inline fun forEachTokenWithPrefix(prefix: String, action: (String) -> Unit) {
+        var low = 0
+        var high = sortedTokens.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (sortedTokens[mid] < prefix) low = mid + 1 else high = mid
+        }
+        var index = low
+        while (index < sortedTokens.size && sortedTokens[index].startsWith(prefix)) {
+            action(sortedTokens[index])
+            index++
+        }
     }
 
     private fun commonPrefixLength(a: String, b: String): Int {
@@ -450,5 +522,34 @@ class FieldWeightedIndex<T>(
     private companion object {
         val VOWELS = setOf('a', 'e', 'i', 'o', 'u')
         const val TRANSPOSITION_COST = 0.55
+
+        /**
+         * How much of a term's rarity each kind of match is allowed to claim.
+         *
+         * Ordered deliberately and with gaps: an exact hit on a weak field must still
+         * beat a fuzzy hit on a strong one, which the previous additive scoring could
+         * not guarantee.
+         */
+        const val QUALITY_EXACT = 1.0
+        const val QUALITY_TRANSLITERATION = 0.78
+        const val QUALITY_PREFIX = 0.62
+        const val QUALITY_TRANSLITERATION_PREFIX = 0.55
+        const val QUALITY_SUBSTRING = 0.45
+
+        /** A term opening its field is stronger evidence than one inside it. */
+        const val START_OF_WORD_BONUS = 1.15
+
+        /** BM25 term-saturation and length-normalisation constants. */
+        const val LENGTH_K1 = 1.2
+        const val LENGTH_B = 0.75
+
+        /** Length normalisation for the shortest plausible field — the ideal case. */
+        const val BEST_LENGTH_NORMALISATION = (LENGTH_K1 + 1.0) / (1.0 + LENGTH_K1 * (1.0 - LENGTH_B))
+
+        /** Weight of a whole-query substring landing inside one field. */
+        const val PHRASE_BONUS = 0.55
+
+        /** Score retained by an item matching only one term of a multi-term query. */
+        const val COVERAGE_FLOOR = 0.55
     }
 }

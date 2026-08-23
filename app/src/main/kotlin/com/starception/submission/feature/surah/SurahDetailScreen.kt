@@ -4800,6 +4800,14 @@ private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.65f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
 /** Ornament height as a fraction of the slot height. */
 private const val MARKER_ORNAMENT_FILL = 0.92f
+
+/**
+ * Pause-mark height as a fraction of the medallion it sits over.
+ *
+ * Print sets these signs small — they are an annotation on the verse, not part of it —
+ * and a mark much larger than this reads as a second ornament stacked on the first.
+ */
+private const val PAUSE_MARK_SIZE_FRACTION = 0.5f
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
 private const val MARKER_ASPECT = 1332f / 1418f
 /** Gap reserved in the text flow on each side of the ornament. This sets how
@@ -5217,7 +5225,62 @@ private data class MarkerGeometry(
     val top: Float,
     val w: Float,
     val h: Float,
+    /** Waqf sign printed above this ayah's medallion; empty when the ayah has none. */
+    val pauseMark: String = "",
 )
+
+/**
+ * Separates the ayah digits from the pause mark inside one marker slot's text.
+ *
+ * INVISIBLE SEPARATOR carries no width and no joining behaviour, and the slot's
+ * characters are replaced by the medallion anyway — the string exists only so the
+ * geometry pass and the painter can read back what the builder put in.
+ */
+private const val PAUSE_MARK_SEPARATOR = '\u2063'
+
+/**
+ * A sign the IndoPak edition prints above the line rather than in it.
+ *
+ * The waqf letters (U+0615 ط, U+06D6-U+06DC صلے ج لا م ۛ, U+06E9 sajdah) are combining
+ * marks, and the private-use range is where this edition's font keeps its compound stop
+ * signs. Both are printed above their word — or, at an ayah's end, above its medallion.
+ */
+private fun Char.isPauseMark(): Boolean =
+    this == '\u0615' || this in '\u06D6'..'\u06DC' || this == '\u06E9' ||
+        this in '\uE000'..'\uF8FF'
+
+/**
+ * Splits an ayah into the text the line sets and the pause mark that belongs above its
+ * end medallion.
+ *
+ * The source text ends these ayahs with SPACE + mark + RIGHT-TO-LEFT MARK. A combining
+ * mark preceded by a space has no base letter to sit on, so the shaper gives it a box of
+ * its own: it floated mid-line as a stray glyph, and its two spaces became justification
+ * expansion points that pulled the surrounding words apart. Taking it out of the flow
+ * fixes the spacing as well as the placement — the printed Mushaf sets it over the
+ * medallion, which is what [MarkerGeometry.pauseMark] is for.
+ */
+private fun splitTrailingPauseMark(raw: String): Pair<String, String> {
+    var end = raw.length
+    val marks = StringBuilder()
+    while (end > 0) {
+        val c = raw[end - 1]
+        when {
+            // Direction and width controls sit between the mark and the word.
+            c == '\u200F' || c == '\u200E' || c == '\u200B' || c == '\uFEFF' ||
+                c.isWhitespace() ->
+                end--
+
+            c.isPauseMark() -> {
+                marks.append(c)
+                end--
+            }
+
+            else -> return raw.substring(0, end) to marks.reverse().toString()
+        }
+    }
+    return "" to marks.reverse().toString()
+}
 
 
 /**
@@ -5305,7 +5368,10 @@ private fun computeInkMarkerGeometries(
         if (rect == null) return@forEachIndexed
         val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
         if (annotation.item == MUSHAF_LINE_FILLER_TAG) return@forEachIndexed
-        val digits = pageText.text.substring(annotation.start, annotation.end)
+        // The slot holds the digits and, after the separator, the ayah's pause mark.
+        val slotText = pageText.text.substring(annotation.start, annotation.end)
+        val digits = slotText.substringBefore(PAUSE_MARK_SEPARATOR)
+        val pauseMark = slotText.substringAfter(PAUSE_MARK_SEPARATOR, "")
         val h = rect.height * MARKER_ORNAMENT_FILL
         val w = h * MARKER_ASPECT
 
@@ -5511,6 +5577,7 @@ private fun computeInkMarkerGeometries(
                 top = rect.top + (rect.height - h) / 2f + translationOpticalOffsetY,
                 w = w,
                 h = h,
+                pauseMark = pauseMark,
             ),
         )
         }
@@ -5754,6 +5821,16 @@ private fun MushafPageWithFrame(
     // localized digits, and the char range locates each marker in the page
     // text so the drawing pass can find the neighbouring words.
     val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
+
+    // The page's own Quran face as a platform Typeface, for the pause marks the marker
+    // pass paints straight onto the canvas. Resolved through the same resolver the Text
+    // uses, so a font switch in reading settings carries to the marks with it.
+    val fontResolver = androidx.compose.ui.platform.LocalFontFamilyResolver.current
+    val arabicTypeface: android.graphics.Typeface? = remember(fontResolver, arabicTextStyle.fontFamily) {
+        runCatching {
+            fontResolver.resolve(arabicTextStyle.fontFamily).value as? android.graphics.Typeface
+        }.getOrNull()
+    }
 
     // PageCurl caches its page draw. Starting this value at zero and animating it
     // after the first draw left the initial page permanently marker-less; returning
@@ -6057,6 +6134,31 @@ private fun MushafPageWithFrame(
                             }
                             val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
                             canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
+
+                            // The pause mark sits over the medallion, as it does in
+                            // print. Drawn in the page's own Quran face: the compound
+                            // stop signs live in that font's private-use range and would
+                            // come out as tofu in any other.
+                            if (g.pauseMark.isNotEmpty() && !g.isTranslation) {
+                                val markPaint = android.graphics.Paint(
+                                    android.graphics.Paint.ANTI_ALIAS_FLAG,
+                                ).apply {
+                                    color = markerColor.toArgb()
+                                    alpha = (255 * markerAlpha).toInt()
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                    textSize = g.h * PAUSE_MARK_SIZE_FRACTION
+                                    typeface = arabicTypeface
+                                }
+                                canvas.nativeCanvas.drawText(
+                                    g.pauseMark,
+                                    g.centerX,
+                                    // Its own descent lifts the glyph clear of the
+                                    // medallion's outer flourish rather than resting on
+                                    // the ring, which is where print sets it.
+                                    g.top - markPaint.descent(),
+                                    markPaint,
+                                )
+                            }
                         }
                     }
                 }
@@ -6274,7 +6376,12 @@ private fun MushafPagerView(
                 // disagreed with the text whenever an append changed its length (Tajweed's
                 // applyWithOverlap does), so every later ayah drifted and a tap resolved early.
                 val ayahStart = length
-                val arabicText = ayah.text.split("\n\n").getOrNull(0) ?: ayah.text
+                // The pause mark is lifted out of the text and set above the medallion
+                // instead — see splitTrailingPauseMark. Only trailing characters are
+                // removed, so the Tajweed annotation offsets below still line up.
+                val (arabicText, pauseMark) = splitTrailingPauseMark(
+                    ayah.text.split("\n\n").getOrNull(0) ?: ayah.text,
+                )
                 pushStringAnnotation(
                     tag = MUSHAF_ARABIC_AYAH_TAG,
                     annotation = ayah.numberInSurah.toString(),
@@ -6346,15 +6453,24 @@ private fun MushafPagerView(
                     append(' ')
                 } else {
                     val digits = markerDigitsFor(ayah.numberInSurah)
+                    // The slot's own characters are never drawn — the medallion covers
+                    // them — so the pause mark rides along inside it. That keeps the mark
+                    // tied to its ayah through pagination, where a page slice would lose
+                    // any side table keyed by position.
+                    val slotText = if (pauseMark.isEmpty()) {
+                        digits
+                    } else {
+                        digits + PAUSE_MARK_SEPARATOR + pauseMark
+                    }
                     // Normally the marker stays attached to the Arabic ending.
                     append('⁠')
                     val markerStart = length
-                    appendInlineContent("ayahOrnament", digits)
+                    appendInlineContent("ayahOrnament", slotText)
                     placeholderRanges.add(
                         androidx.compose.ui.text.AnnotatedString.Range(
                             ornamentPlaceholder,
                             markerStart,
-                            markerStart + digits.length,
+                            markerStart + slotText.length,
                         ),
                     )
                     // A regular space becomes a justification expansion point.

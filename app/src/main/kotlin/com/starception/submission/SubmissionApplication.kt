@@ -419,13 +419,32 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
         // first keystroke pays ~160ms to build all four indices, so SQL hits
         // (fortress / ayahs) show before the in-memory hits — the gap is visible
         // to the user.
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        val searchIndexScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        searchIndexScope.launch {
             try {
                 inMemorySearchService.preload()
             } catch (e: Exception) {
                 Log.w("SubmissionApplication", "Search index preload failed", e)
             }
         }
+
+        // Content databases arrive after first launch — the Quran text and the Fortress
+        // invocations are downloaded rather than bundled — and an index built before they
+        // landed matches nothing from them. Coming back to the foreground is when that is
+        // most likely to have changed, and costs one file stat per source when it has not.
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(
+            object : androidx.lifecycle.DefaultLifecycleObserver {
+                override fun onStart(owner: androidx.lifecycle.LifecycleOwner) {
+                    searchIndexScope.launch {
+                        try {
+                            inMemorySearchService.refresh()
+                        } catch (e: Exception) {
+                            Log.w("SubmissionApplication", "Search index refresh failed", e)
+                        }
+                    }
+                }
+            },
+        )
 
         Log.d("SubmissionApplication", "Application onCreate completed")
         

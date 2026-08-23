@@ -1273,18 +1273,26 @@ private data class RenderableSection(
 )
 
 // Fixed priors for SQL sources so they sort sensibly when in-memory hits don't
-// dominate. Anything above ~20 represents a strong in-memory match; below that,
-// these priors keep the natural order: ayahs > fortress > topics > news.
-private const val SQL_AYAH_PRIOR = 18.0
-private const val SQL_FORTRESS_PRIOR = 16.0
-private const val FTS_TOPICS_PRIOR = 14.0
-private const val FTS_NEWS_PRIOR = 12.0
+// dominate. These share the in-memory indices' 0..1 confidence scale: a hit
+// above ~0.65 is a strong, specific in-memory match and outranks them, while
+// weaker ones fall below and the natural order holds: ayahs > fortress >
+// topics > news. (They were 18/16/14/12 when in-memory scores were unbounded
+// sums; left there, every SQL section would now outrank every in-memory one.)
+private const val SQL_AYAH_PRIOR = 0.60
+private const val SQL_FORTRESS_PRIOR = 0.54
+private const val FTS_TOPICS_PRIOR = 0.46
+private const val FTS_NEWS_PRIOR = 0.40
 
 // Boost applied when the raw query contains a kind word ("surah", "dua",
-// "verse") matching the section. Calibrated to bring a fuzzy-only in-memory
-// match (≈8–13) above the SQL priors so user intent ("Surah imran" → Surahs)
-// pins reliably without over-promoting incidental matches.
-private const val INTENT_BOOST = 25.0
+// "verse") matching the section, so user intent ("Surah imran" → Surahs) pins
+// reliably without over-promoting incidental matches.
+//
+// Half the scale, because the in-memory indices now score 0..1 rather than in
+// arbitrary magnitudes: it lifts a fuzzy-only match (≈0.4-0.6) above ordinary
+// competition, while a near-perfect match in another section can still hold its
+// place. The old value of 25 was calibrated against raw sums and would now make
+// the boost absolute rather than strong.
+private const val INTENT_BOOST = 0.5
 
 
 private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String, subtitleColor: Int) {
