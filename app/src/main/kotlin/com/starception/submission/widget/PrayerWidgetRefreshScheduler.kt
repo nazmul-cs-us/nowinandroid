@@ -18,9 +18,12 @@ package com.starception.submission.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,10 +42,11 @@ private const val TAG = "PrayerWidgetRefresh"
  * So the widget drives its own cadence instead. Two triggers, because they cover
  * different failure modes:
  *
- *  - **A repeating alarm**, re-armed each time it fires, bounding drift while the screen
- *    is on. [setWindow] rather than an exact alarm deliberately: exact alarms need
- *    SCHEDULE_EXACT_ALARM on Android 12+ and are a poor trade for a display refresh, and
- *    the window lets the system batch this with other work.
+ *  - **A minute-aligned alarm**, re-armed each time it fires, keeping the static
+ *    RemoteViews countdown in step with the wall clock while the screen is on. The app
+ *    already has exact-alarm access for its prayer notifications, so the widget can use
+ *    the same capability instead of [AlarmManager.setWindow], whose sub-ten-minute
+ *    windows are expanded by Android 12+ and cannot provide a one-minute cadence.
  *
  *  - **Unlock**, because the alarm is the part the system is entitled to defer. Doze
  *    holds alarms while the screen is off, which is harmless — nobody is reading the
@@ -54,15 +58,12 @@ internal object PrayerWidgetRefreshScheduler {
     /**
      * How often the card re-reads while in use.
      *
-     * Five minutes is the compromise between the two things that go wrong at the ends: a
-     * minute would be honest to the displayed figure but is far more wake-ups than a
-     * home-screen readout justifies, and anything much longer starts showing a countdown
-     * the user can see is wrong.
+     * The countdown is rendered as static RemoteViews text, so it has to be redrawn once
+     * per minute to remain accurate. The alarm is non-wakeup: it will not wake a sleeping
+     * device just to redraw a home screen nobody can see. ACTION_USER_PRESENT handles the
+     * first redraw after sleep.
      */
-    private const val INTERVAL_MILLIS = 5 * 60 * 1000L
-
-    /** Slack the system may use to batch this with other pending work. */
-    private const val WINDOW_MILLIS = 60 * 1000L
+    private const val INTERVAL_MILLIS = 60 * 1000L
 
     fun schedule(context: Context) {
         val appContext = context.applicationContext
@@ -71,15 +72,37 @@ internal object PrayerWidgetRefreshScheduler {
             Log.w(TAG, "No AlarmManager; widget will refresh only when the launcher asks")
             return
         }
+        val triggerAtMillis = nextMinuteBoundary(System.currentTimeMillis())
         try {
-            alarmManager.setWindow(
-                AlarmManager.RTC,
-                System.currentTimeMillis() + INTERVAL_MILLIS,
-                WINDOW_MILLIS,
-                pendingIntent(appContext),
-            )
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                alarmManager.canScheduleExactAlarms()
+            ) {
+                alarmManager.setExact(
+                    AlarmManager.RTC,
+                    triggerAtMillis,
+                    pendingIntent(appContext),
+                )
+            } else {
+                // Exact-alarm access can be revoked. Keep a best-effort refresh instead
+                // of allowing the widget to freeze until the launcher's 30-minute tick.
+                alarmManager.set(
+                    AlarmManager.RTC,
+                    triggerAtMillis,
+                    pendingIntent(appContext),
+                )
+                Log.w(TAG, "Exact alarm access unavailable; widget refresh is best-effort")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Could not schedule widget refresh", e)
+        }
+    }
+
+    /** Re-arm only while at least one prayer widget is actually placed. */
+    fun scheduleIfWidgetPlaced(context: Context) {
+        if (hasPlacedWidget(context)) {
+            schedule(context)
+        } else {
+            cancel(context)
         }
     }
 
@@ -104,6 +127,22 @@ internal object PrayerWidgetRefreshScheduler {
 
     private const val REQUEST_CODE = 0x5A1A
     internal const val ACTION_REFRESH = "com.starception.submission.widget.ACTION_REFRESH_WIDGET"
+
+    private fun nextMinuteBoundary(nowMillis: Long): Long =
+        ((nowMillis / INTERVAL_MILLIS) + 1L) * INTERVAL_MILLIS
+
+    private fun hasPlacedWidget(context: Context): Boolean {
+        val manager = AppWidgetManager.getInstance(context.applicationContext)
+        return listOf(
+            PrayerTimesTinyWidgetReceiver::class.java,
+            PrayerTimesSmallWidgetReceiver::class.java,
+            PrayerTimesWidgetReceiver::class.java,
+            PrayerTimesLargeWidgetReceiver::class.java,
+            PrayerTimesFullWidgetReceiver::class.java,
+        ).any { receiver ->
+            manager.getAppWidgetIds(ComponentName(context, receiver)).isNotEmpty()
+        }
+    }
 }
 
 /**
@@ -127,7 +166,7 @@ class PrayerWidgetRefreshReceiver : BroadcastReceiver() {
             } finally {
                 // Re-armed even on failure: a refresh that threw is the case where
                 // stopping would leave the card frozen for good.
-                PrayerWidgetRefreshScheduler.schedule(appContext)
+                PrayerWidgetRefreshScheduler.scheduleIfWidgetPlaced(appContext)
                 pendingResult.finish()
             }
         }

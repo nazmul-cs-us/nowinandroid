@@ -90,6 +90,10 @@ private val FooterFrostedBackground = DayNightColorProvider(
   androidx.compose.ui.graphics.Color(0xE6283041),
 )
 
+/** Soft frosted transitions framing the scrollable reminder content. */
+private val HeaderFadeHeight = 16.dp
+private val FooterFadeHeight = 20.dp
+
 /**
  * A layout focused on presenting text only content.
  *
@@ -262,6 +266,11 @@ private fun TextStack(
     LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
       item {
         Column(modifier = GlanceModifier.maybeClickable(action)) {
+        // The header fade is always present because RemoteViews does not expose the
+        // launcher-managed LazyColumn scroll offset. Give it clear space initially so it
+        // cannot wash over the HADITH/DUA chip. This spacer scrolls away with the list;
+        // once it has gone, content moving under the header receives the intended fade.
+        Spacer(modifier = GlanceModifier.height(HeaderFadeHeight))
         // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
         // prayer widget beside it. Glance cannot carry a bundled font — see
         // widget_text_regular.xml — so the two cards were in different typefaces on the
@@ -328,7 +337,7 @@ private fun TextStack(
           provider = ImageProvider(R.drawable.widget_footer_fade),
           contentDescription = null,
           contentScale = ContentScale.FillBounds,
-          modifier = GlanceModifier.fillMaxWidth().height(16.dp),
+          modifier = GlanceModifier.fillMaxWidth().height(FooterFadeHeight),
         )
         Row(
           modifier = GlanceModifier
@@ -374,7 +383,7 @@ private fun TextStack(
       provider = ImageProvider(R.drawable.widget_header_fade),
       contentDescription = null,
       contentScale = ContentScale.FillBounds,
-      modifier = GlanceModifier.fillMaxWidth().height(12.dp),
+      modifier = GlanceModifier.fillMaxWidth().height(HeaderFadeHeight),
     )
   }
 }

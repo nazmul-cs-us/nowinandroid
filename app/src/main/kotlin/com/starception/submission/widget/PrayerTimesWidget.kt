@@ -110,6 +110,9 @@ private val GROUP_GAP_MIN = 10.dp
  */
 private val TITLE_BAR_MIN_WIDTH = 200.dp
 
+/** Transparent left space inside ic_location_pin.xml, compensated for optically. */
+private val LOCATION_PIN_OPTICAL_INSET = 3.dp
+
 /** The single-line layout's own inset — tighter than [WIDGET_PADDING], which it cannot afford. */
 /** [ExpressiveProgressBar]'s drawn height, which the height budget has to account for. */
 private const val PROGRESS_BAR_HEIGHT = 6f
@@ -477,9 +480,18 @@ private fun TitledSurface(
                 // the glyph a further 12dp in and leave the header looking lopsided. The
                 // difference lets the button's *glyph* line up with the text margin while
                 // its target still reaches the edge.
+                //
+                // The location vector itself starts 3dp inside its viewport. Pull its
+                // layout box left by that amount so the visible pin, rather than the
+                // transparent edge of the drawable, aligns with the content text below.
                 modifier = GlanceModifier
                     .fillMaxWidth()
-                    .padding(start = WIDGET_PADDING, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    .padding(
+                        start = WIDGET_PADDING - LOCATION_PIN_OPTICAL_INSET,
+                        end = 4.dp,
+                        top = 4.dp,
+                        bottom = 4.dp,
+                    ),
                 verticalAlignment = Alignment.Vertical.CenterVertically,
             ) {
                 Image(

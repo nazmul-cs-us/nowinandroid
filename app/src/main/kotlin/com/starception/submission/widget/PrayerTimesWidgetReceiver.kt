@@ -73,12 +73,10 @@ abstract class BasePrayerWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        // Last widget of this size removed. The alarm is shared by every size, so it is
-        // only really spent once nothing is left on any home screen — cancelling here
-        // would stop refreshing the other sizes too. Re-scheduling instead keeps the
-        // cadence alive for whatever remains, and the alarm costs nothing if the
-        // redraw finds no widgets: Glance treats an empty widget set as a no-op.
-        PrayerWidgetRefreshScheduler.schedule(context)
+        // The alarm is shared by every size. Keep it while another prayer widget remains,
+        // but cancel it after the last one is removed so a minute cadence cannot continue
+        // waking the app process with nothing to draw.
+        PrayerWidgetRefreshScheduler.scheduleIfWidgetPlaced(context)
     }
 
     private companion object {

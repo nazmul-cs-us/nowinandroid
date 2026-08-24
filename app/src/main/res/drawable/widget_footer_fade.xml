@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?><!-- Soft three-stop fade into the citation surface. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
         android:angle="270"
-        android:endColor="#E6ECF0FF"
+        android:centerColor="#73ECF0FF"
+        android:endColor="#F2ECF0FF"
         android:startColor="#00ECF0FF"
         android:type="linear" />
 </shape>
