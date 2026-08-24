@@ -939,6 +939,33 @@ fun SurahDetailScreen(
                             }
                         } else baseAyahs
                     }
+                    // Tajweed offsets are authored against the Uthmani text, so they have
+                    // to travel with it: swapping the edition underneath them left every
+                    // rule pointing at whatever sat at that index in the other spelling —
+                    // the silent-lam colour landed on the following rāʾ, and other rules
+                    // on bare vowels, which reads as colour bleeding across a ligature.
+                    val pageTajweed = remember(num, baseAyahs, pageAyahs, tajweedAnnotations) {
+                        if (pageAyahs === baseAyahs) {
+                            tajweedAnnotations
+                        } else {
+                            val indoPakByNumber = pageAyahs.associate {
+                                it.numberInSurah to it.text.substringBefore("\n\n")
+                            }
+                            baseAyahs.mapNotNull { ayah ->
+                                val rules = tajweedAnnotations[ayah.numberInSurah]
+                                    ?: return@mapNotNull null
+                                val target = indoPakByNumber[ayah.numberInSurah]
+                                    ?: return@mapNotNull null
+                                ayah.numberInSurah to
+                                    com.starception.submission.feature.surah.tajweed
+                                        .TajweedEditionMapper.remap(
+                                            sourceText = ayah.text.substringBefore("\n\n"),
+                                            targetText = target,
+                                            annotations = rules,
+                                        )
+                            }.toMap()
+                        }
+                    }
                 AlbumPlayerContent(
                     surah = pageSurah,
                     ayahs = pageAyahs,
@@ -959,7 +986,7 @@ fun SurahDetailScreen(
                     showTranslationInText = showTranslationInText,
                     showBismillahRow = showBismillahRow,
                     showTajweed = showTajweed,
-                    tajweedAnnotations = tajweedAnnotations,
+                    tajweedAnnotations = pageTajweed,
                     onToggleTajweed = {
                         if (!showTajweed && !viewModel.isTajweedAvailable) {
                             Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()

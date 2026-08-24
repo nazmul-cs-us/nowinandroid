@@ -133,7 +133,7 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         repository.getCachedPrayerTimes()
             ?: recalculateForToday(repository, entryPoint.prayerTimeCalculatorService())
         )
-        ?.withUserOffsets(repository.getCalculationSettings().timeOffsets)
+        ?.withUserOffsets(repository.getCalculationSettingsFromStorage().timeOffsets)
         ?: return PrayerWidgetState.Unavailable
 
     return prayerTimes.toWidgetState(

@@ -694,6 +694,25 @@ class PrayerSettingsRepository @Inject constructor(
     fun getCalculationSettings(): PrayerCalculationSettings {
         return _calculationSettingsFlow.value  // No longer nullable
     }
+
+    /**
+     * Calculation settings that are guaranteed to reflect storage.
+     *
+     * [getCalculationSettings] serves the in-memory flow, which starts at defaults and is
+     * filled by the background load started in the constructor. Callers that run before
+     * that finishes therefore see a schedule with no offsets at all — which is what the
+     * home-screen widget saw, since it is built from a broadcast and reads within
+     * milliseconds of the repository being created. It showed prayer times minutes apart
+     * from the app for anyone who had tuned their schedule.
+     *
+     * Reads SharedPreferences directly when the load has not completed, so it must not be
+     * called on the main thread. Additive: the flow, its loading and its consumers are
+     * untouched.
+     */
+    fun getCalculationSettingsFromStorage(): PrayerCalculationSettings {
+        if (_settingsLoaded) return _calculationSettingsFlow.value
+        return loadCalculationSettings() ?: _calculationSettingsFlow.value
+    }
     
     fun getLocationPreferences(): PrayerLocationPreferences {
         return _locationPreferencesFlow.value  // No longer nullable
