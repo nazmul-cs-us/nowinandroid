@@ -251,6 +251,10 @@ private fun TextStack(
   // so the translucent surface and soft gradient are the widget-safe equivalent of a
   // frosted footer: text disappears gradually under it instead of being sliced against a
   // hard, solid strip.
+  // Two nested boxes because a Glance Box aligns every child the same way: the outer one
+  // keeps its default top alignment for the header fade, the inner one holds the list and
+  // the footer it is aligned to.
+  Box(modifier = GlanceModifier.fillMaxSize()) {
   Box(
     modifier = GlanceModifier.fillMaxSize(),
     contentAlignment = Alignment.BottomStart,
@@ -330,7 +334,11 @@ private fun TextStack(
           modifier = GlanceModifier
             .fillMaxWidth()
             .background(FooterFrostedBackground)
-            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 2.dp)
+            // Vertical padding only. The citation shares its column with the narration
+            // above, so a horizontal inset here reads as a second margin running down the
+            // card. The frosted surface still spans the full width — the strip bleeds,
+            // the words on it line up with the text.
+            .padding(top = 8.dp, bottom = 2.dp)
             .maybeClickable(action),
           verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -357,6 +365,17 @@ private fun TextStack(
         }
       }
     }
+    }
+    // Drawn last, so it sits over the list: the same soft edge the footer gives, at the
+    // top, where a line scrolling up was otherwise cut against the card's border. Shorter
+    // than the footer's fade because nothing sits under it to be read through — it only
+    // has to dissolve one line.
+    androidx.glance.Image(
+      provider = ImageProvider(R.drawable.widget_header_fade),
+      contentDescription = null,
+      contentScale = ContentScale.FillBounds,
+      modifier = GlanceModifier.fillMaxWidth().height(12.dp),
+    )
   }
 }
 

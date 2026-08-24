@@ -4799,7 +4799,7 @@ private const val MARKER_HEIGHT_EM = 1.2f
 private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.65f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
 /** Ornament height as a fraction of the slot height. */
-private const val MARKER_ORNAMENT_FILL = 0.92f
+private const val MARKER_ORNAMENT_FILL = 0.72f
 
 /**
  * Pause-mark height as a fraction of the medallion it sits over.
@@ -4807,7 +4807,49 @@ private const val MARKER_ORNAMENT_FILL = 0.92f
  * Print sets these signs small — they are an annotation on the verse, not part of it —
  * and a mark much larger than this reads as a second ornament stacked on the first.
  */
-private const val PAUSE_MARK_SIZE_FRACTION = 0.5f
+private const val PAUSE_MARK_SIZE_FRACTION = 0.62f
+
+/**
+ * Clearance between the lowest ink of the pause sign and the medallion's top edge, as a
+ * fraction of the medallion's height.
+ *
+ * This is what [MARKER_ORNAMENT_FILL] was reduced for: the medallion no longer fills its
+ * slot, and the room that frees inside the line is where the sign goes, the way the
+ * printed page stacks them.
+ */
+private const val PAUSE_MARK_GAP = 0.06f
+
+/**
+ * The letters a pause sign is printed as.
+ *
+ * The source encodes these as combining marks (SMALL HIGH TAH, SMALL HIGH LAM ALEF, and
+ * so on), which exist to sit on a base letter. Standing alone they will not shape at all
+ * — neither Canvas.drawText nor a Compose Text draws anything for them, verified on
+ * device with the glyph reaching the painter and its box measuring zero width. What the
+ * printed Mushaf actually sets above the medallion is the ordinary letter each sign
+ * abbreviates, so that is what is drawn.
+ *
+ * The edition's private-use signs are compound forms with no letter equivalent; they are
+ * passed through, since those slots do hold real spacing glyphs in this font.
+ */
+private fun pauseMarkGlyph(mark: String): String = buildString {
+    mark.forEach { character ->
+        append(
+            when (character) {
+                'ؕ' -> "ط"
+                'ۖ' -> "صلے"
+                'ۗ' -> "قلے"
+                'ۘ' -> "م"
+                'ۙ' -> "لا"
+                'ۚ' -> "ج"
+                'ۛ' -> "∴"
+                'ۜ' -> "س"
+                '۩' -> "۩"
+                else -> character.toString()
+            },
+        )
+    }
+}
 /** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
 private const val MARKER_ASPECT = 1332f / 1418f
 /** Gap reserved in the text flow on each side of the ornament. This sets how
@@ -6119,6 +6161,12 @@ private fun MushafPageWithFrame(
                 ) {
                     val geoms = inkGeometries ?: return@Canvas
                     if (markerAlpha <= 0.01f) return@Canvas
+                    android.util.Log.d(
+                        "WaqfDebug",
+                        "geoms=${geoms.size} withMark=${geoms.count { it.pauseMark.isNotEmpty() }} " +
+                            "typeface=${arabicTypeface != null} " +
+                            "marks=${geoms.joinToString { "${it.digits}:${it.pauseMark.map { c -> "U+%04X".format(c.code) }}" }}",
+                    )
                     for (g in geoms) {
                         drawIntoCanvas { canvas ->
                             val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -6135,11 +6183,13 @@ private fun MushafPageWithFrame(
                             val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
                             canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
 
-                            // The pause mark sits over the medallion, as it does in
-                            // print. Drawn in the page's own Quran face: the compound
-                            // stop signs live in that font's private-use range and would
-                            // come out as tofu in any other.
-                            if (g.pauseMark.isNotEmpty() && !g.isTranslation) {
+                            // The pause sign, set over the medallion as print sets it.
+                            // Drawn as the letter it abbreviates: the source encodes these
+                            // as combining marks, which shape to nothing on their own —
+                            // neither this canvas nor a Compose Text would draw them,
+                            // verified on device. The letter is ordinary text and renders.
+                            val pauseGlyph = pauseMarkGlyph(g.pauseMark)
+                            if (pauseGlyph.isNotEmpty() && !g.isTranslation) {
                                 val markPaint = android.graphics.Paint(
                                     android.graphics.Paint.ANTI_ALIAS_FLAG,
                                 ).apply {
@@ -6149,19 +6199,24 @@ private fun MushafPageWithFrame(
                                     textSize = g.h * PAUSE_MARK_SIZE_FRACTION
                                     typeface = arabicTypeface
                                 }
+                                // Positioned by the glyph's own ink, not by a shared
+                                // baseline: ج and م carry tails below the baseline while
+                                // لا and ط do not, so one baseline for all of them left
+                                // the tailed signs resting on the ornament. Measuring puts
+                                // the lowest ink of every sign the same distance clear.
+                                val inkBounds = android.graphics.Rect()
+                                markPaint.getTextBounds(pauseGlyph, 0, pauseGlyph.length, inkBounds)
                                 canvas.nativeCanvas.drawText(
-                                    g.pauseMark,
+                                    pauseGlyph,
                                     g.centerX,
-                                    // Its own descent lifts the glyph clear of the
-                                    // medallion's outer flourish rather than resting on
-                                    // the ring, which is where print sets it.
-                                    g.top - markPaint.descent(),
+                                    g.top - g.h * PAUSE_MARK_GAP - inkBounds.bottom,
                                     markPaint,
                                 )
                             }
                         }
                     }
                 }
+
             }
 
         }

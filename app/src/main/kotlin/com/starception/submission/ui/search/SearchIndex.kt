@@ -254,9 +254,15 @@ class FieldWeightedIndex<T>(
         queryTokens.forEachIndexed { tIdx, token ->
             val isLast = tIdx == queryTokens.size - 1
             val idf = inverseDocumentFrequency(token)
-            // What this term would earn from a perfect hit: exact, in the
-            // heaviest field, in a field short enough that the term is most of it.
-            idealScore += idf * START_OF_WORD_BONUS * BEST_LENGTH_NORMALISATION
+            // What this term earns from a plain exact hit in the heaviest field, at
+            // that field's average length. Deliberately reachable: scoring against the
+            // shortest conceivable field and a start-of-word bonus on top made the
+            // ceiling unattainable, so real matches came out fractions of it — "anam"
+            // matched Surah Al-Anaam and still scored below the fixed prior of a section
+            // whose entries only matched the word "name". A hit better than this ideal
+            // (start of word, unusually short field) clamps at 1.0, which is correct:
+            // certainty does not keep growing.
+            idealScore += idf * AVERAGE_LENGTH_NORMALISATION
 
             // Best match quality per (item, field). A term is credited once per field,
             // at its strongest reading: an exact hit is never diluted by also having
@@ -543,8 +549,11 @@ class FieldWeightedIndex<T>(
         const val LENGTH_K1 = 1.2
         const val LENGTH_B = 0.75
 
-        /** Length normalisation for the shortest plausible field — the ideal case. */
-        const val BEST_LENGTH_NORMALISATION = (LENGTH_K1 + 1.0) / (1.0 + LENGTH_K1 * (1.0 - LENGTH_B))
+        /**
+         * Length normalisation at a field of average length — the reference point the
+         * final score is expressed against.
+         */
+        const val AVERAGE_LENGTH_NORMALISATION = (LENGTH_K1 + 1.0) / (1.0 + LENGTH_K1)
 
         /** Weight of a whole-query substring landing inside one field. */
         const val PHRASE_BONUS = 0.55

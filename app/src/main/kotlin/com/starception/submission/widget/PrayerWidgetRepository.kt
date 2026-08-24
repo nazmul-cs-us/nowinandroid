@@ -25,6 +25,7 @@ import com.starception.submission.feature.prayertimes.prayerWindowProgress
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.Location
+import com.starception.submission.feature.prayertimes.utils.applyOffsetToTime
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -128,8 +129,11 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
     )
     val repository = entryPoint.prayerSettingsRepository()
 
-    val prayerTimes = repository.getCachedPrayerTimes()
-        ?: recalculateForToday(repository, entryPoint.prayerTimeCalculatorService())
+    val prayerTimes = (
+        repository.getCachedPrayerTimes()
+            ?: recalculateForToday(repository, entryPoint.prayerTimeCalculatorService())
+        )
+        ?.withUserOffsets(repository.getCalculationSettings().timeOffsets)
         ?: return PrayerWidgetState.Unavailable
 
     return prayerTimes.toWidgetState(
@@ -138,6 +142,25 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         insight = prayerTimes.toInsight(repository),
     )
 }
+
+/**
+ * The user's per-prayer adjustments, applied.
+ *
+ * The cache holds the astronomical result, not what the app displays: the screens apply
+ * the offsets themselves when they render. The widget read the cache straight and so
+ * showed times minutes apart from the app for anyone who had tuned their schedule — with
+ * a +3m Dhuhr and a +15m Fajr set, the card was wrong by exactly those amounts. Applied
+ * once, here, so everything downstream — the schedule, the countdown, the insight and the
+ * weather lookup — works from the same times the app shows.
+ */
+private fun DayPrayerTimes.withUserOffsets(offsets: PrayerTimeOffsets): DayPrayerTimes = copy(
+    fajr = applyOffsetToTime(fajr, offsets.fajr),
+    sunrise = applyOffsetToTime(sunrise, offsets.sunrise),
+    dhuhr = applyOffsetToTime(dhuhr, offsets.dhuhr),
+    asr = applyOffsetToTime(asr, offsets.asr),
+    maghrib = applyOffsetToTime(maghrib, offsets.maghrib),
+    isha = applyOffsetToTime(isha, offsets.isha),
+)
 
 /**
  * Meteocon and temperature for the hour nearest each prayer.
@@ -248,9 +271,9 @@ internal fun DayPrayerTimes.toInsight(repository: PrayerSettingsRepository): Pra
     return SmartContentUtils.getNotificationSyncContent(
         prayerTimes = this,
         currentTime = LocalTime.now(),
-        // Deliberately zero. The generator applies offsets to whatever times it is
-        // given, and these times came from the cache with offsets already applied —
-        // passing them again would shift every prayer by twice the user's adjustment.
+        // Deliberately zero: withUserOffsets has already applied the adjustments to
+        // these times at the load site, and the generator would otherwise apply them a
+        // second time, moving every prayer by twice what the user set.
         timeOffsets = PrayerTimeOffsets(),
         goToMosqueDurationMinutes = { prayer ->
             when (prayer) {
