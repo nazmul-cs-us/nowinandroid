@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Current titled prayer-window hero for the 4x2 picker entry. -->
+<!-- Current Daily Reminder hierarchy for Android 12+ widget pickers. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/prayer_widget_background"
-    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="10dp"
+    android:padding="10dp"
     tools:ignore="HardcodedText">
 
     <LinearLayout
@@ -21,7 +19,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:contentDescription="@null"
-            android:src="@drawable/ic_location_pin"
+            android:src="@drawable/sample_text_icon"
             android:tint="@color/prayer_widget_accent" />
 
         <TextView
@@ -32,90 +30,69 @@
             android:fontFamily="@font/ubuntu_sans"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="Al Safouh Second"
+            android:text="Daily Reminder"
             android:textColor="@color/prayer_widget_on_background"
             android:textSize="12sp"
             android:textStyle="bold" />
 
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:contentDescription="@null"
             android:src="@drawable/sample_refresh_icon"
             android:tint="@color/prayer_widget_muted" />
     </LinearLayout>
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_height="24dp"
         android:layout_marginTop="7dp"
+        android:background="@drawable/prayer_widget_chip_background"
         android:fontFamily="@font/ubuntu_sans"
+        android:gravity="center"
         android:includeFontPadding="false"
-        android:maxLines="1"
-        android:text="Make Time for Isha"
-        android:textColor="@color/prayer_widget_on_background"
-        android:textSize="17sp"
+        android:paddingHorizontal="10dp"
+        android:text="HADITH"
+        android:textColor="@color/prayer_widget_on_card"
+        android:textSize="9sp"
         android:textStyle="bold" />
 
     <TextView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
         android:fontFamily="@font/ubuntu_sans"
         android:includeFontPadding="false"
-        android:text="1h 43m since Isha"
-        android:textColor="@color/prayer_widget_accent"
-        android:textSize="13sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/prayer_widget_preview_progress_active" />
-
-        <ImageView
-            android:layout_width="4dp"
-            android:layout_height="match_parent" />
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="4"
-            android:background="@drawable/prayer_widget_preview_progress_track" />
-    </LinearLayout>
+        android:maxLines="4"
+        android:text="The Prophet ﷺ taught us to bring mindfulness and kindness into our daily actions."
+        android:textColor="@color/prayer_widget_on_background"
+        android:textSize="12sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="Bukhari"
+            android:textColor="@color/prayer_widget_muted"
+            android:textSize="9sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="@font/ubuntu_sans"
             android:includeFontPadding="false"
-            android:text="Next Prayer"
-            android:textColor="@color/prayer_widget_accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:gravity="end"
-            android:includeFontPadding="false"
-            android:text="Fajr in 6h 46m"
-            android:textColor="@color/prayer_widget_on_background"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:text="#154 · Ablutions"
+            android:textColor="@color/prayer_widget_muted"
+            android:textSize="9sp" />
     </LinearLayout>
 </LinearLayout>

@@ -1,41 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Picker preview for the 2x1 entry.
-
-     Colours come from the prayer_widget_* tokens, which were sampled out of
-     platform-samples' own preview assets so these entries sit in the picker with the
-     same surface and text colours as the ported widgets. -->
+<!-- Current 2x1 prayer-window layout for the widget picker. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/prayer_widget_background"
     android:gravity="center_vertical"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:paddingHorizontal="12dp"
-    android:paddingVertical="10dp"
+    android:paddingVertical="8dp"
     tools:ignore="HardcodedText">
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Asr"
-            android:textColor="@color/prayer_widget_accent"
-            android:textSize="14sp"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Make Time for Isha"
+            android:textColor="@color/prayer_widget_on_background"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end"
-            android:text="4:12 PM"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="1h 43m since Isha"
+            android:textColor="@color/prayer_widget_muted"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="end"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="NEXT"
+            android:textColor="@color/prayer_widget_accent"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="Fajr · 6h 46m"
             android:textColor="@color/prayer_widget_on_background"
-            android:textSize="14sp" />
+            android:textSize="11sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

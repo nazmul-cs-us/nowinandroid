@@ -16,6 +16,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewImage="@drawable/sample_long_text_preview"
+    android:previewLayout="@layout/daily_reminder_widget_preview"
     android:maxResizeHeight="@dimen/sample_long_text_max_resize_height"
     android:maxResizeWidth="@dimen/sample_long_text_max_resize_width"
     android:targetCellWidth="@integer/sample_long_text_target_cell_width"
