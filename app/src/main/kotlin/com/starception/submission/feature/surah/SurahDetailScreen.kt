@@ -29,6 +29,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.graphics.toPixelMap
@@ -106,6 +107,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.Canvas
@@ -5684,6 +5686,11 @@ private fun computeInkMarkerGeometries(
 @Composable
 private fun MushafPageWithFrame(
     pageText: AnnotatedString,
+    /**
+     * Tajweed rules for this page, painted over the finished layout rather than carried
+     * as colour spans — a span boundary inside a word breaks the cursive join.
+     */
+    tajweed: List<TajweedSpan> = emptyList(),
     arabicFont: String,
     arabicFontSize: Float,
     /** Page-specific leading used to fill complete pages vertically. */
@@ -6049,6 +6056,37 @@ private fun MushafPageWithFrame(
             }
 
 
+
+            // Tajweed, painted over the finished layout.
+            //
+            // The letters are drawn once, uncoloured, by the Text below; each rule then
+            // redraws that same layout in its own colour, clipped to the characters it
+            // covers. Because both passes share one TextLayoutResult, the shaping is
+            // identical — a rule can colour a nūn alone without the mīm before it losing
+            // its join, which is exactly what colour spans could not do.
+            pageLayout.value?.let { layout ->
+                if (tajweed.isNotEmpty()) {
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = horizontalPadding,
+                                end = horizontalPadding,
+                                top = topPadding + bismillahHeightDp,
+                                bottom = bottomPadding,
+                            ),
+                    ) {
+                        tajweed.forEach { span ->
+                            val start = span.start.coerceIn(0, layout.layoutInput.text.length)
+                            val end = span.end.coerceIn(start, layout.layoutInput.text.length)
+                            if (end <= start) return@forEach
+                            clipPath(layout.getPathForRange(start, end)) {
+                                drawText(textLayoutResult = layout, color = span.color)
+                            }
+                        }
+                    }
+                }
+            }
 
             Text(
                 text = pageText,
@@ -6832,6 +6870,8 @@ private fun MushafPagerView(
                 val pageNumber: Int,
                 val showBismillah: Boolean,
                 val ayahRanges: List<Pair<Int, IntRange>>,
+                /** Rules for this page's characters, painted over the finished layout. */
+                val tajweed: List<TajweedSpan> = emptyList(),
                 /**
                  * Full Mushaf pages distribute the otherwise-unused fraction of
                  * a final line between their existing lines. TextAlign.Justify
@@ -6848,7 +6888,7 @@ private fun MushafPagerView(
             ) {
                 if (masterString.text.isEmpty() || availableWidthPx <= 0f || fullPageHeightPx <= 0f) {
                     return@remember listOf(
-                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges)
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed)
                     )
                 }
 
@@ -6864,7 +6904,7 @@ private fun MushafPagerView(
 
                 if (fullLayout.lineCount == 0) {
                     return@remember listOf(
-                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges)
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed)
                     )
                 }
 
@@ -6941,6 +6981,16 @@ private fun MushafPagerView(
 
                     val usedHeightPx =
                         fullLayout.getLineBottom(endLine) - fullLayout.getLineTop(currentLine)
+                    // Same slice the text took: a rule that straddles the page break is
+                    // clipped to the part that landed here, and one that fell entirely on
+                    // another page is dropped.
+                    val pageTajweed = markerData.tajweed.mapNotNull { span ->
+                        val start = maxOf(span.start, startCharIndex)
+                        val end = minOf(span.end, endCharIndex)
+                        if (end <= start) null
+                        else TajweedSpan(start - startCharIndex, end - startCharIndex, span.color)
+                    }
+
                     val isFinalPage = endCharIndex >= masterString.length
                     val lineGapCount = (linesOnPage - 1).coerceAtLeast(0)
                     // Leave one physical dp for float/rounding differences between
@@ -6964,6 +7014,7 @@ private fun MushafPagerView(
                         pageNumber = pageNum,
                         showBismillah = showBismillah && pageNum == 1,
                         ayahRanges = pageAyahRanges,
+                        tajweed = pageTajweed,
                         lineHeightSp = stretchedLineHeightSp,
                     ))
 
@@ -7234,6 +7285,7 @@ private fun MushafPagerView(
                     val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
                     MushafPageWithFrame(
                         pageText = page.text,
+                        tajweed = page.tajweed,
                         inlineContent = pageInlineContent,
                         inkGeometries = if (pageIndex == state.current) {
                             currentPageGeometry
