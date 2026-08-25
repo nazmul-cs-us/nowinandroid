@@ -79,6 +79,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +96,7 @@ import androidx.compose.ui.graphics.Color
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -102,6 +104,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.LayoutDirection
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
@@ -1435,14 +1438,19 @@ private fun HadithContent(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text(
-                                        text = hadith.textArabic,
-                                        fontFamily = arabicFontFamily,
-                                        fontSize = 26.sp,
-                                        lineHeight = 48.sp,
-                                        textAlign = TextAlign.Center,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    CompositionLocalProvider(
+                                        LocalLayoutDirection provides LayoutDirection.Rtl,
+                                    ) {
+                                        Text(
+                                            text = normalizeHadithParagraphs(hadith.textArabic),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            fontFamily = arabicFontFamily,
+                                            fontSize = 26.sp,
+                                            lineHeight = 48.sp,
+                                            textAlign = TextAlign.End,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
 
                                     if (translatedArabic != null && selectedLanguage != "ar") {
                                         Spacer(modifier = Modifier.height(16.dp))
@@ -1460,25 +1468,34 @@ private fun HadithContent(
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = translatedArabic,
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontSize = 16.sp,
-                                                lineHeight = 26.sp
-                                            ),
-                                            textAlign = TextAlign.Center,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        val translationDirection = hadithLayoutDirection(selectedLanguage)
+                                        CompositionLocalProvider(
+                                            LocalLayoutDirection provides translationDirection,
+                                        ) {
+                                            Text(
+                                                text = normalizeHadithParagraphs(translatedArabic),
+                                                modifier = Modifier.fillMaxWidth(),
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontSize = 16.sp,
+                                                    lineHeight = 26.sp,
+                                                ),
+                                                textAlign = hadithTextAlignment(selectedLanguage),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                         HadithSection.TRANSLATION -> {
-                            val displayText = translatedText ?: hadith.textPlain ?: ""
+                            val displayText = normalizeHadithParagraphs(
+                                translatedText ?: hadith.textPlain.orEmpty(),
+                            )
                             HadithSectionCard(
                                 title = "Translation (${getLanguageName(selectedLanguage)})",
                                 accentColor = MaterialTheme.colorScheme.primary,
                                 content = displayText,
+                                contentLanguage = selectedLanguage,
                                 isLoading = isTranslating && translatedText == null,
                                 showDragHandle = true,
                                 isDragging = isDragging,
@@ -1487,11 +1504,14 @@ private fun HadithContent(
                             )
                         }
                         HadithSection.EXPLANATION -> {
-                            val displayText = translatedElaboration ?: hadith.elaboration ?: ""
+                            val displayText = normalizeHadithParagraphs(
+                                translatedElaboration ?: hadith.elaboration.orEmpty(),
+                            )
                             HadithSectionCard(
                                 title = "Explanation (${getLanguageName(selectedLanguage)})",
                                 accentColor = MaterialTheme.colorScheme.secondary,
                                 content = displayText,
+                                contentLanguage = selectedLanguage,
                                 isExpanded = false,
                                 isLoading = isTranslating && translatedElaboration == null,
                                 showDragHandle = true,
@@ -1804,6 +1824,7 @@ private fun HadithSectionCard(
     title: String,
     accentColor: Color,
     content: String,
+    contentLanguage: String,
     isExpanded: Boolean = true,
     isLoading: Boolean = false,
     showDragHandle: Boolean = false,
@@ -1981,14 +2002,20 @@ private fun HadithSectionCard(
                                 }
                             }
                         } else {
-                            Text(
-                                text = content,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontSize = 15.sp,
-                                    lineHeight = 24.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            CompositionLocalProvider(
+                                LocalLayoutDirection provides hadithLayoutDirection(contentLanguage),
+                            ) {
+                                Text(
+                                    text = content,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontSize = 15.sp,
+                                        lineHeight = 24.sp,
+                                    ),
+                                    textAlign = hadithTextAlignment(contentLanguage),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -2165,6 +2192,27 @@ private enum class HadithSection {
     TRANSLATION,
     EXPLANATION
 }
+
+/** Keeps paragraph direction and its visual edge consistent for every Hadith language. */
+private fun hadithLayoutDirection(language: String): LayoutDirection =
+    if (language == "ar" || language == "ur") LayoutDirection.Rtl else LayoutDirection.Ltr
+
+private fun hadithTextAlignment(language: String): TextAlign =
+    if (hadithLayoutDirection(language) == LayoutDirection.Rtl) TextAlign.End else TextAlign.Start
+
+/**
+ * Bukhari source rows are wrapped at a fixed character width and often indent continuation
+ * lines. Those are storage-format breaks, not authored paragraphs. Remove the wrapping and
+ * indentation while retaining real blank-line paragraph boundaries.
+ */
+private fun normalizeHadithParagraphs(text: String): String = text
+    .replace("\r\n", "\n")
+    .replace('\r', '\n')
+    .trim()
+    .split(Regex("\\n\\s*\\n+"))
+    .joinToString("\n\n") { paragraph ->
+        paragraph.replace(Regex("\\s+"), " ").trim()
+    }
 
 
 @Composable

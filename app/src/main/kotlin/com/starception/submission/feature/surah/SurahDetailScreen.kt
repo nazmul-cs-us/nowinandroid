@@ -5285,6 +5285,23 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeWordRects(
     return result
 }
 
+/**
+ * One Tajweed rule's colour and the characters it covers, in the coordinates of whichever
+ * string carries it — the master string while paginating, page-local once sliced.
+ *
+ * Kept out of the [AnnotatedString] on purpose: a colour span that begins inside a word
+ * splits the shaping run, and Arabic letters either side of that split stop joining.
+ */
+private data class TajweedSpan(val start: Int, val end: Int, val color: androidx.compose.ui.graphics.Color)
+
+/** The paginated Mushaf's master string and everything indexed against it. */
+private data class MushafMaster(
+    val text: AnnotatedString,
+    val placeholders: List<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>,
+    val ayahRanges: List<Pair<Int, IntRange>>,
+    val tajweed: List<TajweedSpan>,
+)
+
 private data class MarkerGeometry(
     val digits: String,
     val isTranslation: Boolean,
@@ -6450,6 +6467,7 @@ private fun MushafPagerView(
         inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
+        val tajweedSpans = mutableListOf<TajweedSpan>()
         val builtRanges = mutableListOf<Pair<Int, IntRange>>()
         val built = buildAnnotatedString {
             ayahs.forEach { ayah ->
@@ -6468,20 +6486,20 @@ private fun MushafPagerView(
                     tag = MUSHAF_ARABIC_AYAH_TAG,
                     annotation = ayah.numberInSurah.toString(),
                 )
+                // Tajweed colour is deliberately NOT a span on this string. A colour
+                // change inside a word splits the shaping run, and cursive Arabic then
+                // renders the two halves in isolated forms — the mīm of "مِنْ" stopped
+                // joining its nūn wherever a rule coloured only the nūn. The rules are
+                // carried alongside instead and painted over the finished layout, which
+                // cannot disturb shaping because the shaping has already happened.
+                val arabicStart = length
+                append(arabicText)
                 if (showTajweed) {
-                    val annotations = tajweedAnnotations[ayah.numberInSurah]
-                    if (annotations != null && annotations.isNotEmpty()) {
-                        val annotated = com.starception.submission.feature.surah.tajweed.TajweedTextApplier.applyWithOverlap(
-                            text = arabicText,
-                            annotations = annotations,
-                            defaultStyle = SpanStyle()
-                        )
-                        append(annotated)
-                    } else {
-                        append(arabicText)
+                    tajweedAnnotations[ayah.numberInSurah]?.forEach { rule ->
+                        val start = (arabicStart + rule.startIndex).coerceIn(arabicStart, length)
+                        val end = (arabicStart + rule.endIndex).coerceIn(start, length)
+                        if (end > start) tajweedSpans.add(TajweedSpan(start, end, rule.rule.color))
                     }
-                } else {
-                    append(arabicText)
                 }
                 pop()
 
@@ -6570,10 +6588,10 @@ private fun MushafPagerView(
                 builtRanges.add(ayah.numberInSurah to (ayahStart until length))
             }
         }
-        Triple(built, placeholderRanges, builtRanges.toList())
+        MushafMaster(built, placeholderRanges, builtRanges.toList(), tajweedSpans.toList())
     }
-    val masterString = markerData.first
-    val markerPlaceholders = markerData.second
+    val masterString = markerData.text
+    val markerPlaceholders = markerData.placeholders
 
     // ---- old per-ayah measurement removed; drawing pass handles positioning ----
     /* removed:
@@ -6676,7 +6694,7 @@ private fun MushafPagerView(
 
     // Taken straight from the master string's construction, so the ranges that drive page
     // slicing, tap hit-testing and highlighting cannot disagree with the text they index.
-    val ayahCharRanges = markerData.third
+    val ayahCharRanges = markerData.ayahRanges
 
 
     Column(

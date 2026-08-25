@@ -1,6 +1,8 @@
 package com.starception.submission.feature.prayertimes
 
 import com.starception.submission.core.duadatabase.Dua
+import com.starception.submission.core.model.data.BukhariBook
+import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.feature.quran.QuranData
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -37,6 +39,10 @@ internal sealed interface ContextualRecommendationTarget {
     data class FortressDua(
         val dua: Dua,
     ) : ContextualRecommendationTarget
+
+    data class Bukhari(
+        val book: BukhariBook,
+    ) : ContextualRecommendationTarget
 }
 
 internal data class ContextualInsightRecommendation(
@@ -51,15 +57,17 @@ private data class RecommendationWindow(
     val name: String,
     val surahCandidates: List<Int>,
     val duaChapterCandidates: List<Int>,
+    val bukhariBookCandidates: List<Int>,
     val surahTitlePrefix: String,
 )
 
 /**
  * Builds a deterministic, private recommendation from the local date and time.
  *
- * Friday remains dedicated to Al-Kahf. On other days the source alternates
- * between Quran and Fortress of the Muslim, while each time window has its own
- * relevant shortlist. Missing Fortress data gracefully falls back to Quran.
+ * Friday remains dedicated to Al-Kahf. On other days the source rotates between
+ * Quran, Fortress of the Muslim, and a playable Sahih al-Bukhari book. Each time
+ * window has its own relevant shortlist. Missing Fortress data gracefully falls
+ * back to Quran.
  */
 internal fun buildContextualInsightRecommendation(
     date: LocalDate,
@@ -84,18 +92,35 @@ internal fun buildContextualInsightRecommendation(
     }
 
     val window = recommendationWindow(time)
-    // Alternate by day so the recommendation remains calm and stable rather
-    // than changing source every few hours. Even day-of-year values prefer Dua.
-    val preferFortress = date.dayOfYear % 2 == 0
-    if (preferFortress) {
-        selectFortressDua(date, window, fortressDuasByChapter)?.let { dua ->
-            return ContextualInsightRecommendation(
-                title = contextualDuaTitle(dua.chapterId, dua.chapterTitle),
-                supportingText = dua.previewText(),
-                footerText = "Fortress of the Muslim · Dua ${dua.position} · ${window.name}",
-                actionDescription = "Open ${dua.chapterTitle}",
-                target = ContextualRecommendationTarget.FortressDua(dua),
-            )
+    // Rotate by day so recommendations stay stable for the entire day.
+    when (date.dayOfYear % 3) {
+        0 -> {
+            val candidateIndex = Math.floorMod(
+                date.toEpochDay(),
+                window.bukhariBookCandidates.size.toLong(),
+            ).toInt()
+            val book = BukhariBooks.find(window.bukhariBookCandidates[candidateIndex])
+            if (book != null) {
+                return ContextualInsightRecommendation(
+                    title = "Listen: ${book.nameEnglish}",
+                    supportingText = book.nameArabic,
+                    footerText = "Sahih al-Bukhari · Book ${book.id} · ${book.hadithCount} hadiths",
+                    actionDescription = "Play ${book.nameEnglish} from Sahih al-Bukhari",
+                    target = ContextualRecommendationTarget.Bukhari(book),
+                )
+            }
+        }
+
+        1 -> {
+            selectFortressDua(date, window, fortressDuasByChapter)?.let { dua ->
+                return ContextualInsightRecommendation(
+                    title = contextualDuaTitle(dua.chapterId, dua.chapterTitle),
+                    supportingText = dua.previewText(),
+                    footerText = "Fortress of the Muslim · Dua ${dua.position} · ${window.name}",
+                    actionDescription = "Open ${dua.chapterTitle}",
+                    target = ContextualRecommendationTarget.FortressDua(dua),
+                )
+            }
         }
     }
 
@@ -123,6 +148,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         name = "morning",
         surahCandidates = listOf(93, 94, 91),
         duaChapterCandidates = listOf(1, 27, 130),
+        bukhariBookCandidates = listOf(2, 3, 80),
         surahTitlePrefix = "Begin gently with",
     )
 
@@ -130,6 +156,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         name = "afternoon",
         surahCandidates = listOf(55, 49, 103),
         duaChapterCandidates = listOf(43, 44, 129, 130),
+        bukhariBookCandidates = listOf(8, 9, 78),
         surahTitlePrefix = "Pause and reflect with",
     )
 
@@ -137,6 +164,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         name = "evening",
         surahCandidates = listOf(103, 92, 55),
         duaChapterCandidates = listOf(27, 106, 123, 129),
+        bukhariBookCandidates = listOf(66, 80, 81),
         surahTitlePrefix = "Reset your evening with",
     )
 
@@ -144,6 +172,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         name = "night",
         surahCandidates = listOf(67, 32, 112),
         duaChapterCandidates = listOf(28, 29, 30, 34),
+        bukhariBookCandidates = listOf(19, 80, 81),
         surahTitlePrefix = "Close the day with",
     )
 
@@ -151,6 +180,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         name = "quiet hours",
         surahCandidates = listOf(73, 67, 32),
         duaChapterCandidates = listOf(34, 35, 126, 129),
+        bukhariBookCandidates = listOf(19, 80, 81),
         surahTitlePrefix = "Take a quiet moment with",
     )
 }

@@ -1,6 +1,6 @@
 Flaticon UIcons attribution
 
-The Settings, Salah Training, and location marker icons use the Rounded Regular UIcons family.
+The Settings, Salah Training, widget mosque, and location marker icons use the Rounded Regular UIcons family.
 Salah Training and posture workflows use Flaticon's machine-learning glyph.
 
 UIcons by Flaticon

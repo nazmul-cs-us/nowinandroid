@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/prayer_widget_background"
+    android:orientation="vertical"
+    android:padding="12dp"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:background="@drawable/prayer_widget_card_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@null"
+            android:src="@drawable/flaticon_search_152536"
+            android:tint="@color/prayer_widget_accent" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="Search Quran"
+            android:textColor="@color/prayer_widget_muted"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="9dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/prayer_widget_card_background"
+            android:contentDescription="@null"
+            android:padding="6dp"
+            android:src="@drawable/sample_mic_icon"
+            android:tint="@color/prayer_widget_accent" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/prayer_widget_card_background"
+            android:contentDescription="@null"
+            android:padding="6dp"
+            android:src="@drawable/flaticon_magic_book_9061096"
+            android:tint="@color/prayer_widget_accent" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/prayer_widget_card_background"
+            android:contentDescription="@null"
+            android:padding="6dp"
+            android:src="@drawable/sample_tasbih_icon"
+            android:tint="@color/prayer_widget_accent" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,12 +1,18 @@
 package com.starception.submission.prayer.silent
 
 import android.app.AlarmManager
+import android.app.AutomaticZenRule
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
+import android.os.Build
+import android.service.notification.Condition
 import android.util.Log
+import com.starception.submission.MainActivity
 
 class PrayerSilentModeController(private val context: Context) {
 
@@ -46,7 +52,7 @@ class PrayerSilentModeController(private val context: Context) {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+        scheduleWakeup(triggerAt, pi, "start $prayerName")
         Log.i(TAG, "Silent mode for $prayerName scheduled at +${delayMinutes}m (Go to Mosque phase), then ${durationMinutes}m duration")
     }
 
@@ -55,26 +61,40 @@ class PrayerSilentModeController(private val context: Context) {
             Log.w(TAG, "DND access not granted — cannot enable silent mode for $prayerName")
             return
         }
+        val now = System.currentTimeMillis()
+        val existingEndAt = prefs.getLong(KEY_END_AT_MS, 0L)
+        val existingPrayer = prefs.getString(KEY_PRAYER_NAME, null)
+        if (existingEndAt > now && existingPrayer.equals(prayerName, ignoreCase = true)) {
+            Log.i(TAG, "Silent mode already active for $prayerName — ignoring duplicate trigger")
+            return
+        }
         // Preserve the ORIGINAL pre-prayer filter across overlapping/re-entrant windows: if a
         // silent session is already active, reuse its stored prior filter instead of capturing
         // the current one (which is already our own PRIORITY filter). Otherwise restore would
         // put the phone back into DND instead of returning it to the user's real setting.
-        val sessionActive = prefs.getLong(KEY_END_AT_MS, 0L) > System.currentTimeMillis()
+        val sessionActive = existingEndAt > now
         val priorFilter = if (sessionActive) {
             prefs.getInt(KEY_PRIOR_FILTER, nm.currentInterruptionFilter)
         } else {
             nm.currentInterruptionFilter
         }
-        val triggerAt = System.currentTimeMillis() + durationMinutes * 60_000L
+        val triggerAt = now + durationMinutes * 60_000L
         prefs.edit()
             .putInt(KEY_PRIOR_FILTER, priorFilter)
             .putString(KEY_PRAYER_NAME, prayerName)
             .putLong(KEY_END_AT_MS, triggerAt)
             .apply()
-        nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+        if (!activatePrayerRule()) {
+            prefs.edit()
+                .remove(KEY_PRIOR_FILTER)
+                .remove(KEY_PRAYER_NAME)
+                .remove(KEY_END_AT_MS)
+                .apply()
+            return
+        }
         Log.i(TAG, "Silent mode enabled for $prayerName (priorFilter=$priorFilter, duration=${durationMinutes}m)")
 
-        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, restorePendingIntent())
+        scheduleWakeup(triggerAt, restorePendingIntent(), "restore after $prayerName")
     }
 
     /**
@@ -104,14 +124,18 @@ class PrayerSilentModeController(private val context: Context) {
             }
         } else {
             Log.i(TAG, "Recovery: re-arming restore alarm for active silent window (ends in ${(endAt - now) / 60_000L}m)")
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endAt, restorePendingIntent())
+            scheduleWakeup(endAt, restorePendingIntent(), "recovery restore")
         }
     }
 
     fun restore() {
         if (!nm.isNotificationPolicyAccessGranted) return
         val priorFilter = prefs.getInt(KEY_PRIOR_FILTER, NotificationManager.INTERRUPTION_FILTER_ALL)
-        nm.setInterruptionFilter(priorFilter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            setPrayerRuleActive(false)
+        } else {
+            nm.setInterruptionFilter(priorFilter)
+        }
         prefs.edit()
             .remove(KEY_PRIOR_FILTER)
             .remove(KEY_PRAYER_NAME)
@@ -119,6 +143,83 @@ class PrayerSilentModeController(private val context: Context) {
             .apply()
         Log.i(TAG, "Silent mode restored to filter=$priorFilter")
     }
+
+    /**
+     * Android 15+ no longer allows target-35 apps to directly change global DND. A legacy
+     * setInterruptionFilter call creates an implicit rule that OEM settings can leave disabled.
+     * Own an explicit Prayer Time rule instead, then publish its active state at prayer time.
+     */
+    private fun activatePrayerRule(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            setPrayerRuleActive(true)
+        } else {
+            nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+            true
+        }
+    }
+
+    private fun setPrayerRuleActive(active: Boolean): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return false
+        val ruleId = ensurePrayerZenRule() ?: return false
+        val state = if (active) Condition.STATE_TRUE else Condition.STATE_FALSE
+        return runCatching {
+            nm.setAutomaticZenRuleState(
+                ruleId,
+                Condition(prayerConditionId(), "Prayer time", state, Condition.SOURCE_SCHEDULE),
+            )
+            Log.i(TAG, "Prayer Time DND rule ${if (active) "activated" else "deactivated"}")
+            true
+        }.getOrElse { error ->
+            Log.e(TAG, "Unable to ${if (active) "activate" else "deactivate"} Prayer Time DND rule", error)
+            false
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun ensurePrayerZenRule(): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null
+        val storedRuleId = prefs.getString(KEY_ZEN_RULE_ID, null)
+        if (storedRuleId != null) {
+            val storedRule = runCatching { nm.getAutomaticZenRule(storedRuleId) }.getOrNull()
+            if (storedRule != null) {
+                if (!storedRule.isEnabled) {
+                    storedRule.isEnabled = true
+                    val enabled = runCatching {
+                        nm.updateAutomaticZenRule(storedRuleId, storedRule)
+                    }.getOrDefault(false)
+                    if (!enabled) {
+                        Log.w(TAG, "Prayer Time DND rule is disabled in system Modes settings")
+                        return null
+                    }
+                }
+                return storedRuleId
+            }
+            prefs.edit().remove(KEY_ZEN_RULE_ID).apply()
+        }
+
+        val configurationActivity = ComponentName(context, MainActivity::class.java)
+        val rule = AutomaticZenRule(
+            "Prayer Time",
+            null,
+            configurationActivity,
+            prayerConditionId(),
+            null,
+            NotificationManager.INTERRUPTION_FILTER_PRIORITY,
+            true,
+        )
+        return runCatching { nm.addAutomaticZenRule(rule) }
+            .getOrNull()
+            ?.also { newRuleId ->
+                prefs.edit().putString(KEY_ZEN_RULE_ID, newRuleId).apply()
+                Log.i(TAG, "Created Prayer Time automatic DND rule")
+            }
+    }
+
+    private fun prayerConditionId(): Uri = Uri.Builder()
+        .scheme(Condition.SCHEME)
+        .authority(context.packageName)
+        .appendPath("prayer-time")
+        .build()
 
     private fun restorePendingIntent(): PendingIntent {
         val intent = Intent(context, RestorePrayerSilentReceiver::class.java).apply {
@@ -132,12 +233,25 @@ class PrayerSilentModeController(private val context: Context) {
         )
     }
 
+    private fun scheduleWakeup(triggerAt: Long, pendingIntent: PendingIntent, label: String) {
+        try {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        } catch (error: SecurityException) {
+            // Android 12+ may deny exact-alarm access. DND must still restore, so
+            // fall back to an inexact idle-capable alarm instead of leaving the
+            // phone silent indefinitely.
+            Log.w(TAG, "Exact alarm unavailable for $label; using inexact fallback", error)
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        }
+    }
+
     companion object {
         private const val TAG = "PrayerSilentMode"
         private const val PREFS_NAME = "prayer_silent_mode"
         private const val KEY_PRIOR_FILTER = "prior_filter"
         private const val KEY_PRAYER_NAME = "prayer_name"
         private const val KEY_END_AT_MS = "end_at_ms"
+        private const val KEY_ZEN_RULE_ID = "zen_rule_id"
         private const val REQUEST_CODE = 47291
         private const val START_REQUEST_CODE = 47292
         const val ACTION_RESTORE = "com.starception.submission.action.RESTORE_PRAYER_SILENT"

@@ -22,6 +22,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewImage="@drawable/sample_check_list_preview"
+    android:previewLayout="@layout/widget_preview_prayer_checklist"
     android:maxResizeHeight="@dimen/sample_check_list_widget_max_resize_height"
     android:maxResizeWidth="@dimen/sample_check_list_widget_max_resize_width"
     android:minHeight="@dimen/sample_check_list_widget_min_height"

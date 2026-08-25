@@ -298,7 +298,7 @@ class ChapterRecitationService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(currentTitle.ifBlank { "Recitation" })
             .setContentText(currentSubtitle)
-            .setSmallIcon(R.drawable.transparent_greyscaled)
+            .setSmallIcon(R.drawable.ic_audio_notification)
             .setContentIntent(contentPending)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)

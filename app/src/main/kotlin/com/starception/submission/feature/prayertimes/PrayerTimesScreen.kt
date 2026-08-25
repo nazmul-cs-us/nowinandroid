@@ -385,6 +385,7 @@ fun PrayerTimesScreen(
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
     // Full media-source router for the mini-bar title tap (surah/hadith/dua);
     // when null, falls back to the legacy surah-only behavior.
     onMediaSourceClick: ((com.starception.submission.media.MediaSource) -> Unit)? = null,
@@ -1670,6 +1671,10 @@ fun PrayerTimesScreen(
     
     // INSTANT LOAD STRATEGY - Show cached data immediately, update in background
     LaunchedEffect(Unit) {
+        // Give the home screen time to settle before an automatic threshold
+        // warning expands the pull-to-sync banner. The weather request may run
+        // during this window, but its result cannot be presented before 5s.
+        val appOpenWeatherWarningEligibleAt = System.currentTimeMillis() + 5_000L
         android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
         
         // STEP 1: Skip redundant cache loading - already done in remember{} block
@@ -1689,6 +1694,39 @@ fun PrayerTimesScreen(
         android.util.Log.d("PrayerScreen", "STEP 2: Starting background GPS update with fresh location...")
         calculatePrayerTimes(true)  // forceGpsRefresh = true for auto-refresh on app open
         android.util.Log.d("PrayerScreen", "Background update completed with fresh GPS location")
+
+        // Surface noteworthy conditions immediately on app entry. Previously this
+        // forecast was only evaluated after a manual pull-to-sync, so users could
+        // miss a rain/heat/humidity warning until they refreshed the page themselves.
+        prayerTimes?.let { freshTimes ->
+            val target = getUpcomingPrayerForecastTarget(
+                prayerTimes = freshTimes,
+                timeOffsets = storedOffsets,
+                now = LocalDateTime.now(),
+            )
+            val displayName = getPrayerDisplayName(target.prayerName, target.date)
+            val insight = withTimeoutOrNull(3_500L) {
+                CurrentWeatherRepository.getPrayerInsight(
+                    latitude = freshTimes.location.latitude,
+                    longitude = freshTimes.location.longitude,
+                    prayerName = displayName,
+                    prayerDate = target.date,
+                    prayerTime = target.time,
+                    thresholds = prayerWeatherThresholds,
+                )
+            }
+            insight?.compactText?.takeIf { it.isNotBlank() }?.let { warningText ->
+                val remainingDelay = appOpenWeatherWarningEligibleAt - System.currentTimeMillis()
+                if (remainingDelay > 0L) {
+                    delay(remainingDelay)
+                }
+                // A manual pull-to-sync may have produced a newer warning while
+                // the app-open result was waiting; never overwrite that result.
+                if (syncWeatherResult == null) {
+                    syncWeatherResult = warningText
+                }
+            }
+        }
         
         // Note: calculatePrayerTimes() now handles turning off isLoading
     }
@@ -1758,7 +1796,7 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
-                syncResultText = voiceFeedback ?: syncWeatherResult,
+                syncResultText = voiceFeedback,
                 onSyncResultClick = voiceFeedback?.let {
                     {
                         com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
@@ -1766,11 +1804,7 @@ fun PrayerTimesScreen(
                     }
                 },
                 onSyncResultDismiss = {
-                    if (voiceFeedback != null) {
-                        com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
-                    } else {
-                        syncWeatherResult = null
-                    }
+                    com.starception.submission.ui.search.SearchPrefillBus.clearVoiceFeedback()
                 },
                 idleContainerColor = Color.Transparent,
                 idleContainerBrush = mainPageBackgroundBrush(),
@@ -1789,6 +1823,8 @@ fun PrayerTimesScreen(
                     }
                 },
                 prayerAlertState = prayerAlertState,
+                weatherWarningText = syncWeatherResult,
+                onWeatherWarningDismiss = { syncWeatherResult = null },
                 silentModeState = silentModeState,
                 islamicEventState = islamicEventState,
                 onIslamicEventClick = { event ->
@@ -1801,7 +1837,10 @@ fun PrayerTimesScreen(
             var showAllPrayers by rememberSaveable { mutableStateOf(false) }
             val portraitScrollState = rememberScrollState()
             var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
-            val expansionScrollDistancePx = with(LocalDensity.current) { 142.dp.toPx() }
+            // The expanded prayer row grows the layout while Insights compacts above it.
+            // 122dp is the resulting viewport compensation: it keeps the Location row
+            // at the same screen coordinate in collapsed and expanded states.
+            val expansionScrollDistancePx = with(LocalDensity.current) { 122.dp.toPx() }
             // A disabled verticalScroll does not dispatch nested-scroll deltas, which
             // prevents PullToSyncContainer from seeing downward drags while the prayer
             // list is collapsed. This no-op scrollable keeps the page stationary while
@@ -1810,9 +1849,8 @@ fun PrayerTimesScreen(
             LaunchedEffect(showAllPrayers, outerIsLandscape) {
                 if (!outerIsLandscape) {
                     if (showAllPrayers) {
-                        // The two existing rows each grow by 10dp and the optional
-                        // row unfolds to 122dp. Scroll by the same 142dp on the same
-                        // curve so the control remains visible below the full list.
+                        // Synchronize the page scroll with the added prayer row so
+                        // Location does not jump when the list changes state.
                         keepExpansionScrollEnabled = true
                         withFrameNanos { }
                         portraitScrollState.animateScrollBy(
@@ -1924,9 +1962,8 @@ fun PrayerTimesScreen(
                 .coerceAtLeast(0.dp)
                 .coerceAtMost(syncState.heldContentInsetTop)
             val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
-            // The expanded prayer list needs the full bottom clearance as scroll runway.
-            // Reclaiming it while expanded clamps animateScrollBy before the location
-            // tile reaches its intended position above the floating navigation.
+            // The expanded prayer list needs the full bottom clearance as manual
+            // scroll runway for its added row and the location card beneath it.
             val effectiveSyncBottomClearanceReclaim =
                 if (showAllPrayers || keepExpansionScrollEnabled) {
                     0.dp
@@ -2024,6 +2061,7 @@ fun PrayerTimesScreen(
                                 onSurahClick = onSurahClick,
                                 onSurahClickWithAyah = onSurahClickWithAyah,
                                 onFortressDuaClick = onFortressDuaClick,
+                                onBukhariBookPlayClick = onBukhariBookPlayClick,
                                 fortressDuasByChapter = contextualDuasByChapter,
                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
@@ -2221,7 +2259,10 @@ fun PrayerTimesScreen(
                     // paints past its line box, so 104dp is the floor that holds the
                     // design intact. Going lower needs the landscape compact preset,
                     // and that preset drops the Arabic name.
-                    if (expanded) 116.dp else 106.dp
+                    // The third row is funded by compacting the Insights carousel,
+                    // not by growing every prayer card and extending the dashboard
+                    // below the viewport. 104dp is the measured content-safe floor.
+                    if (expanded) 104.dp else 106.dp
                 }
                 val tileHeight = baseTileHeight
                 val buttonIconRotation by dashboardTransition.animateFloat(
@@ -2232,7 +2273,18 @@ fun PrayerTimesScreen(
                 ) { expanded ->
                     if (expanded) 180f else 0f
                 }
-                
+                val expandedLocationPositionCorrection by dashboardTransition.animateDp(
+                    transitionSpec = {
+                        tween(durationMillis = 680, easing = FastOutSlowInEasing)
+                    },
+                    label = "expandedLocationPositionCorrection",
+                ) { expanded ->
+                    // The synchronized scroll reaches its viewport limit before it
+                    // can absorb the final 14dp of expansion. Offset only that
+                    // residual so Location stays at its collapsed screen position.
+                    if (expanded) 14.dp else 0.dp
+                }
+
                 // Swipeable Big Tiles
                 Box(
                     modifier = Modifier
@@ -2297,9 +2349,11 @@ fun PrayerTimesScreen(
                     },
                     timeOffsets = storedOffsets,
                     portraitStripHeight = portraitInsightHeight,
+                    compactForExpandedPrayers = showAllPrayers,
                     onSurahClick = onSurahClick,
                     onSurahClickWithAyah = onSurahClickWithAyah,
                     onFortressDuaClick = onFortressDuaClick,
+                    onBukhariBookPlayClick = onBukhariBookPlayClick,
                     fortressDuasByChapter = contextualDuasByChapter,
                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                     isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
@@ -2736,6 +2790,7 @@ fun PrayerTimesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .offset(y = expandedLocationPositionCorrection)
                         // The clearance Spacer below sits after this card in a
                         // top-aligned column, so it cannot push the card up: the only
                         // way to keep the card off the floating nav is to keep the

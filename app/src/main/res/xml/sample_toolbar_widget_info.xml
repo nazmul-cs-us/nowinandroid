@@ -16,6 +16,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewImage="@drawable/sample_toolbar_preview"
+    android:previewLayout="@layout/widget_preview_prayer_toolbar"
     android:maxResizeHeight="@dimen/sample_toolbar_widget_max_resize_height"
     android:maxResizeWidth="@dimen/sample_toolbar_widget_max_resize_width"
     android:minHeight="@dimen/sample_toolbar_widget_min_height"

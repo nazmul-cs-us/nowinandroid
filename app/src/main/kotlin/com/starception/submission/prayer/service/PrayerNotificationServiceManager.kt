@@ -69,8 +69,12 @@ class PrayerNotificationServiceManager @Inject constructor(
                     // Cancel existing scheduled notifications
                     PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
 
-                    // Only reschedule if notifications are enabled
-                    if (notificationPrefs.notificationsEnabled) {
+                    // Silent-during-prayer is independent from banners and Adhan.
+                    // Keep the prayer-boundary alarms scheduled even when the master
+                    // notification switch is off so DND can still start on time.
+                    if (notificationPrefs.notificationsEnabled ||
+                        notificationPrefs.silentDuringPrayerEnabled
+                    ) {
                         // Get prayer times from repository
                         val settings = repository.getSettings()
                         val location = settings.location
@@ -122,7 +126,7 @@ class PrayerNotificationServiceManager @Inject constructor(
                             }
                         }
                     } else {
-                        Log.d(TAG, "🔕 Notifications disabled, not rescheduling")
+                        Log.d(TAG, "🔕 Notifications and silent-during-prayer disabled, not rescheduling")
                     }
 
                 } catch (e: Exception) {

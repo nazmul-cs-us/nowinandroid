@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -137,6 +138,8 @@ fun PullToSyncContainer(
     onMediaAction: (MediaAction) -> Unit = {},
     onMediaTitleClick: () -> Unit = {},
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
+    weatherWarningText: String? = null,
+    onWeatherWarningDismiss: () -> Unit = {},
     silentModeState: SilentModeState = SilentModeState(),
     islamicEventState: IslamicEventState = IslamicEventState(),
     onIslamicEventClick: (IslamicEventState) -> Unit = {},
@@ -166,6 +169,11 @@ fun PullToSyncContainer(
         islamicEventDismissed = false
     }
     val isPrayerAlert = prayerAlertState.isActive && !prayerAlertDismissed
+    var weatherWarningDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(weatherWarningText) {
+        weatherWarningDismissed = false
+    }
+    val isWeatherWarning = !weatherWarningText.isNullOrBlank() && !weatherWarningDismissed
     val isSilentMode = silentModeState.isActive
     val isIslamicEvent = islamicEventState.isActive && !islamicEventDismissed
     val hapticFeedback = LocalHapticFeedback.current
@@ -277,7 +285,7 @@ fun PullToSyncContainer(
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
     val hasSyncResult = !syncResultText.isNullOrBlank()
-    val hasStatus = isPrayerAlert || isIslamicEvent || isSilentMode || hasSyncResult ||
+    val hasStatus = isPrayerAlert || isWeatherWarning || isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
     val targetHoldHeightDp = if (mediaState.isVisible || isMushafActive || hasStatus) {
         standardBarHeightDp
@@ -418,6 +426,19 @@ fun PullToSyncContainer(
                     text = prayerAlertState.displayText,
                     icon = SyncBarIcon.Spinner,
                     onDismiss = { prayerAlertDismissed = true },
+                ),
+            )
+        }
+        if (isWeatherWarning) {
+            add(
+                SyncBarStatus(
+                    key = "weather:$weatherWarningText",
+                    text = weatherWarningText.orEmpty(),
+                    icon = SyncBarIcon.WeatherWarning,
+                    onDismiss = {
+                        weatherWarningDismissed = true
+                        onWeatherWarningDismiss()
+                    },
                 ),
             )
         }
@@ -660,7 +681,7 @@ fun PullToSyncContainer(
 }
 
 /** Leading glyph for a [SyncBarStatus]. */
-private enum class SyncBarIcon { Spinner, Sparkle, Retry, DoNotDisturb }
+private enum class SyncBarIcon { Spinner, Sparkle, Retry, WeatherWarning, DoNotDisturb }
 
 /**
  * One line of information the top strip can show. Several can be live at once;
@@ -772,6 +793,13 @@ private fun SyncBarStatusRow(
 
             SyncBarIcon.Retry -> Icon(
                 imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+            )
+
+            SyncBarIcon.WeatherWarning -> Icon(
+                imageVector = Icons.Default.WarningAmber,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(18.dp),

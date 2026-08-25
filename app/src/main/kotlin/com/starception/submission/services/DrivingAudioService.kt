@@ -1519,7 +1519,7 @@ class DrivingAudioService : Service() {
             .setContentTitle(currentTitle)
             .setContentText(currentSubtitle)
             .setSubText("Driving Mode")
-            .setSmallIcon(R.drawable.transparent_greyscaled)
+            .setSmallIcon(R.drawable.ic_audio_notification)
             .setContentIntent(contentPendingIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)

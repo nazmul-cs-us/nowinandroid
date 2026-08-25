@@ -16,6 +16,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewImage="@drawable/sample_text_image_preview"
+    android:previewLayout="@layout/widget_preview_prayer_insight"
     android:maxResizeHeight="@dimen/sample_text_with_image_widget_max_resize_height"
     android:maxResizeWidth="@dimen/sample_text_with_image_widget_max_resize_width"
     android:targetCellWidth="@integer/sample_text_with_image_target_cell_width"
@@ -26,4 +27,3 @@
     android:minWidth="@dimen/sample_text_with_image_widget_min_width"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen|keyguard" />
-

@@ -721,6 +721,20 @@ class PrayerSettingsRepository @Inject constructor(
     fun getNotificationPreferences(): PrayerNotificationPreferences {
         return _notificationPreferencesFlow.value  // No longer nullable
     }
+
+    /**
+     * Returns the persisted notification preferences for background entry points.
+     *
+     * A Worker can start in a fresh app process before this repository's
+     * asynchronous initialization has populated the in-memory flow. Reading the
+     * flow in that window returns notification defaults and can play Adhan for a
+     * prayer the user already disabled. This storage-backed accessor closes that
+     * race and should be called off the main thread.
+     */
+    fun getNotificationPreferencesFromStorage(): PrayerNotificationPreferences {
+        if (_settingsLoaded) return _notificationPreferencesFlow.value
+        return loadNotificationPreferences() ?: _notificationPreferencesFlow.value
+    }
     
     /**
      * LEGACY SETTINGS GETTER: Gets combined prayer settings for backward compatibility

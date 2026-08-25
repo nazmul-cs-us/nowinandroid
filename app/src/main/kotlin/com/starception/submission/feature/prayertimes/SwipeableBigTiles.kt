@@ -27,14 +27,17 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import android.content.pm.ApplicationInfo
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityManager as AndroidAccessibilityManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
@@ -134,6 +137,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.CornerRadius
@@ -1139,6 +1143,121 @@ private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
  */
 private const val INSIGHT_CARD_ASPECT_RATIO = 250f / 288f
 
+/** One accelerated 24-hour Prayer Now preview cycle in debug builds. */
+private const val PRAYER_NOW_DAY_PREVIEW_DURATION_MS = 48_000L
+
+private data class PrayerSkyPalette(
+    val top: Color,
+    val horizon: Color,
+    val strength: Float,
+    val sceneDarkness: Float,
+    val lightX: Float,
+    val lightY: Float,
+)
+
+private data class PrayerSkyKeyframe(
+    val minuteOfDay: Float,
+    val palette: PrayerSkyPalette,
+)
+
+/**
+ * Resolves the insight artwork's sky treatment from the calculated prayer
+ * boundaries. This keeps the carousel visually in step with the user's local
+ * salah day instead of relying on fixed clock-hour assumptions.
+ */
+private fun prayerSkyPalette(
+    currentTime: LocalTime,
+    prayerTimes: DayPrayerTimes?,
+): PrayerSkyPalette {
+    fun LocalTime.minuteOfDay(): Float = toSecondOfDay() / 60f
+
+    val midnight = PrayerSkyPalette(
+        top = Color(0xFF06142F),
+        horizon = Color(0xFF263F68),
+        strength = 0.32f,
+        sceneDarkness = 0.18f,
+        lightX = 0.78f,
+        lightY = 0.18f,
+    )
+    val fajr = PrayerSkyPalette(
+        top = Color(0xFF344B7D),
+        horizon = Color(0xFFE48672),
+        strength = 0.43f,
+        sceneDarkness = 0.08f,
+        lightX = 0.12f,
+        lightY = 0.64f,
+    )
+    val sunrise = PrayerSkyPalette(
+        top = Color(0xFF63A7D5),
+        horizon = Color(0xFFFFCC82),
+        strength = 0.44f,
+        sceneDarkness = 0f,
+        lightX = 0.20f,
+        lightY = 0.45f,
+    )
+    val midday = PrayerSkyPalette(
+        top = Color(0xFF318CCB),
+        horizon = Color(0xFFB8E5F4),
+        strength = 0.42f,
+        sceneDarkness = 0f,
+        lightX = 0.52f,
+        lightY = 0.12f,
+    )
+    val afternoon = PrayerSkyPalette(
+        top = Color(0xFF4C86B8),
+        horizon = Color(0xFFF0BE76),
+        strength = 0.40f,
+        sceneDarkness = 0.01f,
+        lightX = 0.72f,
+        lightY = 0.28f,
+    )
+    val sunset = PrayerSkyPalette(
+        top = Color(0xFF603D7A),
+        horizon = Color(0xFFF26C4E),
+        strength = 0.49f,
+        sceneDarkness = 0.06f,
+        lightX = 0.88f,
+        lightY = 0.62f,
+    )
+    val isha = PrayerSkyPalette(
+        top = Color(0xFF0D1D42),
+        horizon = Color(0xFF3A557D),
+        strength = 0.34f,
+        sceneDarkness = 0.16f,
+        lightX = 0.76f,
+        lightY = 0.20f,
+    )
+
+    val keyframes = listOf(
+        PrayerSkyKeyframe(0f, midnight),
+        PrayerSkyKeyframe(prayerTimes?.fajr?.minuteOfDay() ?: 300f, fajr),
+        PrayerSkyKeyframe(prayerTimes?.sunrise?.minuteOfDay() ?: 390f, sunrise),
+        PrayerSkyKeyframe(prayerTimes?.dhuhr?.minuteOfDay() ?: 720f, midday),
+        PrayerSkyKeyframe(prayerTimes?.asr?.minuteOfDay() ?: 930f, afternoon),
+        PrayerSkyKeyframe(prayerTimes?.maghrib?.minuteOfDay() ?: 1_080f, sunset),
+        PrayerSkyKeyframe(prayerTimes?.isha?.minuteOfDay() ?: 1_200f, isha),
+        PrayerSkyKeyframe(1_440f, midnight),
+    ).sortedBy(PrayerSkyKeyframe::minuteOfDay)
+
+    val nowMinute = currentTime.minuteOfDay()
+    val (start, end) = keyframes.zipWithNext().firstOrNull { (left, right) ->
+        nowMinute >= left.minuteOfDay && nowMinute <= right.minuteOfDay
+    } ?: (keyframes[keyframes.lastIndex - 1] to keyframes.last())
+    val duration = (end.minuteOfDay - start.minuteOfDay).coerceAtLeast(1f)
+    val linearFraction = ((nowMinute - start.minuteOfDay) / duration).coerceIn(0f, 1f)
+    // Smoothstep removes visible speed changes as the clock crosses a prayer boundary.
+    val fraction = linearFraction * linearFraction * (3f - (2f * linearFraction))
+
+    return PrayerSkyPalette(
+        top = lerpColor(start.palette.top, end.palette.top, fraction),
+        horizon = lerpColor(start.palette.horizon, end.palette.horizon, fraction),
+        strength = lerp(start.palette.strength, end.palette.strength, fraction),
+        sceneDarkness = lerp(start.palette.sceneDarkness, end.palette.sceneDarkness, fraction),
+        lightX = lerp(start.palette.lightX, end.palette.lightX, fraction),
+        lightY = lerp(start.palette.lightY, end.palette.lightY, fraction),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeableBigTiles(
@@ -1173,6 +1292,7 @@ fun SwipeableBigTiles(
     onSurahClick: (Int) -> Unit = {},
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onFortressDuaClick: (Dua) -> Unit = {},
+    onBukhariBookPlayClick: (Int) -> Unit = {},
     fortressDuasByChapter: Map<Int, List<Dua>> = emptyMap(),
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
@@ -1231,6 +1351,7 @@ fun SwipeableBigTiles(
     var isUserTouching by remember { mutableStateOf(false) }
     var interactionEpoch by remember { mutableIntStateOf(0) }
     var isAutoAdvancing by remember { mutableStateOf(false) }
+    var expandedLogicalPage by rememberSaveable { mutableStateOf<Int?>(null) }
     var pendingPrayerUndo by remember { mutableStateOf<PrayerUndoState?>(null) }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val pagerFlingBehavior = PagerDefaults.flingBehavior(
@@ -1284,6 +1405,39 @@ fun SwipeableBigTiles(
             timeOffsets = timeOffsets,
             goToMosqueDurationMinutes = goToMosqueDurationMinutes,
         )
+    }
+    val livePrayerSkyPalette = remember(currentTime, prayerTimes) {
+        prayerSkyPalette(currentTime = currentTime, prayerTimes = prayerTimes)
+    }
+    val prayerNowPreviewEnabled = remember(context) {
+        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    }
+    val prayerNowEffectTime = if (prayerNowPreviewEnabled) {
+        val previewTime by produceState(
+            initialValue = LocalTime.MIDNIGHT,
+            key1 = prayerTimes,
+        ) {
+            val previewStartedAt = SystemClock.elapsedRealtime()
+            while (true) {
+                val elapsed = SystemClock.elapsedRealtime() - previewStartedAt
+                val cycleFraction =
+                    (elapsed % PRAYER_NOW_DAY_PREVIEW_DURATION_MS).toFloat() /
+                        PRAYER_NOW_DAY_PREVIEW_DURATION_MS.toFloat()
+                val secondOfDay = (cycleFraction * 86_400f)
+                    .toLong()
+                    .coerceIn(0L, 86_399L)
+                value = LocalTime.ofSecondOfDay(secondOfDay)
+                // Ten visual updates per second keeps the long color transitions
+                // smooth without recomposing the image-heavy carousel every frame.
+                delay(100L)
+            }
+        }
+        previewTime
+    } else {
+        currentTime
+    }
+    val prayerNowSkyPalette = remember(prayerNowEffectTime, prayerTimes) {
+        prayerSkyPalette(currentTime = prayerNowEffectTime, prayerTimes = prayerTimes)
     }
     val forecastTarget = remember(prayerTimes, timeOffsets, currentTime) {
         prayerTimes?.let {
@@ -1376,7 +1530,25 @@ fun SwipeableBigTiles(
         (dailyReadingPlayback.isPlaying || dailyReadingPlayback.isDownloading || dailyReadingPlayback.isLoading)
     val autoAdvanceEnabled = autoSwipeEnabled && isResumed && systemAnimationsEnabled && !touchExplorationEnabled &&
         !isUserTouching && (!pagerState.isScrollInProgress || isAutoAdvancing) && !isInteractionBlocked &&
-        !showGlobePopup && !showAutoSwipeSettings && pendingPrayerUndo == null && !readingKeepsFocus
+        !showGlobePopup && !showAutoSwipeSettings && pendingPrayerUndo == null && !readingKeepsFocus &&
+        expandedLogicalPage == null
+
+    BackHandler(enabled = expandedLogicalPage != null) {
+        expandedLogicalPage = null
+        interactionEpoch++
+    }
+
+    // Expanded mode remains a carousel. Once a swipe settles, transfer the
+    // expanded identity to the newly focused logical page so another long press
+    // collapses that card and accessibility reports the correct state.
+    LaunchedEffect(pagerState.settledPage, expandedLogicalPage) {
+        if (expandedLogicalPage != null) {
+            val settledLogicalPage = pagerState.settledPage % insightPageCount
+            if (expandedLogicalPage != settledLogicalPage) {
+                expandedLogicalPage = settledLogicalPage
+            }
+        }
+    }
 
     LaunchedEffect(pendingPrayerUndo) {
         if (pendingPrayerUndo != null) {
@@ -1418,12 +1590,29 @@ fun SwipeableBigTiles(
     ) { isCompact ->
         if (isCompact) 1f else 0f
     }
+    val animatedExpansionProgress by animateFloatAsState(
+        targetValue = if (expandedLogicalPage != null && !isLandscape) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = 250f,
+        ),
+        label = "insightExpansionProgress",
+    )
+    // A spring is intentionally allowed to overshoot its target. Layout values
+    // are not: values above 1 would make the pager's interpolated padding and
+    // spacing negative during the overshoot frame, which Compose rejects.
+    val expansionProgress = animatedExpansionProgress.coerceIn(0f, 1f)
     // The host derives the normal portrait height from the real window height,
     // so the content below the carousel is not pushed under floating navigation
     // on shorter/taller phone profiles. The expanded-prayer state remains 170dp.
     val stripHeight = (
         portraitStripHeight.value +
             ((170f - portraitStripHeight.value) * compactProgress)
+        ).dp
+    val expandedStripHeight = maxOf(portraitStripHeight + 92.dp, 348.dp)
+    val animatedStripHeight = (
+        stripHeight.value +
+            ((expandedStripHeight.value - stripHeight.value) * expansionProgress)
         ).dp
     val headerFontSize = (20f - (4f * compactProgress)).sp
     val headerLineHeight = (24f - (4f * compactProgress)).sp
@@ -1458,7 +1647,10 @@ fun SwipeableBigTiles(
                     onSelect = { index ->
                         interactionEpoch++
                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        val wasExpanded = expandedLogicalPage != null
+                        expandedLogicalPage = null
                         carouselScope.launch {
+                            if (wasExpanded) delay(180)
                             val currentLogical = pagerState.currentPage % insightPageCount
                             pagerState.animateScrollToPage(
                                 pagerState.currentPage + (index - currentLogical),
@@ -1481,7 +1673,7 @@ fun SwipeableBigTiles(
         } else {
             Modifier
                 .fillMaxWidth()
-                .height(stripHeight)
+                .height(animatedStripHeight)
         }
 
         BoxWithConstraints(modifier = stripModifier) {
@@ -1508,22 +1700,33 @@ fun SwipeableBigTiles(
             } else {
                 (maxWidth * 0.38f).coerceIn(138.dp, 152.dp)
             }
-            val cardWidth = (
+            val restingCardWidth = (
                 normalCardWidth.value +
                     ((compactCardWidth.value - normalCardWidth.value) * compactProgress)
                 ).dp
-            val pageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
+            val cardWidth = (
+                restingCardWidth.value +
+                    ((maxWidth.value - restingCardWidth.value) * expansionProgress)
+                ).dp
+            val restingPageSpacing = if (isLandscape) 10.dp else (14f - (4f * compactProgress)).dp
+            val pageSpacing = (restingPageSpacing.value * (1f - expansionProgress)).dp
+            val endContentPadding = if (isLandscape) {
+                0.dp
+            } else {
+                (18f * (1f - expansionProgress)).dp
+            }
 
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(cardWidth),
                 pageSpacing = pageSpacing,
-                contentPadding = if (isLandscape) PaddingValues(0.dp) else PaddingValues(end = 18.dp),
+                contentPadding = PaddingValues(end = endContentPadding),
                 // One page of runway either side. At 0 the card entering the peek
                 // slot composed exactly as it became visible, which showed up as a
                 // pop partway through the drag.
                 beyondViewportPageCount = 1,
                 flingBehavior = pagerFlingBehavior,
+                userScrollEnabled = true,
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
@@ -1553,13 +1756,34 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
                             ).coerceIn(0f, 1f)
                             val focus = 1f - pageOffset
-                            val cardScale = lerp(0.97f, 1f, focus)
+                            val restingScale = lerp(0.97f, 1f, focus)
+                            val expansionModeActive = expandedLogicalPage != null
+                            val cardScale = if (expansionModeActive) {
+                                lerp(restingScale, 1f, expansionProgress)
+                            } else {
+                                restingScale
+                            }
                             scaleX = cardScale
                             scaleY = cardScale
-                            alpha = lerp(0.9f, 1f, focus)
+                            val restingAlpha = lerp(0.9f, 1f, focus)
+                            alpha = if (expansionModeActive) {
+                                lerp(restingAlpha, 1f, expansionProgress)
+                            } else {
+                                restingAlpha
+                            }
                         },
                 ) {
                     val isFocused = page == pagerState.settledPage && !pagerState.isScrollInProgress
+                    val isExpandedCard = logicalPage == expandedLogicalPage
+                    val onCardLongPress: (() -> Unit)? = if (!isLandscape && isFocused) {
+                        {
+                            interactionEpoch++
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            expandedLogicalPage = if (isExpandedCard) null else logicalPage
+                        }
+                    } else {
+                        null
+                    }
                     when (logicalPage) {
                         0 -> InsightPreviewCard(
                             label = "Prayer now",
@@ -1580,8 +1804,21 @@ fun SwipeableBigTiles(
                             // later condition (usually heat) was also active.
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
-                            backgroundPainterRes = R.drawable.insight_salah,
+                            backgroundPainterRes = R.drawable.insight_salah_background,
+                            foregroundPainterRes = R.drawable.insight_salah_foreground,
+                            skyTintTop = prayerNowSkyPalette.top,
+                            skyTintHorizon = prayerNowSkyPalette.horizon,
+                            skyTintStrength = prayerNowSkyPalette.strength,
+                            sceneDarkness = prayerNowSkyPalette.sceneDarkness,
+                            adaptiveLightPosition = Offset(
+                                prayerNowSkyPalette.lightX,
+                                prayerNowSkyPalette.lightY,
+                            ),
                             compactProgress = compactProgress,
+                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = isExpandedCard,
+                            onLongPress = onCardLongPress,
+                            fullDayEffect = true,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -1614,8 +1851,22 @@ fun SwipeableBigTiles(
                                     "$prayersRemaining remain · $nextUnmarkedPrayer is next"
                                 else -> "$prayersRemaining prayers remain today"
                             },
-                            backgroundPainterRes = R.drawable.insight_prayer,
+                            backgroundPainterRes = R.drawable.insight_prayer_background,
+                            foregroundPainterRes = R.drawable.insight_prayer_foreground,
+                            foregroundBaseScale = 0.84f,
+                            foregroundOffsetFraction = Offset(0f, 0.08f),
+                            skyTintTop = livePrayerSkyPalette.top,
+                            skyTintHorizon = livePrayerSkyPalette.horizon,
+                            skyTintStrength = livePrayerSkyPalette.strength * 0.58f,
+                            sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.72f,
+                            adaptiveLightPosition = Offset(
+                                livePrayerSkyPalette.lightX,
+                                livePrayerSkyPalette.lightY,
+                            ),
                             compactProgress = compactProgress,
+                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = isExpandedCard,
+                            onLongPress = onCardLongPress,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -1657,8 +1908,21 @@ fun SwipeableBigTiles(
                             title = dailySurah.nameEnglish,
                             supportingText = dailySurah.nameArabic,
                             footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
-                            backgroundPainterRes = R.drawable.insight_quran,
+                            backgroundPainterRes = R.drawable.insight_quran_background,
+                            foregroundPainterRes = R.drawable.insight_quran_foreground_v2,
+                            foregroundBaseScale = 0.80f,
+                            skyTintTop = livePrayerSkyPalette.top,
+                            skyTintHorizon = livePrayerSkyPalette.horizon,
+                            skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
+                            sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.64f,
+                            adaptiveLightPosition = Offset(
+                                livePrayerSkyPalette.lightX,
+                                livePrayerSkyPalette.lightY,
+                            ),
                             compactProgress = compactProgress,
+                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = isExpandedCard,
+                            onLongPress = onCardLongPress,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -1692,8 +1956,22 @@ fun SwipeableBigTiles(
                                 ?: "Direction to Makkah",
                             supportingText = qiblaBearing?.let(::qiblaCardinalDirection),
                             footerText = "Open the live compass and 3D globe",
-                            backgroundPainterRes = R.drawable.insight_qibla,
+                            backgroundPainterRes = R.drawable.insight_qibla_background,
+                            foregroundPainterRes = R.drawable.insight_qibla_foreground_v2,
+                            foregroundBaseScale = 0.81f,
+                            foregroundOffsetFraction = Offset(0.025f, 0.035f),
+                            skyTintTop = livePrayerSkyPalette.top,
+                            skyTintHorizon = livePrayerSkyPalette.horizon,
+                            skyTintStrength = livePrayerSkyPalette.strength * 0.54f,
+                            sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.68f,
+                            adaptiveLightPosition = Offset(
+                                livePrayerSkyPalette.lightX,
+                                livePrayerSkyPalette.lightY,
+                            ),
                             compactProgress = compactProgress,
+                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = isExpandedCard,
+                            onLongPress = onCardLongPress,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -1717,7 +1995,18 @@ fun SwipeableBigTiles(
                             supportingText = aiRecommendation.supportingText,
                             footerText = aiRecommendation.footerText,
                             backgroundPainterRes = R.drawable.insight_suggestion,
+                            skyTintTop = livePrayerSkyPalette.top,
+                            skyTintHorizon = livePrayerSkyPalette.horizon,
+                            skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
+                            sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.70f,
+                            adaptiveLightPosition = Offset(
+                                livePrayerSkyPalette.lightX,
+                                livePrayerSkyPalette.lightY,
+                            ),
                             compactProgress = compactProgress,
+                            expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
+                            isExpanded = isExpandedCard,
+                            onLongPress = onCardLongPress,
                             isFocused = isFocused,
                             backgroundPageOffset = {
                                 (pagerState.currentPage - page) +
@@ -1728,6 +2017,7 @@ fun SwipeableBigTiles(
                             actionLabel = when (aiRecommendation.target) {
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
+                                is ContextualRecommendationTarget.Bukhari -> "Play book"
                             },
                             actionDescription = aiRecommendation.actionDescription,
                             onClick = {
@@ -1740,6 +2030,10 @@ fun SwipeableBigTiles(
 
                                     is ContextualRecommendationTarget.FortressDua -> {
                                         onFortressDuaClick(target.dua)
+                                    }
+
+                                    is ContextualRecommendationTarget.Bukhari -> {
+                                        onBukhariBookPlayClick(target.book.id)
                                     }
                                 }
                             },
@@ -2078,7 +2372,19 @@ private fun InsightPreviewCard(
     label: String,
     title: String,
     backgroundPainterRes: Int,
+    foregroundPainterRes: Int? = null,
+    foregroundBaseScale: Float = 1f,
+    foregroundOffsetFraction: Offset = Offset.Zero,
+    skyTintTop: Color? = null,
+    skyTintHorizon: Color? = null,
+    skyTintStrength: Float = 0f,
+    sceneDarkness: Float = 0f,
+    adaptiveLightPosition: Offset? = null,
     compactProgress: Float,
+    expansionProgress: Float = 0f,
+    isExpanded: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
+    fullDayEffect: Boolean = false,
     isFocused: Boolean = false,
     backgroundPageOffset: () -> Float = { 0f },
     luminousAccent: Color = Color(0xFFFFD27A),
@@ -2103,14 +2409,15 @@ private fun InsightPreviewCard(
     actionDescription: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
+    var suppressClickUntilMs by remember { mutableLongStateOf(0L) }
     val hasPrayerContext = !supportingText.isNullOrBlank() ||
         !statusText.isNullOrBlank() ||
         !statusMetaText.isNullOrBlank() ||
         !footerText.isNullOrBlank() ||
         prayerRecap.isNotEmpty()
-    val cornerExtent = (26f - (8f * compactProgress)).dp
+    val cornerExtent = (26f - (8f * compactProgress) + (6f * expansionProgress)).dp
     val shape = ContinuousCornerShape(cornerExtent)
-    val shadowElevation = (6f - (2f * compactProgress)).dp
+    val shadowElevation = (6f - (2f * compactProgress) + (4f * expansionProgress)).dp
     val rawDirectionalRotation = directionalHintBearing?.let { bearing ->
         normalizeDegrees(bearing - (deviceHeadingDegrees ?: 0f))
     }
@@ -2131,6 +2438,36 @@ private fun InsightPreviewCard(
         ),
         label = "liveQiblaDirection",
     )
+    val animatedSkyTop by animateColorAsState(
+        targetValue = skyTintTop ?: Color.Transparent,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "prayerSkyTop",
+    )
+    val animatedSkyHorizon by animateColorAsState(
+        targetValue = skyTintHorizon ?: Color.Transparent,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "prayerSkyHorizon",
+    )
+    val animatedSkyStrength by animateFloatAsState(
+        targetValue = skyTintStrength,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "prayerSkyStrength",
+    )
+    val animatedSceneDarkness by animateFloatAsState(
+        targetValue = sceneDarkness,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "insightSceneDarkness",
+    )
+    val animatedLightX by animateFloatAsState(
+        targetValue = adaptiveLightPosition?.x ?: luminousAnchor.x,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "insightLightX",
+    )
+    val animatedLightY by animateFloatAsState(
+        targetValue = adaptiveLightPosition?.y ?: luminousAnchor.y,
+        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
+        label = "insightLightY",
+    )
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -2146,23 +2483,45 @@ private fun InsightPreviewCard(
             // ripple around the rounded card.
             .clip(shape)
             .then(
-                if (onClick != null) {
-                    Modifier.clickable(onClick = onClick)
-                } else {
-                    Modifier
+                when {
+                    onLongPress != null -> Modifier.combinedClickable(
+                        onClick = {
+                            if (SystemClock.uptimeMillis() >= suppressClickUntilMs) {
+                                onClick?.invoke()
+                            }
+                        },
+                        onLongClickLabel = if (isExpanded) {
+                            "Collapse insight"
+                        } else {
+                            "Expand insight"
+                        },
+                        onLongClick = {
+                            // Expanding changes the card's measured bounds while
+                            // the pointer is still held. Guard the release so the
+                            // newly measured clickable cannot interpret it as a
+                            // separate tap and launch the card action as well.
+                            suppressClickUntilMs = SystemClock.uptimeMillis() + 900L
+                            onLongPress()
+                        },
+                    )
+
+                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    else -> Modifier
                 },
-        ),
+            ),
         shape = shape,
         color = Color(0xFF635A56),
         tonalElevation = 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val cardMaxWidth = maxWidth
-            val tagInset = (11f - (5f * compactProgress)).dp
-            val labelFontSize = (11f - (3f * compactProgress)).sp
-            val titleFontSize = (17f - (5f * compactProgress)).sp
-            val titleLineHeight = (22f - (8f * compactProgress)).sp
-            val defaultHorizontalPadding = (22f - (10f * compactProgress)).dp
+            val tagInset = (11f - (5f * compactProgress) + (3f * expansionProgress)).dp
+            val labelFontSize = (11f - (3f * compactProgress) + expansionProgress).sp
+            val titleFontSize = (17f - (5f * compactProgress) + (3f * expansionProgress)).sp
+            val titleLineHeight = (22f - (8f * compactProgress) + (4f * expansionProgress)).sp
+            val defaultHorizontalPadding = (
+                22f - (10f * compactProgress) + (4f * expansionProgress)
+                ).dp
             val titleHorizontalPadding = if (hasPrayerContext && maxWidth < 240.dp) {
                 // A half-width insight card cannot afford desktop-like 22dp side
                 // insets. Preserve the original footer composition while giving
@@ -2171,12 +2530,12 @@ private fun InsightPreviewCard(
             } else {
                 defaultHorizontalPadding
             }
-            val titleBottomPadding = (16f - (7f * compactProgress)).dp
-            val contentSpacing = (7f - (4f * compactProgress)).dp
-            val supportingFontSize = (13f - (3f * compactProgress)).sp
-            val supportingLineHeight = (17f - (4f * compactProgress)).sp
-            val footerFontSize = (12f - (3f * compactProgress)).sp
-            val footerLineHeight = (16f - (4f * compactProgress)).sp
+            val titleBottomPadding = (16f - (7f * compactProgress) + (4f * expansionProgress)).dp
+            val contentSpacing = (7f - (4f * compactProgress) + (2f * expansionProgress)).dp
+            val supportingFontSize = (13f - (3f * compactProgress) + (2f * expansionProgress)).sp
+            val supportingLineHeight = (17f - (4f * compactProgress) + (3f * expansionProgress)).sp
+            val footerFontSize = (12f - (3f * compactProgress) + expansionProgress).sp
+            val footerLineHeight = (16f - (4f * compactProgress) + (2f * expansionProgress)).sp
             val recapIndicatorSize = (24f - (7f * compactProgress)).dp
             val recapFontSize = (11f - (3f * compactProgress)).sp
             val requestedHeroAccent = MaterialTheme.colorScheme.primaryContainer
@@ -2241,12 +2600,78 @@ private fun InsightPreviewCard(
                         val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
                         val restingMotion = ambientMotion * focusedMotionStrength
                         val imageScale = 1.065f + (restingMotion * 0.006f)
+                        val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                        // The old parallax could move the next page farther than
+                        // this scaled layer's overscan, revealing the card's grey
+                        // Surface along its leading edge. Restrict the shift to
+                        // the pixels that are guaranteed to remain covered.
+                        val maxCoveredHorizontalShift = (
+                            (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
+                            ).coerceAtLeast(0f)
                         scaleX = imageScale
                         scaleY = imageScale
-                        translationX = -pageOffset * 18.dp.toPx()
+                        translationX = requestedTranslationX.coerceIn(
+                            -maxCoveredHorizontalShift,
+                            maxCoveredHorizontalShift,
+                        )
                         translationY = restingMotion * 4.dp.toPx()
                     },
             )
+
+            if (animatedSceneDarkness > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = animatedSceneDarkness)),
+                )
+            }
+
+            if (animatedSkyStrength > 0f) {
+                // Concentrate the time-of-day treatment in the sky and horizon;
+                // fading before the lower content keeps the mosque lighting and
+                // text scrim natural. Every insight supplies the same local-time
+                // palette at a strength suited to its artwork.
+                val skyBrush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to animatedSkyTop.copy(alpha = animatedSkyStrength),
+                        0.42f to animatedSkyHorizon.copy(
+                            alpha = animatedSkyStrength * 0.82f,
+                        ),
+                        0.68f to Color.Transparent,
+                    ),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (fullDayEffect && animatedSceneDarkness < 0.08f) {
+                                Modifier.drawBehind {
+                                    drawRect(
+                                        brush = skyBrush,
+                                        blendMode = BlendMode.Screen,
+                                    )
+                                }
+                            } else {
+                                Modifier.background(skyBrush)
+                            },
+                        ),
+                )
+            }
+
+            if (fullDayEffect) {
+                // The source photograph is intentionally warm and moody. During
+                // daylight, lift the architecture as well as recoloring the sky so
+                // the card reads as daytime instead of a blue-tinted evening shot.
+                val daylight = (1f - (animatedSceneDarkness / 0.18f).coerceIn(0f, 1f))
+                val daylightLift = daylight * animatedSkyStrength * 0.18f
+                if (daylightLift > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.White.copy(alpha = daylightLift)),
+                    )
+                }
+            }
 
             Box(
                 modifier = Modifier
@@ -2262,22 +2687,29 @@ private fun InsightPreviewCard(
             // each photograph. The gradient is cached as a render layer; only its
             // transform and alpha move, so it does not add per-frame image work.
             val luminousDiameter = minOf(cardMaxWidth, maxHeight) * 0.92f
-            val luminousBrush = remember(luminousAccent) {
+            val adaptiveLuminousAccent = lerpColor(
+                luminousAccent,
+                animatedSkyHorizon,
+                0.34f,
+            )
+            val luminousBrush = remember(adaptiveLuminousAccent) {
                 Brush.radialGradient(
                     colorStops = arrayOf(
                         0f to Color.White.copy(alpha = 0.72f),
-                        0.12f to luminousAccent.copy(alpha = 0.52f),
-                        0.48f to luminousAccent.copy(alpha = 0.18f),
+                        0.12f to adaptiveLuminousAccent.copy(alpha = 0.52f),
+                        0.48f to adaptiveLuminousAccent.copy(alpha = 0.18f),
                         1f to Color.Transparent,
                     ),
                 )
             }
+            val resolvedLightX = lerp(luminousAnchor.x, animatedLightX, 0.38f)
+            val resolvedLightY = lerp(luminousAnchor.y, animatedLightY, 0.30f)
             Box(
                 modifier = Modifier
                     .requiredSize(luminousDiameter)
                     .offset(
-                        x = (cardMaxWidth * luminousAnchor.x) - (luminousDiameter / 2f),
-                        y = (maxHeight * luminousAnchor.y) - (luminousDiameter / 2f),
+                        x = (cardMaxWidth * resolvedLightX) - (luminousDiameter / 2f),
+                        y = (maxHeight * resolvedLightY) - (luminousDiameter / 2f),
                     )
                     .graphicsLayer {
                         val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
@@ -2299,6 +2731,33 @@ private fun InsightPreviewCard(
                         )
                     },
             )
+
+            foregroundPainterRes?.let { foregroundRes ->
+                Image(
+                    painter = painterResource(foregroundRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // The subject remains materially stable while the
+                            // independently controlled environment breathes.
+                            // A smaller movement preserves depth without making
+                            // the object appear to float over its background.
+                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val foregroundScale = (1.025f * foregroundBaseScale) +
+                                (restingMotion * 0.002f)
+                            scaleX = foregroundScale
+                            scaleY = foregroundScale
+                            translationX = (-pageOffset * 6.dp.toPx()) +
+                                (restingMotion * 1.5.dp.toPx()) +
+                                (size.width * foregroundOffsetFraction.x)
+                            translationY = (restingMotion * 1.dp.toPx()) +
+                                (size.height * foregroundOffsetFraction.y)
+                        },
+                )
+            }
 
             Box(
                 modifier = Modifier

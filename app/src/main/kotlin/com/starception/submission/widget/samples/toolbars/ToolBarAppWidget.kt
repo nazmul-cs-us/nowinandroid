@@ -27,6 +27,7 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.core.ui.R as CoreUiR
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarButton
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
@@ -52,7 +53,7 @@ class ToolBarAppWidget : GlanceAppWidget() {
     fun WidgetContent() {
         ToolBarLayout(
             appName = "App name",
-            appIconRes = R.drawable.sample_app_logo,
+            appIconRes = R.drawable.flaticon_mosque_uicon,
             headerButton = ToolBarButton(
                 iconRes = R.drawable.sample_mark_prayed_icon,
                 contentDescription = "Mark prayed",
@@ -65,7 +66,7 @@ class ToolBarAppWidget : GlanceAppWidget() {
                     onClick = actionStartDemoActivity("mic button")
                 ),
                 ToolBarButton(
-                    iconRes = R.drawable.sample_quran_icon,
+                    iconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
                     contentDescription = "Quran",
                     onClick = actionStartDemoActivity("share button")
                 ),

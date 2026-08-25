@@ -237,11 +237,15 @@ private fun SilentDuringPrayerSection(
             Switch(
                 checked = preferences.silentDuringPrayerEnabled,
                 onCheckedChange = { enabled ->
+                    // Persist the requested state before leaving for special-access
+                    // settings. Previously enabling from OFF opened Settings and
+                    // returned early, so the feature remained disabled after access
+                    // was granted.
+                    onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
                     if (enabled && !dndGranted()) {
                         openDndAccessSettings()
                         return@Switch
                     }
-                    onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
                 },
             )
         }

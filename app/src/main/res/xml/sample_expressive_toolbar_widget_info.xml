@@ -22,6 +22,7 @@
     android:minResizeWidth="@dimen/sample_expressive_toolbar_widget_min_resize_width"
     android:minWidth="@dimen/sample_expressive_toolbar_widget_min_width"
     android:previewImage="@drawable/sample_expressive_toolbar_preview"
+    android:previewLayout="@layout/widget_preview_quick_actions"
     android:resizeMode="horizontal|vertical"
     android:targetCellHeight="@integer/sample_expressive_toolbar_target_cell_height"
     android:targetCellWidth="@integer/sample_expressive_toolbar_target_cell_width"

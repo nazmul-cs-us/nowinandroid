@@ -21,6 +21,8 @@ import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.silent.PrayerSilentModeController
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.prayer.util.FileLogger
+import com.starception.submission.sync.workers.DelegatingWorker
+import com.starception.submission.sync.workers.delegatedData
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -116,14 +118,11 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             )
         }.getOrNull() ?: return
         if (!preferences.silentDuringPrayerEnabled) return
-        // "Go to Mosque" phase delays the silent window so the user has time to
-        // travel before their phone goes silent. Once the delay elapses, the
-        // scheduled StartPrayerSilentReceiver flips DND on for the configured
-        // silent-during-prayer duration.
-        val delayMin = preferences.goToMosqueDurationFor(prayerName)
-        PrayerSilentModeController(context.applicationContext).scheduleStartAfter(
+        // This setting promises silence DURING prayer, so start DND at the prayer
+        // boundary. The separate "Go to Mosque" duration describes the live prayer
+        // phase and must not postpone the user's silent window by 10–20 minutes.
+        PrayerSilentModeController(context.applicationContext).enableForPrayer(
             prayerName = prayerName,
-            delayMinutes = delayMin,
             durationMinutes = preferences.silentDuringPrayerMinutes,
         )
     }
@@ -135,12 +134,13 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         notificationType: String
     ) {
         val inputData = Data.Builder()
+            .putAll(PrayerNotificationWorker::class.delegatedData())
             .putString(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
             .putString(PrayerNotificationWorker.PRAYER_TIME_KEY, prayerTime)
             .putString(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
             .build()
         
-        val workRequest = OneTimeWorkRequestBuilder<PrayerNotificationWorker>()
+        val workRequest = OneTimeWorkRequestBuilder<DelegatingWorker>()
             .setInputData(inputData)
             .setInitialDelay(0, TimeUnit.MILLISECONDS) // Execute immediately
             .addTag("prayer_notification")

@@ -19,6 +19,7 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.core.ui.R as CoreUiR
 import com.starception.submission.widget.samples.collections.data.FakeImageTextListDataRepository
 import com.starception.submission.widget.samples.collections.data.FakeImageTextListDataRepository.Companion.getImageTextListDataRepo
 import com.starception.submission.widget.samples.collections.layout.ImageTextListItemData
@@ -78,7 +79,7 @@ class ImageTextListAppWidget : GlanceAppWidget() {
       title = context.getString(
         R.string.sample_text_and_image_list_app_widget_name
       ),
-      titleIconRes = R.drawable.sample_image_icon,
+      titleIconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
       titleBarActionIconRes = R.drawable.sample_refresh_icon,
       titleBarActionIconContentDescription = context.getString(
         R.string.sample_refresh_icon_button_label

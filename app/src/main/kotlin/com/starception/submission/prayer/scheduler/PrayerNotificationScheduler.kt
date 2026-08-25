@@ -9,6 +9,8 @@ import android.provider.Settings
 import android.util.Log
 import androidx.work.*
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
+import com.starception.submission.sync.workers.DelegatingWorker
+import com.starception.submission.sync.workers.delegatedData
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -238,11 +240,27 @@ object PrayerNotificationScheduler {
         val delayMillis = java.time.Duration.between(currentTime, notificationTime).toMillis()
 
         if (delayMillis > 0) {
-            // Use BOTH systems for maximum reliability
-            // 1. WorkManager (good for reliability and constraints)
-            scheduleWithWorkManager(context, prayerName, prayerTime, notificationType, delayMillis, priorMinutes)
+            // WorkManager is also the fallback prayer-boundary trigger for DND when
+            // exact alarms are unavailable. A main-prayer job must therefore remain
+            // scheduled when silent mode is enabled, even if this prayer's bell is off.
+            val notificationsEnabled = isNotificationEnabledForPrayer(context, prayerName)
+            val needsSilentModeFallback =
+                notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
+                    isSilentDuringPrayerEnabled(context)
+            if (notificationsEnabled || needsSilentModeFallback) {
+                scheduleWithWorkManager(
+                    context,
+                    prayerName,
+                    prayerTime,
+                    notificationType,
+                    delayMillis,
+                    priorMinutes,
+                )
+            } else {
+                Log.d(TAG, "🔕 Skipping WorkManager path for $prayerName")
+            }
 
-            // 2. AlarmManager (best for exact timing, works even in deep sleep)
+            // AlarmManager also owns the independent silent-mode path.
             scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode, priorMinutes)
         }
     }
@@ -256,13 +274,14 @@ object PrayerNotificationScheduler {
         priorMinutes: Int = 10
     ) {
         val inputData = Data.Builder()
+            .putAll(PrayerNotificationWorker::class.delegatedData())
             .putString(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
             .putString(PrayerNotificationWorker.PRAYER_TIME_KEY, prayerTime)
             .putString(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
             .putInt(PrayerNotificationWorker.PRIOR_MINUTES_KEY, priorMinutes)
             .build()
         
-        val workRequest = OneTimeWorkRequestBuilder<PrayerNotificationWorker>()
+        val workRequest = OneTimeWorkRequestBuilder<DelegatingWorker>()
             .setInputData(inputData)
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
             .addTag("prayer_notification")

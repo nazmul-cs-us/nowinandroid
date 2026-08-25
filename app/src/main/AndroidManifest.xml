@@ -121,6 +121,13 @@
                 <data android:scheme="starception" />
                 <data android:host="course" />
             </intent-filter>
+
+            <!-- Configuration destination for the app-owned Prayer Time mode used
+                 by Android 15+ to activate Do Not Disturb during prayer. -->
+            <intent-filter>
+                <action android:name="android.app.action.AUTOMATIC_ZEN_RULE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
         
         <!-- location for prayer-time positioning + specialUse for the persistent

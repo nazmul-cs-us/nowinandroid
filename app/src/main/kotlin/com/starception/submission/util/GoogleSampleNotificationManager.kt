@@ -38,6 +38,8 @@ import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationTrackerIcon
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -606,6 +608,10 @@ object GoogleSampleNotificationManager {
             val isNewPrayer = (currentPrayerName != lastAdhanPrayerName || currentPrayerTime != lastAdhanPrayerTime)
             val timeSinceLastAdhan = System.currentTimeMillis() - lastAdhanPlayedTime
             val isEnoughTimePassedSinceLastAdhan = timeSinceLastAdhan > 60_000  // At least 1 minute since last Adhan
+            // The home prayer tile and notification settings both persist the bell state in
+            // prayer_settings. This live-update path used to bypass that state completely,
+            // which allowed it to play Adhan after a prayer's bell had been turned off.
+            val isPrayerNotificationEnabled = isNotificationEnabledForPrayer(currentPrayerName)
 
             // CRITICAL: Don't play Adhan within 2 minutes of app startup - PERIOD!
             val timeSinceAppStart = System.currentTimeMillis() - appInitializedTime
@@ -636,7 +642,8 @@ object GoogleSampleNotificationManager {
                                   isNearPrayerTime &&
                                   isNewPrayer &&
                                   newPhase == 0 &&
-                                  isEnoughTimePassedSinceLastAdhan
+                                  isEnoughTimePassedSinceLastAdhan &&
+                                  isPrayerNotificationEnabled
 
             if (shouldPlayAdhan) {
                 android.util.Log.d("GoogleSampleNotificationManager",
@@ -660,6 +667,7 @@ object GoogleSampleNotificationManager {
                     isVeryFirstNotification -> "First notification after app start - NEVER play Adhan on startup"
                     !isAppRunningLongEnough -> "App just started (${timeSinceAppStart/1000}s ago) - waiting 120s before allowing Adhan"
                     !isNearPrayerTime -> "Already past prayer time (progress: ${progress}%)"
+                    !isPrayerNotificationEnabled -> "Notifications disabled for $currentPrayerName"
                     !isNewPrayer -> "Already played Adhan for ${currentPrayerName} at ${currentPrayerTime}"
                     !isEnoughTimePassedSinceLastAdhan -> "Too soon since last Adhan (${timeSinceLastAdhan/1000}s ago)"
                     else -> "Unknown reason"
@@ -921,6 +929,35 @@ object GoogleSampleNotificationManager {
             }
         } catch (e: Exception) {
             android.util.Log.e("GoogleSampleNotificationManager", "❌ Failed to play Adhan sound", e)
+        }
+    }
+
+    /**
+     * Re-read the persisted preference immediately before playback. Live-update notifications
+     * can remain active for hours, so an in-memory snapshot would miss a bell toggle changed
+     * from the home prayer tile after the service started.
+     */
+    private fun isNotificationEnabledForPrayer(prayerName: String): Boolean {
+        val normalizedPrayerName = when (prayerName.lowercase()) {
+            "jumu'ah", "jumuah", "jummah", "friday prayer" -> "Dhuhr"
+            else -> prayerName
+        }
+        val settingsPrefs = appContext.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+        val encodedPreferences = settingsPrefs.getString("notification_preferences_json", null)
+            ?: return true
+        return runCatching {
+            Json { ignoreUnknownKeys = true }.decodeFromString(
+                PrayerNotificationPreferences.serializer(),
+                encodedPreferences,
+            ).isNotificationEnabledForPrayer(normalizedPrayerName)
+        }.getOrElse { error ->
+            // A corrupted preference must never result in unsolicited audio.
+            android.util.Log.e(
+                "GoogleSampleNotificationManager",
+                "Unable to verify the Adhan preference for $prayerName; blocking playback",
+                error,
+            )
+            false
         }
     }
 }

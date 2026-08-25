@@ -21,6 +21,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:previewImage="@drawable/sample_image_grid_preview"
+    android:previewLayout="@layout/widget_preview_quran_grid"
     android:minHeight="@dimen/sample_image_grid_widget_min_height"
     android:minResizeHeight="@dimen/sample_image_grid_widget_min_resize_height"
     android:minResizeWidth="@dimen/sample_image_grid_widget_min_resize_width"

@@ -441,6 +441,7 @@ fun NiaNavHost(
             onSurahClick = { surahNumber -> navController.navigateToSurah(surahNumber, null) },
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
             onFortressDuaClick = navController::navigateToFortressDua,
+            onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
             onMediaSourceClick = { source -> navController.navigateToMediaSourceDetail(source) },
             downloadProgress = homeDownloadProgress,
             downloadLabel = homeDownloadLabel,

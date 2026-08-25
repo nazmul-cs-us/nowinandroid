@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/prayer_widget_background"
+    android:orientation="vertical"
+    android:padding="12dp"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="19dp"
+            android:layout_height="19dp"
+            android:contentDescription="@null"
+            android:src="@drawable/flaticon_magic_book_9061096"
+            android:tint="@color/prayer_widget_accent" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="7dp"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="Quran Surahs"
+            android:textColor="@color/prayer_widget_on_background"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="19dp"
+            android:layout_height="19dp"
+            android:contentDescription="@null"
+            android:src="@drawable/sample_refresh_icon"
+            android:tint="@color/prayer_widget_muted" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        android:background="@drawable/prayer_widget_card_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="7dp">
+
+        <ImageView
+            android:layout_width="50dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/prayer_widget_chip_background"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/surah_001_al_fatihah" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="9dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="Surah Al-Fatihah"
+                android:textColor="@color/prayer_widget_on_card"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="7 ayahs · Meccan"
+                android:textColor="@color/prayer_widget_muted"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="19dp"
+            android:layout_height="19dp"
+            android:contentDescription="@null"
+            android:src="@drawable/sample_heart_icon"
+            android:tint="@color/prayer_widget_accent" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="7dp">
+
+        <ImageView
+            android:layout_width="50dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/prayer_widget_chip_background"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/surah_002_al_baqarah" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="9dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="Surah Al-Baqarah"
+                android:textColor="@color/prayer_widget_on_background"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="286 ayahs · Medinan"
+                android:textColor="@color/prayer_widget_muted"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="19dp"
+            android:layout_height="19dp"
+            android:contentDescription="@null"
+            android:src="@drawable/sample_heart_icon"
+            android:tint="@color/prayer_widget_muted" />
+    </LinearLayout>
+</LinearLayout>

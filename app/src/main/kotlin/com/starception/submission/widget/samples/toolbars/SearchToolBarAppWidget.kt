@@ -26,6 +26,7 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.core.ui.R as CoreUiR
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarButton
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
@@ -51,7 +52,7 @@ class SearchToolBarAppWidget : GlanceAppWidget() {
   fun WidgetContent() {
     SearchToolBarLayout(
       searchButton = SearchToolBarButton(
-        iconRes = R.drawable.sample_search_icon,
+        iconRes = CoreUiR.drawable.flaticon_search_152536,
         contentDescription = "Search notes",
         text = "Search",
         onClick = actionStartDemoActivity("search notes button")
@@ -73,7 +74,7 @@ class SearchToolBarAppWidget : GlanceAppWidget() {
           onClick = actionStartDemoActivity("camera button")
         ),
         SearchToolBarButton(
-          iconRes = R.drawable.sample_quran_icon,
+          iconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
           contentDescription = "Quran",
           onClick = actionStartDemoActivity("share button")
         ),

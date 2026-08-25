@@ -23,14 +23,12 @@ import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
-import com.starception.submission.prayer.scheduler.PrayerNotificationScheduler
+import com.starception.submission.prayer.silent.PrayerSilentModeController
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
@@ -83,6 +81,32 @@ class PrayerNotificationWorker @AssistedInject constructor(
             val prayerTime = inputData.getString(PRAYER_TIME_KEY) ?: ""
             val notificationType = inputData.getString(NOTIFICATION_TYPE_KEY) ?: TYPE_PRAYER_TIME
 
+            // Work may have been queued hours before the user changed the bell
+            // toggle. Re-check persisted preferences at execution time before
+            // creating a channel, posting a notification, or starting Adhan.
+            // The storage-backed read also handles a Worker starting in a fresh
+            // process before the repository's in-memory flows have initialized.
+            val notificationPreferences =
+                prayerSettingsRepository.getNotificationPreferencesFromStorage()
+            if (notificationType == TYPE_PRAYER_TIME &&
+                notificationPreferences.silentDuringPrayerEnabled
+            ) {
+                // WorkManager is the fallback when an exact AlarmManager delivery is
+                // unavailable. Apply DND here as well; the controller is idempotent when
+                // the exact receiver already started the same prayer session.
+                PrayerSilentModeController(applicationContext).enableForPrayer(
+                    prayerName = prayerName,
+                    durationMinutes = notificationPreferences.silentDuringPrayerMinutes,
+                )
+            }
+            if (!notificationPreferences.isNotificationEnabledForPrayer(prayerName)) {
+                Log.i(
+                    TAG,
+                    "🔕 $prayerName notification disabled — skipping notification and Adhan",
+                )
+                return@withContext Result.success()
+            }
+
             // Get prior minutes from input data, or fetch from settings
             val priorMinutes = inputData.getInt(PRIOR_MINUTES_KEY, -1).let { inputMinutes ->
                 if (inputMinutes > 0) {
@@ -103,11 +127,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
             when (notificationType) {
                 TYPE_PRAYER_TIME -> showPrayerTimeNotification(prayerName, prayerTime)
                 TYPE_REMINDER -> showPrayerReminderNotification(prayerName, prayerTime, priorMinutes)
-            }
-            
-            // Schedule next prayer if this is a prayer time notification
-            if (notificationType == TYPE_PRAYER_TIME) {
-                scheduleNextPrayerNotification()
             }
             
             Log.d(TAG, "✅ PrayerNotificationWorker completed successfully")
@@ -290,26 +309,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
         notificationManager.notify(NOTIFICATION_ID + 1, notification)
 
         Log.d(TAG, "📱 Posted prayer reminder notification: $prayerName at $prayerTime ($priorMinutes min before)")
-    }
-
-    private suspend fun scheduleNextPrayerNotification() {
-        try {
-            // For now, schedule a simple test notification
-            // TODO: Integrate with actual prayer time calculation service
-            Log.d(TAG, "📅 Scheduling next prayer notification (simplified version)")
-            
-            // Schedule a test notification for 1 minute from now
-            val testTime = LocalTime.now().plusMinutes(1)
-            PrayerNotificationScheduler.schedulePrayerNotification(
-                applicationContext,
-                "Test Prayer",
-                testTime.format(DateTimeFormatter.ofPattern("h:mm a"))
-            )
-            
-            Log.d(TAG, "📅 Scheduled test prayer notification at ${testTime}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to schedule next prayer notification", e)
-        }
     }
 
 }
