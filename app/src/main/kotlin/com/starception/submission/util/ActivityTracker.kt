@@ -46,6 +46,7 @@ import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.QuranData
+import com.starception.submission.prayer.util.FileLogger
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -489,6 +490,8 @@ object ActivityTracker {
             // DrivingAudioService owns the authoritative cooldown timestamp and writes
             // it only after playback starts. Refresh it before every eligibility check.
             refreshLastDuaPlayTime()
+            refreshTripState()
+            drivingStartTime = currentTime
 
             // Check if travel dua feature is enabled
             if (!travelDuaEnabled) {
@@ -500,6 +503,11 @@ object ActivityTracker {
             val timeSinceLastDua = currentTime - lastDuaPlayTime
             val gapSinceLastDriving = currentTime - drivingStopTime
             val cooldownMinutes = travelDuaCooldownMillis / 60000
+            val resumedWithinTripGap = TravelDuaPolicy.isWithinTripGap(
+                drivingStopTimeMillis = drivingStopTime,
+                nowMillis = currentTime,
+                gapToleranceMillis = travelDuaGapToleranceMillis,
+            )
 
             // Enhanced diagnostic logging for cooldown debugging
             Log.i("ActivityTracker", "🚗 ========== DRIVING DETECTED ==========")
@@ -507,6 +515,32 @@ object ActivityTracker {
             Log.i("ActivityTracker", "🚗 Last dua played: ${if (lastDuaPlayTime == 0L) "NEVER" else "${timeSinceLastDua / 1000}s ago"}")
             Log.i("ActivityTracker", "🚗 Cooldown setting: ${cooldownMinutes}min (${travelDuaCooldownMillis}ms)")
             Log.i("ActivityTracker", "🚗 Cooldown status: ${if (timeSinceLastDua < travelDuaCooldownMillis) "ACTIVE ⏳" else "EXPIRED ✅"}")
+            FileLogger.i(
+                "ActivityTracker",
+                "Driving entered: previous=$oldActivity, gapMs=${gapSinceLastDriving.takeIf { drivingStopTime > 0L } ?: "none"}, " +
+                    "sameTrip=$resumedWithinTripGap, duaPlayedThisTrip=$duaPlayedForCurrentSession",
+            )
+
+            // The configurable gap is the journey boundary. A traffic stop shorter than
+            // this remains the same trip, regardless of whether the playback cooldown has
+            // expired since the dua originally played.
+            if (resumedWithinTripGap && duaPlayedForCurrentSession) {
+                FileLogger.i(
+                    "ActivityTracker",
+                    "Travel Dua suppressed: resumed same trip after ${gapSinceLastDriving / 1000}s",
+                )
+                lastDrivingTime = currentTime
+                return
+            }
+
+            if (drivingStopTime > 0L && !resumedWithinTripGap) {
+                FileLogger.i(
+                    "ActivityTracker",
+                    "Previous trip ended after ${gapSinceLastDriving / 1000}s gap; clearing trip playback state",
+                )
+                resetDrivingAccumulation(clearPlayedState = true)
+                drivingStartTime = currentTime
+            }
 
             // Check if dua cooldown has passed
             if (timeSinceLastDua < travelDuaCooldownMillis) {
@@ -519,8 +553,7 @@ object ActivityTracker {
             Log.i("ActivityTracker", "🚗 ✅ Cooldown check PASSED - proceeding to schedule dua")
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
-            if (drivingStopTime > 0 && gapSinceLastDriving < travelDuaGapToleranceMillis) {
-                drivingStartTime = currentTime
+            if (resumedWithinTripGap) {
 
                 // If dua already played for this trip/session, never replay within gap tolerance.
                 if (duaPlayedForCurrentSession) {
@@ -539,8 +572,7 @@ object ActivityTracker {
                         // Already accumulated enough time, play dua now
                         Log.i("ActivityTracker", "🎵 Accumulated ${accumulatedDrivingTime / 1000}s driving - scheduling immediate wake-up")
                         scheduleDrivingDuaWithRemainingTime(0L)
-                        resetDrivingAccumulation()
-                        duaPlayedForCurrentSession = true
+                        resetDrivingAccumulation(clearPlayedState = false)
                         // Set driving start time since user is now driving
                         drivingStartTime = currentTime
                     }
@@ -554,13 +586,11 @@ object ActivityTracker {
                 // FRESH START: New driving session (first time or gap exceeds tolerance)
                 val delaySeconds = travelDuaPlaybackDelayMillis / 1000
                 Log.i("ActivityTracker", "🚗 New driving session started - scheduling travel dua in ${delaySeconds}s")
-                if (duaPlayedForCurrentSession) {
-                    Log.i("ActivityTracker", "🚦 Dua already played this trip - starting fresh countdown (not replaying at signal)")
-                } else if (gapSinceLastDriving >= travelDuaGapToleranceMillis && drivingStopTime > 0) {
+                if (gapSinceLastDriving >= travelDuaGapToleranceMillis && drivingStopTime > 0) {
                     val gapToleranceMinutes = travelDuaGapToleranceMillis / 60000
                     Log.d("ActivityTracker", "   Gap was ${gapSinceLastDriving / 1000}s (> ${gapToleranceMinutes}min) - resetting accumulation")
                 }
-                resetDrivingAccumulation()
+                resetDrivingAccumulation(clearPlayedState = true)
                 drivingStartTime = currentTime
                 scheduleDrivingDuaWithDelay()
             }
@@ -570,14 +600,21 @@ object ActivityTracker {
 
         // ========== DRIVING STOPPED ==========
         if (normalizedActivity != "Driving" && oldActivity == "Driving") {
+            refreshTripState()
             // Calculate how long we were driving in this session
-            val sessionDrivingTime = currentTime - drivingStartTime
+            val sessionDrivingTime = (currentTime - drivingStartTime).coerceAtLeast(0L)
             accumulatedDrivingTime += sessionDrivingTime
             drivingStopTime = currentTime
+            persistTripStopTime(currentTime)
 
             val delaySeconds = travelDuaPlaybackDelayMillis / 1000
             Log.i("ActivityTracker", "🛑 Driving stopped after ${sessionDrivingTime / 1000}s")
             Log.i("ActivityTracker", "   Total accumulated: ${accumulatedDrivingTime / 1000}s / ${delaySeconds}s needed")
+            FileLogger.i(
+                "ActivityTracker",
+                "Driving stopped: sessionMs=$sessionDrivingTime, accumulatedMs=$accumulatedDrivingTime, " +
+                    "duaPlayedThisTrip=$duaPlayedForCurrentSession",
+            )
 
             // Cancel pending dua - we'll reschedule with remaining time if driving resumes
             cancelPendingDua()
@@ -605,11 +642,22 @@ object ActivityTracker {
     /**
      * Reset driving time accumulation (for fresh start)
      */
-    private fun resetDrivingAccumulation() {
+    private fun resetDrivingAccumulation(clearPlayedState: Boolean = true) {
         accumulatedDrivingTime = 0L
         drivingStopTime = 0L
         drivingStartTime = 0L
-        duaPlayedForCurrentSession = false
+        if (clearPlayedState) {
+            duaPlayedForCurrentSession = false
+        }
+        context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.remove(TravelDuaSettings.KEY_DRIVING_STOP_TIME)
+            ?.apply {
+                if (clearPlayedState) {
+                    putBoolean(TravelDuaSettings.KEY_DUA_PLAYED_FOR_CURRENT_TRIP, false)
+                }
+            }
+            ?.apply()
     }
     
     /**
@@ -942,8 +990,14 @@ object ActivityTracker {
                 "⏰ Travel Dua wake-up alarm scheduled in ${safeDelay / 1000}s " +
                     "(token=$sessionToken)",
             )
+            FileLogger.i(
+                "ActivityTracker",
+                "Travel Dua alarm scheduled: delayMs=$safeDelay, token=$sessionToken, " +
+                    "duaPlayedThisTrip=$duaPlayedForCurrentSession",
+            )
         } catch (e: Exception) {
             Log.e("ActivityTracker", "Failed to schedule Travel Dua wake-up alarm", e)
+            FileLogger.e("ActivityTracker", "Failed to schedule Travel Dua wake-up alarm", e)
             clearPendingAlarmState(ctx)
         }
     }
@@ -993,6 +1047,30 @@ object ActivityTracker {
                 Context.MODE_PRIVATE,
             ).getLong(KEY_LAST_DUA_PLAY_TIME, lastDuaPlayTime)
         }
+    }
+
+    private fun refreshTripState() {
+        context?.let { ctx ->
+            val prefs = ctx.getSharedPreferences(
+                TravelDuaSettings.PREFS_NAME,
+                Context.MODE_PRIVATE,
+            )
+            duaPlayedForCurrentSession = prefs.getBoolean(
+                TravelDuaSettings.KEY_DUA_PLAYED_FOR_CURRENT_TRIP,
+                duaPlayedForCurrentSession,
+            )
+            drivingStopTime = prefs.getLong(
+                TravelDuaSettings.KEY_DRIVING_STOP_TIME,
+                drivingStopTime,
+            )
+        }
+    }
+
+    private fun persistTripStopTime(stopTimeMillis: Long) {
+        context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putLong(TravelDuaSettings.KEY_DRIVING_STOP_TIME, stopTimeMillis)
+            ?.apply()
     }
 
     /**
@@ -2185,6 +2263,11 @@ object ActivityTracker {
 
             // CRITICAL: Load persisted cooldown timestamp to survive app restarts
             lastDuaPlayTime = prefs.getLong(KEY_LAST_DUA_PLAY_TIME, 0L)
+            duaPlayedForCurrentSession = prefs.getBoolean(
+                TravelDuaSettings.KEY_DUA_PLAYED_FOR_CURRENT_TRIP,
+                false,
+            )
+            drivingStopTime = prefs.getLong(TravelDuaSettings.KEY_DRIVING_STOP_TIME, 0L)
             // Only restore Google authority when a Travel Dua is still pending. This
             // preserves the countdown across a sticky service/process restart without
             // allowing a missed EXIT to leave driving latched after playback completes.

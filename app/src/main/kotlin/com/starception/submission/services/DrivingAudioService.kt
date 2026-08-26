@@ -48,6 +48,7 @@ import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.VoiceCompletionManager
@@ -1588,10 +1589,17 @@ class DrivingAudioService : Service() {
             getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putLong(KEY_LAST_DUA_PLAY_TIME, now)
+                .putBoolean(TravelDuaSettings.KEY_DUA_PLAYED_FOR_CURRENT_TRIP, true)
+                .remove(TravelDuaSettings.KEY_DRIVING_STOP_TIME)
                 .apply()
             Log.i(TAG, "🚗 Cooldown persisted at playback start")
+            FileLogger.i(
+                TAG,
+                "Travel Dua playback started; current trip marked as already played",
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Failed to persist travel dua start time: ${e.message}")
+            FileLogger.e(TAG, "Failed to persist Travel Dua trip state", e)
         }
     }
 

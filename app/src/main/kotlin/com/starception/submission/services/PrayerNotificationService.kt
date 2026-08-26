@@ -84,6 +84,7 @@ class PrayerNotificationService : Service() {
     private var activityTransitionPendingIntent: PendingIntent? = null
     private var currentActivity: String = "UNKNOWN"
     private var hasLocationForegroundType = false
+    private var lastForegroundNotification: Notification? = null
     private var toneGenerator: ToneGenerator? = null
     private var timezoneReceiver: BroadcastReceiver? = null
 
@@ -240,6 +241,10 @@ class PrayerNotificationService : Service() {
      * without "Allow all the time" falls back to specialUse so boot remains reliable.
      */
     private fun startForegroundWithSafeTypes(notification: Notification) {
+        // Retain the current notification so a later duplicate foreground-service
+        // start can acknowledge Android's new promotion deadline without replacing
+        // the live prayer content with the startup placeholder.
+        lastForegroundNotification = notification
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val hasFineLocation = ContextCompat.checkSelfPermission(
                 this,
@@ -288,14 +293,16 @@ class PrayerNotificationService : Service() {
         Log.d(TAG, "Prayer notification service onStartCommand - startId: $startId, isServiceRunning: $isServiceRunning")
 
         if (isServiceRunning) {
-            // The service may originally have been cold-started at boot as specialUse.
-            // A later start while the app is visible is our opportunity to add the
-            // location FGS type and restore unthrottled driving-speed updates.
-            if (!hasLocationForegroundType) {
-                startForegroundWithSafeTypes(createInitialNotification())
-            }
+            // Every startForegroundService() request creates a fresh promotion
+            // deadline on affected Samsung/Android builds, even when this Service
+            // instance is already foreground. Always acknowledge the duplicate start.
+            // Reuse the current live notification so app resume does not flash the
+            // generic startup notification.
+            startForegroundWithSafeTypes(
+                lastForegroundNotification ?: createInitialNotification(),
+            )
             handleActivityTransitionIntent(intent)
-            Log.w(TAG, "Service already running, ignoring duplicate start - startId: $startId")
+            Log.i(TAG, "Service already running; foreground start re-acknowledged - startId: $startId")
             return START_STICKY
         }
 
@@ -873,18 +880,26 @@ class PrayerNotificationService : Service() {
                     // ONLY use Google's proven Live Update system for Android 16+
                     if (Build.VERSION.SDK_INT >= 35) {
                         try {
+                            // ProgressStyle only exposes two content lines on Samsung.
+                            // Keep the visible payload focused on elapsed time + next
+                            // prayer; the complete detail still feeds the weather
+                            // tracker icon without appending weather/advice as text.
+                            val nextPrayerDetail = detailedMessage
+                                .lineSequence()
+                                .firstOrNull { it.isNotBlank() }
+                                .orEmpty()
                             // FIX: Build notification and use startForeground() to maintain foreground service priority
                             // Previously using postPrayerNotification() which called notify() directly,
                             // removing the FOREGROUND_SERVICE flag and causing OOM adj to spike to 915
                             val liveUpdateNotification = GoogleSampleNotificationManager.buildPrayerNotification(
                                 title = title,
                                 content = content,
-                                detailedMessage = detailedMessage,
+                                detailedMessage = nextPrayerDetail,
                                 progress = progress,
                                 prayerPhase = prayerPhase,
                                 prayerName = prayerName,
                                 prayerTime = prayerTime,
-                                nextPrayerCountdown = detailedMessage.trim(), // Pass countdown for status chip
+                                nextPrayerCountdown = nextPrayerDetail,
                                 weatherSummary = detailedMessage,
                             )
 
@@ -1975,6 +1990,7 @@ class PrayerNotificationService : Service() {
             // Reset flags FIRST to stop all loops immediately
             isServiceRunning = false
             isInitializing = false
+            lastForegroundNotification = null
             
             // Cancel all coroutines immediately
             serviceScope.cancel()

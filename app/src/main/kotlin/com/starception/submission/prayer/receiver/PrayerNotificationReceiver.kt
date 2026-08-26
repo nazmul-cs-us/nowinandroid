@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -179,7 +180,6 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 prayerName = displayName,
                 prayerTimeText = prayerTime,
             )
-
             val notificationId = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) 2001 else 2002
 
             // Create PendingIntent to open app when notification is tapped
@@ -194,26 +194,29 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             )
 
             // Create large icon from app launcher icon
-            val largeIcon = ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.toBitmap()
+            val largeIcon = prayerWeatherNotificationBitmap(
+                context = context,
+                summary = weatherInsight?.summary,
+            ) ?: ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.toBitmap()
 
             val notification = if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 // Prayer time notification - when it's actually prayer time
+                val compactWeather = weatherInsight?.summary?.substringBefore(" · ")
+                val compactContent = listOfNotNull(
+                    "$displayName began at $prayerTime",
+                    compactWeather,
+                ).joinToString(" · ")
+                val expandedContent = buildList {
+                    add("$displayName began at $prayerTime.")
+                    weatherInsight?.let { add("${it.summary} — ${it.advice}") }
+                    add("")
+                    add("اَللّٰهُمَّ تَقَبَّلْ مِنَّا")
+                    add("O Allah, accept from us.")
+                }.joinToString("\n")
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$displayName Prayer")
-                    .setContentText(
-                        listOfNotNull(
-                            "It's time for $displayName • $prayerTime",
-                            weatherInsight?.summary,
-                        ).joinToString(" · "),
-                    )
-                    .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("$displayName Prayer Time\n\n" +
-                                "Time: $prayerTime\n" +
-                                weatherInsight?.let {
-                                    "${it.notificationLine}\n${it.advice}\n"
-                                }.orEmpty() +
-                                "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
-                                "(O Allah, accept from us)"))
+                    .setContentTitle("It's time for $displayName")
+                    .setContentText(compactContent)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setLargeIcon(largeIcon)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -225,20 +228,21 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .build()
             } else {
                 // Prayer reminder notification - X minutes before prayer (user configurable)
+                val reminderLeadTime = if (priorMinutes == 1) "1 minute" else "$priorMinutes minutes"
+                val compactWeather = weatherInsight?.summary?.substringBefore(" · ")
+                val compactContent = listOfNotNull(
+                    "Prayer begins at $prayerTime",
+                    compactWeather,
+                ).joinToString(" · ")
+                val expandedContent = buildList {
+                    add("Prayer begins at $prayerTime.")
+                    weatherInsight?.let { add("${it.summary} — ${it.advice}") }
+                    add("Take a moment to prepare.")
+                }.joinToString("\n")
                 NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setContentTitle("$displayName in $priorMinutes min")
-                    .setContentText(
-                        listOfNotNull(
-                            "Starts at $prayerTime",
-                            weatherInsight?.summary,
-                        ).joinToString(" · "),
-                    )
-                    .setStyle(NotificationCompat.BigTextStyle()
-                        .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
-                                "Time: $prayerTime\n" +
-                                weatherInsight?.let {
-                                    "${it.notificationLine}\n${it.advice}\n"
-                                }.orEmpty()))
+                    .setContentTitle("$displayName in $reminderLeadTime")
+                    .setContentText(compactContent)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
                     .setSmallIcon(R.drawable.ic_prayer)
                     .setLargeIcon(largeIcon)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)

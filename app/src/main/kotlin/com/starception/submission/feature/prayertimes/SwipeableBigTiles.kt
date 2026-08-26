@@ -27,7 +27,6 @@
  */
 package com.starception.submission.feature.prayertimes
 
-import android.content.pm.ApplicationInfo
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -1145,9 +1144,6 @@ private const val INSIGHT_INDICATOR_STYLE_KEY = "insight_indicator_style"
  */
 private const val INSIGHT_CARD_ASPECT_RATIO = 250f / 288f
 
-/** One accelerated 24-hour Prayer Now preview cycle in debug builds. */
-private const val PRAYER_NOW_DAY_PREVIEW_DURATION_MS = 48_000L
-
 private data class PrayerSkyPalette(
     val top: Color,
     val horizon: Color,
@@ -1517,33 +1513,9 @@ fun SwipeableBigTiles(
     val livePrayerSkyPalette = remember(currentTime, prayerTimes) {
         prayerSkyPalette(currentTime = currentTime, prayerTimes = prayerTimes)
     }
-    val prayerNowPreviewEnabled = remember(context) {
-        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-    }
-    val prayerNowEffectTime = if (prayerNowPreviewEnabled) {
-        val previewTime by produceState(
-            initialValue = LocalTime.MIDNIGHT,
-            key1 = prayerTimes,
-        ) {
-            val previewStartedAt = SystemClock.elapsedRealtime()
-            while (true) {
-                val elapsed = SystemClock.elapsedRealtime() - previewStartedAt
-                val cycleFraction =
-                    (elapsed % PRAYER_NOW_DAY_PREVIEW_DURATION_MS).toFloat() /
-                        PRAYER_NOW_DAY_PREVIEW_DURATION_MS.toFloat()
-                val secondOfDay = (cycleFraction * 86_400f)
-                    .toLong()
-                    .coerceIn(0L, 86_399L)
-                value = LocalTime.ofSecondOfDay(secondOfDay)
-                // Ten visual updates per second keeps the long color transitions
-                // smooth without recomposing the image-heavy carousel every frame.
-                delay(100L)
-            }
-        }
-        previewTime
-    } else {
-        currentTime
-    }
+    // Use real local time in every build. The accelerated debug preview made the
+    // generated skies loop continuously instead of remaining at the current phase.
+    val prayerNowEffectTime = currentTime
     val prayerNowSkyPalette = remember(prayerNowEffectTime, prayerTimes) {
         prayerSkyPalette(currentTime = prayerNowEffectTime, prayerTimes = prayerTimes)
     }
@@ -1568,12 +1540,15 @@ fun SwipeableBigTiles(
     val prayerNowSkyResource = remember(prayerNowSkyPhase, prayerNowSkyWeather) {
         prayerSkyResource(prayerNowSkyPhase, prayerNowSkyWeather)
     }
-    // Rotate the architectural foreground daily so the Prayer Now scene can
-    // feature the local-style mosque, the Kaaba, and Al-Masjid an-Nabawi without
-    // changing underneath the user during the day.
-    // Keep one mosque for the whole local calendar day, then rotate through all three.
-    // Epoch days keep the sequence continuous across month and year boundaries.
-    val prayerNowSceneIndex = LocalDate.now().toEpochDay().mod(3).toInt()
+    // Start each day on the next architectural scene. A long press can then cycle
+    // through all three scenes immediately without changing the sky selection.
+    val prayerNowDay = LocalDate.now().toEpochDay()
+    var prayerNowManualSceneOffset by rememberSaveable(prayerNowDay) {
+        mutableIntStateOf(0)
+    }
+    val prayerNowSceneIndex = (
+        prayerNowDay.mod(3).toInt() + prayerNowManualSceneOffset
+        ).mod(3)
     val prayerNowForegroundResource = remember(prayerNowSceneIndex) {
         when (prayerNowSceneIndex) {
             0 -> R.drawable.insight_salah_foreground
@@ -1581,6 +1556,14 @@ fun SwipeableBigTiles(
             else -> R.drawable.prayer_foreground_nabawi
         }
     }
+    val prayerNowGroundResource = remember(prayerNowSceneIndex) {
+        when (prayerNowSceneIndex) {
+            0 -> R.drawable.prayer_ground_local
+            1 -> R.drawable.prayer_ground_kaaba
+            else -> R.drawable.prayer_ground_nabawi
+        }
+    }
+    val prayerNowGroundFadeStart = if (prayerNowSceneIndex == 0) 0.68f else 0.84f
     val prayerNowForegroundScale = when (prayerNowSceneIndex) {
         1 -> 0.94f
         2 -> 0.92f
@@ -1933,14 +1916,27 @@ fun SwipeableBigTiles(
                 ) {
                     val isFocused = page == pagerState.settledPage && !pagerState.isScrollInProgress
                     val isExpandedCard = logicalPage == expandedLogicalPage
-                    val onCardLongPress: (() -> Unit)? = if (!isLandscape && isFocused) {
-                        {
-                            interactionEpoch++
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                            expandedLogicalPage = if (isExpandedCard) null else logicalPage
+                    val onCardLongPress: (() -> Unit)? = when {
+                        !isFocused -> null
+                        logicalPage == 0 -> {
+                            {
+                                interactionEpoch++
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                prayerNowManualSceneOffset =
+                                    (prayerNowManualSceneOffset + 1).mod(3)
+                                if (!isLandscape) {
+                                    expandedLogicalPage = if (isExpandedCard) null else logicalPage
+                                }
+                            }
                         }
-                    } else {
-                        null
+                        !isLandscape -> {
+                            {
+                                interactionEpoch++
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                expandedLogicalPage = if (isExpandedCard) null else logicalPage
+                            }
+                        }
+                        else -> null
                     }
                     when (logicalPage) {
                         0 -> InsightPreviewCard(
@@ -1963,6 +1959,8 @@ fun SwipeableBigTiles(
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
                             backgroundPainterRes = prayerNowSkyResource,
+                            groundPainterRes = prayerNowGroundResource,
+                            groundFadeStartFraction = prayerNowGroundFadeStart,
                             foregroundPainterRes = prayerNowForegroundResource,
                             foregroundBaseScale = prayerNowForegroundScale,
                             foregroundContentScale = prayerNowForegroundContentScale,
@@ -1982,6 +1980,11 @@ fun SwipeableBigTiles(
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
                             onLongPress = onCardLongPress,
+                            longPressLabel = if (isExpandedCard) {
+                                "Change mosque and collapse Prayer Now"
+                            } else {
+                                "Change mosque and enlarge Prayer Now"
+                            },
                             fullDayEffect = true,
                             isFocused = isFocused,
                             backgroundPageOffset = {
@@ -2539,6 +2542,8 @@ private fun InsightPreviewCard(
     label: String,
     title: String,
     backgroundPainterRes: Int,
+    groundPainterRes: Int? = null,
+    groundFadeStartFraction: Float = 0.68f,
     foregroundPainterRes: Int? = null,
     foregroundBaseScale: Float = 1f,
     foregroundOffsetFraction: Offset = Offset.Zero,
@@ -2553,6 +2558,7 @@ private fun InsightPreviewCard(
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
     onLongPress: (() -> Unit)? = null,
+    longPressLabel: String? = null,
     fullDayEffect: Boolean = false,
     isFocused: Boolean = false,
     backgroundPageOffset: () -> Float = { 0f },
@@ -2664,7 +2670,7 @@ private fun InsightPreviewCard(
                                 onClick?.invoke()
                             }
                         },
-                        onLongClickLabel = if (isExpanded) {
+                        onLongClickLabel = longPressLabel ?: if (isExpanded) {
                             "Collapse insight"
                         } else {
                             "Expand insight"
@@ -2913,31 +2919,80 @@ private fun InsightPreviewCard(
                     },
             )
 
+            groundPainterRes?.let { groundRes ->
+                Crossfade(
+                    targetState = groundRes,
+                    animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
+                    label = "insightGroundCrossfade",
+                    modifier = Modifier.fillMaxSize(),
+                ) { resolvedGroundRes ->
+                    Image(
+                        painter = painterResource(resolvedGroundRes),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
+                        alignment = Alignment.BottomCenter,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                                translationX = -pageOffset * 3.dp.toPx()
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                // The generated courtyard contains more distant
+                                // floor than the card needs. Mask its upper area so
+                                // it remains a floor beneath the architecture instead
+                                // of becoming a wall-like backdrop behind the mosque.
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        colorStops = arrayOf(
+                                            0f to Color.Transparent,
+                                            groundFadeStartFraction to Color.Transparent,
+                                            (groundFadeStartFraction + 0.07f)
+                                                .coerceAtMost(1f) to Color.White,
+                                            1f to Color.White,
+                                        ),
+                                    ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            },
+                    )
+                }
+            }
+
             foregroundPainterRes?.let { foregroundRes ->
-                Image(
-                    painter = painterResource(foregroundRes),
-                    contentDescription = null,
-                    contentScale = foregroundContentScale,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            // The subject remains materially stable while the
-                            // independently controlled environment breathes.
-                            // A smaller movement preserves depth without making
-                            // the object appear to float over its background.
-                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                            val restingMotion = ambientMotion * focusedMotionStrength
-                            val foregroundScale = (1.025f * foregroundBaseScale) +
-                                (restingMotion * 0.002f)
-                            scaleX = foregroundScale
-                            scaleY = foregroundScale
-                            translationX = (-pageOffset * 6.dp.toPx()) +
-                                (restingMotion * 1.5.dp.toPx()) +
-                                (size.width * foregroundOffsetFraction.x)
-                            translationY = (restingMotion * 1.dp.toPx()) +
-                                (size.height * foregroundOffsetFraction.y)
-                        },
-                )
+                Crossfade(
+                    targetState = foregroundRes,
+                    animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
+                    label = "insightForegroundCrossfade",
+                    modifier = Modifier.fillMaxSize(),
+                ) { resolvedForegroundRes ->
+                    Image(
+                        painter = painterResource(resolvedForegroundRes),
+                        contentDescription = null,
+                        contentScale = foregroundContentScale,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                // The subject remains materially stable while the
+                                // independently controlled environment breathes.
+                                // A smaller movement preserves depth without making
+                                // the object appear to float over its background.
+                                val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                                val restingMotion = ambientMotion * focusedMotionStrength
+                                val foregroundScale = (1.025f * foregroundBaseScale) +
+                                    (restingMotion * 0.002f)
+                                scaleX = foregroundScale
+                                scaleY = foregroundScale
+                                translationX = (-pageOffset * 6.dp.toPx()) +
+                                    (restingMotion * 1.5.dp.toPx()) +
+                                    (size.width * foregroundOffsetFraction.x)
+                                translationY = (restingMotion * 1.dp.toPx()) +
+                                    (size.height * foregroundOffsetFraction.y)
+                            },
+                    )
+                }
             }
 
             if (animatedForegroundSceneDarkness > 0f) {

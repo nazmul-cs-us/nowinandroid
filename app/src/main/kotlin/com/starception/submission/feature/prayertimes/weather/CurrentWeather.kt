@@ -173,9 +173,9 @@ object PrayerWeatherIntelligence {
             if (highTemperature) add("Hot ${forecast.temperatureCelsius.toInt()}°C")
         }
         val advice = when {
-            rainLikely && highTemperature -> "Allow extra travel time, and take water and rain protection."
-            rainLikely -> "Allow extra travel time and take rain protection."
-            highTemperature -> "Take water and avoid a long walk in direct sun."
+            rainLikely && highTemperature -> "Allow extra travel time; carry water and rain protection."
+            rainLikely -> "Allow extra travel time and carry rain protection."
+            highTemperature -> "Carry water and limit prolonged exposure to direct sunlight."
             else -> "Allow a little extra time to arrive comfortably."
         }
         return PrayerWeatherInsight(

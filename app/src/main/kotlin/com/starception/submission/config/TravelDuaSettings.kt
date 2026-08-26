@@ -61,6 +61,10 @@ data class TravelDuaSettings(
         const val KEY_PENDING_ALARM_TOKEN = "travel_dua_pending_alarm_token"
         const val KEY_PENDING_ALARM_TRIGGER_ELAPSED = "travel_dua_pending_alarm_trigger_elapsed"
         const val KEY_IS_DRIVING = "travel_dua_is_driving"
+        const val KEY_DUA_PLAYED_FOR_CURRENT_TRIP = "travel_dua_played_for_current_trip"
+        const val KEY_DRIVING_STOP_TIME = "travel_dua_driving_stop_time"
+        const val KEY_LAST_RELIABLE_SPEED_ELAPSED = "travel_dua_last_reliable_speed_elapsed"
+        const val KEY_LAST_RELIABLE_SPEED_MPS = "travel_dua_last_reliable_speed_mps"
 
         // Default values
         const val DEFAULT_COOLDOWN_MINUTES = 5

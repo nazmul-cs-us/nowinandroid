@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionResult
 import com.google.android.gms.location.DetectedActivity
+import com.starception.submission.prayer.util.FileLogger
 
 /**
  * Process-independent endpoint for Google Play services activity transitions.
@@ -20,7 +21,7 @@ class DrivingActivityTransitionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityTransitionResult.hasResult(intent)) {
-            Log.w(TAG, "Activity transition broadcast contained no result")
+            FileLogger.w(TAG, "Activity transition broadcast contained no result")
             return
         }
 
@@ -29,6 +30,10 @@ class DrivingActivityTransitionReceiver : BroadcastReceiver() {
             Log.d(
                 TAG,
                 "Transition: ${activityName(event.activityType)} / ${event.transitionType}",
+            )
+            FileLogger.i(
+                TAG,
+                "Google transition: ${activityName(event.activityType)} / ${event.transitionType}",
             )
         }
 
@@ -77,7 +82,7 @@ class DrivingActivityTransitionReceiver : BroadcastReceiver() {
         runCatching {
             ContextCompat.startForegroundService(context, serviceIntent)
         }.onFailure {
-            Log.e(TAG, "Unable to deliver background activity transition to service", it)
+            FileLogger.e(TAG, "Unable to deliver background activity transition to service", it)
         }
     }
 

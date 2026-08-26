@@ -188,6 +188,11 @@ class PrayerNotificationServiceManager @Inject constructor(
      */
     private fun startForegroundService() {
         try {
+            if (PrayerNotificationService.isServiceRunningInAnotherProcess(context)) {
+                Log.d(TAG, "📱 Prayer foreground service already running; skipping duplicate start")
+                return
+            }
+
             val serviceIntent = android.content.Intent(context, PrayerNotificationService::class.java)
             context.startForegroundService(serviceIntent)
             Log.d(TAG, "📱 Started foreground service for live updates")

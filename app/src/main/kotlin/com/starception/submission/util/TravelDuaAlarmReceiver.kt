@@ -15,9 +15,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.services.DrivingAudioService
 
 /**
@@ -41,11 +42,33 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
         val enabled = prefs.getBoolean(TravelDuaSettings.KEY_ENABLED, true)
 
         if (receivedToken == 0L || receivedToken != expectedToken || !isDriving || !enabled) {
-            Log.i(
+            FileLogger.i(
                 TAG,
                 "Ignoring stale Travel Dua alarm: tokenMatch=${receivedToken == expectedToken}, " +
                     "driving=$isDriving, enabled=$enabled",
             )
+            return
+        }
+
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val lastReliableSpeedElapsed = prefs.getLong(
+            TravelDuaSettings.KEY_LAST_RELIABLE_SPEED_ELAPSED,
+            0L,
+        )
+        val lastReliableSpeedMps = prefs.getFloat(
+            TravelDuaSettings.KEY_LAST_RELIABLE_SPEED_MPS,
+            0f,
+        )
+        if (!TravelDuaPolicy.hasRecentDrivingEvidence(nowElapsed, lastReliableSpeedElapsed)) {
+            val evidenceAge = (nowElapsed - lastReliableSpeedElapsed)
+                .takeIf { lastReliableSpeedElapsed > 0L && it >= 0L }
+            FileLogger.w(
+                TAG,
+                "Blocked Travel Dua: no recent reliable driving speed " +
+                    "(evidenceAgeMs=${evidenceAge ?: "none"}, " +
+                    "lastSpeedKmh=${"%.1f".format(lastReliableSpeedMps * 3.6f)})",
+            )
+            clearPendingAlarm(prefs)
             return
         }
 
@@ -57,7 +80,7 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
         )
         val cooldownMillis = cooldownMinutes * 60_000L
         if (lastPlayTime > 0L && now - lastPlayTime < cooldownMillis) {
-            Log.i(TAG, "Ignoring Travel Dua alarm because cooldown is still active")
+            FileLogger.i(TAG, "Ignoring Travel Dua alarm because cooldown is still active")
             clearPendingAlarm(prefs)
             return
         }
@@ -71,10 +94,14 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
         }
         try {
             ContextCompat.startForegroundService(context, playbackIntent)
-            Log.i(TAG, "Travel Dua wake-up alarm delivered to DrivingAudioService")
+            FileLogger.i(
+                TAG,
+                "Travel Dua alarm accepted with recent speed " +
+                    "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h",
+            )
         } catch (e: Exception) {
             // Do not write a cooldown here: a failed start must remain eligible for retry.
-            Log.e(TAG, "Unable to start Travel Dua playback from wake-up alarm", e)
+            FileLogger.e(TAG, "Unable to start Travel Dua playback from wake-up alarm", e)
         }
     }
 

@@ -204,22 +204,23 @@ class PrayerNotificationWorker @AssistedInject constructor(
         // Get the URI for the adhan sound
         val adhanSoundUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
 
+        val compactWeather = weatherInsight?.summary?.substringBefore(" · ")
+        val compactContent = listOfNotNull(
+            "$displayName began at $prayerTime",
+            compactWeather,
+        ).joinToString(" · ")
+        val expandedContent = buildList {
+            add("$displayName began at $prayerTime.")
+            weatherInsight?.let { add("${it.summary} — ${it.advice}") }
+            add("")
+            add("اَللّٰهُمَّ تَقَبَّلْ مِنَّا")
+            add("O Allah, accept from us.")
+        }.joinToString("\n")
+
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("$displayName Prayer")
-            .setContentText(
-                listOfNotNull(
-                    "It's time for $displayName • $prayerTime",
-                    weatherInsight?.summary,
-                ).joinToString(" · "),
-            )
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("$displayName Prayer Time\n\n" +
-                        "Time: $prayerTime\n" +
-                        weatherInsight?.let {
-                            "${it.notificationLine}\n${it.advice}\n"
-                        }.orEmpty() +
-                        "اَللّٰهُمَّ تَقَبَّلْ مِنَّا\n" +
-                        "(O Allah, accept from us)"))
+            .setContentTitle("It's time for $displayName")
+            .setContentText(compactContent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -282,20 +283,22 @@ class PrayerNotificationWorker @AssistedInject constructor(
             summary = weatherInsight?.summary,
         ) ?: ContextCompat.getDrawable(applicationContext, R.mipmap.ic_launcher)?.toBitmap()
 
+        val reminderLeadTime = if (priorMinutes == 1) "1 minute" else "$priorMinutes minutes"
+        val compactWeather = weatherInsight?.summary?.substringBefore(" · ")
+        val compactContent = listOfNotNull(
+            "Prayer begins at $prayerTime",
+            compactWeather,
+        ).joinToString(" · ")
+        val expandedContent = buildList {
+            add("Prayer begins at $prayerTime.")
+            weatherInsight?.let { add("${it.summary} — ${it.advice}") }
+            add("Take a moment to prepare.")
+        }.joinToString("\n")
+
         val notification = NotificationCompat.Builder(applicationContext, REMINDER_CHANNEL_ID)  // Use reminder channel
-            .setContentTitle("$displayName in $priorMinutes min")
-            .setContentText(
-                listOfNotNull(
-                    "Starts at $prayerTime",
-                    weatherInsight?.summary,
-                ).joinToString(" · "),
-            )
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("$displayName Prayer in $priorMinutes minutes\n\n" +
-                        "Time: $prayerTime\n" +
-                        weatherInsight?.let {
-                            "${it.notificationLine}\n${it.advice}\n"
-                        }.orEmpty()))
+            .setContentTitle("$displayName in $reminderLeadTime")
+            .setContentText(compactContent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
             .setSmallIcon(R.drawable.ic_prayer)
             .setLargeIcon(largeIcon)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

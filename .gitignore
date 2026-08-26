@@ -45,6 +45,10 @@ _sandbox
 # Android Studio captures folder
 captures/
 
+# Local visual verification and generated-image working files
+artifacts/screenshots/
+tmp/
+
 # Kotlin
 .kotlin
 
