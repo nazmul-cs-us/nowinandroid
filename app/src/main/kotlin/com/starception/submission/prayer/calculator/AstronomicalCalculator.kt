@@ -1,12 +1,28 @@
 package com.starception.submission.prayer.calculator
 
-import android.util.Log
+import com.starception.submission.core.logging.SharedLog
 import com.starception.submission.prayer.model.Location
 import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+
+/**
+ * Wall-clock stamp for the calculation logs, as HH:mm:ss.SSS.
+ *
+ * Written against kotlinx-datetime rather than SimpleDateFormat/Date/Locale,
+ * which are JVM-only and would block this file from reaching commonMain.
+ */
+private fun logTimestamp(): String {
+    val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
+    fun pad(value: Int, width: Int = 2) = value.toString().padStart(width, '0')
+    return "${pad(now.hour)}:${pad(now.minute)}:${pad(now.second)}." +
+        pad(now.nanosecond / 1_000_000, 3)
+}
 
 /**
  * ASTRONOMICAL CALCULATOR: Precise sun position calculations for Islamic prayer times
@@ -61,36 +77,35 @@ class AstronomicalCalculator @Inject constructor() {
      * Logs astronomical calculation operations with input parameters and results
      */
     private fun logCalculation(operation: String, inputs: Map<String, Any>, result: Any, duration: Long = 0) {
-        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
-            .format(java.util.Date())
+        val timestamp = logTimestamp()
         
-        Log.i(TAG, "")
-        Log.i(TAG, "🌟 ASTRONOMICAL CALCULATION")
-        Log.i(TAG, "⏰ Timestamp: $timestamp")
-        Log.i(TAG, "🔬 Operation: $operation")
+        SharedLog.i(TAG, "")
+        SharedLog.i(TAG, "🌟 ASTRONOMICAL CALCULATION")
+        SharedLog.i(TAG, "⏰ Timestamp: $timestamp")
+        SharedLog.i(TAG, "🔬 Operation: $operation")
         
         inputs.forEach { (key, value) ->
-            Log.i(TAG, "📥 Input $key: $value")
+            SharedLog.i(TAG, "📥 Input $key: $value")
         }
         
         when (result) {
             is Double -> {
                 if (result.isNaN()) {
-                    Log.w(TAG, "⚠️ Result: NaN (calculation failed - likely high latitude)")
+                    SharedLog.w(TAG, "⚠️ Result: NaN (calculation failed - likely high latitude)")
                 } else if (result.isInfinite()) {
-                    Log.w(TAG, "⚠️ Result: Infinite (mathematical overflow)")
+                    SharedLog.w(TAG, "⚠️ Result: Infinite (mathematical overflow)")
                 } else {
-                    Log.i(TAG, "✅ Result: $result")
+                    SharedLog.i(TAG, "✅ Result: $result")
                 }
             }
-            is LocalTime -> Log.i(TAG, "✅ Result: $result")
-            else -> Log.i(TAG, "✅ Result: $result")
+            is LocalTime -> SharedLog.i(TAG, "✅ Result: $result")
+            else -> SharedLog.i(TAG, "✅ Result: $result")
         }
         
         if (duration > 0) {
-            Log.i(TAG, "⚡ Duration: ${duration}ms")
+            SharedLog.i(TAG, "⚡ Duration: ${duration}ms")
         }
-        Log.i(TAG, "")
+        SharedLog.i(TAG, "")
     }
     
     /**
@@ -99,48 +114,47 @@ class AstronomicalCalculator @Inject constructor() {
      */
     private fun logInputValidation(operation: String, latitude: Double? = null, longitude: Double? = null, 
                                  julianDay: Double? = null, angle: Double? = null): Boolean {
-        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
-            .format(java.util.Date())
+        val timestamp = logTimestamp()
             
-        Log.i(TAG, "")
-        Log.i(TAG, "🔍 INPUT VALIDATION")
-        Log.i(TAG, "⏰ Timestamp: $timestamp")
-        Log.i(TAG, "🔬 Operation: $operation")
+        SharedLog.i(TAG, "")
+        SharedLog.i(TAG, "🔍 INPUT VALIDATION")
+        SharedLog.i(TAG, "⏰ Timestamp: $timestamp")
+        SharedLog.i(TAG, "🔬 Operation: $operation")
         
         var valid = true
         
         latitude?.let {
             if (it < -90.0 || it > 90.0) {
-                Log.e(TAG, "❌ Invalid latitude: $it (must be -90° to +90°)")
+                SharedLog.e(TAG, "❌ Invalid latitude: $it (must be -90° to +90°)")
                 valid = false
             } else {
-                Log.i(TAG, "✅ Latitude: $it° (valid)")
+                SharedLog.i(TAG, "✅ Latitude: $it° (valid)")
             }
         }
         
         longitude?.let {
             if (it < -180.0 || it > 180.0) {
-                Log.e(TAG, "❌ Invalid longitude: $it (must be -180° to +180°)")
+                SharedLog.e(TAG, "❌ Invalid longitude: $it (must be -180° to +180°)")
                 valid = false
             } else {
-                Log.i(TAG, "✅ Longitude: $it° (valid)")
+                SharedLog.i(TAG, "✅ Longitude: $it° (valid)")
             }
         }
         
         julianDay?.let {
             if (it < 1000000 || it > 5000000) {
-                Log.w(TAG, "⚠️ Unusual Julian Day: $it (expected range: 1M-5M)")
+                SharedLog.w(TAG, "⚠️ Unusual Julian Day: $it (expected range: 1M-5M)")
             } else {
-                Log.i(TAG, "✅ Julian Day: $it (valid)")
+                SharedLog.i(TAG, "✅ Julian Day: $it (valid)")
             }
         }
         
         angle?.let {
-            Log.i(TAG, "📐 Angle: $it° (${if (it < 0) "below" else "above"} horizon)")
+            SharedLog.i(TAG, "📐 Angle: $it° (${if (it < 0) "below" else "above"} horizon)")
         }
         
-        Log.i(TAG, if (valid) "✅ All inputs valid" else "❌ Input validation failed")
-        Log.i(TAG, "")
+        SharedLog.i(TAG, if (valid) "✅ All inputs valid" else "❌ Input validation failed")
+        SharedLog.i(TAG, "")
         
         return valid
     }
@@ -154,22 +168,21 @@ class AstronomicalCalculator @Inject constructor() {
         val result = calculation()
         val duration = System.currentTimeMillis() - startTime
         
-        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
-            .format(java.util.Date())
+        val timestamp = logTimestamp()
             
-        Log.i(TAG, "")
-        Log.i(TAG, "📊 PERFORMANCE BENCHMARK")
-        Log.i(TAG, "⏰ Timestamp: $timestamp")
-        Log.i(TAG, "🔬 Operation: $operation")
-        Log.i(TAG, "⚡ Duration: ${duration}ms")
+        SharedLog.i(TAG, "")
+        SharedLog.i(TAG, "📊 PERFORMANCE BENCHMARK")
+        SharedLog.i(TAG, "⏰ Timestamp: $timestamp")
+        SharedLog.i(TAG, "🔬 Operation: $operation")
+        SharedLog.i(TAG, "⚡ Duration: ${duration}ms")
         
         when {
-            duration < 1 -> Log.i(TAG, "🚀 Performance: Excellent (<1ms)")
-            duration < 10 -> Log.i(TAG, "✅ Performance: Good (<10ms)")
-            duration < 100 -> Log.i(TAG, "⚠️ Performance: Acceptable (<100ms)")
-            else -> Log.w(TAG, "🐌 Performance: Slow (${duration}ms)")
+            duration < 1 -> SharedLog.i(TAG, "🚀 Performance: Excellent (<1ms)")
+            duration < 10 -> SharedLog.i(TAG, "✅ Performance: Good (<10ms)")
+            duration < 100 -> SharedLog.i(TAG, "⚠️ Performance: Acceptable (<100ms)")
+            else -> SharedLog.w(TAG, "🐌 Performance: Slow (${duration}ms)")
         }
-        Log.i(TAG, "")
+        SharedLog.i(TAG, "")
         
         return result
     }
@@ -179,36 +192,35 @@ class AstronomicalCalculator @Inject constructor() {
      * Verifies calculation results are within expected ranges
      */
     private fun verifyTimeResult(operation: String, result: Double, expectedRange: Pair<Double, Double>): Boolean {
-        val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
-            .format(java.util.Date())
+        val timestamp = logTimestamp()
             
-        Log.i(TAG, "")
-        Log.i(TAG, "🔍 RESULT VERIFICATION")
-        Log.i(TAG, "⏰ Timestamp: $timestamp")
-        Log.i(TAG, "🔬 Operation: $operation")
-        Log.i(TAG, "📊 Result: $result")
-        Log.i(TAG, "📏 Expected Range: ${expectedRange.first} to ${expectedRange.second}")
+        SharedLog.i(TAG, "")
+        SharedLog.i(TAG, "🔍 RESULT VERIFICATION")
+        SharedLog.i(TAG, "⏰ Timestamp: $timestamp")
+        SharedLog.i(TAG, "🔬 Operation: $operation")
+        SharedLog.i(TAG, "📊 Result: $result")
+        SharedLog.i(TAG, "📏 Expected Range: ${expectedRange.first} to ${expectedRange.second}")
         
         val isValid = when {
             result.isNaN() -> {
-                Log.w(TAG, "⚠️ Verification: NaN result (calculation failed)")
+                SharedLog.w(TAG, "⚠️ Verification: NaN result (calculation failed)")
                 false
             }
             result.isInfinite() -> {
-                Log.w(TAG, "⚠️ Verification: Infinite result (mathematical error)")
+                SharedLog.w(TAG, "⚠️ Verification: Infinite result (mathematical error)")
                 false
             }
             result < expectedRange.first || result > expectedRange.second -> {
-                Log.w(TAG, "⚠️ Verification: Result outside expected range")
+                SharedLog.w(TAG, "⚠️ Verification: Result outside expected range")
                 false
             }
             else -> {
-                Log.i(TAG, "✅ Verification: Result within valid range")
+                SharedLog.i(TAG, "✅ Verification: Result within valid range")
                 true
             }
         }
         
-        Log.i(TAG, "")
+        SharedLog.i(TAG, "")
         return isValid
     }
     
@@ -251,12 +263,12 @@ class AstronomicalCalculator @Inject constructor() {
             if (month <= 2) {
                 year -= 1
                 month += 12
-                Log.d(TAG, "📅 Calendar adjustment applied: Jan/Feb treated as months 13/14 of previous year")
+                SharedLog.d(TAG, "📅 Calendar adjustment applied: Jan/Feb treated as months 13/14 of previous year")
             }
             
             // Convert time to Universal Time fraction of day
             val ut = hour + minute / 60.0 + second / 3600.0
-            Log.d(TAG, "🕐 Time fraction: $ut (${hour}h ${minute}m ${second}s)")
+            SharedLog.d(TAG, "🕐 Time fraction: $ut (${hour}h ${minute}m ${second}s)")
             
             // JULIAN DAY CALCULATION with Gregorian calendar correction
             val a = floor(year / 100.0)              // Century
@@ -362,7 +374,7 @@ class AstronomicalCalculator @Inject constructor() {
      */
     fun calculateSolarNoon(location: Location, julianDay: Double): Double {
         if (!logInputValidation("SOLAR_NOON", location.latitude, location.longitude, julianDay)) {
-            Log.e(TAG, "❌ Solar noon calculation aborted due to invalid inputs")
+            SharedLog.e(TAG, "❌ Solar noon calculation aborted due to invalid inputs")
             return Double.NaN
         }
         
@@ -416,12 +428,12 @@ class AstronomicalCalculator @Inject constructor() {
             
             // Check if sun reaches the required altitude
             if (cosH < -1.0 || cosH > 1.0) {
-                Log.w(TAG, "")
-                Log.w(TAG, "⚠️ HOUR ANGLE CALCULATION FAILED")
-                Log.w(TAG, "📊 Cosine H: $cosH (outside [-1,+1] range)")
-                Log.w(TAG, "🔍 Cause: Sun never reaches altitude ${altitude}° at latitude ${latitude}°")
-                Log.w(TAG, "🌅 Common for: High latitude locations, extreme sun angles")
-                Log.w(TAG, "")
+                SharedLog.w(TAG, "")
+                SharedLog.w(TAG, "⚠️ HOUR ANGLE CALCULATION FAILED")
+                SharedLog.w(TAG, "📊 Cosine H: $cosH (outside [-1,+1] range)")
+                SharedLog.w(TAG, "🔍 Cause: Sun never reaches altitude ${altitude}° at latitude ${latitude}°")
+                SharedLog.w(TAG, "🌅 Common for: High latitude locations, extreme sun angles")
+                SharedLog.w(TAG, "")
                 
                 logCalculation("HOUR_ANGLE_CALCULATION", inputs, "NaN (sun doesn't reach altitude)")
                 return@benchmarkCalculation Double.NaN
@@ -483,11 +495,11 @@ class AstronomicalCalculator @Inject constructor() {
             )
             
             if (hourAngle.isNaN()) {
-                Log.w(TAG, "")
-                Log.w(TAG, "⚠️ SUNRISE CALCULATION FAILED")
-                Log.w(TAG, "🔍 Cause: Sun never rises at this latitude/date combination")
-                Log.w(TAG, "🌍 Common in: Polar regions during winter months")
-                Log.w(TAG, "")
+                SharedLog.w(TAG, "")
+                SharedLog.w(TAG, "⚠️ SUNRISE CALCULATION FAILED")
+                SharedLog.w(TAG, "🔍 Cause: Sun never rises at this latitude/date combination")
+                SharedLog.w(TAG, "🌍 Common in: Polar regions during winter months")
+                SharedLog.w(TAG, "")
                 
                 logCalculation("SUNRISE_CALCULATION", inputs, "NaN (no sunrise)")
                 return@benchmarkCalculation Double.NaN
@@ -547,11 +559,11 @@ class AstronomicalCalculator @Inject constructor() {
             )
             
             if (hourAngle.isNaN()) {
-                Log.w(TAG, "")
-                Log.w(TAG, "⚠️ SUNSET CALCULATION FAILED")
-                Log.w(TAG, "🔍 Cause: Sun never sets at this latitude/date combination")
-                Log.w(TAG, "🌍 Common in: Polar regions during summer months")
-                Log.w(TAG, "")
+                SharedLog.w(TAG, "")
+                SharedLog.w(TAG, "⚠️ SUNSET CALCULATION FAILED")
+                SharedLog.w(TAG, "🔍 Cause: Sun never sets at this latitude/date combination")
+                SharedLog.w(TAG, "🌍 Common in: Polar regions during summer months")
+                SharedLog.w(TAG, "")
                 
                 logCalculation("SUNSET_CALCULATION", inputs, "NaN (no sunset)")
                 return@benchmarkCalculation Double.NaN
@@ -606,12 +618,12 @@ class AstronomicalCalculator @Inject constructor() {
             )
             
             if (hourAngle.isNaN()) {
-                Log.w(TAG, "")
-                Log.w(TAG, "⚠️ FAJR CALCULATION FAILED")
-                Log.w(TAG, "🔍 Cause: Sun never reaches ${fajrAngle}° below horizon")
-                Log.w(TAG, "🌍 Common in: High latitude locations during summer")
-                Log.w(TAG, "📐 Solution: Use different calculation method or apply midnight rule")
-                Log.w(TAG, "")
+                SharedLog.w(TAG, "")
+                SharedLog.w(TAG, "⚠️ FAJR CALCULATION FAILED")
+                SharedLog.w(TAG, "🔍 Cause: Sun never reaches ${fajrAngle}° below horizon")
+                SharedLog.w(TAG, "🌍 Common in: High latitude locations during summer")
+                SharedLog.w(TAG, "📐 Solution: Use different calculation method or apply midnight rule")
+                SharedLog.w(TAG, "")
                 
                 logCalculation("FAJR_CALCULATION", inputs, "NaN (no dawn)")
                 return@benchmarkCalculation Double.NaN
@@ -680,12 +692,12 @@ class AstronomicalCalculator @Inject constructor() {
                 )
                 
                 if (hourAngle.isNaN()) {
-                    Log.w(TAG, "")
-                    Log.w(TAG, "⚠️ ISHA ANGLE CALCULATION FAILED")
-                    Log.w(TAG, "🔍 Cause: Sun never reaches ${ishaAngle}° below horizon")
-                    Log.w(TAG, "🌍 Common in: High latitude locations during summer")
-                    Log.w(TAG, "📐 Solution: Use delay method or different angle")
-                    Log.w(TAG, "")
+                    SharedLog.w(TAG, "")
+                    SharedLog.w(TAG, "⚠️ ISHA ANGLE CALCULATION FAILED")
+                    SharedLog.w(TAG, "🔍 Cause: Sun never reaches ${ishaAngle}° below horizon")
+                    SharedLog.w(TAG, "🌍 Common in: High latitude locations during summer")
+                    SharedLog.w(TAG, "📐 Solution: Use delay method or different angle")
+                    SharedLog.w(TAG, "")
                     
                     logCalculation("ISHA_ANGLE_CALCULATION", inputs, "NaN (no dusk)")
                     return@benchmarkCalculation Double.NaN
@@ -716,11 +728,11 @@ class AstronomicalCalculator @Inject constructor() {
                 )
 
                 if (sunset.isNaN()) {
-                    Log.w(TAG, "")
-                    Log.w(TAG, "⚠️ ISHA DELAY CALCULATION FAILED")
-                    Log.w(TAG, "🔍 Cause: Cannot calculate sunset time")
-                    Log.w(TAG, "🌍 Common in: Polar regions during extreme seasons")
-                    Log.w(TAG, "")
+                    SharedLog.w(TAG, "")
+                    SharedLog.w(TAG, "⚠️ ISHA DELAY CALCULATION FAILED")
+                    SharedLog.w(TAG, "🔍 Cause: Cannot calculate sunset time")
+                    SharedLog.w(TAG, "🌍 Common in: Polar regions during extreme seasons")
+                    SharedLog.w(TAG, "")
 
                     logCalculation("ISHA_DELAY_CALCULATION", inputs, "NaN (no sunset)")
                     return@benchmarkCalculation Double.NaN
@@ -738,11 +750,11 @@ class AstronomicalCalculator @Inject constructor() {
                 result
             }
         } else {
-            Log.e(TAG, "")
-            Log.e(TAG, "❌ ISHA CALCULATION ERROR")
-            Log.e(TAG, "🔍 Cause: Neither angle nor delay specified")
-            Log.e(TAG, "📐 Solution: Provide either ishaAngle or ishaDelay parameter")
-            Log.e(TAG, "")
+            SharedLog.e(TAG, "")
+            SharedLog.e(TAG, "❌ ISHA CALCULATION ERROR")
+            SharedLog.e(TAG, "🔍 Cause: Neither angle nor delay specified")
+            SharedLog.e(TAG, "📐 Solution: Provide either ishaAngle or ishaDelay parameter")
+            SharedLog.e(TAG, "")
             
             Double.NaN
         }
@@ -817,13 +829,13 @@ class AstronomicalCalculator @Inject constructor() {
             )
             
             if (hourAngle.isNaN()) {
-                Log.w(TAG, "")
-                Log.w(TAG, "⚠️ ASR CALCULATION FAILED")
-                Log.w(TAG, "🔍 Cause: Sun never reaches calculated Asr altitude")
-                Log.w(TAG, "📐 Asr altitude required: ${asrAltitudeDegrees}°")
-                Log.w(TAG, "🌍 Common in: Extreme latitudes or unusual date/location combinations")
-                Log.w(TAG, "📚 Madhhab: $madhhabName (shadow factor: $shadowFactor)")
-                Log.w(TAG, "")
+                SharedLog.w(TAG, "")
+                SharedLog.w(TAG, "⚠️ ASR CALCULATION FAILED")
+                SharedLog.w(TAG, "🔍 Cause: Sun never reaches calculated Asr altitude")
+                SharedLog.w(TAG, "📐 Asr altitude required: ${asrAltitudeDegrees}°")
+                SharedLog.w(TAG, "🌍 Common in: Extreme latitudes or unusual date/location combinations")
+                SharedLog.w(TAG, "📚 Madhhab: $madhhabName (shadow factor: $shadowFactor)")
+                SharedLog.w(TAG, "")
                 
                 logCalculation("ASR_CALCULATION", inputs, "NaN (invalid geometry)")
                 return@benchmarkCalculation Double.NaN
@@ -869,39 +881,39 @@ class AstronomicalCalculator @Inject constructor() {
             // VALIDATION: Check for invalid input values
             when {
                 decimalHour.isNaN() -> {
-                    Log.w(TAG, "")
-                    Log.w(TAG, "⚠️ TIME CONVERSION FAILED")
-                    Log.w(TAG, "🔍 Cause: Decimal hour is NaN (calculation failed)")
-                    Log.w(TAG, "📐 Source: Prayer time calculation returned invalid result")
-                    Log.w(TAG, "")
+                    SharedLog.w(TAG, "")
+                    SharedLog.w(TAG, "⚠️ TIME CONVERSION FAILED")
+                    SharedLog.w(TAG, "🔍 Cause: Decimal hour is NaN (calculation failed)")
+                    SharedLog.w(TAG, "📐 Source: Prayer time calculation returned invalid result")
+                    SharedLog.w(TAG, "")
                     
                     logCalculation("TIME_CONVERSION", inputs, "null (NaN input)")
                     return@benchmarkCalculation null
                 }
                 
                 decimalHour.isInfinite() -> {
-                    Log.w(TAG, "")
-                    Log.w(TAG, "⚠️ TIME CONVERSION FAILED")
-                    Log.w(TAG, "🔍 Cause: Decimal hour is infinite (mathematical overflow)")
-                    Log.w(TAG, "📐 Source: Extreme calculation conditions")
-                    Log.w(TAG, "")
+                    SharedLog.w(TAG, "")
+                    SharedLog.w(TAG, "⚠️ TIME CONVERSION FAILED")
+                    SharedLog.w(TAG, "🔍 Cause: Decimal hour is infinite (mathematical overflow)")
+                    SharedLog.w(TAG, "📐 Source: Extreme calculation conditions")
+                    SharedLog.w(TAG, "")
                     
                     logCalculation("TIME_CONVERSION", inputs, "null (infinite input)")
                     return@benchmarkCalculation null
                 }
                 
                 decimalHour < 0 || decimalHour >= 24 -> {
-                    Log.w(TAG, "")
-                    Log.w(TAG, "⚠️ TIME CONVERSION WARNING")
-                    Log.w(TAG, "🔍 Cause: Decimal hour outside 24-hour range: $decimalHour")
-                    Log.w(TAG, "📐 Normalizing to valid range...")
-                    Log.w(TAG, "")
+                    SharedLog.w(TAG, "")
+                    SharedLog.w(TAG, "⚠️ TIME CONVERSION WARNING")
+                    SharedLog.w(TAG, "🔍 Cause: Decimal hour outside 24-hour range: $decimalHour")
+                    SharedLog.w(TAG, "📐 Normalizing to valid range...")
+                    SharedLog.w(TAG, "")
                     
                     // Normalize to 24-hour range
                     var normalizedHour = decimalHour % 24.0
                     if (normalizedHour < 0) normalizedHour += 24.0
                     
-                    Log.i(TAG, "🔄 Normalized time: $decimalHour → $normalizedHour")
+                    SharedLog.i(TAG, "🔄 Normalized time: $decimalHour → $normalizedHour")
                     
                     val normalizedInputs = inputs + mapOf("normalizedHour" to normalizedHour)
                     
@@ -948,9 +960,9 @@ class AstronomicalCalculator @Inject constructor() {
                     
                     // Verify reasonable time values
                     if (hours in 0..23 && minutes in 0..59 && seconds in 0..59) {
-                        Log.d(TAG, "✅ Time conversion successful: ${decimalHour}h → $result")
+                        SharedLog.d(TAG, "✅ Time conversion successful: ${decimalHour}h → $result")
                     } else {
-                        Log.w(TAG, "⚠️ Unusual time components: H:$hours M:$minutes S:$seconds")
+                        SharedLog.w(TAG, "⚠️ Unusual time components: H:$hours M:$minutes S:$seconds")
                     }
                     
                     return@benchmarkCalculation result

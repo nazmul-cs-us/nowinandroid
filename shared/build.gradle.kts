@@ -31,6 +31,7 @@ kotlin {
             // with nothing but the Kotlin runtime base classes, and iosApp/ can
             // see no model types at all.
             export(projects.core.model)
+            export(projects.core.logging)
         }
     }
 
@@ -39,6 +40,7 @@ kotlin {
             // Re-exported so the generated iOS framework exposes the model types
             // directly, rather than making iosApp/ depend on :core:model itself.
             api(projects.core.model)
+            api(projects.core.logging)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
         }

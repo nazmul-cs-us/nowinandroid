@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.starception.submission.shared.logging
+package com.starception.submission.core.logging
 
 /**
  * Multiplatform stand-in for `android.util.Log`.
