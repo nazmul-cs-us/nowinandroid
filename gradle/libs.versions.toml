@@ -239,3 +239,4 @@ nowinandroid-android-room = { id = "nowinandroid.android.room" }
 nowinandroid-android-test = { id = "nowinandroid.android.test" }
 nowinandroid-hilt = { id = "nowinandroid.hilt" }
 nowinandroid-jvm-library = { id = "nowinandroid.jvm.library" }
+nowinandroid-kmp-library = { id = "nowinandroid.kmp.library" }

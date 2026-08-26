@@ -14,52 +14,15 @@
  * limitations under the License.
  */
 
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
-// This module deliberately does NOT use the `nowinandroid.*` convention plugins.
-// configureKotlin() in build-logic (KotlinAndroid.kt) only handles
-// KotlinAndroidProjectExtension and KotlinJvmProjectExtension, and hits a TODO()
-// for anything else — including KotlinMultiplatformExtension. The Android/JVM
-// settings it would have applied (compileSdk 36, minSdk 28, JVM 17) are
-// reproduced by hand below and must be kept in sync with that file.
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.nowinandroid.kmp.library)
 }
 
 kotlin {
-    androidTarget {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_17
-        }
-    }
-
-    compilerOptions {
-        // `expect`/`actual` on classes and objects is still flagged Beta and warns
-        // on every declaration. build-logic honours a `warningsAsErrors` property,
-        // so left alone this would break the build the moment anyone sets it.
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-
-        // Mirrors configureKotlin() in build-logic/.../KotlinAndroid.kt, which
-        // multiplatform modules do not go through. Keep in sync with that file.
-        freeCompilerArgs.addAll(
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-opt-in=kotlin.time.ExperimentalTime",
-            "-Xconsistent-data-class-copy-visibility",
-        )
-    }
-
-    // Apple targets. Declaring them costs nothing without Xcode — only the
-    // native compile/link tasks need the iOS SDK, and nothing in the Android
-    // build graph depends on them. iosX64 covers Intel simulators;
-    // iosSimulatorArm64 covers Apple Silicon simulators and, via
-    // "Designed for iPad", is what ultimately runs on M-series Macs.
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
+    // The framework iosApp/ links against. Everything the iOS host needs should
+    // be reachable through here, which is why dependencies below are `api`.
+    targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+        binaries.framework {
             baseName = "Shared"
             isStatic = true
         }
@@ -84,14 +47,4 @@ kotlin {
 
 android {
     namespace = "com.starception.submission.shared"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 28
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 }

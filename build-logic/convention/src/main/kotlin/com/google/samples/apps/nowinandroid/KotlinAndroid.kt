@@ -29,23 +29,63 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 /**
+ * Settings that must hold for every module regardless of how it is built.
+ *
+ * These are constants rather than literals because multiplatform modules cannot
+ * go through [configureKotlinAndroid] — Kotlin's multiplatform extension is not a
+ * [KotlinAndroidProjectExtension] — and so configure themselves via
+ * `configureKotlinMultiplatform` instead. Both paths read from here so the two
+ * cannot drift apart.
+ */
+internal const val NIA_COMPILE_SDK = 36
+internal const val NIA_MIN_SDK = 28
+internal val NIA_JAVA_VERSION = JavaVersion.VERSION_17
+
+/**
+ * Compiler arguments applied to every module.
+ *
+ * Not optional niceties: without the `kotlin.time` opt-in, `kotlinx.datetime.Instant`
+ * — a typealias to `kotlin.time.Instant` since datetime 0.7 — fails to compile
+ * outright, so any module that omits these breaks rather than merely warns.
+ */
+internal val NIA_FREE_COMPILER_ARGS = listOf(
+    // Enable experimental coroutines APIs, including Flow
+    "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+    // kotlin.time.Instant (used by WorldWind's AtmosphereLayer.time) is still
+    // experimental in Kotlin 2.2.
+    "-opt-in=kotlin.time.ExperimentalTime",
+    // Remove this arg after Phase 3.
+    // https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-consistent-copy-visibility/#deprecation-timeline
+    //
+    // Deprecation timeline
+    // Phase 3. (Supposedly Kotlin 2.2 or Kotlin 2.3).
+    // The default changes.
+    // Unless ExposedCopyVisibility is used, the generated 'copy' method has the same
+    // visibility as the primary constructor.
+    // The binary signature changes. The error on the declaration is no longer reported.
+    // '-Xconsistent-data-class-copy-visibility' compiler flag and ConsistentCopyVisibility
+    // annotation are now unnecessary.
+    "-Xconsistent-data-class-copy-visibility",
+)
+
+/**
  * Configure base Kotlin with Android options
  */
 internal fun Project.configureKotlinAndroid(
     commonExtension: CommonExtension<*, *, *, *, *, *>,
 ) {
     commonExtension.apply {
-        compileSdk = 36
+        compileSdk = NIA_COMPILE_SDK
 
         defaultConfig {
-            minSdk = 28
+            minSdk = NIA_MIN_SDK
         }
 
         compileOptions {
             // Up to Java 11 APIs are available through desugaring
             // https://developer.android.com/studio/write/java11-minimal-support-table
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
+            sourceCompatibility = NIA_JAVA_VERSION
+            targetCompatibility = NIA_JAVA_VERSION
             isCoreLibraryDesugaringEnabled = true
         }
     }
@@ -64,8 +104,8 @@ internal fun Project.configureKotlinJvm() {
     extensions.configure<JavaPluginExtension> {
         // Up to Java 11 APIs are available through desugaring
         // https://developer.android.com/studio/write/java11-minimal-support-table
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = NIA_JAVA_VERSION
+        targetCompatibility = NIA_JAVA_VERSION
     }
 
     configureKotlin<KotlinJvmProjectExtension>()
@@ -87,28 +127,6 @@ private inline fun <reified T : KotlinProjectExtension> Project.configureKotlin(
     }.apply {
         jvmTarget = JvmTarget.JVM_17
         allWarningsAsErrors = warningsAsErrors
-        freeCompilerArgs.add(
-            // Enable experimental coroutines APIs, including Flow
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-        )
-        freeCompilerArgs.add(
-            // kotlin.time.Instant (used by WorldWind's AtmosphereLayer.time) is still
-            // experimental in Kotlin 2.2.
-            "-opt-in=kotlin.time.ExperimentalTime",
-        )
-        freeCompilerArgs.add(
-            /**
-             * Remove this args after Phase 3.
-             * https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-consistent-copy-visibility/#deprecation-timeline
-             *
-             * Deprecation timeline
-             * Phase 3. (Supposedly Kotlin 2.2 or Kotlin 2.3).
-             * The default changes.
-             * Unless ExposedCopyVisibility is used, the generated 'copy' method has the same visibility as the primary constructor.
-             * The binary signature changes. The error on the declaration is no longer reported.
-             * '-Xconsistent-data-class-copy-visibility' compiler flag and ConsistentCopyVisibility annotation are now unnecessary.
-             */
-            "-Xconsistent-data-class-copy-visibility"
-        )
+        freeCompilerArgs.addAll(NIA_FREE_COMPILER_ARGS)
     }
 }
