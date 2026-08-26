@@ -44,6 +44,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -108,6 +110,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaTopicTag
@@ -159,6 +162,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
 private const val HADITH_SECTION_ORDER_KEY = "section_order"
@@ -241,6 +245,30 @@ fun HadithDetailScreen(
     val sherpaOnnxTts = remember { entryPoint.sherpaOnnxTtsService() }
     val downloadManager = remember { entryPoint.assetDownloadManager() }
     val audioDownloadHelper = remember { entryPoint.audioDownloadHelper() }
+    val userDataRepository = remember { entryPoint.userDataRepository() }
+
+    // Resolve to the real news-resource ID when this hadith exists in the feed,
+    // so the shared Bookmarks screen can render it. Direct book playback still
+    // has a deterministic fallback ID if no feed entry exists.
+    var bookmarkId by remember(databaseFile, hadithNumber) {
+        mutableStateOf("hadith-${databaseFile.removeSuffix(".db")}-$hadithNumber")
+    }
+    var isBookmarked by remember(databaseFile, hadithNumber) { mutableStateOf(false) }
+    val bookmarkScope = rememberCoroutineScope()
+
+    LaunchedEffect(databaseFile, hadithNumber) {
+        val fallbackId = "hadith-${databaseFile.removeSuffix(".db")}-$hadithNumber"
+        val hadithUrl = "hadith://${databaseFile.removeSuffix(".db")}/$hadithNumber"
+        val resolvedId = kotlinx.coroutines.withContext(Dispatchers.IO) {
+            runCatching {
+                NewsDatabase.getInstance(context).newsDao()
+                    .getNewsIdByExactUrl(hadithUrl)
+                    ?.toString()
+            }.getOrNull()
+        }
+        bookmarkId = resolvedId ?: fallbackId
+        isBookmarked = bookmarkId in userDataRepository.userData.first().bookmarkedNewsResources
+    }
 
     // Load user's TTS preferences from SharedPreferences
     val ttsPrefs = remember {
@@ -991,7 +1019,17 @@ fun HadithDetailScreen(
                                 translatedElaboration = if (num == hadithNumber) translatedElaboration else null,
                                 isTranslating = if (num == hadithNumber) isTranslating else false,
                                 selectedLanguage = selectedLanguage,
-                                onLanguageClick = { showTranslationSheet = true },
+                                isBookmarked = isBookmarked,
+                                onBookmarkClick = {
+                                    val newState = !isBookmarked
+                                    isBookmarked = newState
+                                    bookmarkScope.launch {
+                                        userDataRepository.setNewsResourceBookmarked(
+                                            bookmarkId,
+                                            newState,
+                                        )
+                                    }
+                                },
                                 onMoreClick = { showReadingSettingsSheet = true },
                                 arabicFontFamily = hadithArabicFontFamily(selectedArabicFont),
                                 isLandscape = isLandscape,
@@ -1121,7 +1159,8 @@ private fun HadithContent(
     translatedElaboration: String? = null,
     isTranslating: Boolean = false,
     selectedLanguage: String = "en",
-    onLanguageClick: () -> Unit = {},
+    isBookmarked: Boolean = false,
+    onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
     arabicFontFamily: FontFamily = QuranFonts.PDMSSaleem,
     isLandscape: Boolean = false,
@@ -1595,7 +1634,7 @@ private fun HadithContent(
         // Calculate available width for icons on the right side
         val availableWidthDp = screenWidthDp - cutoutRightDp - 16.dp
 
-        // Icon sizes - Language (48dp) + Badge (~100dp) + More (48dp) = 196dp needed
+        // Icon sizes - Bookmark (48dp) + Badge (~100dp) + More (48dp) = 196dp needed
         val iconButtonSize = 44.dp
         val badgeWidth = 90.dp // Compact badge width
         val moreButtonSize = 44.dp
@@ -1604,8 +1643,8 @@ private fun HadithContent(
         val totalNeeded = iconButtonSize + badgeWidth + moreButtonSize // ~178dp
 
         // Show elements based on available space
-        // Priority: More (always) > Language > Badge
-        val showLanguageButton = availableWidthDp >= (iconButtonSize + moreButtonSize) // ~88dp
+        // Priority: More (always) > Bookmark > Badge
+        val showBookmarkButton = availableWidthDp >= (iconButtonSize + moreButtonSize) // ~88dp
         val showBadge = availableWidthDp >= totalNeeded // ~178dp
 
         Surface(
@@ -1644,15 +1683,23 @@ private fun HadithContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    // Language selector button - shown if space allows (priority 1)
-                    if (showLanguageButton) {
+                    // Bookmark button - same filled/outlined treatment as Surah Details.
+                    if (showBookmarkButton) {
                         IconButton(
-                            onClick = onLanguageClick,
+                            onClick = onBookmarkClick,
                             modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Language,
-                                contentDescription = "Select Translation Language",
+                                imageVector = if (isBookmarked) {
+                                    Icons.Rounded.Bookmark
+                                } else {
+                                    Icons.Rounded.BookmarkBorder
+                                },
+                                contentDescription = if (isBookmarked) {
+                                    "Remove bookmark"
+                                } else {
+                                    "Add bookmark"
+                                },
                                 tint = toolbarContentColor,
                                 modifier = Modifier.size(24.dp)
                             )
