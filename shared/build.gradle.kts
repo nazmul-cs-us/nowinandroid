@@ -25,6 +25,12 @@ kotlin {
         binaries.framework {
             baseName = "Shared"
             isStatic = true
+            // `api(projects.core.model)` alone only makes the types available to
+            // Kotlin; the generated Objective-C header exports declarations from
+            // this module only. Without an explicit export the framework ships
+            // with nothing but the Kotlin runtime base classes, and iosApp/ can
+            // see no model types at all.
+            export(projects.core.model)
         }
     }
 
