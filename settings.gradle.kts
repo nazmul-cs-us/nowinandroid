@@ -50,6 +50,10 @@ rootProject.name = "Submission"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(":app")
+
+// Kotlin Multiplatform module backing the iOS/iPad/Mac port. Android code
+// consumes it exactly like any other library; iosApp/ consumes it as a framework.
+include(":shared")
 include(":benchmarks")
 include(":core:analytics")
 include(":core:common")
