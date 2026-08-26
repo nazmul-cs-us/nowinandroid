@@ -301,9 +301,18 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                 // Bridge the service's playback state/progress back to the in-app media bar
                 // (GlobalMediaViewModel) and the news-card play/pause icons (ChapterAudioController).
                 com.starception.submission.services.ChapterRecitationState.onStateChanged =
-                    { playing, title, _ ->
-                        com.starception.submission.core.ui.ChapterAudioController.updateExternalState(playing, title)
-                        com.starception.submission.media.GlobalMediaViewModel.onFortressPlaybackChanged?.invoke(playing, title)
+                    { playing, title, subtitle ->
+                        if (title.startsWith("Hadith #")) {
+                            val hadithNumber = title.substringAfter('#').toIntOrNull() ?: 0
+                            com.starception.submission.media.GlobalMediaViewModel
+                                .onHadithPlaybackChanged
+                                ?.invoke(playing, hadithNumber, subtitle, title)
+                        } else {
+                            com.starception.submission.core.ui.ChapterAudioController
+                                .updateExternalState(playing, title)
+                            com.starception.submission.media.GlobalMediaViewModel
+                                .onFortressPlaybackChanged?.invoke(playing, title)
+                        }
                     }
                 com.starception.submission.services.ChapterRecitationState.onProgressChanged =
                     { pos, dur ->

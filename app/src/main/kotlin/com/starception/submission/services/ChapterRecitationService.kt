@@ -45,6 +45,9 @@ class ChapterRecitationService : Service() {
     private var currentSource: String? = null
     private var currentTitle: String = ""
     private var currentSubtitle: String = ""
+    // Sherpa/Android TTS owns its audio pipeline, but still needs this service's
+    // MediaSession and foreground notification. In that mode there is no MediaPlayer.
+    private var isExternalPlayback = false
 
     companion object {
         private const val TAG = "ChapterRecitationSvc"
@@ -52,6 +55,8 @@ class ChapterRecitationService : Service() {
         private const val CHANNEL_ID = "chapter_recitation_channel"
 
         const val ACTION_PLAY_SOURCE = "com.starception.submission.CHAPTER_PLAY_SOURCE"
+        const val ACTION_SHOW_EXTERNAL_PLAYBACK =
+            "com.starception.submission.CHAPTER_SHOW_EXTERNAL_PLAYBACK"
         const val ACTION_TOGGLE = "com.starception.submission.CHAPTER_TOGGLE"
         const val ACTION_STOP = "com.starception.submission.CHAPTER_STOP"
         const val EXTRA_SOURCE = "source"
@@ -63,6 +68,20 @@ class ChapterRecitationService : Service() {
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_PLAY_SOURCE
                 putExtra(EXTRA_SOURCE, source)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_SUBTITLE, subtitle)
+            }
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        }
+
+        /**
+         * Publish media controls for audio rendered outside MediaPlayer (for example
+         * Sherpa or Android TTS). The external renderer remains responsible for audio;
+         * this service owns the foreground lifetime and MediaSession notification.
+         */
+        fun showExternalPlayback(context: Context, title: String, subtitle: String) {
+            val intent = Intent(context, ChapterRecitationService::class.java).apply {
+                action = ACTION_SHOW_EXTERNAL_PLAYBACK
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
             }
@@ -97,8 +116,12 @@ class ChapterRecitationService : Service() {
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS,
             )
             setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() { if (mediaPlayer?.isPlaying == false) togglePlayPause() }
-                override fun onPause() { if (mediaPlayer?.isPlaying == true) togglePlayPause() }
+                override fun onPlay() {
+                    if (isExternalPlayback || mediaPlayer?.isPlaying == false) togglePlayPause()
+                }
+                override fun onPause() {
+                    if (isExternalPlayback || mediaPlayer?.isPlaying == true) togglePlayPause()
+                }
                 override fun onSeekTo(pos: Long) { seekTo(pos.toInt()) }
                 override fun onStop() { stopPlaybackAndSelf() }
             })
@@ -119,6 +142,10 @@ class ChapterRecitationService : Service() {
                     )
                 }
             }
+            ACTION_SHOW_EXTERNAL_PLAYBACK -> startExternalPlayback(
+                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+                subtitle = intent.getStringExtra(EXTRA_SUBTITLE).orEmpty(),
+            )
             ACTION_TOGGLE -> togglePlayPause()
             ACTION_STOP -> stopPlaybackAndSelf()
         }
@@ -134,6 +161,7 @@ class ChapterRecitationService : Service() {
         currentSource = source
         currentTitle = title
         currentSubtitle = subtitle
+        isExternalPlayback = false
 
         mediaPlayer?.let { runCatching { it.stop() }; it.release() }
         val player = MediaPlayer()
@@ -186,7 +214,36 @@ class ChapterRecitationService : Service() {
         }
     }
 
+    private fun startExternalPlayback(title: String, subtitle: String) {
+        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer = null
+        currentSource = null
+        currentTitle = title
+        currentSubtitle = subtitle
+        isExternalPlayback = true
+
+        ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
+        updateMetadata(0L)
+        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+        startForegroundNotification()
+    }
+
     fun togglePlayPause() {
+        if (isExternalPlayback) {
+            // The Hadith screen owns the TTS renderer. Its callback applies the
+            // same stop/restart behavior as the in-app media controller.
+            val callback = ChapterRecitationState.onExternalToggle
+            if (callback != null) {
+                callback.invoke()
+            } else {
+                // The screen may have been closed while app-scoped Sherpa audio
+                // continued. Preserve a working notification control in that case.
+                com.starception.submission.media.GlobalMediaViewModel
+                    .onHadithFallbackStop?.invoke()
+                stopPlaybackAndSelf()
+            }
+            return
+        }
         val player = mediaPlayer ?: return
         if (player.isPlaying) {
             player.pause()
@@ -216,6 +273,7 @@ class ChapterRecitationService : Service() {
         mediaPlayer?.let { runCatching { it.stop() }; it.release() }
         mediaPlayer = null
         currentSource = null
+        isExternalPlayback = false
         ChapterRecitationState.markStopped()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -234,7 +292,11 @@ class ChapterRecitationService : Service() {
                         PlaybackStateCompat.ACTION_SEEK_TO or
                         PlaybackStateCompat.ACTION_STOP,
                 )
-                .setState(state, pos, 1.0f)
+                .setState(
+                    state,
+                    pos,
+                    if (state == PlaybackStateCompat.STATE_PLAYING) 1.0f else 0f,
+                )
                 .build(),
         )
     }
@@ -289,7 +351,11 @@ class ChapterRecitationService : Service() {
     }
 
     private fun createNotification(): Notification {
-        val isPlaying = mediaPlayer?.isPlaying ?: false
+        val isPlaying = if (isExternalPlayback) {
+            ChapterRecitationState.isPlaying
+        } else {
+            mediaPlayer?.isPlaying ?: false
+        }
         val contentIntent = packageManager.getLaunchIntentForPackage(packageName)
         val contentPending = PendingIntent.getActivity(
             this, 0, contentIntent,
@@ -359,6 +425,8 @@ object ChapterRecitationState {
     var onCompletion: (() -> Unit)? = null
     /** Fired when a downloaded Hadith recording naturally finishes. */
     var onHadithCompletion: (() -> Unit)? = null
+    /** MediaSession play/pause request for audio rendered by an external TTS engine. */
+    var onExternalToggle: (() -> Unit)? = null
 
     // Last-known snapshot so the UI can re-sync on app resume even if the process/Activity was
     // recreated while the service kept playing (e.g. user closed and reopened the app).

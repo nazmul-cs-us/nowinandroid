@@ -617,7 +617,15 @@ class GlobalMediaViewModel(
         // a process-wide snapshot, so we can restore the mini-bar without a bound connection.
         val recite = com.starception.submission.services.ChapterRecitationState
         if (recite.isActive) {
-            onFortressPlaybackStarted(recite.title)
+            if (recite.title.startsWith("Hadith #")) {
+                onHadithPlaybackStarted(
+                    hadithNumber = recite.title.substringAfter('#').toIntOrNull() ?: 0,
+                    collectionName = recite.subtitle.ifBlank { "Sahih Bukhari" },
+                    title = recite.title,
+                )
+            } else {
+                onFortressPlaybackStarted(recite.title)
+            }
             _controllerState.update { current ->
                 current.copy(
                     playback = current.playback.copy(

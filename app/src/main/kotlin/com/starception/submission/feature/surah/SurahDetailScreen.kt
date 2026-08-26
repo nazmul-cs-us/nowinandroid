@@ -6057,37 +6057,6 @@ private fun MushafPageWithFrame(
 
 
 
-            // Tajweed, painted over the finished layout.
-            //
-            // The letters are drawn once, uncoloured, by the Text below; each rule then
-            // redraws that same layout in its own colour, clipped to the characters it
-            // covers. Because both passes share one TextLayoutResult, the shaping is
-            // identical — a rule can colour a nūn alone without the mīm before it losing
-            // its join, which is exactly what colour spans could not do.
-            pageLayout.value?.let { layout ->
-                if (tajweed.isNotEmpty()) {
-                    androidx.compose.foundation.Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                start = horizontalPadding,
-                                end = horizontalPadding,
-                                top = topPadding + bismillahHeightDp,
-                                bottom = bottomPadding,
-                            ),
-                    ) {
-                        tajweed.forEach { span ->
-                            val start = span.start.coerceIn(0, layout.layoutInput.text.length)
-                            val end = span.end.coerceIn(start, layout.layoutInput.text.length)
-                            if (end <= start) return@forEach
-                            clipPath(layout.getPathForRange(start, end)) {
-                                drawText(textLayoutResult = layout, color = span.color)
-                            }
-                        }
-                    }
-                }
-            }
-
             Text(
                 text = pageText,
                 onTextLayout = { pageLayout.value = it },
@@ -6204,6 +6173,38 @@ private fun MushafPageWithFrame(
                         }
                     )
             )
+
+            // Tajweed, painted over the finished layout.
+            //
+            // The letters are drawn once, uncoloured, by the Text below; each rule then
+            // redraws that same layout in its own colour, clipped to the characters it
+            // covers. Because both passes share one TextLayoutResult, the shaping is
+            // identical — a rule can colour a nūn alone without the mīm before it losing
+            // its join, which is exactly what colour spans could not do.
+            pageLayout.value?.let { layout ->
+                if (tajweed.isNotEmpty()) {
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = horizontalPadding,
+                                end = horizontalPadding,
+                                top = topPadding + bismillahHeightDp,
+                                bottom = bottomPadding,
+                            ),
+                    ) {
+                        tajweed.forEach { span ->
+                            val start = span.start.coerceIn(0, layout.layoutInput.text.length)
+                            val end = span.end.coerceIn(start, layout.layoutInput.text.length)
+                            if (end <= start) return@forEach
+                            clipPath(layout.getPathForRange(start, end)) {
+                                drawText(textLayoutResult = layout, color = span.color)
+                            }
+                        }
+                    }
+                }
+            }
+
 
             // Reveal the inserted gloss without changing the text being measured.
             // The mask shares the Text's exact content bounds, and its annotated

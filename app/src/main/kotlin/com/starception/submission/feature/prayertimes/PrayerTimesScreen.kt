@@ -1835,36 +1835,21 @@ fun PrayerTimesScreen(
             val outerConfiguration = LocalConfiguration.current
             val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
             var showAllPrayers by rememberSaveable { mutableStateOf(false) }
-            var isLocationCompact by rememberSaveable {
-                mutableStateOf(showAllPrayers)
-            }
-            var expandPrayersAfterLocationLeadIn by remember {
-                mutableStateOf(false)
-            }
             val portraitScrollState = rememberScrollState()
             var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
             // Insights keeps its full geometry in expanded mode. Follow the added
             // prayer row with scroll instead of compressing the carousel; the full
             // location card simultaneously contracts into a compact action.
-            val expansionScrollDistancePx = with(LocalDensity.current) { 122.dp.toPx() }
+            // Row 3 adds 106dp while the location control gives back 52dp
+            // (92dp -> 40dp). Scroll only that 54dp net growth. The previous
+            // 122dp travel made the entering tiles move farther than their reveal,
+            // which looked like a bounce before the layout settled.
+            val expansionScrollDistancePx = with(LocalDensity.current) { 54.dp.toPx() }
             // A disabled verticalScroll does not dispatch nested-scroll deltas, which
             // prevents PullToSyncContainer from seeing downward drags while the prayer
             // list is collapsed. This no-op scrollable keeps the page stationary while
             // still forwarding those gestures to the pull-to-sync connection.
             val pullGestureScrollState = rememberScrollableState { 0f }
-            LaunchedEffect(isLocationCompact, expandPrayersAfterLocationLeadIn) {
-                if (isLocationCompact && expandPrayersAfterLocationLeadIn) {
-                    // Give the card enough of a head start to clear its old layout
-                    // position, then overlap the final part of the morph with a slower
-                    // row-3 entrance. This reads as one coordinated transition without
-                    // the former push-down or a mechanical pause between phases.
-                    delay(280L)
-                    if (isLocationCompact) {
-                        showAllPrayers = true
-                    }
-                    expandPrayersAfterLocationLeadIn = false
-                }
-            }
             LaunchedEffect(showAllPrayers, outerIsLandscape) {
                 if (!outerIsLandscape) {
                     if (showAllPrayers) {
@@ -2267,27 +2252,10 @@ fun PrayerTimesScreen(
                     targetState = showAllPrayers,
                     label = "prayerDashboardExpansion",
                 )
-                val locationTransition = updateTransition(
-                    targetState = isLocationCompact,
-                    label = "prayerLocationMorph",
-                )
-                val baseTileHeight by dashboardTransition.animateDp(
-                    transitionSpec = {
-                        tween(durationMillis = 680, easing = FastOutSlowInEasing)
-                    },
-                    label = "prayerTileHeight",
-                ) { expanded ->
-                    // 96dp clipped the time. The full-size tile carries the prayer
-                    // name, the Arabic name and a 24sp time, and the Arabic font
-                    // paints past its line box, so 104dp is the floor that holds the
-                    // design intact. Going lower needs the landscape compact preset,
-                    // and that preset drops the Arabic name.
-                    // The third row is funded by compacting the Insights carousel,
-                    // not by growing every prayer card and extending the dashboard
-                    // below the viewport. 104dp is the measured content-safe floor.
-                    if (expanded) 104.dp else 106.dp
-                }
-                val tileHeight = baseTileHeight
+                // Keep the child measurement stable while row 3 is revealed. If the
+                // tiles resize during expandVertically, its moving target produces a
+                // visible settle at the end of the entrance.
+                val tileHeight = 106.dp
                 val buttonIconRotation by dashboardTransition.animateFloat(
                     transitionSpec = {
                         tween(durationMillis = 680, easing = FastOutSlowInEasing)
@@ -2760,57 +2728,59 @@ fun PrayerTimesScreen(
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    val locationControlHeight by locationTransition.animateDp(
+                    // The location morph and row-3 expansion share the same state,
+                    // duration and easing so neither can lead or catch up to the other.
+                    val locationControlHeight by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 560, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationControlHeight",
                     ) { expanded ->
                         if (expanded) 40.dp else 92.dp
                     }
-                    val locationCardWidth by locationTransition.animateDp(
+                    val locationCardWidth by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 560, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationCardWidth",
                     ) { expanded ->
                         if (expanded) 40.dp else maxWidth
                     }
-                    val locationCardHeight by locationTransition.animateDp(
+                    val locationCardHeight by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationCardHeight",
                     ) { expanded ->
                         if (expanded) 40.dp else 52.dp
                     }
-                    val locationCardOffsetY by locationTransition.animateDp(
+                    val locationCardOffsetY by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 560, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationCardOffsetY",
                     ) { expanded ->
                         if (expanded) 0.dp else 40.dp
                     }
-                    val locationCardEndInset by locationTransition.animateDp(
+                    val locationCardEndInset by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 560, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationCardEndInset",
                     ) { expanded ->
                         if (expanded) 12.dp else 0.dp
                     }
-                    val locationCardCornerRadius by locationTransition.animateDp(
+                    val locationCardCornerRadius by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 460, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationCardCornerRadius",
                     ) { expanded ->
                         if (expanded) 20.dp else 16.dp
                     }
-                    val locationMarkerInset by locationTransition.animateDp(
+                    val locationMarkerInset by dashboardTransition.animateDp(
                         transitionSpec = {
-                            tween(durationMillis = 560, easing = FastOutSlowInEasing)
+                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
                         },
                         label = "locationMarkerInset",
                     ) { expanded ->
@@ -2827,16 +2797,9 @@ fun PrayerTimesScreen(
                     TextButton(
                         onClick = {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            if (showAllPrayers) {
-                                expandPrayersAfterLocationLeadIn = false
-                                showAllPrayers = false
-                                isLocationCompact = false
-                            } else if (!isLocationCompact) {
-                                // Phase 1: morph the location card. The effect above
-                                // starts the extra prayer row only after this finishes.
-                                isLocationCompact = true
-                                expandPrayersAfterLocationLeadIn = true
-                            }
+                            // One state starts (or reverses) the prayer-row expansion,
+                            // dashboard scroll and location morph on the same frame.
+                            showAllPrayers = !showAllPrayers
                         },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary,
@@ -2879,25 +2842,21 @@ fun PrayerTimesScreen(
                         .clip(locationCardShape)
                         .combinedClickable(
                             onClick = {
-                                if (isLocationCompact) {
+                                if (showAllPrayers) {
                                     hapticFeedback.performHapticFeedback(
                                         HapticFeedbackType.TextHandleMove,
                                     )
-                                    expandPrayersAfterLocationLeadIn = false
                                     showAllPrayers = false
-                                    isLocationCompact = false
                                 } else {
                                     showWeatherThresholds = true
                                 }
                             },
                             onLongClick = {
-                                if (isLocationCompact) {
+                                if (showAllPrayers) {
                                     hapticFeedback.performHapticFeedback(
                                         HapticFeedbackType.TextHandleMove,
                                     )
-                                    expandPrayersAfterLocationLeadIn = false
                                     showAllPrayers = false
-                                    isLocationCompact = false
                                 } else {
                                     hapticFeedback.performHapticFeedback(
                                         HapticFeedbackType.LongPress,
@@ -2912,7 +2871,7 @@ fun PrayerTimesScreen(
                     // needs an edge to separate from the background. In light it was
                     // the one outlined card on the screen, and primary at 20% renders
                     // a cool blue hairline against these warm surfaces.
-                    border = if (isLocationCompact) {
+                    border = if (showAllPrayers) {
                         BorderStroke(
                             1.dp,
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
@@ -2925,7 +2884,7 @@ fun PrayerTimesScreen(
                     } else {
                         null
                     },
-                    shadowElevation = if (isLocationCompact) 3.dp else if (LocalDarkTheme.current) 0.dp else 1.dp,
+                    shadowElevation = if (showAllPrayers) 3.dp else if (LocalDarkTheme.current) 0.dp else 1.dp,
                     ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                     // This is the same marker in both states. The surface's animated
@@ -2933,7 +2892,7 @@ fun PrayerTimesScreen(
                     // the floating position, so there is no icon handoff or blank frame.
                     Image(
                         painter = painterResource(R.drawable.ic_flaticon_location_marker),
-                        contentDescription = if (isLocationCompact) {
+                        contentDescription = if (showAllPrayers) {
                             "Collapse prayers and show location details"
                         } else {
                             "Prayer location"
@@ -2947,7 +2906,7 @@ fun PrayerTimesScreen(
                     )
 
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = !isLocationCompact,
+                        visible = !showAllPrayers,
                         enter = fadeIn(
                             animationSpec = tween(durationMillis = 220, delayMillis = 150),
                         ),

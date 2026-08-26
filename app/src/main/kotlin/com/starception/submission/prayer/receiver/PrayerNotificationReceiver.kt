@@ -118,11 +118,11 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             )
         }.getOrNull() ?: return
         if (!preferences.silentDuringPrayerEnabled) return
-        // This setting promises silence DURING prayer, so start DND at the prayer
-        // boundary. The separate "Go to Mosque" duration describes the live prayer
-        // phase and must not postpone the user's silent window by 10–20 minutes.
-        PrayerSilentModeController(context.applicationContext).enableForPrayer(
+        // Keep the phone audible during the configured "Go to Mosque" phase, then
+        // enable DND for the separate silent-during-prayer duration.
+        PrayerSilentModeController(context.applicationContext).scheduleStartAfter(
             prayerName = prayerName,
+            delayMinutes = preferences.getGoToMosqueDurationForPrayer(prayerName),
             durationMinutes = preferences.silentDuringPrayerMinutes,
         )
     }

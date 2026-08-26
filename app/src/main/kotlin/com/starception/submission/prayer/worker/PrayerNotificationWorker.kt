@@ -91,11 +91,12 @@ class PrayerNotificationWorker @AssistedInject constructor(
             if (notificationType == TYPE_PRAYER_TIME &&
                 notificationPreferences.silentDuringPrayerEnabled
             ) {
-                // WorkManager is the fallback when an exact AlarmManager delivery is
-                // unavailable. Apply DND here as well; the controller is idempotent when
-                // the exact receiver already started the same prayer session.
-                PrayerSilentModeController(applicationContext).enableForPrayer(
+                // WorkManager is the fallback when the prayer-boundary exact alarm is
+                // unavailable. It must preserve the configured go-to-mosque phase too.
+                PrayerSilentModeController(applicationContext).scheduleStartAfter(
                     prayerName = prayerName,
+                    delayMinutes = notificationPreferences
+                        .getGoToMosqueDurationForPrayer(prayerName),
                     durationMinutes = notificationPreferences.silentDuringPrayerMinutes,
                 )
             }

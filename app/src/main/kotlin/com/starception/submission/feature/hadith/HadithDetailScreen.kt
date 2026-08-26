@@ -307,6 +307,9 @@ fun HadithDetailScreen(
 
     // Audio playback state
     var isPlaying by remember { mutableStateOf(false) }
+    // True when Sherpa/Android TTS renders the audio while
+    // ChapterRecitationService supplies the system MediaSession notification.
+    var isTtsBackedPlayback by remember { mutableStateOf(false) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var textToSpeech by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsInitialized by remember { mutableStateOf(false) }
@@ -557,6 +560,10 @@ fun HadithDetailScreen(
             suppressStopNotification = true
             shouldAutoPlayAfterLoad = true
         }
+        if (isTtsBackedPlayback) {
+            com.starception.submission.services.ChapterRecitationService.stop(context)
+            isTtsBackedPlayback = false
+        }
         isPlaying = false
         if (shouldAdvance) {
             android.util.Log.d(
@@ -694,6 +701,21 @@ fun HadithDetailScreen(
                     )
                 }
                 hadith != null -> {
+                    val updateTtsPlaybackState: (Boolean) -> Unit = { playing ->
+                        isPlaying = playing
+                        if (playing) {
+                            isTtsBackedPlayback = true
+                            com.starception.submission.services.ChapterRecitationService
+                                .showExternalPlayback(
+                                    context = context,
+                                    title = "Hadith #$hadithNumber",
+                                    subtitle = "Sahih Bukhari",
+                                )
+                        } else if (isTtsBackedPlayback) {
+                            com.starception.submission.services.ChapterRecitationService.stop(context)
+                            isTtsBackedPlayback = false
+                        }
+                    }
                     val handlePlayClick: () -> Unit = {
                             if (isPlaying) {
                                 playbackGeneration += 1
@@ -704,6 +726,7 @@ fun HadithDetailScreen(
                                 textToSpeech?.stop()
                                 sherpaOnnxTts.stopSpeaking()
                                 com.starception.submission.services.ChapterRecitationService.stop(context)
+                                isTtsBackedPlayback = false
                                 isPlaying = false
                             } else {
                                 // Start playback
@@ -743,7 +766,7 @@ fun HadithDetailScreen(
                                                 hadithNumber = hadithNumber,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
-                                                onPlayingChanged = { isPlaying = it },
+                                                onPlayingChanged = updateTtsPlaybackState,
                                                 onPlaybackCompleted = completeCurrentPlayback,
                                             )
                                         }
@@ -797,7 +820,7 @@ fun HadithDetailScreen(
                                                                 hadithNumber = hadithNumber,
                                                                 selectedVoice = selectedVoice,
                                                                 speakerId = selectedSpeakerId,
-                                                                onPlayingChanged = { isPlaying = it },
+                                                                onPlayingChanged = updateTtsPlaybackState,
                                                                 onPlaybackCompleted = completeCurrentPlayback,
                                                             )
                                                         }
@@ -810,7 +833,7 @@ fun HadithDetailScreen(
                                                             hadithNumber = hadithNumber,
                                                             selectedVoice = selectedVoice,
                                                             speakerId = selectedSpeakerId,
-                                                            onPlayingChanged = { isPlaying = it },
+                                                            onPlayingChanged = updateTtsPlaybackState,
                                                             onPlaybackCompleted = completeCurrentPlayback,
                                                         )
                                                     }
@@ -822,7 +845,7 @@ fun HadithDetailScreen(
                                                             hadithNumber = hadithNumber,
                                                             selectedVoice = selectedVoice,
                                                             speakerId = selectedSpeakerId,
-                                                            onPlayingChanged = { isPlaying = it },
+                                                            onPlayingChanged = updateTtsPlaybackState,
                                                             onPlaybackCompleted = completeCurrentPlayback,
                                                         )
                                                     }
@@ -838,7 +861,7 @@ fun HadithDetailScreen(
                                                     hadithNumber = hadithNumber,
                                                     selectedVoice = selectedVoice,
                                                     speakerId = selectedSpeakerId,
-                                                    onPlayingChanged = { isPlaying = it },
+                                                    onPlayingChanged = updateTtsPlaybackState,
                                                     onPlaybackCompleted = completeCurrentPlayback,
                                                 )
                                             }
@@ -862,7 +885,7 @@ fun HadithDetailScreen(
                                                 hadithNumber = hadithNumber,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
-                                                onPlayingChanged = { isPlaying = it },
+                                                onPlayingChanged = updateTtsPlaybackState,
                                                 onPlaybackCompleted = completeCurrentPlayback,
                                             )
                                         }
@@ -875,7 +898,7 @@ fun HadithDetailScreen(
                                             language = selectedLanguage,
                                             tts = textToSpeech,
                                             onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
-                                            onPlayingChanged = { isPlaying = it },
+                                            onPlayingChanged = updateTtsPlaybackState,
                                             onPlaybackCompleted = completeCurrentPlayback,
                                         )
                                     }
@@ -915,6 +938,7 @@ fun HadithDetailScreen(
                         GlobalMediaViewModel.onHadithPlayPauseRequested = playCb
                         GlobalMediaViewModel.onHadithSkipNextRequested = nextCb
                         GlobalMediaViewModel.onHadithSkipPreviousRequested = prevCb
+                        com.starception.submission.services.ChapterRecitationState.onExternalToggle = playCb
                         onDispose {
                             android.util.Log.d("HadithMiniBar", "🧹 UNREGISTER | hadith=$hadithNumber | clearing only own callbacks")
                             if (GlobalMediaViewModel.onHadithPlayPauseRequested === playCb) {
@@ -925,6 +949,13 @@ fun HadithDetailScreen(
                             }
                             if (GlobalMediaViewModel.onHadithSkipPreviousRequested === prevCb) {
                                 GlobalMediaViewModel.onHadithSkipPreviousRequested = null
+                            }
+                            if (
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalToggle === playCb
+                            ) {
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalToggle = null
                             }
                         }
                     }
