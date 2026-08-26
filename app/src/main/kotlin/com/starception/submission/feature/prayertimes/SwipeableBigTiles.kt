@@ -106,6 +106,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.LinearEasing
@@ -178,6 +179,7 @@ import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.feature.prayertimes.components.CompassProgressIndicator
 import com.starception.submission.feature.prayertimes.components.rememberParallaxTilt
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherInsight
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
@@ -1160,6 +1162,112 @@ private data class PrayerSkyKeyframe(
     val palette: PrayerSkyPalette,
 )
 
+private enum class PrayerSkyPhase {
+    Fajr,
+    Sunrise,
+    Dhuhr,
+    Asr,
+    Maghrib,
+    Isha,
+}
+
+private enum class PrayerSkyWeather {
+    Clear,
+    PartlyCloudy,
+    Overcast,
+    Fog,
+    Rain,
+    Snow,
+    Thunderstorm,
+}
+
+/** Resolves the current visual phase around the calculated local prayer boundaries. */
+private fun prayerSkyPhase(
+    currentTime: LocalTime,
+    prayerTimes: DayPrayerTimes?,
+): PrayerSkyPhase {
+    val now = currentTime.toSecondOfDay() / 60
+    val fajr = prayerTimes?.fajr?.let { it.toSecondOfDay() / 60 } ?: 300
+    val sunrise = prayerTimes?.sunrise?.let { it.toSecondOfDay() / 60 } ?: 390
+    val asr = prayerTimes?.asr?.let { it.toSecondOfDay() / 60 } ?: 930
+    val maghrib = prayerTimes?.maghrib?.let { it.toSecondOfDay() / 60 } ?: 1_080
+    val isha = prayerTimes?.isha?.let { it.toSecondOfDay() / 60 } ?: 1_200
+
+    val fajrApproach = (fajr - 45).coerceAtLeast(0)
+    val sunriseEnd = (sunrise + 75).coerceAtMost(1_439)
+    val maghribApproach = (maghrib - 45).coerceAtLeast(asr)
+
+    return when {
+        now < fajrApproach -> PrayerSkyPhase.Isha
+        now < sunrise -> PrayerSkyPhase.Fajr
+        now < sunriseEnd -> PrayerSkyPhase.Sunrise
+        now < asr -> PrayerSkyPhase.Dhuhr
+        now < maghribApproach -> PrayerSkyPhase.Asr
+        now < isha -> PrayerSkyPhase.Maghrib
+        else -> PrayerSkyPhase.Isha
+    }
+}
+
+/** Groups Open-Meteo WMO codes into the seven generated sky families. */
+private fun prayerSkyWeather(weatherCode: Int?): PrayerSkyWeather = when (weatherCode) {
+    1, 2 -> PrayerSkyWeather.PartlyCloudy
+    3 -> PrayerSkyWeather.Overcast
+    45, 48 -> PrayerSkyWeather.Fog
+    in 51..67, in 80..82 -> PrayerSkyWeather.Rain
+    in 71..77, 85, 86 -> PrayerSkyWeather.Snow
+    in 95..99 -> PrayerSkyWeather.Thunderstorm
+    else -> PrayerSkyWeather.Clear
+}
+
+private fun prayerSkyResource(
+    phase: PrayerSkyPhase,
+    weather: PrayerSkyWeather,
+): Int = when (phase to weather) {
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_fajr_clear
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_fajr_partly_cloudy
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_fajr_overcast
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_fajr_fog
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_fajr_rain
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_fajr_snow
+    PrayerSkyPhase.Fajr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_fajr_thunderstorm
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_sunrise_clear
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_sunrise_partly_cloudy
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_sunrise_overcast
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_sunrise_fog
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_sunrise_rain
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_sunrise_snow
+    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_sunrise_thunderstorm
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_dhuhr_clear
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_dhuhr_partly_cloudy
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_dhuhr_overcast
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_dhuhr_fog
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_dhuhr_rain
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_dhuhr_snow
+    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_dhuhr_thunderstorm
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_asr_clear
+    PrayerSkyPhase.Asr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_asr_partly_cloudy
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_asr_overcast
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_asr_fog
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_asr_rain
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_asr_snow
+    PrayerSkyPhase.Asr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_asr_thunderstorm
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_maghrib_clear
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_maghrib_partly_cloudy
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_maghrib_overcast
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_maghrib_fog
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_maghrib_rain
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_maghrib_snow
+    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_maghrib_thunderstorm
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_isha_clear
+    PrayerSkyPhase.Isha to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_isha_partly_cloudy
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_isha_overcast
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_isha_fog
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_isha_rain
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_isha_snow
+    PrayerSkyPhase.Isha to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_isha_thunderstorm
+    else -> R.drawable.prayer_sky_dhuhr_clear
+}
+
 /**
  * Resolves the insight artwork's sky treatment from the calculated prayer
  * boundaries. This keeps the carousel visually in step with the user's local
@@ -1438,6 +1546,56 @@ fun SwipeableBigTiles(
     }
     val prayerNowSkyPalette = remember(prayerNowEffectTime, prayerTimes) {
         prayerSkyPalette(currentTime = prayerNowEffectTime, prayerTimes = prayerTimes)
+    }
+    val currentPrayerWeather by produceState<CurrentWeather?>(
+        initialValue = null,
+        key1 = prayerTimes?.location?.latitude,
+        key2 = prayerTimes?.location?.longitude,
+    ) {
+        value = prayerTimes?.location?.let { location ->
+            CurrentWeatherRepository.get(
+                latitude = location.latitude,
+                longitude = location.longitude,
+            )
+        }
+    }
+    val prayerNowSkyPhase = remember(prayerNowEffectTime, prayerTimes) {
+        prayerSkyPhase(prayerNowEffectTime, prayerTimes)
+    }
+    val prayerNowSkyWeather = remember(currentPrayerWeather?.weatherCode) {
+        prayerSkyWeather(currentPrayerWeather?.weatherCode)
+    }
+    val prayerNowSkyResource = remember(prayerNowSkyPhase, prayerNowSkyWeather) {
+        prayerSkyResource(prayerNowSkyPhase, prayerNowSkyWeather)
+    }
+    // Rotate the architectural foreground daily so the Prayer Now scene can
+    // feature the local-style mosque, the Kaaba, and Al-Masjid an-Nabawi without
+    // changing underneath the user during the day.
+    // Keep one mosque for the whole local calendar day, then rotate through all three.
+    // Epoch days keep the sequence continuous across month and year boundaries.
+    val prayerNowSceneIndex = LocalDate.now().toEpochDay().mod(3).toInt()
+    val prayerNowForegroundResource = remember(prayerNowSceneIndex) {
+        when (prayerNowSceneIndex) {
+            0 -> R.drawable.insight_salah_foreground
+            1 -> R.drawable.prayer_foreground_kaaba
+            else -> R.drawable.prayer_foreground_nabawi
+        }
+    }
+    val prayerNowForegroundScale = when (prayerNowSceneIndex) {
+        1 -> 0.94f
+        2 -> 0.92f
+        else -> 1f
+    }
+    val prayerNowForegroundContentScale = if (prayerNowSceneIndex == 0) {
+        ContentScale.Crop
+    } else {
+        ContentScale.Fit
+    }
+    val prayerNowSceneDarkness = when (prayerNowSkyPhase) {
+        PrayerSkyPhase.Isha -> 0.18f
+        PrayerSkyPhase.Fajr -> 0.08f
+        PrayerSkyPhase.Maghrib -> 0.04f
+        else -> 0f
     }
     val forecastTarget = remember(prayerTimes, timeOffsets, currentTime) {
         prayerTimes?.let {
@@ -1804,12 +1962,18 @@ fun SwipeableBigTiles(
                             // later condition (usually heat) was also active.
                             statusMetaText = prayerWeatherInsight?.summary,
                             weatherThresholds = weatherThresholds,
-                            backgroundPainterRes = R.drawable.insight_salah_background,
-                            foregroundPainterRes = R.drawable.insight_salah_foreground,
+                            backgroundPainterRes = prayerNowSkyResource,
+                            foregroundPainterRes = prayerNowForegroundResource,
+                            foregroundBaseScale = prayerNowForegroundScale,
+                            foregroundContentScale = prayerNowForegroundContentScale,
+                            foregroundSceneDarkness = prayerNowSceneDarkness,
                             skyTintTop = prayerNowSkyPalette.top,
                             skyTintHorizon = prayerNowSkyPalette.horizon,
-                            skyTintStrength = prayerNowSkyPalette.strength,
-                            sceneDarkness = prayerNowSkyPalette.sceneDarkness,
+                            // Every time × weather combination has its own graded
+                            // photograph, so retain its natural color instead of
+                            // tinting it a second time.
+                            skyTintStrength = 0f,
+                            sceneDarkness = 0f,
                             adaptiveLightPosition = Offset(
                                 prayerNowSkyPalette.lightX,
                                 prayerNowSkyPalette.lightY,
@@ -2378,6 +2542,8 @@ private fun InsightPreviewCard(
     foregroundPainterRes: Int? = null,
     foregroundBaseScale: Float = 1f,
     foregroundOffsetFraction: Offset = Offset.Zero,
+    foregroundContentScale: ContentScale = ContentScale.Crop,
+    foregroundSceneDarkness: Float = 0f,
     skyTintTop: Color? = null,
     skyTintHorizon: Color? = null,
     skyTintStrength: Float = 0f,
@@ -2460,6 +2626,11 @@ private fun InsightPreviewCard(
         targetValue = sceneDarkness,
         animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
         label = "insightSceneDarkness",
+    )
+    val animatedForegroundSceneDarkness by animateFloatAsState(
+        targetValue = foregroundSceneDarkness,
+        animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
+        label = "insightForegroundSceneDarkness",
     )
     val animatedLightX by animateFloatAsState(
         targetValue = adaptiveLightPosition?.x ?: luminousAnchor.x,
@@ -2590,36 +2761,43 @@ private fun InsightPreviewCard(
                 label = "heroBackgroundFocus",
             )
 
-            Image(
-                painter = painterResource(backgroundPainterRes),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        // A single decoded still stays on the GPU. Moving it opposite
-                        // the pager creates depth without competing with the swipe for
-                        // animated-image decoding or causing a loop-boundary jump.
-                        val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                        val restingMotion = ambientMotion * focusedMotionStrength
-                        val imageScale = 1.065f + (restingMotion * 0.006f)
-                        val requestedTranslationX = -pageOffset * 18.dp.toPx()
-                        // The old parallax could move the next page farther than
-                        // this scaled layer's overscan, revealing the card's grey
-                        // Surface along its leading edge. Restrict the shift to
-                        // the pixels that are guaranteed to remain covered.
-                        val maxCoveredHorizontalShift = (
-                            (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
-                            ).coerceAtLeast(0f)
-                        scaleX = imageScale
-                        scaleY = imageScale
-                        translationX = requestedTranslationX.coerceIn(
-                            -maxCoveredHorizontalShift,
-                            maxCoveredHorizontalShift,
-                        )
-                        translationY = restingMotion * 4.dp.toPx()
-                    },
-            )
+            Crossfade(
+                targetState = backgroundPainterRes,
+                animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
+                label = "prayerSkyCrossfade",
+                modifier = Modifier.fillMaxSize(),
+            ) { resolvedBackgroundRes ->
+                Image(
+                    painter = painterResource(resolvedBackgroundRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // A single decoded still stays on the GPU. Moving it opposite
+                            // the pager creates depth without competing with the swipe for
+                            // animated-image decoding or causing a loop-boundary jump.
+                            val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
+                            val restingMotion = ambientMotion * focusedMotionStrength
+                            val imageScale = 1.065f + (restingMotion * 0.006f)
+                            val requestedTranslationX = -pageOffset * 18.dp.toPx()
+                            // The old parallax could move the next page farther than
+                            // this scaled layer's overscan, revealing the card's grey
+                            // Surface along its leading edge. Restrict the shift to
+                            // the pixels that are guaranteed to remain covered.
+                            val maxCoveredHorizontalShift = (
+                                (size.width * (imageScale - 1f) / 2f) - 1.dp.toPx()
+                                ).coerceAtLeast(0f)
+                            scaleX = imageScale
+                            scaleY = imageScale
+                            translationX = requestedTranslationX.coerceIn(
+                                -maxCoveredHorizontalShift,
+                                maxCoveredHorizontalShift,
+                            )
+                            translationY = restingMotion * 4.dp.toPx()
+                        },
+                )
+            }
 
             if (animatedSceneDarkness > 0f) {
                 Box(
@@ -2739,7 +2917,7 @@ private fun InsightPreviewCard(
                 Image(
                     painter = painterResource(foregroundRes),
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = foregroundContentScale,
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
@@ -2759,6 +2937,14 @@ private fun InsightPreviewCard(
                             translationY = (restingMotion * 1.dp.toPx()) +
                                 (size.height * foregroundOffsetFraction.y)
                         },
+                )
+            }
+
+            if (animatedForegroundSceneDarkness > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = animatedForegroundSceneDarkness)),
                 )
             }
 
