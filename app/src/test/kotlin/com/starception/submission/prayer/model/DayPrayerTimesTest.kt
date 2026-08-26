@@ -64,14 +64,29 @@ class DayPrayerTimesTest {
     }
 
     @Test
-    fun exactlyAtPrayerTime_noPrayerIsCurrent() {
-        // Pre-existing quirk, pinned deliberately. Both bounds are strict:
-        // Dhuhr stays current while now < Asr, and Asr becomes current only once
-        // now > Asr. At exactly Asr neither holds, so the boundary instant
-        // belongs to no prayer at all.
-        assertNull(currentPrayerAt(LocalTime.of(15, 53)))
+    fun exactlyAtPrayerTime_thatPrayerBecomesCurrent() {
+        // The window is [start, end): a prayer is current from the instant it
+        // begins. Previously both bounds were strict, so this instant belonged to
+        // no prayer at all and the UI showed nothing.
+        assertEquals("Asr", currentPrayerAt(LocalTime.of(15, 53)))
         assertEquals("Dhuhr", currentPrayerAt(LocalTime.of(15, 52)))
         assertEquals("Asr", currentPrayerAt(LocalTime.of(15, 54)))
+    }
+
+    @Test
+    fun everyMinuteOfTheDayHasAtMostOneCurrentPrayer() {
+        // Guards the handover between adjacent windows: no minute may report two
+        // current prayers, and no minute between Fajr and the end of Isha may
+        // report none.
+        var minute = LocalTime.of(0, 0)
+        repeat(24 * 60) {
+            val current = schedule().getActualPrayers(minute).filter { it.isCurrently }
+            assertTrue("$minute had ${current.size} current prayers", current.size <= 1)
+            if (minute >= LocalTime.of(4, 37) && minute < LocalTime.of(22, 5)) {
+                assertEquals("$minute had no current prayer", 1, current.size)
+            }
+            minute = minute.plusMinutes(1)
+        }
     }
 
     // --- the Isha two-hour window -------------------------------------------
@@ -88,22 +103,29 @@ class DayPrayerTimesTest {
     }
 
     @Test
-    fun isha_isNotCurrentAfterMidnight() {
-        // now.isAfter(isha) is a plain same-day comparison, so 00:30 is not
-        // "after" 20:05 and no prayer is current.
+    fun isha_isNotCurrentAfterMidnight_whenItsWindowClosedBefore() {
+        // A 20:05 Isha closes at 22:05, well before midnight, so nothing is
+        // current at 00:30.
         assertNull(currentPrayerAt(LocalTime.of(0, 30)))
     }
 
     @Test
-    fun isha_isNotCurrent_whenTwoHourWindowWrapsPastMidnight() {
-        // Pre-existing quirk, pinned deliberately. For a late Isha, plusHours(2)
-        // wraps around midnight (23:00 + 2h = 01:00), so the isBefore check fails
-        // immediately and Isha never reads as current at all -- not even one
-        // minute after it starts.
+    fun isha_isCurrent_whenTwoHourWindowWrapsPastMidnight() {
+        // A late Isha's window runs past midnight (23:00 + 2h = 01:00), so `end`
+        // is earlier than `start` and membership is the union of the two spans.
+        // This previously failed at every instant, leaving a late Isha never
+        // current at all.
         val lateIsha = schedule(isha = LocalTime.of(23, 0))
-        val current = lateIsha.getActualPrayers(LocalTime.of(23, 30))
-            .firstOrNull { it.isCurrently }?.name
-        assertNull(current)
+        fun currentAt(t: LocalTime) =
+            lateIsha.getActualPrayers(t).firstOrNull { it.isCurrently }?.name
+
+        assertEquals("Isha", currentAt(LocalTime.of(23, 0)))
+        assertEquals("Isha", currentAt(LocalTime.of(23, 30)))
+        assertEquals("Isha", currentAt(LocalTime.of(0, 30)))
+        assertEquals("Isha", currentAt(LocalTime.of(0, 59)))
+        // ...and closes on time on the far side of midnight.
+        assertNull(currentAt(LocalTime.of(1, 1)))
+        assertNull(currentAt(LocalTime.of(3, 0)))
     }
 
     // --- next prayer ---------------------------------------------------------
@@ -130,12 +152,12 @@ class DayPrayerTimesTest {
     }
 
     @Test
-    fun timeUntilNextPrayer_losesASecondCrossingMidnight() {
-        // Pre-existing quirk, pinned deliberately. The cross-midnight branch sums
-        // (now -> 23:59:59.999999999) + (00:00 -> Fajr), which is one nanosecond
-        // short of the true span, so the minute is truncated downward: the real
-        // gap from 23:00 to 04:37 is 5h37m, but this reports 5h36m.
-        assertEquals("5h 36m", schedule().getTimeUntilNextPrayer(LocalTime.of(23, 0)))
+    fun timeUntilNextPrayer_isExactCrossingMidnight() {
+        // 23:00 to an 04:37 Fajr is 5h37m. The cross-midnight branch used to sum
+        // (now -> 23:59:59.999999999) + (00:00 -> Fajr), a nanosecond short, and
+        // truncated to 5h36m.
+        assertEquals("5h 37m", schedule().getTimeUntilNextPrayer(LocalTime.of(23, 0)))
+        assertEquals("4h 38m", schedule().getTimeUntilNextPrayer(LocalTime.of(23, 59)))
     }
 
     // --- injection defaults --------------------------------------------------

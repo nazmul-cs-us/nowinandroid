@@ -272,12 +272,12 @@ data class DayPrayerTimes(
         val nextPrayerIndex = prayers.indexOfFirst { it.time.isAfter(now) }
         
         return prayers.mapIndexed { index, prayer ->
-            val isCurrently = when {
-                // For Fajr to Maghrib prayers, check if we're between this prayer and the next
-                index < prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayers[index + 1].time) -> true
-                // For Isha prayer, only show as current for a reasonable time after it starts (max 2 hours)
-                index == prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayer.time.plusHours(2)) -> true
-                else -> false
+            val isCurrently = if (index < prayers.size - 1) {
+                // Runs until the next prayer begins.
+                isWithinWindow(now, prayer.time, prayers[index + 1].time)
+            } else {
+                // Isha stays current for a reasonable time after it starts (max 2 hours).
+                isWithinWindow(now, prayer.time, prayer.time.plusHours(2))
             }
             
             val isNext = when {
@@ -395,12 +395,12 @@ data class DayPrayerTimes(
         val nextPrayerIndex = actualPrayers.indexOfFirst { it.time.isAfter(now) }
         
         return actualPrayers.mapIndexed { index, prayer ->
-            val isCurrently = when {
-                // For Fajr to Maghrib prayers, check if we're between this prayer and the next
-                index < actualPrayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(actualPrayers[index + 1].time) -> true
-                // For Isha prayer, only show as current for a reasonable time after it starts (max 2 hours)
-                index == actualPrayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayer.time.plusHours(2)) -> true
-                else -> false
+            val isCurrently = if (index < actualPrayers.size - 1) {
+                // Runs until the next prayer begins.
+                isWithinWindow(now, prayer.time, actualPrayers[index + 1].time)
+            } else {
+                // Isha stays current for a reasonable time after it starts (max 2 hours).
+                isWithinWindow(now, prayer.time, prayer.time.plusHours(2))
             }
             
             val isNext = when {
@@ -656,8 +656,14 @@ data class DayPrayerTimes(
                 else -> "Now"
             }
         } else {
-            // Next prayer is tomorrow's Fajr
-            val duration = java.time.Duration.between(now, LocalTime.MAX) + 
+            // Next prayer is tomorrow's Fajr.
+            //
+            // LocalTime.MAX is 23:59:59.999999999, one nanosecond short of
+            // midnight, so summing the two halves naively lands a nanosecond
+            // under the true span and truncates the minute downward -- 23:00 to
+            // an 04:37 Fajr reported 5h 36m rather than 5h 37m. The plusNanos(1)
+            // closes the gap so the halves meet exactly at midnight.
+            val duration = java.time.Duration.between(now, LocalTime.MAX).plusNanos(1) +
                          java.time.Duration.between(LocalTime.MIN, nextPrayer.time)
             val hours = duration.toHours()
             val minutes = duration.toMinutesPart()
@@ -669,4 +675,34 @@ data class DayPrayerTimes(
             }
         }
     }
+
+    /**
+     * # Is [now] Inside a Prayer's Window?
+     *
+     * Returns true when [now] falls in `[start, end)` — inclusive of the moment
+     * the prayer begins, exclusive of the moment the next one does. Exactly one
+     * prayer is current at any instant.
+     *
+     * Two details this exists to get right, both of which were wrong when the
+     * comparisons were written inline:
+     *
+     * 1. **The start is inclusive.** Written as `now.isAfter(start) &&
+     *    now.isBefore(end)`, both bounds are strict, so at exactly a prayer's
+     *    time neither that prayer nor the previous one is current and the UI
+     *    briefly shows nothing.
+     *
+     * 2. **The window may wrap past midnight.** Isha's window runs two hours
+     *    from when it starts, and `LocalTime.plusHours` wraps, so a 23:00 Isha
+     *    yields `end` = 01:00 — an end *before* the start. A plain `now < end`
+     *    is then false for every instant of the evening, and Isha never reads as
+     *    current at all. When the window wraps, membership is the union of
+     *    `[start, midnight)` and `[midnight, end)`.
+     */
+    private fun isWithinWindow(now: LocalTime, start: LocalTime, end: LocalTime): Boolean =
+        if (end > start) {
+            now >= start && now < end
+        } else {
+            // Wraps past midnight: after the start today, or before the end tomorrow.
+            now >= start || now < end
+        }
 }
