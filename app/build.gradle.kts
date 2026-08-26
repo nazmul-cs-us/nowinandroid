@@ -128,6 +128,7 @@ dependencies {
     implementation(projects.core.data)
     implementation(projects.core.domain)
     implementation(projects.core.model)
+    implementation(projects.core.logging)
     implementation(projects.core.analytics)
     implementation(projects.sync.work)
 
