@@ -39,6 +39,14 @@ kotlin {
         // on every declaration. build-logic honours a `warningsAsErrors` property,
         // so left alone this would break the build the moment anyone sets it.
         freeCompilerArgs.add("-Xexpect-actual-classes")
+
+        // Mirrors configureKotlin() in build-logic/.../KotlinAndroid.kt, which
+        // multiplatform modules do not go through. Keep in sync with that file.
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlin.time.ExperimentalTime",
+            "-Xconsistent-data-class-copy-visibility",
+        )
     }
 
     // Apple targets. Declaring them costs nothing without Xcode — only the
@@ -59,6 +67,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Re-exported so the generated iOS framework exposes the model types
+            // directly, rather than making iosApp/ depend on :core:model itself.
+            api(projects.core.model)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
         }
