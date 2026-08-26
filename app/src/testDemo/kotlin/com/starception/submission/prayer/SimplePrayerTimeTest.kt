@@ -23,8 +23,8 @@ class SimplePrayerTimeTest {
         val location = Location(
             latitude = latitude,
             longitude = longitude,
-            name = "Dubai",
-            country = "UAE", 
+            city = "Dubai",
+            country = "UAE",
             timeZoneOffset = timezone,
             altitude = 5.0
         )

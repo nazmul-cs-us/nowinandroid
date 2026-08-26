@@ -100,6 +100,11 @@ android {
         ignoreAssetsPattern = "!audio"
     }
     testOptions.unitTests.isIncludeAndroidResources = true
+    // android.util.Log is an unimplemented stub on the JVM and throws by default,
+    // which fails every unit test that reaches the prayer engine
+    // (AstronomicalCalculator logs 112 times). Returning defaults lets the
+    // existing prayer calculation tests actually run off-device.
+    testOptions.unitTests.isReturnDefaultValues = true
     namespace = "com.starception.submission"
 }
 

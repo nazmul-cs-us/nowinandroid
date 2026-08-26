@@ -20,7 +20,7 @@ class PrayerTimeCalculationTest {
     private val dubaiLocation = Location(
         latitude = 25.276987,
         longitude = 55.296249,
-        name = "Dubai",
+        city = "Dubai",
         country = "UAE",
         timeZoneOffset = 4.0, // UTC+4
         altitude = 5.0

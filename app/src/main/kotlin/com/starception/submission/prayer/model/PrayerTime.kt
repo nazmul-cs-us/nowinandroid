@@ -258,8 +258,7 @@ data class DayPrayerTimes(
      * ]
      * ```
      */
-    fun getAllPrayers(): List<PrayerTime> {
-        val now = LocalTime.now()
+    fun getAllPrayers(now: LocalTime = LocalTime.now()): List<PrayerTime> {
         val prayers = listOf(
             PrayerTime("Fajr", fajr),
             PrayerTime("Sunrise", sunrise),
@@ -383,8 +382,7 @@ data class DayPrayerTimes(
      * ]
      * ```
      */
-    fun getActualPrayers(): List<PrayerTime> {
-        val now = LocalTime.now()
+    fun getActualPrayers(now: LocalTime = LocalTime.now()): List<PrayerTime> {
         val actualPrayers = listOf(
             PrayerTime("Fajr", fajr),
             PrayerTime("Dhuhr", dhuhr),
@@ -503,11 +501,9 @@ data class DayPrayerTimes(
      * PrayerTime("Fajr", 05:30, isNext=true, isCurrently=false)
      * ```
      */
-    fun getNextPrayer(): PrayerTime? {
-        val now = LocalTime.now()
-        
+    fun getNextPrayer(now: LocalTime = LocalTime.now()): PrayerTime? {
         // First try to find a prayer today that's after current time
-        val todayNextPrayer = getActualPrayers().firstOrNull { it.time.isAfter(now) }
+        val todayNextPrayer = getActualPrayers(now).firstOrNull { it.time.isAfter(now) }
         if (todayNextPrayer != null) {
             return todayNextPrayer
         }
@@ -645,10 +641,9 @@ data class DayPrayerTimes(
      * - **Memory Usage**: Minimal (temporary Duration objects)
      * - **Thread Safety**: Safe (immutable operations)
      */
-    fun getTimeUntilNextPrayer(): String? {
-        val nextPrayer = getNextPrayer() ?: return null
-        val now = LocalTime.now()
-        
+    fun getTimeUntilNextPrayer(now: LocalTime = LocalTime.now()): String? {
+        val nextPrayer = getNextPrayer(now) ?: return null
+
         return if (nextPrayer.time.isAfter(now)) {
             // Next prayer is today
             val duration = java.time.Duration.between(now, nextPrayer.time)
