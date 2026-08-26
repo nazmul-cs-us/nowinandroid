@@ -110,6 +110,10 @@ gradlePlugin {
             id = libs.plugins.nowinandroid.android.lint.get().pluginId
             implementationClass = "AndroidLintConventionPlugin"
         }
+        register("kmpLibrary") {
+            id = libs.plugins.nowinandroid.kmp.library.get().pluginId
+            implementationClass = "KmpLibraryConventionPlugin"
+        }
         register("jvmLibrary") {
             id = libs.plugins.nowinandroid.jvm.library.get().pluginId
             implementationClass = "JvmLibraryConventionPlugin"
