@@ -1910,7 +1910,9 @@ fun SwipeableBigTiles(
                             footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
                             backgroundPainterRes = R.drawable.insight_quran_background,
                             foregroundPainterRes = R.drawable.insight_quran_foreground_v2,
-                            foregroundBaseScale = 0.80f,
+                            // Let more of the reading scene breathe around the Quran.
+                            foregroundBaseScale = 0.74f,
+                            foregroundOffsetFraction = Offset(0f, 0.09f),
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
@@ -1958,8 +1960,9 @@ fun SwipeableBigTiles(
                             footerText = "Open the live compass and 3D globe",
                             backgroundPainterRes = R.drawable.insight_qibla_background,
                             foregroundPainterRes = R.drawable.insight_qibla_foreground_v2,
-                            foregroundBaseScale = 0.81f,
-                            foregroundOffsetFraction = Offset(0.025f, 0.035f),
+                            // Keep the compass present without dominating the Qibla scene.
+                            foregroundBaseScale = 0.75f,
+                            foregroundOffsetFraction = Offset(0.025f, 0.11f),
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.54f,
