@@ -39,6 +39,16 @@ kotlin {
             api(compose.runtime)
             api(compose.ui)
             api(compose.material3)
+            // Generates the Res accessors for the bundled fonts.
+            implementation(compose.components.resources)
         }
     }
+}
+
+// Pin the generated resource package. Left to itself the plugin derives
+// "submission.core.theme.generated.resources" from the namespace, dropping the
+// company prefix — fine but surprising, and not something to have imports depend on.
+compose.resources {
+    publicResClass = false
+    packageOfResClass = "com.starception.submission.core.theme.resources"
 }

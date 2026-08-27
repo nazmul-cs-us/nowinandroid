@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.window.ComposeUIViewController
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
+import com.starception.submission.core.designsystem.theme.sharedTypography
 import com.starception.submission.shared.PrayerSchedule
 import platform.UIKit.UIViewController
 
@@ -66,6 +67,7 @@ fun PrayerTimesViewController(
     // feature with no iOS equivalent, and it stays behind in core:designsystem.
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
+        typography = sharedTypography(),
     ) {
         PrayerTimesScreen(placeName = placeName, slots = slots)
     }
