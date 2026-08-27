@@ -30,6 +30,8 @@ import com.starception.submission.core.designsystem.theme.sharedTypography
 import com.starception.submission.shared.PrayerSchedule
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
+import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.shared.salah.SalahTracker
 import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
@@ -47,6 +49,10 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     var location by remember { mutableStateOf<DeviceLocation?>(null) }
     var resolved by remember { mutableStateOf(false) }
     var weatherCode by remember { mutableStateOf<Int?>(null) }
+
+    // One tracker for the life of the screen; it reads and writes through
+    // NSUserDefaults, so the marks survive relaunch.
+    val tracker = remember { SalahTracker() }
 
     LaunchedEffect(Unit) {
         location = LocationProvider().current()
@@ -67,6 +73,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
 
     val place = location ?: FALLBACK_LOCATION
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+    var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
 
     val day = PrayerSchedule.forDate(
         year = today.year,
@@ -89,6 +97,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         PrayerTimesScreen(
             placeName = place.placeName.ifEmpty { "Locating…" },
             day = day,
+            salah = SalahProgress.from(completed),
+            onTogglePrayer = { completed = tracker.toggle(today, it) },
             isLocating = !resolved,
         )
     }

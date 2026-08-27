@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
+import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.SharedPrayerSlot
 
 /**
@@ -57,6 +58,8 @@ import com.starception.submission.shared.SharedPrayerSlot
 fun PrayerTimesScreen(
     placeName: String,
     day: SharedPrayerDay,
+    salah: SalahProgress,
+    onTogglePrayer: (String) -> Unit,
     modifier: Modifier = Modifier,
     isLocating: Boolean = false,
 ) {
@@ -92,7 +95,12 @@ fun PrayerTimesScreen(
             // list a few rows tall.
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
-                    InsightPager(day = day, placeName = placeName)
+                    InsightPager(
+                        day = day,
+                        placeName = placeName,
+                        salah = salah,
+                        onTogglePrayer = onTogglePrayer,
+                    )
                 }
                 item {
                     Text(
