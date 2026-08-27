@@ -7,6 +7,25 @@ import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.datetime.toJavaLocalTime
+import kotlinx.datetime.toKotlinLocalDate
+
+/**
+ * Boundary between the shared calculation engine and this Android service.
+ *
+ * `AstronomicalCalculator` lives in `:core:prayer-engine` and speaks
+ * kotlinx-datetime so it can compile for iOS; everything above it here still
+ * speaks java.time. Converting in these two adapters keeps the seam in one
+ * place, rather than sprinkling `.toJavaLocalTime()` through the schedule logic.
+ *
+ * They disappear when this service itself moves to kotlinx-datetime as part of
+ * its feature slice.
+ */
+private fun AstronomicalCalculator.julianDayFor(date: LocalDate): Double =
+    calculateJulianDay(date.toKotlinLocalDate())
+
+private fun AstronomicalCalculator.decimalHourToJavaTime(decimalHour: Double): LocalTime? =
+    decimalHourToLocalTime(decimalHour)?.toJavaLocalTime()
 
 /**
  * Main service for calculating Islamic prayer times
@@ -179,7 +198,7 @@ class PrayerTimeCalculatorService @Inject constructor(
             mapOf("inputDate" to date)
         )
         
-        val julianDay = astronomicalCalculator.calculateJulianDay(date)
+        val julianDay = astronomicalCalculator.julianDayFor(date)
         
         if (julianDay.isNaN()) {
             Log.e(TAG, "❌ JULIAN DAY CALCULATION FAILED")
@@ -216,9 +235,9 @@ class PrayerTimeCalculatorService @Inject constructor(
             return null
         }
         
-        val solarNoonTime = astronomicalCalculator.decimalHourToLocalTime(solarNoon)
-        val sunriseTime = astronomicalCalculator.decimalHourToLocalTime(sunrise)
-        val sunsetTime = astronomicalCalculator.decimalHourToLocalTime(sunset)
+        val solarNoonTime = astronomicalCalculator.decimalHourToJavaTime(solarNoon)
+        val sunriseTime = astronomicalCalculator.decimalHourToJavaTime(sunrise)
+        val sunsetTime = astronomicalCalculator.decimalHourToJavaTime(sunset)
         
         Log.i(TAG, "✅ FUNDAMENTAL SOLAR CALCULATIONS: All positions calculated successfully")
         Log.i(TAG, "☀️ Solar Noon: $solarNoonTime (${solarNoon} decimal hours)")
@@ -280,11 +299,11 @@ class PrayerTimeCalculatorService @Inject constructor(
 
         // SUNRISE: Base astronomical sunrise time (no user offset applied)
         // Note: Sunrise is for reference/sunnah prayers, not one of the 5 obligatory prayers
-        val sunriseAdjusted = astronomicalCalculator.decimalHourToLocalTime(sunrise)
+        val sunriseAdjusted = astronomicalCalculator.decimalHourToJavaTime(sunrise)
 
         // DHUHR: Base solar noon time (no user offset applied)
         // This is when the sun reaches its zenith (highest point in the sky)
-        val dhuhr = astronomicalCalculator.decimalHourToLocalTime(solarNoon)
+        val dhuhr = astronomicalCalculator.decimalHourToJavaTime(solarNoon)
 
         // ASR: Base afternoon shadow-based time (no user offset applied)
         val asr = asrTime
@@ -293,7 +312,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         // Method-specific offset (e.g., +3 minutes for some regions) is still applied
         // User personal offset will be applied at UI layer
         val maghrib = addMinutesToTime(
-            astronomicalCalculator.decimalHourToLocalTime(sunset),
+            astronomicalCalculator.decimalHourToJavaTime(sunset),
             settings.getEffectiveMaghribOffset()  // Method/country-specific offset (e.g., 4min for Iran)
         )
 
@@ -422,7 +441,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         
         // Check if standard calculation succeeded
         if (!fajrDecimal.isNaN()) {
-            val fajrTime = astronomicalCalculator.decimalHourToLocalTime(fajrDecimal)
+            val fajrTime = astronomicalCalculator.decimalHourToJavaTime(fajrDecimal)
             Log.i(TAG, "  ✅ FAJR SUCCESS: $fajrTime (standard astronomical calculation)")
             Log.i(TAG, "  🌅 Method: ${settings.calculationMethod.displayName} depression angle")
             Log.i(TAG, "")
@@ -501,7 +520,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         Log.i(TAG, "  📊 Raw Result: $asrDecimal decimal hours")
         
         if (!asrDecimal.isNaN()) {
-            val asrTime = astronomicalCalculator.decimalHourToLocalTime(asrDecimal)
+            val asrTime = astronomicalCalculator.decimalHourToJavaTime(asrDecimal)
             Log.i(TAG, "  ✅ ASR SUCCESS: $asrTime (shadow-based calculation)")
             Log.i(TAG, "  📈 Interpretation: When shadow = ${shadowFactor} × object height")
             Log.i(TAG, "")
@@ -587,7 +606,7 @@ class PrayerTimeCalculatorService @Inject constructor(
         Log.i(TAG, "  📊 Raw Result: $ishaDecimal decimal hours")
         
         if (!ishaDecimal.isNaN()) {
-            val ishaTime = astronomicalCalculator.decimalHourToLocalTime(ishaDecimal)
+            val ishaTime = astronomicalCalculator.decimalHourToJavaTime(ishaDecimal)
             Log.i(TAG, "  ✅ ISHA SUCCESS: $ishaTime (${if (isAngleBased) "angle" else "time"}-based calculation)")
             Log.i(TAG, "")
             return ishaTime
@@ -641,7 +660,7 @@ class PrayerTimeCalculatorService @Inject constructor(
                     midNight + (sunset - midNight) / 2.0
                 }
                 
-                astronomicalCalculator.decimalHourToLocalTime(time)
+                astronomicalCalculator.decimalHourToJavaTime(time)
             }
             
             HighLatitudeAdjustment.ONE_SEVENTH_OF_NIGHT -> {
@@ -659,7 +678,7 @@ class PrayerTimeCalculatorService @Inject constructor(
                     sunset + oneSeventhOfNight
                 }
                 
-                astronomicalCalculator.decimalHourToLocalTime(time.let { if (it < 0) it + 24 else it % 24 })
+                astronomicalCalculator.decimalHourToJavaTime(time.let { if (it < 0) it + 24 else it % 24 })
             }
             
             HighLatitudeAdjustment.ANGLE_BASED -> {
@@ -679,7 +698,7 @@ class PrayerTimeCalculatorService @Inject constructor(
                     sunset + timeOffset
                 }
                 
-                astronomicalCalculator.decimalHourToLocalTime(time.let { if (it < 0) it + 24 else it % 24 })
+                astronomicalCalculator.decimalHourToJavaTime(time.let { if (it < 0) it + 24 else it % 24 })
             }
             
             else -> null

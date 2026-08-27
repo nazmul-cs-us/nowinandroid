@@ -2,12 +2,10 @@ package com.starception.submission.prayer.calculator
 
 import com.starception.submission.core.logging.SharedLog
 import com.starception.submission.prayer.model.Location
-import java.time.LocalDate
-import java.time.LocalTime
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.*
 import kotlin.time.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -17,6 +15,20 @@ import kotlinx.datetime.toLocalDateTime
  * Written against kotlinx-datetime rather than SimpleDateFormat/Date/Locale,
  * which are JVM-only and would block this file from reaching commonMain.
  */
+/**
+ * Degree/radian conversion, replacing `java.lang.Math`, which does not exist on
+ * Kotlin/Native.
+ *
+ * The expressions deliberately mirror the JDK's implementations exactly —
+ * `angdeg / 180.0 * PI` and `angrad * 180.0 / PI` — rather than an
+ * algebraically-equivalent rearrangement. Floating-point multiplication is not
+ * associative, so reordering these can move the final bit, and this code decides
+ * what minute a prayer falls on.
+ */
+private fun toRadians(angdeg: Double): Double = angdeg / 180.0 * PI
+
+private fun toDegrees(angrad: Double): Double = angrad * 180.0 / PI
+
 private fun logTimestamp(): String {
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
     fun pad(value: Int, width: Int = 2) = value.toString().padStart(width, '0')
@@ -56,8 +68,7 @@ private fun logTimestamp(): String {
  * - Modify astronomical constants
  * - Include advanced atmospheric models
  */
-@Singleton
-class AstronomicalCalculator @Inject constructor() {
+class AstronomicalCalculator {
     
     companion object {
         private const val TAG = "AstronomicalCalculator"
@@ -164,9 +175,9 @@ class AstronomicalCalculator @Inject constructor() {
      * Measures and logs calculation performance
      */
     private fun <T> benchmarkCalculation(operation: String, calculation: () -> T): T {
-        val startTime = System.currentTimeMillis()
+        val startTime = Clock.System.now().toEpochMilliseconds()
         val result = calculation()
-        val duration = System.currentTimeMillis() - startTime
+        val duration = Clock.System.now().toEpochMilliseconds() - startTime
         
         val timestamp = logTimestamp()
             
@@ -241,18 +252,18 @@ class AstronomicalCalculator @Inject constructor() {
      * - Include Julian/Gregorian calendar transition
      * - Add support for different calendar systems
      */
-    fun calculateJulianDay(date: LocalDate, time: LocalTime = LocalTime.MIDNIGHT): Double {
+    fun calculateJulianDay(date: LocalDate, time: LocalTime = LocalTime(0, 0)): Double {
         return benchmarkCalculation("JULIAN_DAY_CONVERSION") {
             val inputs = mapOf(
                 "date" to date,
                 "time" to time,
                 "year" to date.year,
-                "month" to date.monthValue,
+                "month" to date.monthNumber,
                 "day" to date.dayOfMonth
             )
             
             var year = date.year
-            var month = date.monthValue
+            var month = date.monthNumber
             val day = date.dayOfMonth
             val hour = time.hour.toDouble()
             val minute = time.minute.toDouble()
@@ -297,26 +308,26 @@ class AstronomicalCalculator @Inject constructor() {
         return benchmarkCalculation("SOLAR_DECLINATION") {
             val n = julianDay - 2451545.0
             val l = (280.46 + 0.9856474 * n) % 360
-            val g = Math.toRadians(357.528 + 0.9856003 * n)
-            val lambdaSun = Math.toRadians(l + 1.915 * sin(g) + 0.020 * sin(2 * g))
-            val epsilon = Math.toRadians(23.439 - 0.0000004 * n)
+            val g = toRadians(357.528 + 0.9856003 * n)
+            val lambdaSun = toRadians(l + 1.915 * sin(g) + 0.020 * sin(2 * g))
+            val epsilon = toRadians(23.439 - 0.0000004 * n)
             
             val result = asin(sin(epsilon) * sin(lambdaSun))
-            val resultDegrees = Math.toDegrees(result)
+            val resultDegrees = toDegrees(result)
             
             val inputs = mapOf(
                 "julianDay" to julianDay,
                 "daysSinceJ2000" to n,
                 "meanLongitude" to l,
-                "meanAnomaly" to Math.toDegrees(g),
-                "trueLongitude" to Math.toDegrees(lambdaSun),
-                "obliquity" to Math.toDegrees(epsilon)
+                "meanAnomaly" to toDegrees(g),
+                "trueLongitude" to toDegrees(lambdaSun),
+                "obliquity" to toDegrees(epsilon)
             )
             
             logCalculation("SOLAR_DECLINATION", inputs, "$resultDegrees° (${result} rad)")
             
             // Solar declination should be between -23.5° and +23.5°
-            val expectedRange = Pair(Math.toRadians(-23.5), Math.toRadians(23.5))
+            val expectedRange = Pair(toRadians(-23.5), toRadians(23.5))
             verifyTimeResult("SOLAR_DECLINATION", result, expectedRange)
             
             result
@@ -330,14 +341,14 @@ class AstronomicalCalculator @Inject constructor() {
         return benchmarkCalculation("EQUATION_OF_TIME") {
             val n = julianDay - 2451545.0
             val l = (280.46 + 0.9856474 * n) % 360
-            val g = Math.toRadians(357.528 + 0.9856003 * n)
-            val lambdaSun = Math.toRadians(l + 1.915 * sin(g) + 0.020 * sin(2 * g))
-            val epsilon = Math.toRadians(23.439 - 0.0000004 * n)
+            val g = toRadians(357.528 + 0.9856003 * n)
+            val lambdaSun = toRadians(l + 1.915 * sin(g) + 0.020 * sin(2 * g))
+            val epsilon = toRadians(23.439 - 0.0000004 * n)
             
             val ra = atan2(cos(epsilon) * sin(lambdaSun), cos(lambdaSun))
 
             // Normalize right ascension to 0-360 degrees
-            var raDegrees = Math.toDegrees(ra)
+            var raDegrees = toDegrees(ra)
             if (raDegrees < 0) raDegrees += 360.0
 
             // Calculate equation of time: EqT = Mean Solar Time - Apparent Solar Time
@@ -355,7 +366,7 @@ class AstronomicalCalculator @Inject constructor() {
                 "julianDay" to julianDay,
                 "daysSinceJ2000" to n,
                 "meanLongitude" to "${l}°",
-                "meanAnomaly" to "${Math.toDegrees(g)}°",
+                "meanAnomaly" to "${toDegrees(g)}°",
                 "rightAscension" to "${raDegrees}°",
                 "equationOfTimeHours" to "${eotHours}h"
             )
@@ -412,9 +423,9 @@ class AstronomicalCalculator @Inject constructor() {
         }
         
         return benchmarkCalculation("HOUR_ANGLE_CALCULATION") {
-            val latRad = Math.toRadians(latitude)
-            val altRad = Math.toRadians(altitude)
-            val decDegrees = Math.toDegrees(declination)
+            val latRad = toRadians(latitude)
+            val altRad = toRadians(altitude)
+            val decDegrees = toDegrees(declination)
             
             val cosH = (sin(altRad) - sin(latRad) * sin(declination)) / 
                        (cos(latRad) * cos(declination))
@@ -440,12 +451,12 @@ class AstronomicalCalculator @Inject constructor() {
             }
             
             val result = acos(cosH)
-            val resultDegrees = Math.toDegrees(result)
+            val resultDegrees = toDegrees(result)
             
             logCalculation("HOUR_ANGLE_CALCULATION", inputs, "${resultDegrees}° (${result} rad)")
             
             // Hour angle should be between 0° and 180°
-            verifyTimeResult("HOUR_ANGLE", result, Pair(0.0, Math.PI))
+            verifyTimeResult("HOUR_ANGLE", result, Pair(0.0, PI))
             
             result
         }
@@ -485,13 +496,13 @@ class AstronomicalCalculator @Inject constructor() {
             val inputs = mapOf(
                 "location" to location.getDisplayName(),
                 "julianDay" to julianDay,
-                "declination" to "${Math.toDegrees(declination)}°",
+                "declination" to "${toDegrees(declination)}°",
                 "solarNoon" to "${solarNoon}h",
                 "altitude" to "${location.altitude}m",
                 "baseRefraction" to "${baseRefraction}°",
                 "altitudeCorrection" to "${altitudeCorrection}°",
                 "totalSunriseAltitude" to "${sunriseAltitude}°",
-                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                "hourAngle" to "${toDegrees(hourAngle)}°"
             )
             
             if (hourAngle.isNaN()) {
@@ -505,7 +516,7 @@ class AstronomicalCalculator @Inject constructor() {
                 return@benchmarkCalculation Double.NaN
             }
             
-            val result = solarNoon - Math.toDegrees(hourAngle) / 15.0
+            val result = solarNoon - toDegrees(hourAngle) / 15.0
             
             logCalculation("SUNRISE_CALCULATION", inputs, "${result}h")
             
@@ -549,13 +560,13 @@ class AstronomicalCalculator @Inject constructor() {
             val inputs = mapOf(
                 "location" to location.getDisplayName(),
                 "julianDay" to julianDay,
-                "declination" to "${Math.toDegrees(declination)}°",
+                "declination" to "${toDegrees(declination)}°",
                 "solarNoon" to "${solarNoon}h",
                 "altitude" to "${location.altitude}m",
                 "baseRefraction" to "${baseRefraction}°",
                 "altitudeCorrection" to "${altitudeCorrection}°",
                 "totalSunsetAltitude" to "${sunsetAltitude}°",
-                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                "hourAngle" to "${toDegrees(hourAngle)}°"
             )
             
             if (hourAngle.isNaN()) {
@@ -569,7 +580,7 @@ class AstronomicalCalculator @Inject constructor() {
                 return@benchmarkCalculation Double.NaN
             }
             
-            val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+            val result = solarNoon + toDegrees(hourAngle) / 15.0
             
             logCalculation("SUNSET_CALCULATION", inputs, "${result}h")
             
@@ -612,9 +623,9 @@ class AstronomicalCalculator @Inject constructor() {
                 "julianDay" to julianDay,
                 "fajrAngle" to "${fajrAngle}°",
                 "fajrAltitude" to "${fajrAltitude}° (below horizon)",
-                "declination" to "${Math.toDegrees(declination)}°",
+                "declination" to "${toDegrees(declination)}°",
                 "solarNoon" to "${solarNoon}h",
-                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                "hourAngle" to "${toDegrees(hourAngle)}°"
             )
             
             if (hourAngle.isNaN()) {
@@ -629,7 +640,7 @@ class AstronomicalCalculator @Inject constructor() {
                 return@benchmarkCalculation Double.NaN
             }
             
-            val result = solarNoon - Math.toDegrees(hourAngle) / 15.0
+            val result = solarNoon - toDegrees(hourAngle) / 15.0
             
             logCalculation("FAJR_CALCULATION", inputs, "${result}h")
             
@@ -686,9 +697,9 @@ class AstronomicalCalculator @Inject constructor() {
                     "method" to "Depression Angle",
                     "ishaAngle" to "${ishaAngle}°",
                     "ishaAltitude" to "${ishaAltitude}° (below horizon)",
-                    "declination" to "${Math.toDegrees(declination)}°",
+                    "declination" to "${toDegrees(declination)}°",
                     "solarNoon" to "${solarNoon}h",
-                    "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                    "hourAngle" to "${toDegrees(hourAngle)}°"
                 )
                 
                 if (hourAngle.isNaN()) {
@@ -703,7 +714,7 @@ class AstronomicalCalculator @Inject constructor() {
                     return@benchmarkCalculation Double.NaN
                 }
                 
-                val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+                val result = solarNoon + toDegrees(hourAngle) / 15.0
                 
                 logCalculation("ISHA_ANGLE_CALCULATION", inputs, "${result}h")
                 
@@ -793,17 +804,17 @@ class AstronomicalCalculator @Inject constructor() {
             val declination = calculateSolarDeclination(julianDay)
             val solarNoon = calculateSolarNoon(location, julianDay)
             
-            val latRad = Math.toRadians(location.latitude)
-            val decDegrees = Math.toDegrees(declination)
+            val latRad = toRadians(location.latitude)
+            val decDegrees = toDegrees(declination)
             
             // SHADOW CALCULATION: Core Islamic astronomical formula
             // cotangent(Asr altitude) = shadowFactor + tan(|latitude - declination|)
             val latDecDiff = abs(latRad - declination)
-            val latDecDiffDegrees = Math.toDegrees(latDecDiff)
+            val latDecDiffDegrees = toDegrees(latDecDiff)
             val tanLatDecDiff = tan(latDecDiff)
             val cotanAsrAltitude = shadowFactor + tanLatDecDiff
             val asrAltitude = atan(1.0 / cotanAsrAltitude)
-            val asrAltitudeDegrees = Math.toDegrees(asrAltitude)
+            val asrAltitudeDegrees = toDegrees(asrAltitude)
             
             val hourAngle = calculateHourAngle(location.latitude, declination, asrAltitudeDegrees)
             
@@ -825,7 +836,7 @@ class AstronomicalCalculator @Inject constructor() {
                 "cotanAsrAltitude" to cotanAsrAltitude,
                 "asrAltitude" to "${asrAltitudeDegrees}°",
                 "solarNoon" to "${solarNoon}h",
-                "hourAngle" to "${Math.toDegrees(hourAngle)}°"
+                "hourAngle" to "${toDegrees(hourAngle)}°"
             )
             
             if (hourAngle.isNaN()) {
@@ -841,7 +852,7 @@ class AstronomicalCalculator @Inject constructor() {
                 return@benchmarkCalculation Double.NaN
             }
             
-            val result = solarNoon + Math.toDegrees(hourAngle) / 15.0
+            val result = solarNoon + toDegrees(hourAngle) / 15.0
             
             logCalculation("ASR_CALCULATION", inputs, "${result}h")
             
@@ -924,7 +935,7 @@ class AstronomicalCalculator @Inject constructor() {
                     val secondsFraction = (minutesFraction - minutes) * 60.0
                     val seconds = floor(secondsFraction).toInt()
                     
-                    val result = LocalTime.of(hours, minutes, seconds)
+                    val result = LocalTime(hours, minutes, seconds)
                     
                     val conversionData = normalizedInputs + mapOf(
                         "extractedHours" to hours,
@@ -946,7 +957,7 @@ class AstronomicalCalculator @Inject constructor() {
                     val secondsFraction = (minutesFraction - minutes) * 60.0
                     val seconds = floor(secondsFraction).toInt()
                     
-                    val result = LocalTime.of(hours, minutes, seconds)
+                    val result = LocalTime(hours, minutes, seconds)
                     
                     val conversionData = inputs + mapOf(
                         "extractedHours" to hours,
