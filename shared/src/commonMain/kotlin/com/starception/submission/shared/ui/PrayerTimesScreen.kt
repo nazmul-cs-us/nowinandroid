@@ -83,57 +83,21 @@ fun PrayerTimesScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            if (day.nextPrayer != null) {
-                NextPrayerBanner(name = day.nextPrayer, countdown = day.countdown)
-                Spacer(Modifier.height(16.dp))
-            }
+            PrayerNowTile(
+                phase = day.skyPhase,
+                weather = day.skyWeather,
+                headline = day.currentPrayer?.let { "Best Time to Pray $it" } ?: "Prayer Times",
+                subtitle = placeName,
+                nextPrayer = day.nextPrayer.orEmpty(),
+                countdown = day.countdown,
+            )
+
+            Spacer(Modifier.height(16.dp))
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(day.slots) { slot ->
                     PrayerCard(slot = slot)
                 }
-            }
-        }
-    }
-}
-
-/** Headline for the prayer coming up, with time remaining. */
-@Composable
-private fun NextPrayerBanner(
-    name: String,
-    countdown: String,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                text = "Next prayer",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Text(
-                    text = countdown,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
             }
         }
     }

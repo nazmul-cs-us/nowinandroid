@@ -16,6 +16,10 @@
 
 package com.starception.submission.shared
 
+import com.starception.submission.core.images.PrayerSkyPhase
+import com.starception.submission.core.images.PrayerSkyWeather
+import com.starception.submission.core.images.prayerSkyPhase
+import com.starception.submission.core.images.prayerSkyWeather
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
@@ -54,6 +58,10 @@ data class SharedPrayerDay(
     val nextPrayer: String?,
     /** Time until [nextPrayer], as `5h 37m`, `37m` or `Now`. */
     val countdown: String,
+    /** Which sky artwork suits this moment. */
+    val skyPhase: PrayerSkyPhase,
+    /** Which sky artwork suits the forecast. */
+    val skyWeather: PrayerSkyWeather,
 )
 
 /**
@@ -94,6 +102,7 @@ object PrayerSchedule {
         asrShadowFactor: Int = 1,
         nowHour: Int = -1,
         nowMinute: Int = -1,
+        weatherCode: Int? = null,
     ): SharedPrayerDay {
         val calculator = AstronomicalCalculator()
         val location = Location(
@@ -137,6 +146,9 @@ object PrayerSchedule {
             )
         }
 
+        fun minuteOf(name: String) = computed.firstOrNull { it.name == name }
+            ?.time?.let { it.hour * 60 + it.minute }
+
         val next = annotated.values.firstOrNull { it.isNext }
         return SharedPrayerDay(
             slots = slots,
@@ -145,6 +157,15 @@ object PrayerSchedule {
             countdown = next
                 ?.let { PrayerWindows.formatCountdown(PrayerWindows.minutesUntil(now, it.time)) }
                 .orEmpty(),
+            skyPhase = prayerSkyPhase(
+                nowMinute = now.hour * 60 + now.minute,
+                fajrMinute = minuteOf("Fajr") ?: 300,
+                sunriseMinute = minuteOf("Sunrise") ?: 390,
+                asrMinute = minuteOf("Asr") ?: 930,
+                maghribMinute = minuteOf("Maghrib") ?: 1_080,
+                ishaMinute = minuteOf("Isha") ?: 1_200,
+            ),
+            skyWeather = prayerSkyWeather(weatherCode),
         )
     }
 }

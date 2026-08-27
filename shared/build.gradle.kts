@@ -38,6 +38,7 @@ kotlin {
             export(projects.core.logging)
             export(projects.core.prayerEngine)
             export(projects.core.theme)
+            export(projects.core.images)
         }
     }
 
@@ -49,6 +50,7 @@ kotlin {
             api(projects.core.logging)
             api(projects.core.prayerEngine)
             api(projects.core.theme)
+            api(projects.core.images)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
 
