@@ -285,12 +285,19 @@ class InMemorySearchService @Inject constructor(
         val tReady = System.nanoTime()
         ensureReady()
         val tReadyDone = System.nanoTime()
-        val tokens = SearchTokenizer.tokenize(query)
+        val parsedQuery = SearchTokenizer.parse(query)
+        val tokens = parsedQuery.tokens
         if (tokens.isEmpty()) return InMemorySearchResult()
-        val fullNorm = SearchTokenizer.normalize(query.trim())
+        val fullNorm = tokens.joinToString(" ")
+        val surahIntent = parsedQuery.intent == SearchIntent.Surah
         val tQ = System.nanoTime()
         val result = InMemorySearchResult(
-            surahs = surahIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
+            surahs = surahIndex?.query(
+                queryTokens = tokens,
+                fullNormalizedQuery = fullNorm,
+                limit = limitPerSource,
+                allowShortFuzzy = surahIntent,
+            ).orEmpty(),
             quranicDuas = quranicDuaIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
             verses = verseIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
             chapters = chapterIndex?.query(tokens, fullNorm, limitPerSource).orEmpty(),
@@ -355,11 +362,13 @@ private val SURAH_SEARCH_ALIASES = mapOf(
     1 to "fatiha fateha fatihah",
     2 to "baqara baqarah bakara bakarah",
     3 to "imran imraan",
+    10 to "yunus younus yonus yunos",
     17 to "isra bani israel",
     18 to "kahf kehf",
     19 to "maryam mariam",
     20 to "taha ta-ha ta ha",
     36 to "yasin yaseen ya-sin ya sin",
+    38 to "sad saad",
     55 to "rahman rehman ar-rahman",
     56 to "waqiah waqia waqiyah",
     67 to "mulk al-mulk",

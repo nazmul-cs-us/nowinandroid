@@ -180,24 +180,44 @@ fun VoiceSettingsSection(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Engine selection section
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Keep the engine choice compact so the voice test remains the focus.
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "Recognition Engine",
+                text = "Recognition mode",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
 
-            // Modern engine selection cards
-            VoiceRecognitionEngine.entries.forEach { engine ->
-                ModernEngineCard(
-                    engine = engine,
-                    isSelected = state.selectedEngine == engine,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onEngineSelected(engine)
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                VoiceRecognitionEngine.entries.forEach { engine ->
+                    ModernEngineCard(
+                        engine = engine,
+                        isSelected = state.selectedEngine == engine,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEngineSelected(engine)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = state.selectedEngine,
+                transitionSpec = {
+                    fadeIn(tween(260)) togetherWith fadeOut(tween(180))
+                },
+                label = "selectedVoiceEngineDescription",
+            ) { engine ->
+                Text(
+                    text = engine.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
         }
@@ -229,6 +249,7 @@ fun VoiceSettingsSection(
                 )
 
                 ModernVoiceTestCard(
+                    selectedEngine = state.selectedEngine,
                     testState = state.testState,
                     testResult = state.testResult,
                     testError = state.testError,
@@ -249,31 +270,32 @@ private fun ModernEngineCard(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        else
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "cardBackground"
     )
 
     val borderColor by animateColorAsState(
         targetValue = if (isSelected)
-            MaterialTheme.colorScheme.primary
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
         else
-            Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
         label = "cardBorder"
     )
 
     Surface(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .height(82.dp)
+            .clip(RoundedCornerShape(18.dp))
             .border(
-                width = 2.dp,
+                width = if (isSelected) 1.5.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(18.dp)
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -281,103 +303,70 @@ private fun ModernEngineCard(
                 onClick = onClick
             ),
         color = backgroundColor,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            // Icon with gradient background
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = if (isSelected) listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                            ) else listOf(
-                                MaterialTheme.colorScheme.surfaceContainerHighest,
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                FlaticonIcon(
-                    glyph = engine.iconGlyph,
-                    contentDescription = null,
-                    tint = if (isSelected)
-                        MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 24.sp,
-                )
-            }
-
-            // Text content
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = engine.displayName,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                    // Speed badge
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (engine == VoiceRecognitionEngine.SHERPA_KWS)
-                            GoogleGreen.copy(alpha = 0.2f)
-                        else
-                            MaterialTheme.colorScheme.tertiaryContainer
-                    ) {
-                        Text(
-                            text = engine.speed,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = if (engine == VoiceRecognitionEngine.SHERPA_KWS)
-                                GoogleGreen
-                            else
-                                MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = engine.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Selection indicator
-            if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(28.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
+                    FlaticonIcon(
+                        glyph = engine.iconGlyph,
+                        contentDescription = null,
+                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 15.sp,
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (isSelected) {
                     FlaticonIcon(
                         glyph = FlaticonIcons.CHECK,
                         contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 16.sp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        fontSize = 15.sp,
                     )
                 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = if (engine == VoiceRecognitionEngine.SHERPA_KWS) {
+                        "Keywords"
+                    } else {
+                        "Transcription"
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = engine.speed,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -684,6 +673,7 @@ private fun AnimatedMicButton(
 
 @Composable
 private fun ModernVoiceTestCard(
+    selectedEngine: VoiceRecognitionEngine,
     testState: VoiceTestState,
     testResult: String?,
     testError: String?,
@@ -694,60 +684,111 @@ private fun ModernVoiceTestCard(
 ) {
     val isActive = testState == VoiceTestState.LISTENING || testState == VoiceTestState.PROCESSING
     val haptic = LocalHapticFeedback.current
+    val statusColor = when (testState) {
+        VoiceTestState.ERROR -> MaterialTheme.colorScheme.error
+        VoiceTestState.SUCCESS -> MaterialTheme.colorScheme.tertiary
+        VoiceTestState.LISTENING -> MaterialTheme.colorScheme.primary
+        VoiceTestState.PROCESSING -> MaterialTheme.colorScheme.secondary
+        VoiceTestState.IDLE -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val statusTitle = when (testState) {
+        VoiceTestState.IDLE -> "Ready to listen"
+        VoiceTestState.LISTENING -> "Listening"
+        VoiceTestState.PROCESSING -> "Creating transcript"
+        VoiceTestState.SUCCESS -> "Voice recognized"
+        VoiceTestState.ERROR -> "Try that again"
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+            .clip(RoundedCornerShape(22.dp))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f),
+                shape = RoundedCornerShape(22.dp),
+            ),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Full test area as one capsule
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(108.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary)
-                        ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            if (isActive) onStopTest() else onTestVoice()
-                        },
-                    contentAlignment = Alignment.Center
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(statusColor),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = statusTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
-                    BubbleSpeakerPad(
-                        isActive = isActive,
-                        amplitude = amplitude,
-                        modifier = Modifier.fillMaxSize()
+                    Text(
+                        text = if (selectedEngine == VoiceRecognitionEngine.WHISPER) {
+                            "Offline · Full"
+                        } else {
+                            "Offline · Fast"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                     )
                 }
             }
 
-            // Status text inside card
-            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(118.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(
+                            bounded = true,
+                            color = MaterialTheme.colorScheme.primary,
+                        ),
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (isActive) onStopTest() else onTestVoice()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                BubbleSpeakerPad(
+                    isActive = isActive,
+                    amplitude = amplitude,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             AnimatedContent(
                 targetState = testState,
-                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
-                label = "statusText"
+                transitionSpec = {
+                    fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(200))
+                },
+                label = "statusText",
             ) { state ->
                 Text(
                     text = when (state) {
-                        VoiceTestState.IDLE -> "Tap to test voice recognition"
-                        VoiceTestState.LISTENING -> "Listening... Tap to stop"
-                        VoiceTestState.PROCESSING -> "Processing..."
+                        VoiceTestState.IDLE -> "Tap play, then speak naturally"
+                        VoiceTestState.LISTENING -> "Speak now · Tap again to stop"
+                        VoiceTestState.PROCESSING -> "Processing securely on this device"
                         VoiceTestState.SUCCESS -> if (testResult != null) "\"$testResult\"" else "Recognized"
                         VoiceTestState.ERROR -> testError ?: "Error occurred"
                     },
@@ -759,8 +800,9 @@ private fun ModernVoiceTestCard(
                         VoiceTestState.LISTENING -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    textAlign = TextAlign.Start,
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -773,34 +815,26 @@ private fun BubbleSpeakerPad(
     amplitude: Float,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "speakerPad")
-    val bubblePulse by infiniteTransition.animateFloat(
-        initialValue = 0.75f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bubblePulse"
-    )
+    val stageStart = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+    val stageEnd = MaterialTheme.colorScheme.surfaceContainerHigh
     BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        Color(0xFF0D355B),
-                        Color(0xFF101A24)
-                    )
+                        stageStart,
+                        stageEnd,
+                    ),
                 )
-            )
+            ),
     ) {
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .width(maxWidth * 0.34f)
-                .padding(end = 6.dp),
+                .width(maxWidth * 0.43f)
+                .padding(horizontal = 2.dp),
             contentAlignment = Alignment.Center
         ) {
             GoogleHumVisualization(
@@ -814,46 +848,127 @@ private fun BubbleSpeakerPad(
             isActive = isActive,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = 18.dp),
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = (-86).dp, y = (-30).dp)
-                .size((8f * bubblePulse).dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.75f))
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = (-78).dp, y = (-12).dp)
-                .size((6f * bubblePulse).dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.68f))
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = (-70).dp, y = (8).dp)
-                .size((5f * bubblePulse).dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.6f))
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = (-92).dp, y = 24.dp)
-                .size((5f * bubblePulse).dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.5f))
+                .padding(start = 24.dp),
         )
     }
 }
 
 @Composable
 private fun VoiceStartStopButton(
+    isActive: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val ringColor by animateColorAsState(
+        targetValue = if (isActive) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        },
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "voiceControlRingColor",
+    )
+    val coreColor by animateColorAsState(
+        targetValue = if (isActive) {
+            MaterialTheme.colorScheme.secondary
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "voiceControlCoreColor",
+    )
+    val glyphColor = if (isActive) {
+        MaterialTheme.colorScheme.onSecondary
+    } else {
+        MaterialTheme.colorScheme.onPrimary
+    }
+    val iconMorphProgress by animateFloatAsState(
+        targetValue = if (isActive) 1f else 0f,
+        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        label = "voiceControlIconMorph",
+    )
+    val density = LocalDensity.current
+    val shadowBlurPx = with(density) { 5.dp.toPx() }
+    val shadowPaint = remember(shadowBlurPx) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(48, 0, 0, 0)
+            maskFilter = BlurMaskFilter(shadowBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+
+    Canvas(modifier = modifier.size(82.dp)) {
+        val outerRadius = 32.dp.toPx()
+        val coreRadius = 25.dp.toPx()
+
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawCircle(
+                center.x,
+                center.y + 3.dp.toPx(),
+                outerRadius,
+                shadowPaint,
+            )
+        }
+        drawCircle(color = ringColor, radius = outerRadius)
+        drawCircle(color = coreColor, radius = coreRadius)
+        drawArc(
+            color = Color.White.copy(alpha = 0.16f),
+            startAngle = 205f,
+            sweepAngle = 130f,
+            useCenter = false,
+            topLeft = Offset(center.x - coreRadius, center.y - coreRadius),
+            size = Size(coreRadius * 2f, coreRadius * 2f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
+        )
+
+        val playAlpha = (1f - iconMorphProgress * 1.45f).coerceIn(0f, 1f)
+        if (playAlpha > 0f) {
+            val playPath = Path().apply {
+                moveTo(center.x - 6.dp.toPx(), center.y - 10.dp.toPx())
+                quadraticTo(
+                    center.x - 6.dp.toPx(),
+                    center.y - 12.dp.toPx(),
+                    center.x - 3.5.dp.toPx(),
+                    center.y - 10.5.dp.toPx(),
+                )
+                lineTo(center.x + 11.dp.toPx(), center.y - 1.5.dp.toPx())
+                quadraticTo(
+                    center.x + 13.dp.toPx(),
+                    center.y,
+                    center.x + 11.dp.toPx(),
+                    center.y + 1.5.dp.toPx(),
+                )
+                lineTo(center.x - 3.5.dp.toPx(), center.y + 10.5.dp.toPx())
+                quadraticTo(
+                    center.x - 6.dp.toPx(),
+                    center.y + 12.dp.toPx(),
+                    center.x - 6.dp.toPx(),
+                    center.y + 10.dp.toPx(),
+                )
+                close()
+            }
+            drawPath(playPath, color = glyphColor, alpha = playAlpha)
+        }
+
+        val pauseAlpha = ((iconMorphProgress - 0.18f) / 0.82f).coerceIn(0f, 1f)
+        if (pauseAlpha > 0f) {
+            val barWidth = 5.dp.toPx()
+            val barHeight = (8.dp + 13.dp * pauseAlpha).toPx()
+            val gap = 4.dp.toPx()
+            listOf(center.x - gap / 2f - barWidth, center.x + gap / 2f).forEach { left ->
+                drawRoundRect(
+                    color = glyphColor,
+                    topLeft = Offset(left, center.y - barHeight / 2f),
+                    size = Size(barWidth, barHeight),
+                    cornerRadius = CornerRadius(2.5.dp.toPx()),
+                    alpha = pauseAlpha,
+                )
+            }
+        }
+    }
+}
+
+@Suppress("unused")
+@Composable
+private fun LegacyVoiceStartStopButton(
     isActive: Boolean,
     modifier: Modifier = Modifier,
 ) {

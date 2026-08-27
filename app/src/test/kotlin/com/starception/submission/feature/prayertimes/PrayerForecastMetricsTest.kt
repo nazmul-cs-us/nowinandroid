@@ -2,11 +2,27 @@ package com.starception.submission.feature.prayertimes
 
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherVisuals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PrayerForecastMetricsTest {
+    @Test
+    fun weatherReplacesBellForCurrentAndNextPrayerOnly() {
+        assertTrue(shouldReplacePrayerBellWithWeather("Current", prayerTimeEditMode = false))
+        assertTrue(shouldReplacePrayerBellWithWeather("Next", prayerTimeEditMode = false))
+        assertFalse(shouldReplacePrayerBellWithWeather("Upcoming", prayerTimeEditMode = false))
+    }
+
+    @Test
+    fun scheduleEditingAlwaysKeepsNotificationBell() {
+        assertFalse(shouldReplacePrayerBellWithWeather("Current", prayerTimeEditMode = true))
+        assertFalse(shouldReplacePrayerBellWithWeather("Next", prayerTimeEditMode = true))
+    }
+
     @Test
     fun heatAndHumidity_keepsBothThresholdValues() {
         assertEquals(
@@ -45,6 +61,18 @@ class PrayerForecastMetricsTest {
     }
 
     @Test
+    fun severalThresholds_supplyEveryMorphingVisual() {
+        assertEquals(
+            listOf(
+                PrayerWeatherVisual.Rain,
+                PrayerWeatherVisual.Heat,
+                PrayerWeatherVisual.Humidity,
+            ),
+            prayerWeatherVisuals("High humidity 84% · Hot 41°C · Rain 65%"),
+        )
+    }
+
+    @Test
     fun compactForecast_keepsOnlyTheValueForItsPriorityIcon() {
         assertEquals(
             "65%",
@@ -58,5 +86,14 @@ class PrayerForecastMetricsTest {
             "74%",
             formatPrimaryPrayerForecastMetric("High humidity 74%"),
         )
+    }
+
+    @Test
+    fun rotatingForecast_pairsEachIconWithItsOwnValue() {
+        val summary = "Rain 65% · High humidity 84% · Hot 41°C"
+
+        assertEquals("65%", formatPrayerForecastMetric(summary, PrayerWeatherVisual.Rain))
+        assertEquals("41°C", formatPrayerForecastMetric(summary, PrayerWeatherVisual.Heat))
+        assertEquals("84%", formatPrayerForecastMetric(summary, PrayerWeatherVisual.Humidity))
     }
 }

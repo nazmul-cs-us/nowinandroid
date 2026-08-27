@@ -67,6 +67,27 @@ class PrayerWeatherIntelligenceTest {
         assertTrue(insight?.advice?.contains("water and rain protection") == true)
     }
 
+    @Test
+    fun warningDelay_usesStrongestCrossedThreshold() {
+        val thresholds = PrayerWeatherThresholds()
+
+        assertEquals(
+            1_250L,
+            prayerWeatherWarningDelayMillis(
+                "Rain 25% · High humidity 51% · Hot 43°C",
+                thresholds,
+            ),
+        )
+        assertEquals(
+            3_000L,
+            prayerWeatherWarningDelayMillis("Rain 25%", thresholds),
+        )
+        assertEquals(
+            5_000L,
+            prayerWeatherWarningDelayMillis("Rain 0%", thresholds),
+        )
+    }
+
     private fun forecast(
         temperature: Double,
         rain: Int,
