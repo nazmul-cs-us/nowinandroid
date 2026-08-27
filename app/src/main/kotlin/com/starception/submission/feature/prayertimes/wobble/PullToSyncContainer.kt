@@ -13,7 +13,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
@@ -629,49 +635,83 @@ fun PullToSyncContainer(
                         )
                     }
 
-                    activeStatus != null -> {
-                        // Swap between cycling statuses rather than cutting, so the
-                        // row reads as one surface changing its message.
-                        Crossfade(
-                            targetState = activeStatus,
-                            animationSpec = tween(durationMillis = 220),
-                            label = "sync_bar_status",
-                        ) { status ->
-                            SyncBarStatusRow(
-                                status = status,
-                                spinAngle = spinAngle,
-                                contentColor = indicatorColor,
-                                onDismissed = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
+                    else -> {
+                        // Pull, release, syncing, results and alerts all occupy one
+                        // animated text slot. Keeping them in the same composition
+                        // prevents the release -> syncing handoff from cutting.
+                        val pullStatus = if (dragDistance > 0f && rawWobbleIntensity > 0.01f) {
+                            val canRelease = wobbleIntensity > 0.4f
+                            SyncBarStatus(
+                                key = if (canRelease) "pull-release" else "pull-drag",
+                                text = if (canRelease) "Release to sync" else "Pull to sync",
+                                icon = SyncBarIcon.Spinner,
                             )
+                        } else {
+                            null
                         }
-                    }
-
-                    // Nothing persistent is live — this is the transient pull gesture.
-                    rawWobbleIntensity > 0.01f -> {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.graphicsLayer {
-                                alpha = (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
-                            },
-                        ) {
-                            Canvas(
+                        val displayedStatus = activeStatus ?: pullStatus
+                        if (displayedStatus != null) {
+                            AnimatedContent(
+                                targetState = displayedStatus,
+                                // Progress percentages update in place; only a real
+                                // message change should start a transition.
+                                contentKey = { it.key },
+                                transitionSpec = {
+                                    val isPullHandoff =
+                                        initialState.key.startsWith("pull-") ||
+                                            targetState.key.startsWith("pull-")
+                                    if (isPullHandoff) {
+                                        // The revealed strip already follows the
+                                        // finger vertically. Sliding its label too
+                                        // creates double motion at the release
+                                        // threshold, so use a compact fade-through.
+                                        fadeIn(tween(150, delayMillis = 35)) togetherWith
+                                            fadeOut(tween(90))
+                                    } else {
+                                        (fadeIn(
+                                            animationSpec = tween(220, delayMillis = 55),
+                                        ) + slideInVertically(
+                                            animationSpec = tween(
+                                                300,
+                                                easing = FastOutSlowInEasing,
+                                            ),
+                                            initialOffsetY = { height -> height / 2 },
+                                        )) togetherWith
+                                            (fadeOut(tween(150)) + slideOutVertically(
+                                                animationSpec = tween(
+                                                    230,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                                targetOffsetY = { height -> -height / 2 },
+                                            ))
+                                    }
+                                },
                                 modifier = Modifier
-                                    .size(18.dp)
+                                    .fillMaxWidth()
                                     .graphicsLayer {
-                                        rotationZ = wobbleIntensity * 360f
+                                        alpha = if (activeStatus == null) {
+                                            (wobbleIntensity * 2.5f).coerceIn(0f, 1f)
+                                        } else {
+                                            1f
+                                        }
                                     },
-                            ) {
-                                drawIndicatorArc(indicatorColor, startAngle = -90f)
+                                label = "syncBarMessageTransition",
+                            ) { status ->
+                                SyncBarStatusRow(
+                                    status = status,
+                                    spinAngle = if (status.key.startsWith("pull-")) {
+                                        wobbleIntensity * 360f
+                                    } else {
+                                        spinAngle
+                                    },
+                                    contentColor = indicatorColor,
+                                    onDismissed = {
+                                        hapticFeedback.performHapticFeedback(
+                                            HapticFeedbackType.LongPress,
+                                        )
+                                    },
+                                )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (wobbleIntensity > 0.4f) "Release to sync" else "Pull to sync",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontSize = 15.sp,
-                                color = indicatorColor,
-                            )
                         }
                     }
                 }

@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Process-wide typewriter loop for the SearchBar hint.
+ * Process-wide phrase rotation for the SearchBar hint.
  *
  * Why a singleton: every top-level destination wraps itself in its own
  * [com.starception.submission.ui.TopLevelTopBarScaffold], so switching pages
@@ -50,33 +50,22 @@ object SearchHintAnimator {
     }
 
     private suspend fun runLoop() {
-        var idx = 0
         while (true) {
-            // Re-pick the slot's hints on each cycle so the rotation tracks
-            // the current time of day (slots roll over mid-loop without a restart).
-            val hints = SearchHints.rotatingHintsFor()
-            val target = hints[idx % hints.size]
-            // Type out — frame-aligned (~16ms ≈ one display frame) so each
-            // character lands on its own frame and the cadence feels even
-            // instead of micro-stuttering between irregular delays. Three
-            // frames per char (~48ms) reads as a natural typing speed.
-            for (i in 1..target.length) {
-                _hintText.value = target.substring(0, i)
-                delay(48)
-            }
-            // Hold for 3 minutes — long enough that the hint feels stable
-            // instead of flickering, short enough that an idle user still
-            // sees a fresh suggestion if they linger.
+            // Hold each complete phrase long enough to stay readable. The view
+            // layer owns the smooth vertical fade between phrases; emitting
+            // character substrings here made every update look like a reset.
             delay(180_000)
-            // Erase — two frames per char (~32ms) so it clears noticeably
-            // faster than it was typed, matching the natural rhythm.
-            for (i in target.length - 1 downTo 0) {
-                _hintText.value = target.substring(0, i)
-                delay(32)
+
+            // Re-pick the slot's hints on each cycle so the rotation follows a
+            // prayer-time band change without restarting the process singleton.
+            val hints = SearchHints.rotatingHintsFor()
+            val currentIndex = hints.indexOf(_hintText.value)
+            val nextIndex = if (currentIndex >= 0) {
+                (currentIndex + 1) % hints.size
+            } else {
+                0
             }
-            // Beat between hints so the next type-in doesn't slam in.
-            delay(600)
-            idx++
+            _hintText.value = hints[nextIndex]
         }
     }
 }

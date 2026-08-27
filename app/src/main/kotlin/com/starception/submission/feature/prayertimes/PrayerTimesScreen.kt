@@ -221,6 +221,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -247,6 +248,9 @@ import com.starception.submission.feature.prayertimes.weather.WeatherThresholdLe
 import com.starception.submission.feature.prayertimes.weather.temperatureThresholdLevel
 import com.starception.submission.feature.prayertimes.weather.humidityThresholdLevel
 import com.starception.submission.feature.prayertimes.weather.rainThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherIntelligence
 import com.starception.submission.feature.prayertimes.weather.weatherThresholdPreviewLevel
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
@@ -258,6 +262,11 @@ private val PrayerReferenceSlate = Color(0xFF5D6574)
 private val PrayerReferenceBlue = Color(0xFF4F779D)
 private val PrayerReferenceRust = Color(0xFF99593C)
 private val PrayerReferenceGold = Color(0xFFD8AB59)
+
+private data class PrayerTileWeatherAlert(
+    val visual: PrayerWeatherVisual,
+    val level: WeatherThresholdLevel,
+)
 
 private sealed interface CurrentWeatherLoadState {
     data object Loading : CurrentWeatherLoadState
@@ -455,6 +464,9 @@ fun PrayerTimesScreen(
     var showWeatherThresholds by rememberSaveable { mutableStateOf(false) }
     var prayerWeatherThresholds by remember {
         mutableStateOf(PrayerWeatherThresholdStore.load(screenContext))
+    }
+    var prayerTileWeatherAlerts by remember {
+        mutableStateOf<Map<String, PrayerTileWeatherAlert>>(emptyMap())
     }
     var syncWeatherResult by remember { mutableStateOf<String?>(null) }
     val voiceFeedback by com.starception.submission.ui.search.SearchPrefillBus.voiceFeedback
@@ -682,6 +694,55 @@ fun PrayerTimesScreen(
     // Observe the reactive flow - this automatically updates when Prayer Settings changes!
     val calculationSettings = repository.calculationSettingsFlow.collectAsState().value
     val storedOffsets = calculationSettings.timeOffsets
+
+    LaunchedEffect(prayerTimes, storedOffsets, prayerWeatherThresholds, currentTime) {
+        val times = prayerTimes
+        if (times == null) {
+            prayerTileWeatherAlerts = emptyMap()
+            return@LaunchedEffect
+        }
+
+        val date = LocalDate.now()
+        val adjustedTimes = mapOf(
+            "Fajr" to LocalDateTime.of(date, times.fajr)
+                .plusMinutes(storedOffsets.fajr.toLong()),
+            "Dhuhr" to LocalDateTime.of(date, times.dhuhr)
+                .plusMinutes(storedOffsets.dhuhr.toLong()),
+            "Asr" to LocalDateTime.of(date, times.asr)
+                .plusMinutes(storedOffsets.asr.toLong()),
+            "Maghrib" to LocalDateTime.of(date, times.maghrib)
+                .plusMinutes(storedOffsets.maghrib.toLong()),
+            "Isha" to LocalDateTime.of(date, times.isha)
+                .plusMinutes(storedOffsets.isha.toLong()),
+        )
+        val forecasts = CurrentWeatherRepository.getPrayerForecasts(
+            latitude = times.location.latitude,
+            longitude = times.location.longitude,
+            date = date,
+            times = adjustedTimes.mapValues { it.value.toLocalTime() },
+        )
+        val now = LocalDateTime.of(date, currentTime)
+        prayerTileWeatherAlerts = forecasts.mapNotNull { (prayerName, forecast) ->
+            val occurrence = adjustedTimes[prayerName] ?: return@mapNotNull null
+            // Keep the current prayer's warning briefly after its start, but do not
+            // decorate completed prayers with weather that is no longer actionable.
+            if (occurrence.isBefore(now.minusMinutes(30))) return@mapNotNull null
+            val insight = PrayerWeatherIntelligence.create(
+                prayerName = prayerName,
+                forecast = forecast,
+                thresholds = prayerWeatherThresholds,
+            ) ?: return@mapNotNull null
+            val visual = primaryPrayerWeatherVisual(insight.summary)
+                ?: return@mapNotNull null
+            prayerName to PrayerTileWeatherAlert(
+                visual = visual,
+                level = prayerWeatherThresholdLevel(
+                    summary = insight.summary,
+                    thresholds = prayerWeatherThresholds,
+                ),
+            )
+        }.toMap()
+    }
 
     // Observe AI suggestions flow
     val aiSuggestions = suggestionRepository.suggestions.collectAsState().value
@@ -1492,30 +1553,61 @@ fun PrayerTimesScreen(
                                             onNotificationToggle(!notificationEnabled)
                                             android.util.Log.d("PrayerCard", "🔔 Notification toggled for $prayerName: ${!notificationEnabled}")
                                         },
-                                        modifier = Modifier.size(if (compactTile) 22.dp else 24.dp)
+                                        modifier = Modifier.size(if (compactTile) 26.dp else 30.dp)
                                     ) {
-                                        FlaticonIcon(
-                                            glyph = if (notificationEnabled) {
-                                                FlaticonIcons.NOTIFICATIONS_ACTIVE
+                                        val weatherAlert = prayerTileWeatherAlerts[prayerName]
+                                            .takeIf {
+                                                !prayerTimeEditMode && prayerStatus == "Next"
+                                            }
+                                        AnimatedContent(
+                                            targetState = weatherAlert,
+                                            transitionSpec = {
+                                                (fadeIn(tween(220)) + scaleIn(
+                                                    initialScale = 0.72f,
+                                                    animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                                )) togetherWith
+                                                    (fadeOut(tween(150)) + scaleOut(
+                                                        targetScale = 0.78f,
+                                                        animationSpec = tween(190),
+                                                    ))
+                                            },
+                                            label = "${prayerName}BellWeatherMorph",
+                                        ) { alert ->
+                                            if (alert != null) {
+                                                AnimatedPrayerWeatherIcon(
+                                                    visual = alert.visual,
+                                                    level = alert.level,
+                                                    styleOverride = MeteoconStyle.Fill,
+                                                    preserveOriginalColors = true,
+                                                    modifier = Modifier.size(
+                                                        if (compactTile) 26.dp else 30.dp,
+                                                    ),
+                                                )
                                             } else {
-                                                FlaticonIcons.NOTIFICATIONS
-                                            },
-                                            contentDescription = when {
-                                                prayerTimeEditMode && notificationEnabled -> "Notifications enabled. Tap to disable"
-                                                prayerTimeEditMode -> "Notifications disabled. Tap to enable"
-                                                notificationEnabled -> "Notifications enabled. Enter edit mode to change"
-                                                else -> "Notifications disabled. Enter edit mode to change"
-                                            },
-                                            tint = accentColor.copy(
-                                                alpha = when {
-                                                    notificationEnabled && prayerTimeEditMode -> 1f
-                                                    notificationEnabled -> 0.78f
-                                                    prayerTimeEditMode -> 0.48f
-                                                    else -> 0.36f
-                                                },
-                                            ),
-                                            fontSize = if (compactTile) 13.sp else 16.sp,
-                                        )
+                                                FlaticonIcon(
+                                                    glyph = if (notificationEnabled) {
+                                                        FlaticonIcons.NOTIFICATIONS_ACTIVE
+                                                    } else {
+                                                        FlaticonIcons.NOTIFICATIONS
+                                                    },
+                                                    contentDescription = when {
+                                                        prayerTimeEditMode && notificationEnabled -> "Notifications enabled. Tap to disable"
+                                                        prayerTimeEditMode -> "Notifications disabled. Tap to enable"
+                                                        notificationEnabled -> "Notifications enabled. Enter edit mode to change"
+                                                        else -> "Notifications disabled. Enter edit mode to change"
+                                                    },
+                                                    tint = accentColor.copy(
+                                                        alpha = when {
+                                                            notificationEnabled && prayerTimeEditMode -> 1f
+                                                            notificationEnabled -> 0.78f
+                                                            prayerTimeEditMode -> 0.48f
+                                                            else -> 0.36f
+                                                        },
+                                                    ),
+                                                    fontSize = if (compactTile) 13.sp else 16.sp,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3118,24 +3210,72 @@ fun PrayerTimesScreen(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     val feelsLike = weather.apparentTemperatureCelsius
-                                    Text(
-                                        text = if (feelsLike != null) {
-                                            "Feels like ${feelsLike.roundToInt()}°"
-                                        } else {
-                                            "${weather.relativeHumidity}% · $precipitationLabel"
+                                    val defaultSupportingText = if (feelsLike != null) {
+                                        "Feels like ${feelsLike.roundToInt()}°"
+                                    } else {
+                                        "${weather.relativeHumidity}% · $precipitationLabel"
+                                    }
+                                    val thresholdSupportingText = when {
+                                        rainLevel != WeatherThresholdLevel.Normal ->
+                                            "Rain ${weather.precipitationProbability}%"
+                                        humidityLevel != WeatherThresholdLevel.Normal ->
+                                            "Humidity ${weather.relativeHumidity}%"
+                                        else -> null
+                                    }
+                                    var showThresholdText by remember(thresholdSupportingText) {
+                                        mutableStateOf(false)
+                                    }
+                                    LaunchedEffect(thresholdSupportingText) {
+                                        showThresholdText = false
+                                        if (thresholdSupportingText != null) {
+                                            while (true) {
+                                                delay(4_500L)
+                                                showThresholdText = true
+                                                delay(3_500L)
+                                                showThresholdText = false
+                                            }
+                                        }
+                                    }
+                                    AnimatedContent(
+                                        targetState = thresholdSupportingText
+                                            ?.takeIf { showThresholdText }
+                                            ?: defaultSupportingText,
+                                        transitionSpec = {
+                                            (fadeIn(
+                                                animationSpec = tween(220, delayMillis = 55),
+                                            ) + slideInVertically(
+                                                animationSpec = tween(
+                                                    300,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                                initialOffsetY = { height -> height / 2 },
+                                            )) togetherWith
+                                                (fadeOut(tween(150)) + slideOutVertically(
+                                                    animationSpec = tween(
+                                                        230,
+                                                        easing = FastOutSlowInEasing,
+                                                    ),
+                                                    targetOffsetY = { height -> -height / 2 },
+                                                ))
                                         },
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 10.5.sp,
-                                            lineHeight = 13.sp,
-                                            letterSpacing = 0.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
+                                        modifier = Modifier.widthIn(min = 70.dp),
+                                        label = "locationWeatherSupportingText",
+                                    ) { supportingText ->
+                                        Text(
+                                            text = supportingText,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 10.5.sp,
+                                                lineHeight = 13.sp,
+                                                letterSpacing = 0.sp,
+                                                platformStyle = PlatformTextStyle(
+                                                    includeFontPadding = false,
+                                                ),
                                             ),
-                                        ),
-                                        color = locationTileSupporting,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                            color = locationTileSupporting,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                             }
