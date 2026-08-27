@@ -21,11 +21,10 @@ import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyPhase
 import com.starception.submission.core.images.prayerSkyWeather
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
-import com.starception.submission.prayer.model.ASR_SHADOW_STANDARD
 import com.starception.submission.prayer.model.CountryPrayerDefaults
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
-import com.starception.submission.prayer.model.PrayerTimeOffsets
+import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.model.PrayerWindows
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDate
@@ -104,7 +103,7 @@ object PrayerSchedule {
         longitude: Double,
         timeZoneOffset: Double,
         defaults: CountryPrayerDefaults? = null,
-        userOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
+        settings: PrayerSettings = PrayerSettings(),
         nowHour: Int = -1,
         nowMinute: Int = -1,
         weatherCode: Int? = null,
@@ -117,9 +116,12 @@ object PrayerSchedule {
         )
         val julianDay = calculator.calculateJulianDay(LocalDate(year, month, day))
 
-        val method = defaults?.method
-        val fajrAngle = method?.fajrAngle ?: MWL_FAJR_ANGLE
-        val shadowFactor = defaults?.asrShadowFactor ?: ASR_SHADOW_STANDARD
+        // The user's settings decide the calculation; the country contributes
+        // only its published per-prayer offsets, which apply regardless of which
+        // method was chosen.
+        val method = settings.calculationMethod
+        val fajrAngle = settings.customFajrAngle ?: method.fajrAngle
+        val shadowFactor = settings.asrMadhhab.shadowFactor
 
         val computed = listOf(
             "Fajr" to calculator.calculateFajr(location, julianDay, fajrAngle),
@@ -130,12 +132,16 @@ object PrayerSchedule {
             // Isha is an angle for most methods and a delay after Maghrib for
             // others, notably Umm al-Qura's 90 minutes. Passing an angle of 0.0
             // for those would put Isha at sunset.
+            // getEffectiveIshaAngle treats 0.0 as "no angle", which is how the
+            // model marks methods that define Isha as a delay after Maghrib —
+            // Umm al-Qura's 90 minutes. Passing 0.0 through would put Isha at
+            // sunset.
             "Isha" to calculator.calculateIsha(
                 location,
                 julianDay,
-                defaults?.ishaAngle ?: if (defaults == null) MWL_ISHA_ANGLE else null,
-                defaults?.ishaDelay,
-                method?.maghribOffset ?: 0,
+                settings.getEffectiveIshaAngle(),
+                settings.customIshaDelay ?: method.ishaDelay,
+                settings.customMaghribOffset ?: method.maghribOffset,
             ),
         ).mapNotNull { (name, decimalHour) ->
             calculator.decimalHourToLocalTime(decimalHour)?.let { instant ->
@@ -145,7 +151,7 @@ object PrayerSchedule {
                 PrayerInstant(
                     name,
                     instant.plusMinutes(
-                        defaults.offsetFor(name) + userOffsets.getOffset(name),
+                        defaults.offsetFor(name) + settings.timeOffsets.getOffset(name),
                     ),
                 )
             }
@@ -197,10 +203,6 @@ object PrayerSchedule {
         )
     }
 }
-
-/** Muslim World League, used when the country is unknown. */
-private const val MWL_FAJR_ANGLE = 18.0
-private const val MWL_ISHA_ANGLE = 17.0
 
 /**
  * The country's published adjustment for a prayer, in minutes.

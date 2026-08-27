@@ -30,6 +30,10 @@ dependencies {
     // the iOS UI uses the real palette. `api` so consumers of this module are
     // unaffected.
     api(projects.core.theme)
+    // Button, icons and motion moved to a multiplatform module so the shared
+    // settings UI can use them; re-exported so this module's consumers are
+    // unaffected.
+    api(projects.core.components)
 
     lintPublish(projects.lint)
     
