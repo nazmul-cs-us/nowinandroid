@@ -33,6 +33,7 @@ import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.salah.SalahTracker
+import com.starception.submission.shared.settings.UserPrayerSettings
 import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
@@ -54,6 +55,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     // One tracker for the life of the screen; it reads and writes through
     // NSUserDefaults, so the marks survive relaunch.
     val tracker = remember { SalahTracker() }
+    val settings = remember { UserPrayerSettings() }
+    var userOffsets by remember { mutableStateOf(settings.offsets()) }
 
     LaunchedEffect(Unit) {
         location = LocationProvider().current()
@@ -87,6 +90,7 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         // The country's own method, so Fajr and Isha use the angles its
         // authority publishes rather than one country's convention everywhere.
         defaults = prayerDefaultsFor(place.countryCode),
+        userOffsets = userOffsets,
         // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
         weatherCode = weatherCode,
     )
@@ -100,6 +104,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
             day = day,
             salah = SalahProgress.from(completed),
             onTogglePrayer = { completed = tracker.toggle(today, it) },
+            offsets = userOffsets,
+            onAdjustPrayer = { prayer, delta -> userOffsets = settings.adjust(prayer, delta) },
             today = today,
             isLocating = !resolved,
         )

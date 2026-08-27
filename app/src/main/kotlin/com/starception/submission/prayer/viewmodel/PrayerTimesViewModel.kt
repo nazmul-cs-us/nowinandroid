@@ -560,9 +560,12 @@ class PrayerTimesViewModel @Inject constructor(
      * Gets current location based on settings with fallback to default location
      */
     private suspend fun getCurrentLocation(settings: PrayerSettings): Location {
-        // If user has set a manual location, use it
-        if (!settings.useGpsLocation && settings.location != null) {
-            return settings.location
+        // If user has set a manual location, use it. Read into a local first:
+        // PrayerSettings now lives in :core:prayer-engine, and Kotlin will not
+        // smart-cast a public property declared in another module.
+        val manualLocation = settings.location
+        if (!settings.useGpsLocation && manualLocation != null) {
+            return manualLocation
         }
         
         // If GPS is preferred and we have permission, try to get current location with enhanced accuracy

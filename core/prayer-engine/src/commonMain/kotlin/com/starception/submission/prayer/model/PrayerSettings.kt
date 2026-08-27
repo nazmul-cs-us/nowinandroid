@@ -1,5 +1,7 @@
 package com.starception.submission.prayer.model
 
+import com.starception.submission.core.logging.SharedLog
+import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
@@ -43,15 +45,15 @@ data class PrayerCalculationSettings(
      * NOTE: 0.0 is treated as null (meaning use delay-based calculation instead)
      */
     fun getEffectiveIshaAngle(): Double? {
-        android.util.Log.i("PrayerSettings", "🔍 getEffectiveIshaAngle() called")
-        android.util.Log.i("PrayerSettings", "   customIshaAngle = $customIshaAngle")
-        android.util.Log.i("PrayerSettings", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
+        SharedLog.i("PrayerSettings", "🔍 getEffectiveIshaAngle() called")
+        SharedLog.i("PrayerSettings", "   customIshaAngle = $customIshaAngle")
+        SharedLog.i("PrayerSettings", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
 
         val angle = customIshaAngle ?: calculationMethod.ishaAngle
-        android.util.Log.i("PrayerSettings", "   Selected angle (before 0.0 check) = $angle")
+        SharedLog.i("PrayerSettings", "   Selected angle (before 0.0 check) = $angle")
 
         val result = if (angle == 0.0) null else angle
-        android.util.Log.i("PrayerSettings", "   Final result (after 0.0 check) = $result")
+        SharedLog.i("PrayerSettings", "   Final result (after 0.0 check) = $result")
 
         return result  // 0.0 means "use delay instead"
     }
@@ -225,15 +227,15 @@ data class PrayerSettings(
     }
 
     fun getEffectiveIshaAngle(): Double? {
-        android.util.Log.i("PrayerSettings_Legacy", "🔍 getEffectiveIshaAngle() called (LEGACY CLASS)")
-        android.util.Log.i("PrayerSettings_Legacy", "   customIshaAngle = $customIshaAngle")
-        android.util.Log.i("PrayerSettings_Legacy", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
+        SharedLog.i("PrayerSettings_Legacy", "🔍 getEffectiveIshaAngle() called (LEGACY CLASS)")
+        SharedLog.i("PrayerSettings_Legacy", "   customIshaAngle = $customIshaAngle")
+        SharedLog.i("PrayerSettings_Legacy", "   calculationMethod.ishaAngle = ${calculationMethod.ishaAngle}")
 
         val angle = customIshaAngle ?: calculationMethod.ishaAngle
-        android.util.Log.i("PrayerSettings_Legacy", "   Selected angle (before 0.0 check) = $angle")
+        SharedLog.i("PrayerSettings_Legacy", "   Selected angle (before 0.0 check) = $angle")
 
         val result = if (angle == 0.0) null else angle
-        android.util.Log.i("PrayerSettings_Legacy", "   Final result (after 0.0 check) = $result")
+        SharedLog.i("PrayerSettings_Legacy", "   Final result (after 0.0 check) = $result")
 
         return result  // 0.0 means "use delay instead"
     }
@@ -345,5 +347,7 @@ data class AutoDetectedSettingsBackup(
     val timeOffsets: PrayerTimeOffsets,
     val countryName: String,
     val countryCode: String,
-    val backupTimestamp: Long = System.currentTimeMillis()
+    // kotlin.time.Clock rather than System.currentTimeMillis(), which is
+    // JVM-only. Same value, available on both platforms.
+    val backupTimestamp: Long = Clock.System.now().toEpochMilliseconds()
 )
