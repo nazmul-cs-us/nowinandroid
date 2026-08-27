@@ -83,18 +83,22 @@ fun PrayerTimesScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            PrayerNowTile(
-                phase = day.skyPhase,
-                weather = day.skyWeather,
-                headline = day.currentPrayer?.let { "Best Time to Pray $it" } ?: "Prayer Times",
-                subtitle = placeName,
-                nextPrayer = day.nextPrayer.orEmpty(),
-                countdown = day.countdown,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
+            // The pager and the schedule scroll together: on a phone the tiles
+            // alone fill most of the screen, so a fixed header would leave the
+            // list a few rows tall.
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item {
+                    InsightPager(day = day, placeName = placeName)
+                }
+                item {
+                    Text(
+                        text = "Prayer times",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
                 items(day.slots) { slot ->
                     PrayerCard(slot = slot)
                 }
