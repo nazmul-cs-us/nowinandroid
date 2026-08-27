@@ -1576,7 +1576,10 @@ fun SwipeableBigTiles(
     }
     val prayerNowSceneDarkness = when (prayerNowSkyPhase) {
         PrayerSkyPhase.Isha -> 0.18f
-        PrayerSkyPhase.Fajr -> 0.08f
+        // Fajr begins well before the sun crosses the horizon. Keep the generated
+        // dawn artwork visibly pre-sunrise until the calculated Sunrise boundary;
+        // otherwise its bright horizon reads as full daylight immediately after Fajr.
+        PrayerSkyPhase.Fajr -> 0.34f
         PrayerSkyPhase.Maghrib -> 0.04f
         else -> 0f
     }
@@ -1971,7 +1974,7 @@ fun SwipeableBigTiles(
                             // photograph, so retain its natural color instead of
                             // tinting it a second time.
                             skyTintStrength = 0f,
-                            sceneDarkness = 0f,
+                            sceneDarkness = prayerNowSceneDarkness,
                             adaptiveLightPosition = Offset(
                                 prayerNowSkyPalette.lightX,
                                 prayerNowSkyPalette.lightY,
