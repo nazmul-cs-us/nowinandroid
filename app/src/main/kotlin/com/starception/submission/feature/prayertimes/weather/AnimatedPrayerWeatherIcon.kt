@@ -75,19 +75,23 @@ private enum class CurrentWeatherVisual {
     Cloudy,
 }
 
-/**
- * Chooses one calm, meaningful visual when several forecast thresholds are active.
- * Rain takes priority because it changes preparation, followed by heat and humidity.
- */
-internal fun primaryPrayerWeatherVisual(summary: String?): PrayerWeatherVisual? {
-    if (summary.isNullOrBlank()) return null
-    return when {
-        summary.contains("rain", ignoreCase = true) -> PrayerWeatherVisual.Rain
-        summary.contains("hot", ignoreCase = true) || '°' in summary -> PrayerWeatherVisual.Heat
-        summary.contains("humidity", ignoreCase = true) -> PrayerWeatherVisual.Humidity
-        else -> null
+/** Returns every noteworthy visual in preparation-first priority order. */
+internal fun prayerWeatherVisuals(summary: String?): List<PrayerWeatherVisual> {
+    if (summary.isNullOrBlank()) return emptyList()
+    return buildList {
+        if (summary.contains("rain", ignoreCase = true)) add(PrayerWeatherVisual.Rain)
+        if (summary.contains("hot", ignoreCase = true) || '°' in summary) {
+            add(PrayerWeatherVisual.Heat)
+        }
+        if (summary.contains("humidity", ignoreCase = true)) {
+            add(PrayerWeatherVisual.Humidity)
+        }
     }
 }
+
+/** The first actionable condition remains the fallback for compact static surfaces. */
+internal fun primaryPrayerWeatherVisual(summary: String?): PrayerWeatherVisual? =
+    prayerWeatherVisuals(summary).firstOrNull()
 
 internal fun temperatureThresholdLevel(
     value: Double,
@@ -129,10 +133,42 @@ internal fun weatherThresholdPreviewLevel(
 internal fun prayerWeatherThresholdLevel(
     summary: String?,
     thresholds: PrayerWeatherThresholds,
+): WeatherThresholdLevel = primaryPrayerWeatherVisual(summary)?.let { visual ->
+    prayerWeatherThresholdLevel(summary, thresholds, visual)
+} ?: WeatherThresholdLevel.Normal
+
+/** Uses the strongest active condition to prioritize time-sensitive guidance. */
+internal fun highestPrayerWeatherThresholdLevel(
+    summary: String?,
+    thresholds: PrayerWeatherThresholds,
+): WeatherThresholdLevel = prayerWeatherVisuals(summary)
+    .maxOfOrNull { visual ->
+        prayerWeatherThresholdLevel(summary, thresholds, visual)
+    } ?: WeatherThresholdLevel.Normal
+
+/**
+ * Severe weather surfaces almost immediately, ordinary threshold alerts wait
+ * long enough for the home screen to settle, and provider-only advisories keep
+ * the original five-second pacing.
+ */
+internal fun prayerWeatherWarningDelayMillis(
+    summary: String?,
+    thresholds: PrayerWeatherThresholds,
+): Long = when (highestPrayerWeatherThresholdLevel(summary, thresholds)) {
+    WeatherThresholdLevel.Severe -> 1_250L
+    WeatherThresholdLevel.Alert -> 3_000L
+    WeatherThresholdLevel.Normal -> 5_000L
+}
+
+/** Resolves severity independently for each condition in a multi-threshold forecast. */
+internal fun prayerWeatherThresholdLevel(
+    summary: String?,
+    thresholds: PrayerWeatherThresholds,
+    visual: PrayerWeatherVisual,
 ): WeatherThresholdLevel {
     if (summary.isNullOrBlank()) return WeatherThresholdLevel.Normal
     val conditions = summary.split('·').map(String::trim)
-    return when (primaryPrayerWeatherVisual(summary)) {
+    return when (visual) {
         PrayerWeatherVisual.Rain -> conditions
             .firstOrNull { it.contains("rain", ignoreCase = true) }
             ?.firstNumber()
@@ -145,7 +181,6 @@ internal fun prayerWeatherThresholdLevel(
             .firstOrNull { it.contains("humidity", ignoreCase = true) }
             ?.firstNumber()
             ?.let { humidityThresholdLevel(it.toInt(), thresholds.humidity) }
-        null -> null
     } ?: WeatherThresholdLevel.Normal
 }
 
@@ -305,7 +340,8 @@ internal fun PrayerWeatherVisual.animationResource(
 ): Int = when (style) {
     MeteoconStyle.Monochrome -> when (this) {
         PrayerWeatherVisual.Rain -> when (level) {
-            WeatherThresholdLevel.Normal -> R.raw.meteocon_mono_raindrop
+            // Keep rain visually distinct from Meteocons' humidity droplet.
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_mono_rain
             WeatherThresholdLevel.Alert -> R.raw.meteocon_mono_rain
             WeatherThresholdLevel.Severe -> R.raw.meteocon_mono_extreme_rain
         }
@@ -323,7 +359,7 @@ internal fun PrayerWeatherVisual.animationResource(
     }
     MeteoconStyle.Fill -> when (this) {
         PrayerWeatherVisual.Rain -> when (level) {
-            WeatherThresholdLevel.Normal -> R.raw.meteocon_fill_raindrop
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_fill_rain
             WeatherThresholdLevel.Alert -> R.raw.meteocon_fill_rain
             WeatherThresholdLevel.Severe -> R.raw.meteocon_fill_extreme_rain
         }
@@ -341,7 +377,7 @@ internal fun PrayerWeatherVisual.animationResource(
     }
     MeteoconStyle.Flat -> when (this) {
         PrayerWeatherVisual.Rain -> when (level) {
-            WeatherThresholdLevel.Normal -> R.raw.meteocon_raindrop
+            WeatherThresholdLevel.Normal -> R.raw.meteocon_rain
             WeatherThresholdLevel.Alert -> R.raw.meteocon_rain
             WeatherThresholdLevel.Severe -> R.raw.meteocon_extreme_rain
         }

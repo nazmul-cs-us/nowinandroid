@@ -105,6 +105,7 @@ import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.feature.search.VoiceSearchService
 import com.starception.submission.feature.search.WhisperVoiceService
 import com.starception.submission.ui.search.InMemorySearchResult
+import com.starception.submission.ui.search.SearchTokenizer
 import com.starception.submission.ui.search.PopularSuggestion
 import com.starception.submission.ui.search.SearchHintAnimator
 import com.starception.submission.ui.search.SearchHints
@@ -1079,14 +1080,23 @@ private fun renderSuggestions(
     // unrelated SQL/FTS hits even when its only match is fuzzy. This makes
     // "Surah imran" pin Al-Imran first even though "imran" only fuzzy-matches
     // the stored "Imraan".
-    val rawWords = trimmedQuery.lowercase().split(Regex("\\s+")).toSet()
-    val surahIntent = "surah" in rawWords || "sura" in rawWords || "soorah" in rawWords
+    val rawWords = SearchTokenizer.splitWords(SearchTokenizer.normalize(trimmedQuery)).toSet()
+    val surahIntent = SearchTokenizer.hasSurahIntent(trimmedQuery)
     val duaIntent = "dua" in rawWords || "duas" in rawWords
     val verseIntent = "verse" in rawWords || "ayah" in rawWords || "ayat" in rawWords ||
         "verses" in rawWords
     val intentBoost: (Boolean) -> Double = { if (it) INTENT_BOOST else 0.0 }
+    // Once an explicit Surah command has a ranked match, keep the surface
+    // focused. Otherwise a fuzzy fragment such as "Asd" can match ordinary
+    // invocation prose and place unrelated duas above the requested chapter.
+    val restrictToSurahs = surahIntent && rankedSurahs.isNotEmpty()
+    val surahCorrection = if (restrictToSurahs) {
+        inferredSurahCorrection(trimmedQuery, rankedSurahs.first().item)
+    } else {
+        null
+    }
     val sections = mutableListOf<RenderableSection>()
-    if (rankedVerses.isNotEmpty()) {
+    if (!restrictToSurahs && rankedVerses.isNotEmpty()) {
         sections.add(
             RenderableSection(
                 title = ctx.getString(R.string.app_search_section_popular_verses),
@@ -1116,7 +1126,7 @@ private fun renderSuggestions(
             },
         )
     }
-    if (rankedQuranicDuas.isNotEmpty()) {
+    if (!restrictToSurahs && rankedQuranicDuas.isNotEmpty()) {
         sections.add(
             RenderableSection(
                 title = "Quranic Duas",
@@ -1132,7 +1142,7 @@ private fun renderSuggestions(
         )
     }
     // SQL-source priors (kept below in-memory exact-match scores but above each other)
-    if (cappedAyahs.isNotEmpty()) {
+    if (!restrictToSurahs && cappedAyahs.isNotEmpty()) {
         sections.add(
             RenderableSection(
                 title = "Quran",
@@ -1147,7 +1157,7 @@ private fun renderSuggestions(
             },
         )
     }
-    if (cappedFortressDuas.isNotEmpty()) {
+    if (!restrictToSurahs && cappedFortressDuas.isNotEmpty()) {
         sections.add(
             RenderableSection(
                 title = "Fortress of the Muslim",
@@ -1165,7 +1175,7 @@ private fun renderSuggestions(
             },
         )
     }
-    if (ftsTopics.isNotEmpty()) {
+    if (!restrictToSurahs && ftsTopics.isNotEmpty()) {
         sections.add(
             RenderableSection(title = "Topics", score = FTS_TOPICS_PRIOR) {
                 ftsTopics.forEach { topic ->
@@ -1177,7 +1187,7 @@ private fun renderSuggestions(
             },
         )
     }
-    if (ftsNews.isNotEmpty()) {
+    if (!restrictToSurahs && ftsNews.isNotEmpty()) {
         sections.add(
             RenderableSection(title = "Duas & Articles", score = FTS_NEWS_PRIOR) {
                 ftsNews.forEach { news ->
@@ -1188,6 +1198,9 @@ private fun renderSuggestions(
                 }
             },
         )
+    }
+    surahCorrection?.let { correction ->
+        addSearchCorrection(container, correction, accentColor)
     }
     sections
         .sortedByDescending { it.score }
@@ -1318,6 +1331,41 @@ private const val FTS_NEWS_PRIOR = 0.40
 // place. The old value of 25 was calibrated against raw sums and would now make
 // the boost absolute rather than strong.
 private const val INTENT_BOOST = 0.5
+
+private fun inferredSurahCorrection(
+    query: String,
+    surah: com.starception.submission.core.qurandatabase.SurahEntity,
+): String? {
+    val parsed = SearchTokenizer.parse(query)
+    val queryToken = parsed.tokens.singleOrNull() ?: return null
+    if (queryToken == surah.number.toString()) return null
+    val displayName = surah.nameEnglish?.takeIf(String::isNotBlank)
+        ?: surah.nameTranslation?.takeIf(String::isNotBlank)
+        ?: return null
+    val queryKey = SearchTokenizer.transliterationKey(queryToken)
+    val nameKeys = SearchTokenizer.indexWords(SearchTokenizer.normalize(displayName))
+        .map(SearchTokenizer::transliterationKey)
+    if (nameKeys.any { key -> key == queryKey || key.startsWith(queryKey) }) return null
+    return "Showing closest match: Surah ${surah.number} — $displayName"
+}
+
+private fun addSearchCorrection(parent: ViewGroup, text: String, accentColor: Int) {
+    val density = parent.resources.displayMetrics.density
+    parent.addView(
+        TextView(parent.context).apply {
+            this.text = text
+            setTextColor(accentColor)
+            typeface = appSearchTypeface(parent.context)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(
+                (24f * density).toInt(),
+                (14f * density).toInt(),
+                (24f * density).toInt(),
+                (2f * density).toInt(),
+            )
+        },
+    )
+}
 
 
 private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String, subtitleColor: Int) {

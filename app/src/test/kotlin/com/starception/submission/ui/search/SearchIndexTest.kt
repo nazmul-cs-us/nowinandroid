@@ -17,7 +17,9 @@ class SearchIndexTest {
             Surah(1, "Al-Fatihah"),
             Surah(2, "Al-Baqarah"),
             Surah(3, "Aal-i-Imraan"),
+            Surah(10, "Yunus", aliases = "younus yonus yunos"),
             Surah(36, "Ya-Sin", aliases = "yaseen"),
+            Surah(38, "Sad", aliases = "saad"),
             Surah(54, "Al-Qamar"),
             Surah(90, "Al-Balad"),
             Surah(93, "Ad-Duha", aliases = "dhuha zoha"),
@@ -58,6 +60,55 @@ class SearchIndexTest {
     @Test
     fun conventionalAlias_zoha_findsAdDuha() {
         assertEquals(93, search("zoha").first().item.number)
+    }
+
+    @Test
+    fun voiceTypo_yumos_findsYunus() {
+        assertEquals(10, search("Surah, Yumos").first().item.number)
+    }
+
+    @Test
+    fun shortVoiceTransposition_asd_findsSadOnlyWithSurahIntent() {
+        val results = index.query(
+            queryTokens = SearchTokenizer.tokenize("Surah, Asd."),
+            fullNormalizedQuery = SearchTokenizer.meaningfulNormalizedQuery("Surah, Asd."),
+            limit = 5,
+            allowShortFuzzy = SearchTokenizer.hasSurahIntent("Surah, Asd."),
+        )
+
+        assertEquals(38, results.first().item.number)
+    }
+
+    @Test
+    fun punctuationDoesNotHideSurahIntent() {
+        assertTrue(SearchTokenizer.hasSurahIntent("Surah, Yumos"))
+        assertTrue(SearchTokenizer.hasSurahIntent("Surah: Sad"))
+        assertEquals("yumos", SearchTokenizer.meaningfulNormalizedQuery("Surah, Yumos"))
+    }
+
+    @Test
+    fun spokenCommandWordsDoNotDiluteSurahSearch() {
+        val parsed = SearchTokenizer.parse("Please open Surah Yunus")
+
+        assertEquals(SearchIntent.Surah, parsed.intent)
+        assertEquals(listOf("yunus"), parsed.tokens)
+        assertEquals(10, search("Please open Surah Yunus").first().item.number)
+    }
+
+    @Test
+    fun spokenSurahNumberWordsBecomeChapterNumber() {
+        val parsed = SearchTokenizer.parse("Show me Surah thirty eight")
+
+        assertEquals(SearchIntent.Surah, parsed.intent)
+        assertEquals(listOf("38"), parsed.tokens)
+    }
+
+    @Test
+    fun verseIntentIsDetectedWithoutTreatingNumberAsSurah() {
+        val parsed = SearchTokenizer.parse("Read verse two")
+
+        assertEquals(SearchIntent.Verse, parsed.intent)
+        assertEquals(listOf("two"), parsed.tokens)
     }
 
     @Test
@@ -132,7 +183,8 @@ class SearchIndexTest {
 
     private fun search(query: String): List<RankedHit<Surah>> = index.query(
         queryTokens = SearchTokenizer.tokenize(query),
-        fullNormalizedQuery = SearchTokenizer.normalize(query),
+        fullNormalizedQuery = SearchTokenizer.meaningfulNormalizedQuery(query),
         limit = 5,
+        allowShortFuzzy = SearchTokenizer.hasSurahIntent(query),
     )
 }

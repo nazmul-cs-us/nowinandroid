@@ -2,6 +2,20 @@ package com.starception.submission.ui.search
 
 import java.text.Normalizer
 
+enum class SearchIntent {
+    Surah,
+    Dua,
+    Verse,
+    General,
+}
+
+data class ParsedSearchQuery(
+    val normalized: String,
+    val words: List<String>,
+    val tokens: List<String>,
+    val intent: SearchIntent,
+)
+
 /**
  * Tokenization + normalization shared by every in-memory search source.
  *
@@ -16,6 +30,25 @@ import java.text.Normalizer
  *   keep the longest one so "dua" / "surah" still searches
  */
 object SearchTokenizer {
+
+    private val SURAH_INTENT_WORDS = setOf("surah", "sura", "soorah", "sourah", "chapter")
+    private val DUA_INTENT_WORDS = setOf("dua", "duas", "supplication", "invocation")
+    private val VERSE_INTENT_WORDS = setOf("ayah", "ayat", "aya", "verse", "verses")
+    private val COMMAND_WORDS = setOf(
+        "open", "show", "find", "search", "play", "read", "please", "tell",
+        "give", "take", "bring", "navigate", "go", "me", "for", "to",
+    )
+    private val SMALL_NUMBERS = mapOf(
+        "zero" to 0, "one" to 1, "two" to 2, "three" to 3, "four" to 4,
+        "five" to 5, "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9,
+        "ten" to 10, "eleven" to 11, "twelve" to 12, "thirteen" to 13,
+        "fourteen" to 14, "fifteen" to 15, "sixteen" to 16,
+        "seventeen" to 17, "eighteen" to 18, "nineteen" to 19,
+    )
+    private val TENS = mapOf(
+        "twenty" to 20, "thirty" to 30, "forty" to 40, "fifty" to 50,
+        "sixty" to 60, "seventy" to 70, "eighty" to 80, "ninety" to 90,
+    )
 
     val STOP_WORDS = setOf(
         "surah", "sura", "soorah", "sourah",
@@ -76,6 +109,12 @@ object SearchTokenizer {
         if (key.isEmpty() || key.any { it !in 'a'..'z' }) return key
         key = key
             .replace("ph", "f")
+            // Users and voice keyboards commonly omit the digraph's silent
+            // h ("Ikhlas" -> "Iklas"), so preserve the leading consonant.
+            .replace("kh", "k")
+            .replace("sh", "s")
+            .replace("dh", "z")
+            .replace("th", "s")
             .replace("ck", "k")
             .replace('q', 'k')
             .replace('c', 'k')
@@ -101,12 +140,53 @@ object SearchTokenizer {
      * Returns the meaningful query tokens. Drops stop words; if the query is
      * entirely stop words, keep the longest one so a bare "dua" still searches.
      */
-    fun tokenize(input: String): List<String> {
-        val raw = splitWords(normalize(input))
-        if (raw.isEmpty()) return emptyList()
-        val nonStop = raw.filter { it !in STOP_WORDS }
-        return if (nonStop.isNotEmpty()) nonStop
-        else listOf(raw.maxByOrNull { it.length } ?: raw.first())
+    fun parse(input: String): ParsedSearchQuery {
+        val normalized = normalize(input)
+        val raw = splitWords(normalized)
+        val intent = when {
+            raw.any { it in SURAH_INTENT_WORDS } -> SearchIntent.Surah
+            raw.any { it in DUA_INTENT_WORDS } -> SearchIntent.Dua
+            raw.any { it in VERSE_INTENT_WORDS } -> SearchIntent.Verse
+            else -> SearchIntent.General
+        }
+        if (raw.isEmpty()) {
+            return ParsedSearchQuery(normalized, emptyList(), emptyList(), SearchIntent.General)
+        }
+        val meaningful = raw.filter { it !in STOP_WORDS && it !in COMMAND_WORDS }
+        val surahNumber = if (intent == SearchIntent.Surah) parseSurahNumber(meaningful) else null
+        val tokens = when {
+            surahNumber != null -> listOf(surahNumber.toString())
+            meaningful.isNotEmpty() -> meaningful
+            else -> listOf(raw.maxByOrNull { it.length } ?: raw.first())
+        }
+        return ParsedSearchQuery(normalized, raw, tokens, intent)
+    }
+
+    fun tokenize(input: String): List<String> = parse(input).tokens
+
+    /** Detects spoken/typed Surah intent after punctuation has been removed. */
+    fun hasSurahIntent(input: String): Boolean =
+        parse(input).intent == SearchIntent.Surah
+
+    /** Phrase used for ranking after command words such as "Surah" are removed. */
+    fun meaningfulNormalizedQuery(input: String): String = tokenize(input).joinToString(" ")
+
+    private fun parseSurahNumber(words: List<String>): Int? {
+        words.singleOrNull()?.toIntOrNull()?.let { return it.takeIf { number -> number in 1..114 } }
+        if (words.isEmpty() || words.any { it !in SMALL_NUMBERS && it !in TENS && it != "hundred" }) {
+            return null
+        }
+        var total = 0
+        var current = 0
+        words.forEach { word ->
+            when {
+                word in SMALL_NUMBERS -> current += SMALL_NUMBERS.getValue(word)
+                word in TENS -> current += TENS.getValue(word)
+                word == "hundred" -> current = current.coerceAtLeast(1) * 100
+            }
+        }
+        total += current
+        return total.takeIf { it in 1..114 }
     }
 }
 
@@ -244,7 +324,12 @@ class FieldWeightedIndex<T>(
      * @param queryTokens the normalized, stop-word-filtered query tokens
      * @param fullNormalizedQuery the full normalized query (used for phrase boost)
      */
-    fun query(queryTokens: List<String>, fullNormalizedQuery: String, limit: Int): List<RankedHit<T>> {
+    fun query(
+        queryTokens: List<String>,
+        fullNormalizedQuery: String,
+        limit: Int,
+        allowShortFuzzy: Boolean = false,
+    ): List<RankedHit<T>> {
         if (queryTokens.isEmpty() || items.isEmpty()) return emptyList()
 
         val itemScores = HashMap<Int, Double>()
@@ -308,12 +393,22 @@ class FieldWeightedIndex<T>(
                 // Approximate candidates by shared prefix and character trigrams, ranked
                 // by phonetic weighted Damerau distance. Candidate generation avoids
                 // comparing the query against every indexed word as the corpus grows.
-                if (transliterationToken.length >= 4) {
+                if (transliterationToken.length >= 4 ||
+                    (allowShortFuzzy && transliterationToken.length == 3)
+                ) {
                     val candidateKeys = LinkedHashSet<String>()
-                    transliterationKeysByPrefix[transliterationToken.take(2)]
-                        ?.let(candidateKeys::addAll)
-                    SearchTokenizer.characterTrigrams(transliterationToken).forEach { trigram ->
-                        transliterationKeysByTrigram[trigram]?.let(candidateKeys::addAll)
+                    if (allowShortFuzzy && transliterationToken.length <= 6) {
+                        // Short voice results often lose or substitute an opening
+                        // sound ("Asd" -> "Sad", "Yomos" -> "Yunus"). Surah indices
+                        // are tiny, so a full vocabulary scan is safe and cheap when
+                        // the caller has explicit Surah intent.
+                        candidateKeys.addAll(postingsByTransliterationKey.keys)
+                    } else {
+                        transliterationKeysByPrefix[transliterationToken.take(2)]
+                            ?.let(candidateKeys::addAll)
+                        SearchTokenizer.characterTrigrams(transliterationToken).forEach { trigram ->
+                            transliterationKeysByTrigram[trigram]?.let(candidateKeys::addAll)
+                        }
                     }
                     candidateKeys.forEach { indexedKey ->
                         if (indexedKey == transliterationToken ||
@@ -322,6 +417,7 @@ class FieldWeightedIndex<T>(
                         val approximate = approximateMatchScore(
                             query = transliterationToken,
                             indexed = indexedKey,
+                            allowShortMatch = allowShortFuzzy,
                         ) ?: return@forEach
                         postingsByTransliterationKey[indexedKey]?.forEach { offer(it, approximate) }
                     }
@@ -434,7 +530,11 @@ class FieldWeightedIndex<T>(
         return index
     }
 
-    private fun approximateMatchScore(query: String, indexed: String): Double? {
+    private fun approximateMatchScore(
+        query: String,
+        indexed: String,
+        allowShortMatch: Boolean = false,
+    ): Double? {
         val queryTrigrams = SearchTokenizer.characterTrigrams(query)
         val indexedTrigrams = SearchTokenizer.characterTrigrams(indexed)
         val sharedTrigrams = queryTrigrams.count { it in indexedTrigrams }
@@ -446,16 +546,17 @@ class FieldWeightedIndex<T>(
         val sharedPrefix = commonPrefixLength(query, indexed)
         val minimumLength = minOf(query.length, indexed.length)
         val minimumDice = if (minimumLength <= 5) 0.50 else 0.42
-        if (sharedPrefix < 2 && dice < minimumDice) return null
-
         val maximumDistance = when (minimumLength) {
             in 0..3 -> 0.75
             4 -> 1.0
-            in 5..6 -> 1.35
+            in 5..6 -> 1.55
             in 7..9 -> 1.65
             else -> 2.0
         }
         val distance = weightedDamerauLevenshtein(query, indexed)
+        val shortDistanceAccepted = allowShortMatch && minimumLength == 3 &&
+            distance <= maximumDistance
+        if (!shortDistanceAccepted && sharedPrefix < 2 && dice < minimumDice) return null
         val distanceAccepted = distance <= maximumDistance
         val trigramAccepted = dice >= minimumDice
         if (!distanceAccepted && !trigramAccepted) return null
@@ -518,6 +619,8 @@ class FieldWeightedIndex<T>(
             samePair(a, b, 'f', 'p') -> 0.45
             samePair(a, b, 'g', 'j') -> 0.55
             samePair(a, b, 'h', 'x') -> 0.55
+            // Common speech-to-text confusion in short names (Yumos/Yunus).
+            samePair(a, b, 'm', 'n') -> 0.55
             else -> 1.0
         }
     }

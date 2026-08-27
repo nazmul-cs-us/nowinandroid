@@ -105,7 +105,13 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.LinearEasing
@@ -186,6 +192,7 @@ import com.starception.submission.feature.prayertimes.weather.PrayerWeatherVisua
 import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
 import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherVisuals
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
@@ -2512,6 +2519,15 @@ internal fun formatPrayerForecastMetrics(summary: String?): String? {
  * would spend width without adding meaning.
  */
 internal fun formatPrimaryPrayerForecastMetric(summary: String?): String? {
+    val visual = primaryPrayerWeatherVisual(summary) ?: return null
+    return formatPrayerForecastMetric(summary, visual)
+}
+
+/** Formats the compact value paired with one rotating forecast visual. */
+internal fun formatPrayerForecastMetric(
+    summary: String?,
+    visual: PrayerWeatherVisual,
+): String? {
     val conditions = summary
         ?.split('·')
         ?.map(String::trim)
@@ -2524,7 +2540,7 @@ internal fun formatPrimaryPrayerForecastMetric(summary: String?): String? {
         .firstOrNull { token -> token.trimEnd(',', '.').endsWith('%') }
         ?.trimEnd(',', '.')
 
-    return when (primaryPrayerWeatherVisual(summary)) {
+    return when (visual) {
         PrayerWeatherVisual.Rain -> conditions
             .firstOrNull { it.contains("rain", ignoreCase = true) }
             ?.let(::percentage)
@@ -2536,7 +2552,6 @@ internal fun formatPrimaryPrayerForecastMetric(summary: String?): String? {
         PrayerWeatherVisual.Humidity -> conditions
             .firstOrNull { it.contains("humidity", ignoreCase = true) }
             ?.let(::percentage)
-        null -> null
     }
 }
 
@@ -3426,19 +3441,39 @@ private fun InsightPreviewCard(
                     val nextPrayerCountdown = statusDetail
                         .substringAfter(" in ", missingDelimiterValue = "")
                         .trim()
-                    val forecastMetrics = formatPrayerForecastMetrics(statusMetaText)
-                    val forecastVisual = primaryPrayerWeatherVisual(statusMetaText)
-                    val forecastLevel = prayerWeatherThresholdLevel(
-                        summary = statusMetaText,
-                        thresholds = weatherThresholds,
-                    )
-                    // Weather is supporting context here. Always keep it to one
-                    // actionable metric so the next-prayer countdown owns the row.
-                    val useCompactForecast = true
-                    val displayedForecastMetrics = if (useCompactForecast) {
-                        formatPrimaryPrayerForecastMetric(statusMetaText)
+                    val forecastVisuals = prayerWeatherVisuals(statusMetaText)
+                    var forecastVisualIndex by remember(statusMetaText) {
+                        mutableIntStateOf(0)
+                    }
+                    LaunchedEffect(forecastVisuals) {
+                        forecastVisualIndex = 0
+                        if (forecastVisuals.size > 1) {
+                            while (true) {
+                                delay(4_500L)
+                                forecastVisualIndex =
+                                    (forecastVisualIndex + 1) % forecastVisuals.size
+                            }
+                        }
+                    }
+                    val forecastVisual = forecastVisuals.getOrNull(forecastVisualIndex)
+                    val forecastLevel = forecastVisual?.let { visual ->
+                        prayerWeatherThresholdLevel(
+                            summary = statusMetaText,
+                            thresholds = weatherThresholds,
+                            visual = visual,
+                        )
+                    }
+                    val displayedForecastMetrics = forecastVisual?.let { visual ->
+                        formatPrayerForecastMetric(statusMetaText, visual)
+                    }
+                    val forecastPresentation = if (
+                        forecastVisual != null &&
+                        forecastLevel != null &&
+                        displayedForecastMetrics != null
+                    ) {
+                        Triple(forecastVisual, forecastLevel, displayedForecastMetrics)
                     } else {
-                        forecastMetrics
+                        null
                     }
                     // A card sized for a short viewport leaves the metric column
                     // about 39dp, and "55%" behind a 16dp icon needs 44dp, so the
@@ -3509,12 +3544,21 @@ private fun InsightPreviewCard(
                             )
                         }
 
-                        if (displayedForecastMetrics != null) {
+                        if (forecastPresentation != null) {
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height((footerLineHeight.value + 9f).dp)
-                                    .background(Color.White.copy(alpha = 0.22f)),
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            0f to Color.Transparent,
+                                            0.22f to Color.White.copy(alpha = 0.10f),
+                                            0.5f to Color.White.copy(alpha = 0.38f),
+                                            0.78f to Color.White.copy(alpha = 0.10f),
+                                            1f to Color.Transparent,
+                                        ),
+                                        shape = RoundedCornerShape(50),
+                                    ),
                             )
                             Column(
                                 modifier = Modifier.weight(if (narrowFooter) 0.58f else 0.52f),
@@ -3532,32 +3576,58 @@ private fun InsightPreviewCard(
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    forecastVisual?.let { visual ->
+                                AnimatedContent(
+                                    targetState = forecastPresentation,
+                                    transitionSpec = {
+                                        // Use the same compact fade-and-scale morph as the
+                                        // prayer-tile notification/weather icon.
+                                        (fadeIn(tween(220)) + scaleIn(
+                                            initialScale = 0.72f,
+                                            animationSpec = tween(
+                                                260,
+                                                easing = FastOutSlowInEasing,
+                                            ),
+                                        )) togetherWith
+                                            (fadeOut(tween(150)) + scaleOut(
+                                                targetScale = 0.78f,
+                                                animationSpec = tween(190),
+                                            ))
+                                    },
+                                    contentAlignment = Alignment.CenterEnd,
+                                    // A stable slot prevents the next-prayer column
+                                    // from moving as values of different widths fade.
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = "prayerNowForecastMorph",
+                                ) { (visual, level, metric) ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            space = 2.dp,
+                                            alignment = Alignment.End,
+                                        ),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
                                         AnimatedPrayerWeatherIcon(
                                             visual = visual,
-                                            level = forecastLevel,
+                                            level = level,
                                             preferFlat = true,
                                             animationSpeed = 1f,
                                             paletteColorOverride = heroAccent,
-                                            modifier = Modifier.size(if (narrowFooter) 13.dp else 16.dp),
+                                            modifier = Modifier.size(if (narrowFooter) 17.dp else 20.dp),
+                                        )
+                                        Text(
+                                            text = metric,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontSize = (12.5f - compactProgress).sp,
+                                                lineHeight = (14f - compactProgress).sp,
+                                                letterSpacing = 0.sp,
+                                            ),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
                                         )
                                     }
-                                    Text(
-                                        text = displayedForecastMetrics,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontSize = (12.5f - compactProgress).sp,
-                                            lineHeight = (14f - compactProgress).sp,
-                                            letterSpacing = 0.sp,
-                                        ),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
                                 }
                             }
                         }

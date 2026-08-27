@@ -60,6 +60,7 @@ import com.starception.submission.core.data.util.NetworkMonitor
 import com.starception.submission.core.data.util.TimeZoneMonitor
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.translation.LocationBasedTranslationDefaults
 import com.starception.submission.core.ui.LocalTimeZone
 import com.starception.submission.ui.NiaApp
 import com.starception.submission.widget.WidgetNavigationBus
@@ -188,6 +189,10 @@ class MainActivity : FragmentActivity() {
         Log.d("MainActivity", "   • savedInstanceState: ${if (savedInstanceState != null) "EXISTS" else "NULL"}")
 
         super.onCreate(savedInstanceState)
+
+        // Mark a genuinely fresh install as eligible before asynchronous location
+        // detection starts. Existing installs and restored language choices are preserved.
+        LocationBasedTranslationDefaults.prepareFirstInstall(this)
         
         // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars
         enableEdgeToEdge()
@@ -512,6 +517,8 @@ class MainActivity : FragmentActivity() {
                 Log.d("MainActivity", "📍 No location available for auto-detection")
                 return
             }
+
+            LocationBasedTranslationDefaults.applyDetectedCountry(this, location.countryCode)
             
             Log.d("MainActivity", "📍 Auto-detecting for location: ${location.getDisplayName()}")
             
@@ -527,6 +534,12 @@ class MainActivity : FragmentActivity() {
                     val detectionResult = countryService.getPrayerMethodForLocation(androidLocation)
                     
                     if (detectionResult.isAutoDetected) {
+                        // The geocoded result is a fallback when the cached location did not yet
+                        // carry a country code. This method is idempotent after the first write.
+                        LocationBasedTranslationDefaults.applyDetectedCountry(
+                            this@MainActivity,
+                            detectionResult.countryCode,
+                        )
                         Log.i("MainActivity", "🎯 Auto-detection successful: ${detectionResult.countryName}")
                         Log.i("MainActivity", "🕌 Method: ${detectionResult.calculationMethod.name}")
                         Log.i("MainActivity", "📿 Madhhab: ${detectionResult.madhhab.name}")

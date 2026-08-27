@@ -91,6 +91,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ColorFilter
@@ -105,6 +106,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -250,6 +252,7 @@ import com.starception.submission.feature.prayertimes.weather.humidityThresholdL
 import com.starception.submission.feature.prayertimes.weather.rainThresholdLevel
 import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherWarningDelayMillis
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherIntelligence
 import com.starception.submission.feature.prayertimes.weather.weatherThresholdPreviewLevel
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
@@ -267,6 +270,11 @@ private data class PrayerTileWeatherAlert(
     val visual: PrayerWeatherVisual,
     val level: WeatherThresholdLevel,
 )
+
+internal fun shouldReplacePrayerBellWithWeather(
+    prayerStatus: String,
+    prayerTimeEditMode: Boolean,
+): Boolean = !prayerTimeEditMode && (prayerStatus == "Current" || prayerStatus == "Next")
 
 private sealed interface CurrentWeatherLoadState {
     data object Loading : CurrentWeatherLoadState
@@ -1557,10 +1565,37 @@ fun PrayerTimesScreen(
                                     ) {
                                         val weatherAlert = prayerTileWeatherAlerts[prayerName]
                                             .takeIf {
-                                                !prayerTimeEditMode && prayerStatus == "Next"
+                                                shouldReplacePrayerBellWithWeather(
+                                                    prayerStatus = prayerStatus,
+                                                    prayerTimeEditMode = prayerTimeEditMode,
+                                                )
                                             }
+                                        var showPrayerWeather by remember(
+                                            prayerName,
+                                            weatherAlert,
+                                        ) {
+                                            mutableStateOf(weatherAlert != null)
+                                        }
+                                        LaunchedEffect(weatherAlert) {
+                                            if (weatherAlert == null) {
+                                                showPrayerWeather = false
+                                                return@LaunchedEffect
+                                            }
+
+                                            // Surface the warning first, then regularly
+                                            // restore the bell so its enabled/disabled state
+                                            // never disappears behind the forecast.
+                                            while (true) {
+                                                showPrayerWeather = true
+                                                delay(8_000L)
+                                                showPrayerWeather = false
+                                                delay(8_000L)
+                                            }
+                                        }
                                         AnimatedContent(
-                                            targetState = weatherAlert,
+                                            targetState = weatherAlert.takeIf {
+                                                showPrayerWeather
+                                            },
                                             transitionSpec = {
                                                 (fadeIn(tween(220)) + scaleIn(
                                                     initialScale = 0.72f,
@@ -1763,10 +1798,9 @@ fun PrayerTimesScreen(
     
     // INSTANT LOAD STRATEGY - Show cached data immediately, update in background
     LaunchedEffect(Unit) {
-        // Give the home screen time to settle before an automatic threshold
-        // warning expands the pull-to-sync banner. The weather request may run
-        // during this window, but its result cannot be presented before 5s.
-        val appOpenWeatherWarningEligibleAt = System.currentTimeMillis() + 5_000L
+        // Measure automatic warning timing from app entry. The actual delay is
+        // resolved after the forecast arrives because it depends on severity.
+        val appOpenStartedAt = System.currentTimeMillis()
         android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
         
         // STEP 1: Skip redundant cache loading - already done in remember{} block
@@ -1808,7 +1842,12 @@ fun PrayerTimesScreen(
                 )
             }
             insight?.compactText?.takeIf { it.isNotBlank() }?.let { warningText ->
-                val remainingDelay = appOpenWeatherWarningEligibleAt - System.currentTimeMillis()
+                val warningDelay = prayerWeatherWarningDelayMillis(
+                    summary = insight.summary,
+                    thresholds = prayerWeatherThresholds,
+                )
+                val warningEligibleAt = appOpenStartedAt + warningDelay
+                val remainingDelay = warningEligibleAt - System.currentTimeMillis()
                 if (remainingDelay > 0L) {
                     delay(remainingDelay)
                 }
@@ -3140,11 +3179,22 @@ fun PrayerTimesScreen(
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
-                                    .height(30.dp)
+                                    .height(32.dp)
                                     .background(
-                                        // outline renders warm here and fought the
-                                        // navy palette; match the card's own border.
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                                        brush = Brush.verticalGradient(
+                                            0f to Color.Transparent,
+                                            0.2f to MaterialTheme.colorScheme.primary.copy(
+                                                alpha = 0.06f,
+                                            ),
+                                            0.5f to MaterialTheme.colorScheme.primary.copy(
+                                                alpha = 0.30f,
+                                            ),
+                                            0.8f to MaterialTheme.colorScheme.primary.copy(
+                                                alpha = 0.06f,
+                                            ),
+                                            1f to Color.Transparent,
+                                        ),
+                                        shape = RoundedCornerShape(50),
                                     ),
                             )
 
@@ -3152,7 +3202,10 @@ fun PrayerTimesScreen(
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    space = 5.dp,
+                                    alignment = Alignment.End,
+                                ),
                             ) {
                                 // Monochrome takes the palette tint fully, so it reads
                                 // at this size against a pale card the way the location
@@ -3163,16 +3216,20 @@ fun PrayerTimesScreen(
                                     AnimatedCurrentWeatherIcon(
                                         weather = weather,
                                         styleOverride = MeteoconStyle.Monochrome,
-                                        modifier = Modifier.size(36.dp),
+                                        modifier = Modifier.size(32.dp),
                                     )
                                 } else {
                                     AnimatedPrayerWeatherIcon(
                                         visual = PrayerWeatherVisual.Heat,
                                         level = temperatureLevel,
-                                        modifier = Modifier.size(36.dp),
+                                        modifier = Modifier.size(32.dp),
                                     )
                                 }
                                 Column(
+                                    // Keep the three lines on a shared leading edge
+                                    // so the icon and copy read as one compact unit.
+                                    // The parent row anchors that unit to the card's
+                                    // 14dp end inset.
                                     horizontalAlignment = Alignment.Start,
                                     verticalArrangement = Arrangement.Center,
                                 ) {
@@ -3183,7 +3240,10 @@ fun PrayerTimesScreen(
                                     // name to "Al Safo...". Stacked, the widest line
                                     // is ~68dp and the location keeps its room.
                                     Text(
-                                        text = "${weather.temperatureCelsius.roundToInt()}°",
+                                        // The weather repository currently requests
+                                        // Celsius explicitly, so always expose the unit
+                                        // instead of leaving a bare degree ambiguous.
+                                        text = "${weather.temperatureCelsius.roundToInt()}°C",
                                         style = MaterialTheme.typography.bodyLarge.copy(
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 15.sp,
@@ -3211,7 +3271,7 @@ fun PrayerTimesScreen(
                                     )
                                     val feelsLike = weather.apparentTemperatureCelsius
                                     val defaultSupportingText = if (feelsLike != null) {
-                                        "Feels like ${feelsLike.roundToInt()}°"
+                                        "Feels like ${feelsLike.roundToInt()}°C"
                                     } else {
                                         "${weather.relativeHumidity}% · $precipitationLabel"
                                     }
@@ -3236,31 +3296,58 @@ fun PrayerTimesScreen(
                                             }
                                         }
                                     }
-                                    AnimatedContent(
-                                        targetState = thresholdSupportingText
-                                            ?.takeIf { showThresholdText }
-                                            ?: defaultSupportingText,
-                                        transitionSpec = {
-                                            (fadeIn(
-                                                animationSpec = tween(220, delayMillis = 55),
-                                            ) + slideInVertically(
-                                                animationSpec = tween(
-                                                    300,
-                                                    easing = FastOutSlowInEasing,
+                                    // Measure both possible labels up front. This gives the
+                                    // animated layer one stable slot instead of letting
+                                    // AnimatedContent resize the weather column on every swap.
+                                    Box(
+                                        modifier = Modifier.height(14.dp),
+                                        contentAlignment = Alignment.CenterStart,
+                                    ) {
+                                        listOfNotNull(
+                                            defaultSupportingText,
+                                            thresholdSupportingText,
+                                        ).forEach { measuredText ->
+                                            Text(
+                                                text = measuredText,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 10.5.sp,
+                                                    lineHeight = 13.sp,
+                                                    letterSpacing = 0.sp,
+                                                    platformStyle = PlatformTextStyle(
+                                                        includeFontPadding = false,
+                                                    ),
                                                 ),
-                                                initialOffsetY = { height -> height / 2 },
-                                            )) togetherWith
-                                                (fadeOut(tween(150)) + slideOutVertically(
+                                                maxLines = 1,
+                                                modifier = Modifier
+                                                    .alpha(0f)
+                                                    .clearAndSetSemantics { },
+                                            )
+                                        }
+
+                                        AnimatedContent(
+                                            targetState = thresholdSupportingText
+                                                ?.takeIf { showThresholdText }
+                                                ?: defaultSupportingText,
+                                            contentAlignment = Alignment.CenterStart,
+                                            transitionSpec = {
+                                                // Match the prayer-tile bell/weather morph:
+                                                // fade through with a restrained scale, without
+                                                // vertical travel that looks like a height change.
+                                                (fadeIn(tween(220)) + scaleIn(
+                                                    initialScale = 0.72f,
                                                     animationSpec = tween(
-                                                        230,
+                                                        260,
                                                         easing = FastOutSlowInEasing,
                                                     ),
-                                                    targetOffsetY = { height -> -height / 2 },
-                                                ))
-                                        },
-                                        modifier = Modifier.widthIn(min = 70.dp),
-                                        label = "locationWeatherSupportingText",
-                                    ) { supportingText ->
+                                                )) togetherWith
+                                                    (fadeOut(tween(150)) + scaleOut(
+                                                        targetScale = 0.78f,
+                                                        animationSpec = tween(190),
+                                                    ))
+                                            },
+                                            modifier = Modifier.matchParentSize(),
+                                            label = "locationWeatherSupportingText",
+                                        ) { supportingText ->
                                         Text(
                                             text = supportingText,
                                             style = MaterialTheme.typography.labelSmall.copy(
@@ -3275,6 +3362,7 @@ fun PrayerTimesScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
+                                        }
                                     }
                                 }
                             }
@@ -3987,7 +4075,7 @@ private fun LandscapeLocationWeatherTile(
                     verticalAlignment = Alignment.Bottom,
                 ) {
                     Text(
-                        text = current.temperatureCelsius.roundToInt().toString(),
+                        text = "${current.temperatureCelsius.roundToInt()}°C",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontSize = 19.sp,
                             lineHeight = 22.sp,
