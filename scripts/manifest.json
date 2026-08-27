@@ -1,12 +1,12 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8315519387,
-  "total_files": 6809,
+  "total_size": 8315879835,
+  "total_files": 6810,
   "categories": {
     "json_data": {
-      "total_size": 9886168,
-      "file_count": 5,
+      "total_size": 10246616,
+      "file_count": 6,
       "required": true
     },
     "news": {
@@ -22,6 +22,51 @@
     "quran_translation": {
       "total_size": 18055168,
       "file_count": 11,
+      "required": false
+    },
+    "hadith_musnad_ahmad": {
+      "total_size": 112041984,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_muwatta_malik": {
+      "total_size": 28508160,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sahih_bukhari": {
+      "total_size": 16850944,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sahih_muslim": {
+      "total_size": 54992896,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_abu_dawud": {
+      "total_size": 61448192,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_darimi": {
+      "total_size": 11665408,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_ibn_majah": {
+      "total_size": 26853376,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_nasai": {
+      "total_size": 31748096,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_tirmidhi": {
+      "total_size": 70643712,
+      "file_count": 1,
       "required": false
     },
     "model_whisper": {
@@ -79,51 +124,6 @@
       "file_count": 5323,
       "required": false
     },
-    "hadith_sahih_bukhari": {
-      "total_size": 16850944,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sahih_muslim": {
-      "total_size": 54992896,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_abu_dawud": {
-      "total_size": 61448192,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_tirmidhi": {
-      "total_size": 70643712,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_nasai": {
-      "total_size": 31748096,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_ibn_majah": {
-      "total_size": 26853376,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_musnad_ahmad": {
-      "total_size": 112041984,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_muwatta_malik": {
-      "total_size": 28508160,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_darimi": {
-      "total_size": 11665408,
-      "file_count": 1,
-      "required": false
-    },
     "fortress_audio_arabic": {
       "total_size": 186301510,
       "file_count": 383,
@@ -151,7 +151,7 @@
     },
     "topics.db": {
       "size": 16384,
-      "sha256": "08fef4ca636b9ef622b64a7052e6eec435080cff6d7a70c7a0826dfc08fc1816",
+      "sha256": "41bea809a7f8bd11691d748cef6380bedbe03188f3ebb3bd08bc96bd3585b239",
       "category": "json_data",
       "required": true
     },
@@ -164,6 +164,12 @@
     "databases/quranic_duas.db": {
       "size": 40960,
       "sha256": "dc69b759a2bb91eebc499912f123b64c1523f51af29ac0bff4477b1765d3743d",
+      "category": "json_data",
+      "required": true
+    },
+    "databases/fortress_of_the_muslim.db": {
+      "size": 360448,
+      "sha256": "7c7c83ee8245a9af01ea9be471a130562c4a49bdb0334786f87334c2715cd35f",
       "category": "json_data",
       "required": true
     },

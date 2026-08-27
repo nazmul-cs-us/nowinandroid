@@ -169,12 +169,14 @@ internal fun AnimatedPrayerWeatherIcon(
     visual: PrayerWeatherVisual,
     level: WeatherThresholdLevel = WeatherThresholdLevel.Alert,
     preferFlat: Boolean = false,
+    styleOverride: MeteoconStyle? = null,
+    preserveOriginalColors: Boolean = false,
     animationSpeed: Float = 0.72f,
     paletteColorOverride: ComposeColor? = null,
     modifier: Modifier = Modifier,
 ) {
     val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val style = when {
+    val style = styleOverride ?: when {
         preferFlat -> MeteoconStyle.Flat
         useDarkPalette -> MeteoconStyle.Flat
         else -> MeteoconStyle.Fill
@@ -186,8 +188,12 @@ internal fun AnimatedPrayerWeatherIcon(
     }
     AnimatedMeteocon(
         animationResource = visual.animationResource(level, style),
-        paletteColorFilter = remember(paletteColor) {
-            themedMeteoconColorFilter(paletteColor.toArgb())
+        paletteColorFilter = remember(paletteColor, preserveOriginalColors) {
+            if (preserveOriginalColors) {
+                null
+            } else {
+                themedMeteoconColorFilter(paletteColor.toArgb())
+            }
         },
         animationSpeed = animationSpeed,
         modifier = modifier,
@@ -205,12 +211,15 @@ internal fun AnimatedCurrentWeatherIcon(
 ) {
     val useDarkPalette = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val paletteColor = MaterialTheme.colorScheme.primary
+    val style = styleOverride ?: if (useDarkPalette) MeteoconStyle.Flat else MeteoconStyle.Fill
     AnimatedMeteocon(
-        animationResource = weather.currentWeatherVisual().animationResource(
-            styleOverride ?: if (useDarkPalette) MeteoconStyle.Flat else MeteoconStyle.Fill,
-        ),
-        paletteColorFilter = remember(paletteColor) {
-            themedMeteoconColorFilter(paletteColor.toArgb())
+        animationResource = weather.currentWeatherVisual().animationResource(style),
+        paletteColorFilter = remember(paletteColor, style) {
+            if (style == MeteoconStyle.Monochrome) {
+                solidMeteoconColorFilter(paletteColor.toArgb())
+            } else {
+                themedMeteoconColorFilter(paletteColor.toArgb())
+            }
         },
         animationSpeed = 0.72f,
         modifier = modifier,
@@ -227,6 +236,15 @@ private fun themedMeteoconColorFilter(paletteColor: Int): ColorFilter =
     } else {
         @Suppress("DEPRECATION")
         PorterDuffColorFilter(paletteColor, PorterDuff.Mode.MULTIPLY)
+    }
+
+/** Replaces monochrome artwork with the theme color so it remains legible in dark mode. */
+private fun solidMeteoconColorFilter(paletteColor: Int): ColorFilter =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        BlendModeColorFilter(paletteColor, BlendMode.SRC_IN)
+    } else {
+        @Suppress("DEPRECATION")
+        PorterDuffColorFilter(paletteColor, PorterDuff.Mode.SRC_IN)
     }
 
 @Composable

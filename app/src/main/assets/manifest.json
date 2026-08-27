@@ -1,16 +1,16 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8128705877,
-  "total_files": 6426,
+  "total_size": 8315879835,
+  "total_files": 6810,
   "categories": {
     "json_data": {
-      "total_size": 9898456,
-      "file_count": 5,
+      "total_size": 10246616,
+      "file_count": 6,
       "required": true
     },
     "news": {
-      "total_size": 5869568,
+      "total_size": 6393856,
       "file_count": 1,
       "required": true
     },
@@ -22,6 +22,51 @@
     "quran_translation": {
       "total_size": 18055168,
       "file_count": 11,
+      "required": false
+    },
+    "hadith_musnad_ahmad": {
+      "total_size": 112041984,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_muwatta_malik": {
+      "total_size": 28508160,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sahih_bukhari": {
+      "total_size": 16850944,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sahih_muslim": {
+      "total_size": 54992896,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_abu_dawud": {
+      "total_size": 61448192,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_darimi": {
+      "total_size": 11665408,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_ibn_majah": {
+      "total_size": 26853376,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_nasai": {
+      "total_size": 31748096,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_sunan_tirmidhi": {
+      "total_size": 70643712,
+      "file_count": 1,
       "required": false
     },
     "model_whisper": {
@@ -79,49 +124,9 @@
       "file_count": 5323,
       "required": false
     },
-    "hadith_sahih_bukhari": {
-      "total_size": 16850944,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sahih_muslim": {
-      "total_size": 54992896,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_abu_dawud": {
-      "total_size": 61448192,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_tirmidhi": {
-      "total_size": 70643712,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_nasai": {
-      "total_size": 31748096,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_ibn_majah": {
-      "total_size": 26853376,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_musnad_ahmad": {
-      "total_size": 112041984,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_muwatta_malik": {
-      "total_size": 28508160,
-      "file_count": 1,
-      "required": false
-    },
-    "hadith_sunan_darimi": {
-      "total_size": 11665408,
-      "file_count": 1,
+    "fortress_audio_arabic": {
+      "total_size": 186301510,
+      "file_count": 383,
       "required": false
     }
   },
@@ -145,20 +150,26 @@
       "required": true
     },
     "topics.db": {
-      "size": 28672,
-      "sha256": "f919403c496a0c7278ff7c3567114120ca6d2d038aa729ebd519f6e4aea75275",
+      "size": 16384,
+      "sha256": "41bea809a7f8bd11691d748cef6380bedbe03188f3ebb3bd08bc96bd3585b239",
       "category": "json_data",
       "required": true
     },
     "databases/news.db": {
-      "size": 5869568,
-      "sha256": "be224aecfb245a3008258c555216c452a9f221c9778cf8cc221ffea80d72e0f8",
+      "size": 6393856,
+      "sha256": "9f6e662cca5f4a91fa07cbaca33e3ec4c8ef9389967495e55bbbdeb2d7dd496b",
       "category": "news",
       "required": true
     },
     "databases/quranic_duas.db": {
       "size": 40960,
       "sha256": "dc69b759a2bb91eebc499912f123b64c1523f51af29ac0bff4477b1765d3743d",
+      "category": "json_data",
+      "required": true
+    },
+    "databases/fortress_of_the_muslim.db": {
+      "size": 360448,
+      "sha256": "7c7c83ee8245a9af01ea9be471a130562c4a49bdb0334786f87334c2715cd35f",
       "category": "json_data",
       "required": true
     },
@@ -38680,6 +38691,2304 @@
       "size": 646933,
       "sha256": "b56d5b8a4241a6d98746de310f5788df0f90264c17bcd65eaafa972373d8adb3",
       "category": "bukhari_audio_bn",
+      "required": false
+    },
+    "audio/fortress/arabic/001.mp3": {
+      "size": 3248270,
+      "sha256": "2edb69e6555358e626229a609f4389c91827a6fa40591302bb078820405ded89",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/002.mp3": {
+      "size": 267070,
+      "sha256": "2ecdfacdaa16c1b0364f25438e14bfbca1127b6f6185b8464077ff9e9ff97c07",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/003.mp3": {
+      "size": 313932,
+      "sha256": "ffe7eb5843e7d63c0219fdf682bdd67402f6940d08f6bdc1b07f6cedfea68aa9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/004.mp3": {
+      "size": 309520,
+      "sha256": "7fa8c13d5b555081acceee829e97b92f7a33a548cadb90df5d1c6c14eb037756",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/005.mp3": {
+      "size": 219270,
+      "sha256": "38cd221dfbbe2bb1eb8ae3e17f8c6ccb4c47be539da1cd4edcee5e71884b9ce3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/006.mp3": {
+      "size": 253246,
+      "sha256": "d0f79f0c55f46ac52566b57220acf57ebb6231dacc2459f4a60f58e5159386a0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/007.mp3": {
+      "size": 206408,
+      "sha256": "03b67e152bb8a00555a01ef42c97fa6f69092b22a79b72a57b2318b912bd0e0d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/008.mp3": {
+      "size": 220990,
+      "sha256": "c01c15a988d7297c8270ab397fcb391f3fa0b7f5dedf60309eb316fdf7f9bb2c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/009.mp3": {
+      "size": 494228,
+      "sha256": "574b8e9b0c656e0f98772f266fba9a01a7ce2bd9b9d93b25561ef789b3fbd489",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/010.mp3": {
+      "size": 432020,
+      "sha256": "49525f20e121f42d38fb0a63fe854f41f815dae76df0c4af1d953e6726145014",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/011.mp3": {
+      "size": 312778,
+      "sha256": "d9c1b1d100871adbe63b3324428be8e40cc96c30751c75a353a1aefacd30ea4b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/012.mp3": {
+      "size": 912588,
+      "sha256": "dea0e5ba3da8ffe8b7386753ebaf1ffe0dcd3313b0c3750f0e30b2fd6e26dd5a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/013.mp3": {
+      "size": 383424,
+      "sha256": "31478c36eccfcf7f94b55c91cc159db5ca01766e2db8c39784f3fc784bbd9d92",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/014.mp3": {
+      "size": 310858,
+      "sha256": "bd21819aad0e5cde5fc40daed5b3bfdb7d95848282ed766882e74057e92bd9b1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/015.mp3": {
+      "size": 813688,
+      "sha256": "17f16c32c0e310d40c121af60a45e8dec25f14fb1593c924100099e649b123b4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/016.mp3": {
+      "size": 2491004,
+      "sha256": "86b2cb093bcca0af32cb7551787649754d55c51aac3287c71a8e31f10e933541",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/017.mp3": {
+      "size": 592502,
+      "sha256": "f17d31880f67112fc90d18b0e2b5850f6463a41b5380e0be6bf903e5d342a7f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/018.mp3": {
+      "size": 577544,
+      "sha256": "dcf2a16c21f2fa16704c92085dbb4eabfa35570eb749bbf47f4b5588a575dd5d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/019.mp3": {
+      "size": 920822,
+      "sha256": "051c06adc836b1c176e385f020b78ee7c8566aeb2660a17d69d3f1ae32ded5bc",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/020.mp3": {
+      "size": 361168,
+      "sha256": "d07f0074584ba678d64561bc3e8c92c82d7a428d92f9cb948e73174fbde0056e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/021.mp3": {
+      "size": 458114,
+      "sha256": "47a4ca6e078124273b42d086476391ccc40d8798801ea279f7228c5d944c423a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/022.mp3": {
+      "size": 418348,
+      "sha256": "5b0f581621363b3e9b626832c5e04d3aa3d1f9a09e78f024cac3af0436eb7bc0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/023.mp3": {
+      "size": 664726,
+      "sha256": "a27b75c0e88e1ed55f6dc34549ab6fe52000ec18d8191f8ae932c99e71fb6e9d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/024.mp3": {
+      "size": 2397350,
+      "sha256": "e12549cea0729a156d8f12f0bbea78c32049b5213c4e8c9dc9c09a71a6f64c17",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/025.mp3": {
+      "size": 2568792,
+      "sha256": "a812ada04953fde68dd854c60de78628f7e516094fb478528af2cbd2ad79d752",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/026.mp3": {
+      "size": 1065798,
+      "sha256": "de7648f61b4b6b34574c75cf9cbc305c549fb37a053ecc5bcce2858f9f2bc97e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/027.mp3": {
+      "size": 5339144,
+      "sha256": "741c387b9ac0df5d39c0a33ab3a97faa83bc3eac13be1d98fb3589367f2af7b5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/028.mp3": {
+      "size": 4037942,
+      "sha256": "84fdf57bf8f9cfd07206054db057bf52d458dc2975f2319caf32760d6a08a9e8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/029.mp3": {
+      "size": 306632,
+      "sha256": "4315bc790a57389877590f660ef7a6b1673462f455977c7d9c62daad35b9b076",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/030.mp3": {
+      "size": 332782,
+      "sha256": "110e27472e1e4faaa5762bf3212d6c8597168b26e3663216c3c17262f5f0a6fb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/031.mp3": {
+      "size": 372700,
+      "sha256": "1c6619d659b062918b80f8b4d54a3c1055f8b63ad5b7cad576420f0d5f579ed0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/032.mp3": {
+      "size": 991486,
+      "sha256": "7731ce2b710d5c534edb4af599f4b1673649591b55339224b6097bcda1761c46",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/033.mp3": {
+      "size": 335250,
+      "sha256": "053d4dce569d5bc9663faf1e2183d4cefd2429bc917b6be8d4e8c3280184eee4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/034.mp3": {
+      "size": 700032,
+      "sha256": "212eceab17c3d4bae24166bccce44fa127f77faa32ed95f1bfb30dba54c659ba",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/035.mp3": {
+      "size": 648372,
+      "sha256": "e904a77f1f89bd4fbfe6389f09297e34801270cfcdbde6030f880e6a6d300332",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/036.mp3": {
+      "size": 456408,
+      "sha256": "4c0388d3eded33efbf91ecf1cf137d95e511895ca3e39513d73a9bbbe7c305ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/037.mp3": {
+      "size": 848654,
+      "sha256": "bfcead44dd60fcfd65d17ea86c443b606338920c6fcb8afed52ad179a442c9b3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/038.mp3": {
+      "size": 285312,
+      "sha256": "4473689e5f3d809cb41ccb076bab675efe5db5e4479abfaed75d554a28cfe192",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/039.mp3": {
+      "size": 223878,
+      "sha256": "d44b58a30245147bde787dc55bddb90192cd6174fddabbfb5e3a62ea9fdb150e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/040.mp3": {
+      "size": 376726,
+      "sha256": "e58790463ccec5d2f296dd7d607803abfb26650c4cd66ad695006752644bba21",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/041.mp3": {
+      "size": 417982,
+      "sha256": "6b3c8e688bed0a3526f57fa9a816a2622353382fcc95724389857fd5a79d8b70",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/042.mp3": {
+      "size": 270176,
+      "sha256": "2f7ace9caa17d8d6a98ee56a7074a62d8e61e09b12b276f77083ffb6ffb1dc8c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/043.mp3": {
+      "size": 286862,
+      "sha256": "a2772a9950a2cf2ef58af43491d069eab219f2e36afdb6780388bfb3002ea40d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/044.mp3": {
+      "size": 321812,
+      "sha256": "524f060b15fa53c35fbe76e6d8d816432f8cfe4f44f541d8d74c5d45e8222186",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/045.mp3": {
+      "size": 261138,
+      "sha256": "3197a1464216dd3ef7e269548c1c4a1cc7c5f70458c2a2dd4e43cd682fec289a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/046.mp3": {
+      "size": 238140,
+      "sha256": "2e73da7849c58baaf4c70659d61e5ca217c27f5da7cd3a6af448d8ae4d2ca45d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/047.mp3": {
+      "size": 435086,
+      "sha256": "118e4bc6e01adeea1ccc01f6366d4fa4a4b8b24319e4f9d08319ef0e6bf77292",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/048.mp3": {
+      "size": 336964,
+      "sha256": "50fd70fe6a6a58efe49345782d5f27ec4096c0f7990932b536448f416b3b6887",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/049.mp3": {
+      "size": 314318,
+      "sha256": "73aa1df89f881d4ee6da63b8cccfaf7f62c863636632fb428d2a2eed0d0b7462",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/050.mp3": {
+      "size": 407232,
+      "sha256": "5953b53f204da3422ebf22af40b78e441e6080aa15280161528f3394756f3a36",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/051.mp3": {
+      "size": 674714,
+      "sha256": "4fa6fe67c44ff80f5a091c3add891eadde4944ebe487e1e5ae24b1ab24bd57de",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/052.mp3": {
+      "size": 254778,
+      "sha256": "a98ffeb1c9ec09ad055ed61f263bc91298e9df6e1c087aca2e8c993477666fde",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/053.mp3": {
+      "size": 306630,
+      "sha256": "407b2e4771fa95d36ffd331fbd5b73c76a6f74149fd7246b12eb804216a76232",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/054.mp3": {
+      "size": 402444,
+      "sha256": "1751dd20d6f8b361b6e45c5ce97e653f8205d6ef6aa4eacbc934b0a145cca166",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/055.mp3": {
+      "size": 1218454,
+      "sha256": "b612fcc4df6196d1168ec62f2fc85210567d857ae3a3430027f1d73c697e7711",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/056.mp3": {
+      "size": 662998,
+      "sha256": "0c024bb26951cd6adc2a96989d62217b17b09bbbfd911531f1cd24fee792706d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/057.mp3": {
+      "size": 389368,
+      "sha256": "e842b5162bacbc6d264aa54b995bbf0325fe64fccbe62155f0e81e863df8236e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/058.mp3": {
+      "size": 238872,
+      "sha256": "64391aa2adbb9fdef2fc44ccceda001d28db339fbdb7239793275c7e06441431",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/059.mp3": {
+      "size": 235016,
+      "sha256": "46a1a48aabeec6a25795a102a4d4dfac8cf4d04decca72f33bd4ddf88fab38c0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/060.mp3": {
+      "size": 355202,
+      "sha256": "3dcb6f5443f3c9e8f22187c9b1e268e52a4705ccd21241f031a1b129caecdcf1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/061.mp3": {
+      "size": 408180,
+      "sha256": "84a935df4810f79d2de4af664241804f56f4019f1ee77a4c159b3c06bca3a41e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/062.mp3": {
+      "size": 266676,
+      "sha256": "ea7c323b6dc0b7a73975bb9348c74d5eeba0b8e276dcef0417312eaa9676be6a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/063.mp3": {
+      "size": 510148,
+      "sha256": "751ae1c514b2a8d47c8d3e42f529a2be7293a0ce8b656f192ed92a9f8a84de4b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/064.mp3": {
+      "size": 228296,
+      "sha256": "fcf1cfc7d8059e3ad4b2e224efd4741d79f23775ef7c62d27ccd5a9411fdfb29",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/065.mp3": {
+      "size": 225608,
+      "sha256": "44330e8e644cd3970bd63b6acb6365e72d59b6eb4f0e401dba32452fed0847a0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/066.mp3": {
+      "size": 282820,
+      "sha256": "db3ff8d83229c03a04f2f6bb25d2803ba9c0c69e0845356ddf55854b7768d923",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/067.mp3": {
+      "size": 340800,
+      "sha256": "b5475cc4cbbc144687679097f6a438f9598b03dc3058386b90fc01de05a32dff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/068.mp3": {
+      "size": 340622,
+      "sha256": "119c5bc663c06f036a4c89328c40c4cc308bf2cf214c1de445b000d3836950ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/069.mp3": {
+      "size": 443138,
+      "sha256": "de9578ef060bbc5d87f24c030ca64a38a4911701031f337437130a2a2389d9c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/070.mp3": {
+      "size": 405718,
+      "sha256": "94543b03737a48c3fb47396b8ead2894c138c4fd14460feb9dcf994dd933ea4f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/071.mp3": {
+      "size": 264782,
+      "sha256": "a6bad01d1fd9a6813b03de13f69f9d74c0fff4b01ef7852455437aacd3a60158",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/072.mp3": {
+      "size": 257118,
+      "sha256": "b1a4673861c596dd78d8b2f2cbbcf155f807419998c2509049e918540cae84a2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/073.mp3": {
+      "size": 282646,
+      "sha256": "9e17b9cb85a3acee26ca517b227464fcbe6c456327a83922081701514ebed0fa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/074.mp3": {
+      "size": 319334,
+      "sha256": "dcad7433161be0a9fbaac3995915cdb58b2659085fc2fe981e445ade71ddf2fa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/075.mp3": {
+      "size": 235606,
+      "sha256": "ca352bb3bd1527f18a89cee224b6aa5b4eeab4c3899b2efb3f3f0277cce61560",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/076.mp3": {
+      "size": 327576,
+      "sha256": "f23ea3140c5cb2d111b295d70c1cbdb69d76743167c53cb0cf03a1ae390e9287",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/077.mp3": {
+      "size": 335414,
+      "sha256": "4cd4791b1aaece0fa27539dfc87e68c6ebf4f17a3e64fb38516a27832ad899a7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/078.mp3": {
+      "size": 239456,
+      "sha256": "c10270e6a870c22f64cb32b29013257dae907747256d165a45c231a4a2804ee1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/079.mp3": {
+      "size": 264188,
+      "sha256": "8ce37c483c12d0bac45ffce1dd9495c896202ee990d2d673cd0e70cf74e2063f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/080.mp3": {
+      "size": 393044,
+      "sha256": "6e2a7b9aaa3bff14bf959ffa3216e9b2f0c12aa95765d7c69234b0eeebe6050f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/081.mp3": {
+      "size": 261902,
+      "sha256": "9da9518dabb80bc2e9a1993f3c0e9e4d47a3fd084a0144393cf98dd1582a4cce",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/082.mp3": {
+      "size": 225396,
+      "sha256": "e2333850358e549d4635f4dac57c325b9017bd7621cda2eba52923afbf180b93",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/083.mp3": {
+      "size": 275906,
+      "sha256": "39818e09b99883fa1119d652b280eab215eae88608b7403942576c9c8a513746",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/084.mp3": {
+      "size": 321410,
+      "sha256": "c9968ced99edf1ddb9e2c154ba9e24e730c616c1f0c9a6d336312e223bf48eeb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/085.mp3": {
+      "size": 271864,
+      "sha256": "e0e49428b44f881b2faeadba99c0c9b637ee004472bba527484b8aaa16ca13f3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/086.mp3": {
+      "size": 210452,
+      "sha256": "2c764ce3eec351468ccedf24686095207233602d2d0ee6e8afa01dc1d30d00e9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/087.mp3": {
+      "size": 225236,
+      "sha256": "b2f7cf4d3bdd7f34c6728374fe2e0fdf12ab5d2fefa2568f9d87d90c96df5242",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/088.mp3": {
+      "size": 284946,
+      "sha256": "774a459704f41a0759e7585b915fd4c443f7574c8af39ab2a0aea3238985176e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/089.mp3": {
+      "size": 232350,
+      "sha256": "d5d8505093ba951449c384a664f68f89814afd0c76018d479fc7ef285c1aa724",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/090.mp3": {
+      "size": 226192,
+      "sha256": "49389445a83cda67cba56988217695a4fa4d27cd6e8f2c0a8efc06f786107ba3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/091.mp3": {
+      "size": 266324,
+      "sha256": "6c5f4a0f5c1b149a596918261f5aafc2c18756febd905c2dc45f28c42ef0c1f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/092.mp3": {
+      "size": 269190,
+      "sha256": "b187f46e808a59a825ad364acaa5947e32f2597189b11d5a377d0dd53ef117b8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/093.mp3": {
+      "size": 214872,
+      "sha256": "467820f1b492e267cb086e24d208c3654227917eaa6bf3b4cc5522cffddd577a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/094.mp3": {
+      "size": 272260,
+      "sha256": "663f45d9185a58e120ae85b77a0694ad2c7bb9a6f0d3bc0e1ea055d3be26559c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/095.mp3": {
+      "size": 515510,
+      "sha256": "c0f81c3b46578a1b4cb7779cfc9857748da9ee453dd5ccc11eebb25b2dd3aa87",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/096.mp3": {
+      "size": 720564,
+      "sha256": "2ee1e4adf80ec80a78a692cd088951391815afb461a3c9abbe0e20f9de0358b3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/097.mp3": {
+      "size": 460628,
+      "sha256": "1f4178ece25dd2f20c89fb4668197880e92faf68f1d0e60001c929ddaf3425d2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/098.mp3": {
+      "size": 350398,
+      "sha256": "90957cd597c46fb13d084e9173a07be3cf3e3be784ab6f9bf5ad9824cdaf3d5e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/099.mp3": {
+      "size": 213518,
+      "sha256": "b904cc984b4c80f809c5215609a4d5b5d3927d0635970f0d92dce17b93e08f56",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/100.mp3": {
+      "size": 238856,
+      "sha256": "ec62c13afc92174c3935baecf2f0d8367d5894b4c1186dfd25c1726b10f49631",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/101.mp3": {
+      "size": 340424,
+      "sha256": "98dc23734c25ede723576fffa75cc02c05aad1c7d392a0d44cc039bd5d3230f1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/102.mp3": {
+      "size": 268446,
+      "sha256": "bbe07686ad01046fe758db6e1238a9ef78fbbf878d78e542b05f5294753e1f71",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/103.mp3": {
+      "size": 314892,
+      "sha256": "d6815a59a930ecb901f19292ed359ff391fa53c810edc8654006ae83800d404e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/104.mp3": {
+      "size": 256360,
+      "sha256": "3df59ba4d8a09bc21ed183ee0158247c9a6b1da8a8c2226ddd91098119b522b6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/105.mp3": {
+      "size": 451016,
+      "sha256": "a529bb370bc02db39d15e9cd7872099edd166cf759492c166634c0db113ee8cd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/106.mp3": {
+      "size": 370020,
+      "sha256": "be54f17f217dc9b45a810b98d2c22abca5f96bdf8ca2760026d99e8b4a5cb545",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/107.mp3": {
+      "size": 677426,
+      "sha256": "8dd79fb47be32dc3b2cd189b2cce730a9a09909e0e751cebe13210ca024aeac1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/108.mp3": {
+      "size": 740971,
+      "sha256": "07db0fba07b6e935542986f290d10289ad1fca96bd64bf0db442fb8a432ba1d6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/109.mp3": {
+      "size": 238692,
+      "sha256": "0422c7e07fa92e73fdade850582efee2d8eece3b60c1c1febb94a646136214ce",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/110.mp3": {
+      "size": 346010,
+      "sha256": "3958cbc10b81f7e5ee2aa999379e4fa170724206f1d2c651faf3051a06d9cf1d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/111.mp3": {
+      "size": 299536,
+      "sha256": "fe4a70d90c909efa91d1bedecb2deac77d363d37e1134eebc766435f70bfb25a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/112.mp3": {
+      "size": 292034,
+      "sha256": "ad43d3cf888f61f8a5edb3dc034657d1ba30d73ca7b6e2b0c41cfd35a0cb5a09",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/113.mp3": {
+      "size": 400540,
+      "sha256": "62022b14794ba33ec79f01ac2422e3cc348a1cdee8ae93f500714fc6684def86",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/114.mp3": {
+      "size": 305486,
+      "sha256": "ad193d82ebcecd28f1b4a02f2f0271bd25c437e9c7743dd866713704ca7b8501",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/115.mp3": {
+      "size": 332584,
+      "sha256": "c8664235ea8aa99181fab17820d98344f2737e31578e477b03ab29f56663c922",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/116.mp3": {
+      "size": 266714,
+      "sha256": "48e6f01f93f36a80b42a3bf02f9956450d2ffa71e98206385b7761692aec7956",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/117.mp3": {
+      "size": 288046,
+      "sha256": "bbdb7c006ebd26e8362414384cac48373724fabe4c5229a3b5f24c084fdc53e0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/118.mp3": {
+      "size": 692188,
+      "sha256": "c7b25f41c59f6206edc43b20ccf078a60e61a737f8cf3dbd20f63a408aba73c0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/119.mp3": {
+      "size": 337728,
+      "sha256": "77cc654a9137effa93a6d4b0ce7d0e24958dcf807da0816758553bc937d9aa3c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/120.mp3": {
+      "size": 354448,
+      "sha256": "eb3e7916410c88abeeb35409bd34b87a9ef308316c5a6f4bdda503824a358f1f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/121.mp3": {
+      "size": 400548,
+      "sha256": "79d165ecc9acd3c14370564fbd4db19c80b68d52b4d44dec298152d6c151317f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/122.mp3": {
+      "size": 242514,
+      "sha256": "b8106fa4cb2b8f0cb016bac8536a7f10fadf85bc052907bfeb2d021ff7e2f808",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/123.mp3": {
+      "size": 285906,
+      "sha256": "0eea721dde925bfb4e8fe348de54c122870c86dc5d6ee55bf0061f7b3b9f681d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/124.mp3": {
+      "size": 317976,
+      "sha256": "a22011f3cf91f8a04a42f51fc42ce0b478e13bb3eb057c791846d8c17126f0fa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/125.mp3": {
+      "size": 295710,
+      "sha256": "49b1d8079d84fdfb189fb7938db13403019ea00d91c79394bf6747ede72fb599",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/126.mp3": {
+      "size": 217540,
+      "sha256": "ef1166925e85327f46070085e466bd1a3ed9203eda97c04cc774932cf4f25845",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/127.mp3": {
+      "size": 261910,
+      "sha256": "6de6b425446c1a0d7a9002bcff0de4eb0bf942ff20f40a859c99f550ac9ec932",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/128.mp3": {
+      "size": 502300,
+      "sha256": "864e17cb5facf76cb55d0546b43439380e055488c304bcaf024b9d1dcba80635",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/129.mp3": {
+      "size": 856710,
+      "sha256": "69d9ba4064d01bfad7d39320f34d6ef53110d00fb39f966150265e9eaa1aea88",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/130.mp3": {
+      "size": 2215352,
+      "sha256": "8e217b1107399d52bf1094a05595e48072dabae9de76c73beea8e28a47354f8d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/131.mp3": {
+      "size": 287624,
+      "sha256": "a186e4883935b8bfe8e3fc2549b17906e1f4076fea0168c810de034843549894",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/132.mp3": {
+      "size": 1043358,
+      "sha256": "445c782266dbd3f48997f442666fa02fdf1427cdb4a41e40068b09dc74e5ee72",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/1.mp3": {
+      "size": 255770,
+      "sha256": "d63f0c06418eb5df7deb7f98168cc0d133f1cb79a0009d35ebcf3ba520529412",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/10.mp3": {
+      "size": 253230,
+      "sha256": "61d2463d6bf5b7848dc1bb445004069f876c0859f0b6ca2ea91c7b4a704d2c6a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/100.mp3": {
+      "size": 1140196,
+      "sha256": "adec2492cf77fe557d1418ffd2a28a9ae968beded43eacd0dc1a32a043f385fa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/101.mp3": {
+      "size": 1539347,
+      "sha256": "02fd47ec54740f1a2545c788ddd29a1007505dcf139b22b71ee806df212b09b0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/102.mp3": {
+      "size": 422560,
+      "sha256": "5dabbcdca3882bdcbe0156f695a1f733167dd96e27a32892518fce8f4bcde463",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/103.mp3": {
+      "size": 486508,
+      "sha256": "f011017b6c42184b8b1396c723c697247fd75cd30cf7f33d20453fed8cf43a18",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/11.mp3": {
+      "size": 206382,
+      "sha256": "b30b274f6459fc3c3bb66f6b881931448f1ea52c5e187428e2171832a80918b7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/112.mp3": {
+      "size": 306606,
+      "sha256": "6ae89fea117c8814cb7e5c4d81339d2a7e082d8ddf4493509aeb20209a1a05aa",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/113.mp3": {
+      "size": 332718,
+      "sha256": "62636c0ccbc6b15fa5369c0b47290083e5f4b08cccdd8c96b5c2b397e71179b8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/114.mp3": {
+      "size": 502808,
+      "sha256": "4428a13e1790006b411bd357b7db3064369e8dab821a954963a3d044c1ce09f4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/115.mp3": {
+      "size": 242002,
+      "sha256": "167dccb27e4c6f0823552c896136672a64e9431f6e54791f9394ff2c3791295a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/116.mp3": {
+      "size": 843027,
+      "sha256": "0436a8eb64f1192972f997494de5c2a9fe6ac4a52e41b81da3838aa9849863d8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/12.mp3": {
+      "size": 220974,
+      "sha256": "6f6b716b533d3ac984002011cc18eb2219d8905da92d128c56fb0fea402d5552",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/120.mp3": {
+      "size": 950860,
+      "sha256": "fe28ffe44fb2d4ea67e307054070d6a0f6841c925e0c20be457a8d791c48f706",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/121.mp3": {
+      "size": 389541,
+      "sha256": "383443ce904d800e7c7e3ff7b97f45a5cc36df897c6cdc4809baa9d25db2df9f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/122.mp3": {
+      "size": 582220,
+      "sha256": "0f23111ae531230cfad9683f7217a07660f3dfd81dce848d108a6096d1e00a7f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/123.mp3": {
+      "size": 357358,
+      "sha256": "9d04895a0806764c8379cfee7737b4cd1bcceae1a5a2ab114e05c1f1183b8493",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/124.mp3": {
+      "size": 262900,
+      "sha256": "9e4cda39a605d14e6ce3cf60e0a5a1437bdc13bb87ed55bd9a185c895732c1c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/125.mp3": {
+      "size": 259138,
+      "sha256": "83f5c58a45c2404c00a8281f3eb28a503ba3797bd5d11650f901c1b328b0e836",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/126.mp3": {
+      "size": 438442,
+      "sha256": "d99dcecafeefca39cda42bb74a22cc8cc6471e9734794de092e158c84d8085c4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/127.mp3": {
+      "size": 310129,
+      "sha256": "475d77d0f4bf652d5d4a391de79977415ff2ae29c6e1d0ebdf8bdaf65fd8fb69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/128.mp3": {
+      "size": 223193,
+      "sha256": "e8aaf015e6b09ca3fdcf153d0d6f9dbcc1cfdca3a9a68a78a281413454e3cfc4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/129.mp3": {
+      "size": 680441,
+      "sha256": "fdd0791f5a50d44e2473158a4ec55adfd6b624e6753416b484b6ed192a8bb88a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/13.mp3": {
+      "size": 425486,
+      "sha256": "18db47d0cd2fe1ed481d8948304f45b615b874ff679b718782e994a3f59a305e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/130.mp3": {
+      "size": 980953,
+      "sha256": "b5506fae8f65a6993916f9ddf6493a3d5c763b25b2005fc85ac8fb4520a302c2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/131.mp3": {
+      "size": 285294,
+      "sha256": "26c0f45594287a5f9427785d14edb8e338881c547d2ce0f11609bde799a9d449",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/132.mp3": {
+      "size": 223854,
+      "sha256": "b119a3ebdcf6bcc6175293bfd3594b85b8f7a105a4a2e11fe44e54358bdf5a67",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/133.mp3": {
+      "size": 318070,
+      "sha256": "be3d2f657a415e7afd560a4a8f30c67c954cfb1fff5838299f3b3dd7f3723abb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/134.mp3": {
+      "size": 214834,
+      "sha256": "dfa971a467e3d61af59d4c439e030997ea8cc399d68844fd52981dbdf253733c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/135.mp3": {
+      "size": 339386,
+      "sha256": "197d3a80dedd27d58dd9663f30679075b3393d03b1453ee0ee3341c9c3d9ed24",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/136.mp3": {
+      "size": 374913,
+      "sha256": "dd1f69616720bc8c5ee00f39d411ff2cc74422749f2337ef729cfcab66f89da3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/137.mp3": {
+      "size": 425904,
+      "sha256": "56f67d3336440e2f28862b6694886bea92b996deeecd087e02b8572e3b7aec72",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/138.mp3": {
+      "size": 270126,
+      "sha256": "3e3fa5426b41f9b945a6fb4ba2f512675228f506b8458b12ec24084b56850ae1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/139.mp3": {
+      "size": 286830,
+      "sha256": "bce74ef48d31f68ff37cfd5634cff0ae18d7930a650ba3a59e308de2a0aba5f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/14.mp3": {
+      "size": 278364,
+      "sha256": "1b015bb081065f5a90b4d6f4c93c78d545f03d6fb11d266dac2ba577198de2d2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/140.mp3": {
+      "size": 321774,
+      "sha256": "985018fcc6d572ee635c1eb06899aa03546de1bb9e9617778b51a2fa6afc17d8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/141.mp3": {
+      "size": 273767,
+      "sha256": "e4b2a15928910fa3d0a1d70d2cba9c56ea4e0ab42155257f28d8ca9a9626d8b7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/142.mp3": {
+      "size": 184323,
+      "sha256": "f5ea66d90fbb0d05b98075ea0af6c950ec2a4719e95caf2ff4ae6b9f5f9fa415",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/143.mp3": {
+      "size": 206057,
+      "sha256": "7a976255d29a470f356f4f5c60403e7d8d507809e7d7e5299ac940bc071b2f69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/144.mp3": {
+      "size": 238062,
+      "sha256": "ea5a043d5f467e6cdae227fa6b9cc663943dcca1a68946fb3f1225cf68f8ef8d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/145.mp3": {
+      "size": 435054,
+      "sha256": "23cda037a6604e8e8a08a5158d2c0f0e66bb68b3e7aa3dcb4804ad6a23cc8459",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/146.mp3": {
+      "size": 336942,
+      "sha256": "df212f89876da404d98a374333d668aa75641ba7f61cb468e87030ca7a098e4b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/147.mp3": {
+      "size": 321414,
+      "sha256": "8b2179671464ef1e32436751a4dde8eb0d88b1e4e3e84f723a78993c1140a382",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/148.mp3": {
+      "size": 282962,
+      "sha256": "e484e83108b25a5690cf81bb1e9d43da60afa1caf71d403dff4ceef44250ca7e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/149.mp3": {
+      "size": 407214,
+      "sha256": "67ee9456cc59031969babfbb6d4bab9452d29ea742d6d8f629047b9b025d269d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/15.mp3": {
+      "size": 360284,
+      "sha256": "17ccd8c8ea5e4ca86654bf2ac2131d2d12795645adc8bec0e8766e54597877c7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/150.mp3": {
+      "size": 359866,
+      "sha256": "3421b2255ca236c839f82914f482189349e735ef73103f4d28ca9674e88885dc",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/151.mp3": {
+      "size": 440114,
+      "sha256": "05de813932302d42b9b839deab144426d72ec1fc98a40acfa3e7d6c4b0993ad4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/152.mp3": {
+      "size": 616493,
+      "sha256": "1191d9ee8ee357eebdddd01b82a1978a9d69973bca2998d40387a8ac2ae34bf7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/153.mp3": {
+      "size": 254766,
+      "sha256": "d8200a19883c149873e0c90a527d728728f7c1f93750ca8a25ac9dfd251bc993",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/154.mp3": {
+      "size": 306606,
+      "sha256": "9e39c889ff557d578bffb302b4348d8b3c57b0c23db08f7b0cde94676557a14e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/155.mp3": {
+      "size": 402414,
+      "sha256": "ff52f973207026356a5b6a08a5824abd27c313cf3cb8187aadc00e9a09eb2bc0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/156.mp3": {
+      "size": 907811,
+      "sha256": "0dbc4b815419d03f1b1377f94b055b84bdacdbf75321e1ee6866f51892de46fc",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/157.mp3": {
+      "size": 673336,
+      "sha256": "433e478ed5dd3945b828958c3f51f9819b7833934f2cf5bb70cf1af651351553",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/158.mp3": {
+      "size": 505316,
+      "sha256": "5d00fa296e007e10fa055acbadcf7cc5d0e40af140c4870a96f7c2566ce05b89",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/159.mp3": {
+      "size": 455161,
+      "sha256": "74655437523c2ad6f4ab2ff389fc5fce763d3b3f91e27a9a05502a9c7d343c13",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/16.mp3": {
+      "size": 394557,
+      "sha256": "d082def86385868392c6cd3e07c3e1d02b29308282bfa64b05ef8c09e7c79580",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/160.mp3": {
+      "size": 1040722,
+      "sha256": "7425cadd097e25ef3ccead4449ef9c0013da1e49faabfa5a82f3f239007c4bc1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/161.mp3": {
+      "size": 232389,
+      "sha256": "33acd2f0e1f95a201f5a414dc3a9266777df361f0cd669e9c4beb329644b938d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/162.mp3": {
+      "size": 389358,
+      "sha256": "4e1d18e2ec441f54d5affb20b9958dd96db936de28cf69b74f907295c0b486e7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/163.mp3": {
+      "size": 238830,
+      "sha256": "2fe2656eba0d0275780f3d037e78dde6d27c2764eb443edf412ec881272e432a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/164.mp3": {
+      "size": 234990,
+      "sha256": "d413b4664f923e1a73cd2a46216e730946823df0bd7b5bd3d8ff42bcf7a5968a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/165.mp3": {
+      "size": 355182,
+      "sha256": "310f168167fcd444be486f25e3a8e49b071cddaaad4971c036895c1b6bbb549c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/166.mp3": {
+      "size": 359030,
+      "sha256": "1c5d4223503ec7a112c7708eeafcce7c4929217c77770c6cb0545560d5efd8df",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/167.mp3": {
+      "size": 407096,
+      "sha256": "015227d0ac7446c2e82df4289c4dea700056cf089c55df386d42948679721245",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/168.mp3": {
+      "size": 266670,
+      "sha256": "a0fdca9f6ac2379724de6cd26793e9aa547df1b3c98f93a5238f723ac8af8abb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/169.mp3": {
+      "size": 438860,
+      "sha256": "94660d246e283eb37d36c4ab816214e7397e987ed8bd16ed57209b9a13dfcbdf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/17.mp3": {
+      "size": 435099,
+      "sha256": "2b95546a19ec056926ff087d8c3e45ce392b784ac7d0193622134f743ae85612",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/170.mp3": {
+      "size": 295082,
+      "sha256": "1858b07da00111b7079098f7358668924a80d67b821af319a6e58dddc1cb8258",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/171.mp3": {
+      "size": 298426,
+      "sha256": "3e240e5aa20724402576bfa045ba0a52878ee704f6880ee72a924fc459a5542a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/172.mp3": {
+      "size": 228270,
+      "sha256": "ddbe724592a1d861ca9e59e2fe2ffe1dbe098a2613fa69f8c278fdf201d880c4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/173.mp3": {
+      "size": 225582,
+      "sha256": "48d71150d8a5ec494f5ca6e138faa1480108e8763503eb4b16baf3ee5d90126c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/174.mp3": {
+      "size": 282798,
+      "sha256": "63f7978059d2befe10a15273a39903f9dbcb330c73c6b95bfc90145944d9d38d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/175.mp3": {
+      "size": 340782,
+      "sha256": "f7eee017954c13523f58e5f6a6b055f244beddcced2e61c1b8812c285fbecbdf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/176.mp3": {
+      "size": 359448,
+      "sha256": "9e87059df0e6af7e2dd7c179ad01d70911fa967aeb1e32b736bc13104db0cc94",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/177.mp3": {
+      "size": 272931,
+      "sha256": "b7b30ab7d548a2520f3556dcdada178f21ddb4e6462dce780245e9b6601bf294",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/178.mp3": {
+      "size": 390377,
+      "sha256": "943ea5d058939094364691f2bcd3b159057094396192542e5652b1b8b7fd4b33",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/179.mp3": {
+      "size": 475641,
+      "sha256": "d4ea21b6a0253fb272f2ebbc251d6b08fa2e8dbdde3966660cda2ba5d90b2f6e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/18.mp3": {
+      "size": 312750,
+      "sha256": "542fc4c3515277efdd7d60f75f013ab7ca50a6e305f8371270a1895ddbe99123",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/180.mp3": {
+      "size": 412529,
+      "sha256": "fe6b1c49519545d0c397a0cce3f86120aad42d03d41273a26733c13cfb595618",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/181.mp3": {
+      "size": 347327,
+      "sha256": "84b62e717d1c94757d9152cf47a586050aeddff9927a0958a2c9ab50d8d03292",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/182.mp3": {
+      "size": 264750,
+      "sha256": "6c8789f2a61cc377974652ea85f7bf6654e45c8c149f9f44e564d15a6a313372",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/183.mp3": {
+      "size": 257070,
+      "sha256": "0dc2c18cf472408a49adf6ef4cc4053d13e65b5167662271b93574a2a90de0d0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/184.mp3": {
+      "size": 282606,
+      "sha256": "c716de879138c780ed500860d343f32e775f681fe04884fc76ecb6f681cb7623",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/185.mp3": {
+      "size": 319278,
+      "sha256": "5ce6a04cf68e8c3980f48739f7982bf99f7a046c9d13c74b5b7d10c6653614ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/186.mp3": {
+      "size": 235566,
+      "sha256": "e4e82c7928b52a841d322ce33ce6dc7af131b054dc9e280c418b23ecf86f35f2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/187.mp3": {
+      "size": 327534,
+      "sha256": "fac2dd5246774c3e7720590ee082b340f70626c51a1a45aa9a2ed9d8d560ea81",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/188.mp3": {
+      "size": 335406,
+      "sha256": "04d552c2ce164602b12b3310ff47b51e0c11f85aec3090727377959db59e68e4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/189.mp3": {
+      "size": 239406,
+      "sha256": "982f0cd1604372d3ec4ac718e35e5be4edbd8b3eabff7754d6de9c73408be606",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/19.mp3": {
+      "size": 912558,
+      "sha256": "956c7f735724de24d332bda35ab625ffe9f5d446d16eda8af08563a67d334d8a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/190.mp3": {
+      "size": 264174,
+      "sha256": "94b735170778a162d36dcda621fee34350703674bda5a43b2cb6d92550beb97b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/191.mp3": {
+      "size": 393006,
+      "sha256": "71a89b9427a5cadfe45879c794cc9eeca93aa5a28dfd2ec58c90e76389ff8bb4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/192.mp3": {
+      "size": 261870,
+      "sha256": "82346f08ddd342a628241c92e2a69d7b37b9e16b1df5a164a5bc351b4f0cac37",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/193.mp3": {
+      "size": 225390,
+      "sha256": "ecb7d73fdb0b405e68822c6b5a732c2d3c3702035abe3f811ca385d08fc6ccf3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/194.mp3": {
+      "size": 275886,
+      "sha256": "9006915a4e90a4ad91a32d6b667fa993f735173e722572b8f424d0c2e30f7f51",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/195.mp3": {
+      "size": 321390,
+      "sha256": "f67cceba162f3347e7ef1e3b4c5159e3a9cc9309f0dd920ab4b8ba7541398ea1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/196.mp3": {
+      "size": 271854,
+      "sha256": "217f762d76a2b6425bb1e6d14047e3e8db9e584b5ac5bfc1eb13738c2ebd7c43",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/197.mp3": {
+      "size": 210414,
+      "sha256": "cbcc7560dda4fc4948295b6fb808a5d676efc6e3075f40460b04b71e7b97e898",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/198.mp3": {
+      "size": 225198,
+      "sha256": "311bedae04ac625b7b5d45ec0c59343477fa319279abc93f3785438524bbf3e9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/199.mp3": {
+      "size": 284910,
+      "sha256": "698ba3247eda4331eb6e9778153e161273362b4cb134654bf17e6b27cd536be1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/2.mp3": {
+      "size": 661633,
+      "sha256": "a033ef142f2e936b311fbad25b309a9155ffeab45c52017f0be663d0b5583e7f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/20.mp3": {
+      "size": 383406,
+      "sha256": "406c711ff04cbe0775ec72fdf8a894337a53f9ca24983f2ae8b049cb765b2291",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/200.mp3": {
+      "size": 232302,
+      "sha256": "5a155838b8c4c3b65705c84525ebd613bae81bb3ea43dab24a36fb232e99cc48",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/201.mp3": {
+      "size": 226158,
+      "sha256": "23d10f1af4f395f179a7440375cc050fc2bf1516a4f1a1defaa997179ae5f2f8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/202.mp3": {
+      "size": 266286,
+      "sha256": "1dd4562a460fe98cfc56016813c19e3208fe5112d0a4d67d3920b295be45b432",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/203.mp3": {
+      "size": 269166,
+      "sha256": "318b8e6a6ee8eb91f36d9a74e7fc86130427aaef584d088be23587c585b2228e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/204.mp3": {
+      "size": 214830,
+      "sha256": "b359ef2ef34222881e9f26d81f1750c9abf3d08f9bf14106bc48274281d93b2e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/205.mp3": {
+      "size": 272238,
+      "sha256": "8cf2a499dceef7f1b3c9d96dd4f6b0eeb865dd05f3cf57d6b9bbe3ee340e9d1f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/206.mp3": {
+      "size": 515502,
+      "sha256": "7c449b12ac105fb7f70cc9a94dcc8e23a9a4f03234ead075c090563be40739f1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/207.mp3": {
+      "size": 720558,
+      "sha256": "5bd6796919ee77f40b333cd47eca0355537279ed2554e0af3e51e5aecb361bc9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/208.mp3": {
+      "size": 460590,
+      "sha256": "c134f2b098081d7145ccf0cf47c1e1c33312179348c5e365ff5d8c435e87fe69",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/209.mp3": {
+      "size": 350382,
+      "sha256": "8482fb61e248718f1c05f2f225cb0d39c348fc67eef707d92e0c82e2629c0f67",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/21.mp3": {
+      "size": 310830,
+      "sha256": "f588144fc327a4fb517a2fac0d14319047904f2c5d25e5ab6a8445708f34cb28",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/210.mp3": {
+      "size": 213486,
+      "sha256": "53b3e35dc0174bb4da8f9de8cd7a1472da929d47793211af1ca113f4dcd656ff",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/211.mp3": {
+      "size": 238830,
+      "sha256": "eb143d96d16c61a8a7ee51c9bf1eaac02cee7fea19829fd411dfa6a3754499cf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/212.mp3": {
+      "size": 330191,
+      "sha256": "1053704d02e641c0bd3b9e1cb3db4408d6bc1133a7a27194905c55b64d1a6a93",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/213.mp3": {
+      "size": 315562,
+      "sha256": "72d813817c14b787e0be0e1bfbbb67ee60e085491684c35490f3cd92a5084a14",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/214.mp3": {
+      "size": 268398,
+      "sha256": "887482396b4d2590571a08db456b0a293a63394227f65e473f17ca4580f535f9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/215.mp3": {
+      "size": 314862,
+      "sha256": "0584af2c870c707f27e89473aad19295e5cc1258d29292d6f40d6278a94d31f7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/216.mp3": {
+      "size": 256302,
+      "sha256": "bb8b24a594e87c42410590042b2d009ac2bff302a875ff55d915833ace8be55b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/217.mp3": {
+      "size": 450990,
+      "sha256": "3afa75c78e9686b47949f5ab35453106e654a8c9d9731a1df5a1cb9cca54bbd0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/218.mp3": {
+      "size": 369966,
+      "sha256": "1007eb7ab5bc1c3bd8a13106c887e171609570b0d70f8e7a2fe5876e11bac110",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/219.mp3": {
+      "size": 377002,
+      "sha256": "157a1dffa9755e7c8baba123d16e9f1ae5a58499dd61e1870554215951355e48",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/22.mp3": {
+      "size": 457251,
+      "sha256": "f06a1544478191cecf5b48d2c388ade08f8f08db0b60470da747c65cc017c032",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/220.mp3": {
+      "size": 375331,
+      "sha256": "c668a17db6634fd4ee90ad49936ed328f44ab67cec104a2d40a0ee9b5a9e56d1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/221.mp3": {
+      "size": 302606,
+      "sha256": "27d19f9b86d12c7fc91c098a0f5db17a381ca38d8da8ee0d4a16cb6e31e233ea",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/222.mp3": {
+      "size": 364046,
+      "sha256": "f252850cfda00d18b826f78e42adbbae888372b19835d498d4a8634148a25e74",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/223.mp3": {
+      "size": 400826,
+      "sha256": "ef5e9a66fe91c85c6ed72942bc9cb60390c29a87d70e27f680f5a331ddd13cab",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/224.mp3": {
+      "size": 553381,
+      "sha256": "62e01db1ebf0697680f30c3e38e15f14d66fcd90a5ff6ce2babc6539ffc7ed21",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/225.mp3": {
+      "size": 407096,
+      "sha256": "0241cb451fbd388c84f19f2e97f51a0788561343fd50a3ce06c6964ebca5711a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/226.mp3": {
+      "size": 647422,
+      "sha256": "4adadbe9f1d3152403dd2215fc5bc225c33144d3338a621321fa0b54eee829fd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/227.mp3": {
+      "size": 238638,
+      "sha256": "f0cee5c3caaadd72116ce6a58da063e20883f9a38b9093e9574608ae60f78af6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/228.mp3": {
+      "size": 345966,
+      "sha256": "da3516f47a9869624cfffbaa1f4388aac34acf759a5d9e48c0463a90cd0bc423",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/229.mp3": {
+      "size": 299502,
+      "sha256": "158131dfd5b60bbc755ff09eaab64d304237a9ea1073cd2ab87d777593ac8152",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/23.mp3": {
+      "size": 516601,
+      "sha256": "12095d4c8dade869884e2e3b2cb7e9ee466c2d97a889ff2f8aafff84fd88271c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/230.mp3": {
+      "size": 292014,
+      "sha256": "c56ff1dca5223690d2abee38556c85864aef2bacf4e1d465b5f4aadbf80cff2b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/231.mp3": {
+      "size": 400494,
+      "sha256": "a1edd33b6efd084be4a8ba73f851f1fc5cf2f999dd2c9df6de173875c1d93439",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/232.mp3": {
+      "size": 305454,
+      "sha256": "c7b1bbe21cb7bb89ab2042286c6b569c8e31459492a3f6a509c0d8476c898700",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/233.mp3": {
+      "size": 332526,
+      "sha256": "4d838e3d7322825769125df588fe50bfae388b860d95656b5e34ffdea7795e33",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/234.mp3": {
+      "size": 266670,
+      "sha256": "58bdce12b3a4f738a90d976a773c169c0fce9a08d6cffc78202432c1c51337ed",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/235.mp3": {
+      "size": 287982,
+      "sha256": "77a81b061f1e2373de6d5d33336de8b72187b041c960a76a2e28d398adc22766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/236.mp3": {
+      "size": 692142,
+      "sha256": "438abbd57bb62017f1383929c168242d779b4ce75b8315cba7eee066946f60f0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/237.mp3": {
+      "size": 337710,
+      "sha256": "cde60a47d19127af7d6f7b40cf7308d2418cf11a22a61f89f500c6e85a38c929",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/238.mp3": {
+      "size": 354414,
+      "sha256": "f5a81a7ddf0d55e577e7b23aa1f64c0fc86b2690d25cca9c7b39f702e903f909",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/239.mp3": {
+      "size": 400494,
+      "sha256": "548208076192dee7b0d7496e96fa1cd8070ca60a469ed1c328dfbf92642bfee4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/240.mp3": {
+      "size": 260810,
+      "sha256": "3dcc789d9867c08d34d639cbb873aaa09a8cc7dbae9c7443a5a4a01b1d3e3d1b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/241.mp3": {
+      "size": 181816,
+      "sha256": "7028ce95bbc76291848d384c8326f749dc3354205a5c0a14d226cebbbd345310",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/242.mp3": {
+      "size": 285870,
+      "sha256": "146e7c1db422057373d2f1194ffdfe8538ad72f8967b19fe2430d748d05e632d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/243.mp3": {
+      "size": 317934,
+      "sha256": "236311f4855ecc517e4bcc5a1f16785197b77071c5e199719896ab2ac7fc0b56",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/244.mp3": {
+      "size": 295662,
+      "sha256": "25643972637dcab9347015b5f91b34a9731bebf1fb32feeb7d37f032e12ba2ba",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/245.mp3": {
+      "size": 217518,
+      "sha256": "de7bc0503995c6c1543d2c70cf1a1af9a44f9ebe817483ea1d1bef965073af45",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/246.mp3": {
+      "size": 261870,
+      "sha256": "e2cf1547d2423b9bcd9fdee3938999561b28a1787bf0a33f4661ad1b72e1c5eb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/247.mp3": {
+      "size": 502254,
+      "sha256": "a902a2928fbe079ad833edbf663858b40067f0b1795be74702c84ce053184466",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/248.mp3": {
+      "size": 406678,
+      "sha256": "24160dfbc37aacb752572bc58cdf300cb0cf812a4b59ea5a4fb813aa8ebd5a3c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/249.mp3": {
+      "size": 364464,
+      "sha256": "1be07ae4679d50f8f4aa5f246ae3e9e6d2b9173a149caee973848d81062c90bd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/250.mp3": {
+      "size": 422978,
+      "sha256": "9bd830ff20130a3548c07aba7a486f5780bd5e7dcd2803257ba1ce5b3b9529f3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/251.mp3": {
+      "size": 406678,
+      "sha256": "28757a0927f684081e046954c3b796c720a73d32daac16af12abcf5f2fb9a489",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/252.mp3": {
+      "size": 327265,
+      "sha256": "5441fc074fc43c969030430640652218cf4bf194a87aeb87a2ccabd86d3d6e96",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/253.mp3": {
+      "size": 344820,
+      "sha256": "788b3edfd775aa9da68ead1806549eb7d7ce235a6719c50d7cfddfd63332b5c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/254.mp3": {
+      "size": 470207,
+      "sha256": "fdb0b3f13349f225408a7470a17cb7e2704d4b560fac6c7f72accfb747212a77",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/255.mp3": {
+      "size": 501972,
+      "sha256": "d81019ebe94ef30dfcf797ef9fda6e3ae8cd7416123eb7c099cfb09d1028b41f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/256.mp3": {
+      "size": 454325,
+      "sha256": "0ea572848cf086bf2f08d2cc7a1512cc8c512e9b7baaff389f9b61a74a19978e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/257.mp3": {
+      "size": 422560,
+      "sha256": "742b7d89090aa9bdefe55fe65824016eef963325604e83e00280068bd049fcac",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/258.mp3": {
+      "size": 581802,
+      "sha256": "8918912660e9de7d5bd8ffb15729870fe743b8a6ec79e9ff832580c984792d6b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/259.mp3": {
+      "size": 326847,
+      "sha256": "5fbc6bee47e8079c4eca2b854a80457cbe36e8cf83f9361b49d11588bee33a4a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/260.mp3": {
+      "size": 486090,
+      "sha256": "2cf929dd048c7d47eb007663e21d624aa156d6b32348a8053331255d62c848ed",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/261.mp3": {
+      "size": 470207,
+      "sha256": "5fdf5a3c3653abe2f2d87dd2b8791729bdbb58558ee89f7a7acd79f3ed81d8f5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/262.mp3": {
+      "size": 916588,
+      "sha256": "d1ab2260c77b76d6b28a90f103feb787a20c8fda16a9fddc667617fc179c16ab",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/263.mp3": {
+      "size": 454325,
+      "sha256": "68cb8b05c1830328623933f7ba6aaebf11ac17bf9f4a6f5e71263846540faf1d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/264.mp3": {
+      "size": 310965,
+      "sha256": "6330fd7d1f1c90200a4f5fcbfa149e8d14be3879146283c231e2ff55271c7dd0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/265.mp3": {
+      "size": 436771,
+      "sha256": "9322ec53a6db44fbcbac7cf285a8355ee9d73d4b6c864faa03d51845c21a3a32",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/266.mp3": {
+      "size": 287598,
+      "sha256": "207a4e485c35161d506ff791f0144a08d5213bd564f9e518f1c7c82b09ad478a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/267.mp3": {
+      "size": 995164,
+      "sha256": "0e9b4f82e51e3a4d05910d5e1c3ed2f66170ad7dcf9c6c34a9e2064f2c31b7f5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/27.mp3": {
+      "size": 598103,
+      "sha256": "57d19e83a452cbc7970123ea18bd0e92a47710d5d563c63d4150a8631ad734d1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/28.mp3": {
+      "size": 346491,
+      "sha256": "c26040ec9c8c9b8fd68207f0615b0a090dbb65a934c9fcf737139e01bb5b2573",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/29.mp3": {
+      "size": 1428170,
+      "sha256": "5d9937bc4777a61847620c1cd569e6ad0ca852ac50c937724d99630b241adccd",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/3.mp3": {
+      "size": 326847,
+      "sha256": "dcd101a6a0b119e5e6e4ac614928280c1bda78b8f3b57becc7373e7449ead64d",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/30.mp3": {
+      "size": 630286,
+      "sha256": "2ebdba133c2b23321ebe2cf754aa3aba5d7cec25be33819bffe881931bb339d4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/31.mp3": {
+      "size": 678351,
+      "sha256": "2173ea741dd9c1be089148a3666b57216115ecdfb224085c6ef4f67d3e0f9fac",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/32.mp3": {
+      "size": 1693156,
+      "sha256": "27662bc53ed9dc5d2df71d580a8be0087d5fc62438de8fde4da3c62606c51744",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/33.mp3": {
+      "size": 313891,
+      "sha256": "f55484719560dc63d6daeac6dc1a46bd0ef81cf2712d4624c1656f118ba744d6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/34.mp3": {
+      "size": 266661,
+      "sha256": "be4b9708c000857435efcaff9562098386e05c201e6d7038bef98ef7a780ac50",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/35.mp3": {
+      "size": 248689,
+      "sha256": "0be5922c3cda17c48c2849928cb7bc66b3c7f0a7d6144f38d95c8b3ae2d0b5f2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/36.mp3": {
+      "size": 422560,
+      "sha256": "931a6aaf0f0cf90c1d4c0f65b52916fc8d46ad923e2c8908108747ee2aba2dcf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/37.mp3": {
+      "size": 267079,
+      "sha256": "fc9c14c4504d37be7339b5e8079fa1477cf9c6b7cece951f02481cf4c9b6b42e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/38.mp3": {
+      "size": 279200,
+      "sha256": "a7c369d995517f1bbeb455ce4df448d27f9717b7d290ae29f32b6ad7edd43858",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/39.mp3": {
+      "size": 274184,
+      "sha256": "5b56700258ffe62a2d891b76fbc2919244163f10c41044c9836b472c5aaa6943",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/4.mp3": {
+      "size": 5346955,
+      "sha256": "f276925bd911a457b5fed4e5b12022aa4df0e2e6944bc3adb67b73f9a23fe9c7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/40.mp3": {
+      "size": 667066,
+      "sha256": "30c3971e5d87dd237cc8d136234f4e6817a5f4b230e49dee08e51c9acf3f02c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/41.mp3": {
+      "size": 305531,
+      "sha256": "e26368fbbeb4d363c0f621644da1ab56ce38de5f6e90c23a1c9a6bbe43fea624",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/42.mp3": {
+      "size": 263736,
+      "sha256": "fe4aa3537374faa060ba4b3cf4a4a4595d17869ff40f5bf766b00be818ac9eeb",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/43.mp3": {
+      "size": 247853,
+      "sha256": "5a7798a35ec47bef49a55598204f0df58815e0f3ef59e2a66c03e2d2be1d2f43",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/44.mp3": {
+      "size": 470625,
+      "sha256": "f3839903ca8e0e117b60ffe5f1bc1b398d8290139402f6349e6d955da07cffa9",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/45.mp3": {
+      "size": 263736,
+      "sha256": "1e0c3c80b818424061322f2fcba3b7499ba81addb0ed98883acd696db41a33b8",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/46.mp3": {
+      "size": 352343,
+      "sha256": "cc60210a0fd24290285e61d007a127756926cf5f726a2671c0dd8d1732347dae",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/47.mp3": {
+      "size": 464356,
+      "sha256": "9772bf300d2e8051a01005957a62a27b35a19e8405fd6a3f0eef9db38f5c4402",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/48.mp3": {
+      "size": 336042,
+      "sha256": "300e9f78edb4a7fea521be1a95f1a80cb6675e93a99a16ff50a8c11496a23610",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/49.mp3": {
+      "size": 359030,
+      "sha256": "08b896eeb6b0f1e33e8ad1eb2fa762eb858823e74012b570473445a88891af4f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/5.mp3": {
+      "size": 267054,
+      "sha256": "f547b76ffe76f13c5a4a2a612e0f5fca676ca666a4d8cd6a4de87d14634eb699",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/50.mp3": {
+      "size": 461848,
+      "sha256": "0885c908438dc98fd83726f2c55e9cfaa67e0de726c0805cf4cd15f04f9ce766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/51.mp3": {
+      "size": 419216,
+      "sha256": "d7c066af1bdc227e2756ea7d63968ca740c42fece0548da5fcac49bd0919056e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/52.mp3": {
+      "size": 418350,
+      "sha256": "4a0017363fc6138198ca5b0ed9eecda20840e3f96984daa2cd0dce7d6bb2ee6b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/53.mp3": {
+      "size": 748150,
+      "sha256": "eb86f16ff5ab91b70ad1f0b342f5e80c8160e8edfcc30d525db70845977af125",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/54.mp3": {
+      "size": 534573,
+      "sha256": "0c7712ed713ca48a87eea5b7c9b8eb2e868f541c2f2245d7e2c26c6e5a942192",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/55.mp3": {
+      "size": 534991,
+      "sha256": "d25a120a072d07ab3a28842f1f5eb85924167d1fdb30a1767b85866a0e7775d7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/56.mp3": {
+      "size": 471043,
+      "sha256": "bee3d7f295c75321b2054e695f24ea00fb2d09f8cd8f8de29cc6339645a48248",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/57.mp3": {
+      "size": 422978,
+      "sha256": "56d785b6393c1a835ab722caa21099cabed45e3cb58ee7aaa6dbbd6e394ea343",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/58.mp3": {
+      "size": 518691,
+      "sha256": "861a8180525a70fe8153c66e3c600e501b941d3bd544824ad89752ae1b707e5a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/59.mp3": {
+      "size": 247435,
+      "sha256": "2d16ca7655ed72525b8d461c1a1e939afab9214575f9325ca8773f461ee0582f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/6.mp3": {
+      "size": 313902,
+      "sha256": "9e99bc67a8694fd8e038d75d84f26b09ed9ce2c3695a7e01c5a09de71e19d3e7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/60.mp3": {
+      "size": 455161,
+      "sha256": "da34ab66824803e32d95a4ed5adad503889eb9df800179d1a781eb712b2a16a7",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/61.mp3": {
+      "size": 237822,
+      "sha256": "8425af6a03e29d840e8d0fa5ddddb3f30d6f8240507a8f3863bd958c2d8ac143",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/62.mp3": {
+      "size": 1285646,
+      "sha256": "088f0481bc74c5781a178165669abb953972270b0604103e02be64282630d5a6",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/63.mp3": {
+      "size": 486926,
+      "sha256": "1434544269b3cc0d31e0734e25fc0baad391d4854d35b5384579153bd9b851c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/64.mp3": {
+      "size": 598939,
+      "sha256": "637daaf75af6a5c27a3a58980ee0ea0f88ab9801150395af26fcee0a793489e0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/65.mp3": {
+      "size": 416291,
+      "sha256": "94595d67a571bd7bb94953467d66162df8c923021f51f519ca52bcd8fbd8f660",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/66.mp3": {
+      "size": 486090,
+      "sha256": "89f26483c51e9a7f5efcb40793e5fb6c400e01742d43de4466720c317aad6d0b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/67.mp3": {
+      "size": 518273,
+      "sha256": "ed9edb505aab272c149b4eb826957545d939fa3cbfb472db9e27386c6edb996f",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/68.mp3": {
+      "size": 725162,
+      "sha256": "9f1ea016fec235366f4003343c03b3e7df372e3928c471cb062ece6b4ce21a03",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/69.mp3": {
+      "size": 534155,
+      "sha256": "018cf1ad59a9a82a00f0632aa5fc765238d9a561b669426a2890c7bbfa74e0d0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/7.mp3": {
+      "size": 307203,
+      "sha256": "25f7f97dcd2fec484e18aa9ffbeda4ead699c30f386cbc53ea890bf42000622c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/70.mp3": {
+      "size": 1586158,
+      "sha256": "4eaedc5eddf9b0fee6c23d1c62e3119b844f393ca6494a2e94c51f8b27474cc0",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/71.mp3": {
+      "size": 1092967,
+      "sha256": "8f53c6331daee9cc16ee92e08d20f8e674a56faf3ac46e33589b035590af8294",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/72.mp3": {
+      "size": 454325,
+      "sha256": "e32726be1a874abea97b9bc42adcc1245b930fa798106bcb7062df20f031c6cf",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/73.mp3": {
+      "size": 374495,
+      "sha256": "bf283c69f838a250c299e6feac24f4a6ccfbb6464bd5c541fdcded2cd5fca32a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/74.mp3": {
+      "size": 1065774,
+      "sha256": "2658dec5e698f16b60419cc8c9da04a074ed27651f6707c455b03f5aa7f66935",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/75.mp3": {
+      "size": 1347922,
+      "sha256": "f4013b5035e4108afd8d1a47376a11520cb74a7da0b307e8555a0d744392359b",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/76.mp3": {
+      "size": 1603295,
+      "sha256": "8c5493937b4bb7e8976fe07f1b6fcf1c3ac583be77232aca40b9b3a5b432e55e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/77.mp3": {
+      "size": 1012718,
+      "sha256": "3ddb2c1f13058cfe2ede03231d6aa964a1bf973b6fe01aa6f07a8e8ca83d6244",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/78.mp3": {
+      "size": 518273,
+      "sha256": "b654dcbdc2e76ac893b2b098d767634f8342102fe587c2e082b5b4d5b0f16509",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/79.mp3": {
+      "size": 582220,
+      "sha256": "a97f8c9b98712bddd5c50c8d33f1128028d92033ee3485728d1c37b9ac995766",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/8.mp3": {
+      "size": 283798,
+      "sha256": "3c30ebb61caa060332977fe42ea9926584b2bbbb0e2c1240ceec523b7afddb96",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/80.mp3": {
+      "size": 550456,
+      "sha256": "caecbd39ce40617a6970da63316f57115d8438998ded1426b9a0242df98c1012",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/81.mp3": {
+      "size": 326847,
+      "sha256": "36833e94a06a40671b5d74a4e17a366a5d90982a72a8ddf5e59593fb4f05684c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/82.mp3": {
+      "size": 662051,
+      "sha256": "a92359c5def750f6801dd3138e6aa8f786b78b213f07c8af865bbdaaa7a3e65c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/83.mp3": {
+      "size": 310965,
+      "sha256": "043e01a9fce0b1a96d0aa5ce34d5de12d2e77191329a208d7f9c08c0533479a1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/84.mp3": {
+      "size": 725580,
+      "sha256": "7349914e738eabfff35ffc2d7c5ebe1df3de5243e3600f9c8d7be192031054c3",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/85.mp3": {
+      "size": 598103,
+      "sha256": "864f0e5d804ceb874de0e1c9716aa9ce1c81ba26a88297b6bc8d0f0e274501d2",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/86.mp3": {
+      "size": 342730,
+      "sha256": "ba25e2c40ea87b9e9f767a2f0c5da71c38205bd4a8fecfbb652f8a957810c99c",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/87.mp3": {
+      "size": 359030,
+      "sha256": "8991c6c180ecc7f4f969f4909e4464af977668991d5db63546cabb1f4f6b524e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/88.mp3": {
+      "size": 390795,
+      "sha256": "0ab04832456d070e7e3154cbb3a064a4f60371181b1be332824944387f697e7e",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/89.mp3": {
+      "size": 486508,
+      "sha256": "586b112b608afb04e4fd56e0284d4d24f7b9c49287e1abb3e9a1fcf9e2e8ecc1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/9.mp3": {
+      "size": 219246,
+      "sha256": "5b7c875d5358f2148cc18b7dbc904fd95f38f4d3d61fcd54a3ffc0e01d8174e4",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/90.mp3": {
+      "size": 518273,
+      "sha256": "037ee1f00288d7fc35611461cc2bcc8a52c065c6b7cb75127258b9e56a130f4a",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/91.mp3": {
+      "size": 231135,
+      "sha256": "1b743aafba753a144f72761044876f8036c485bcf6ccd4a9abf942c28318b444",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/92.mp3": {
+      "size": 438442,
+      "sha256": "10e5fad258ee7f39f7c891a38c66df99460620a06289b902a7430c6758c84a59",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/93.mp3": {
+      "size": 390795,
+      "sha256": "a0b274af9c3006334f6a09c8632542f6310cab8bbaf2b662287a714eea0e1b39",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/94.mp3": {
+      "size": 406678,
+      "sha256": "767b1db4e25319c31ad0e5fc526549c4c3c235b3445938e178428db8035b40c1",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/95.mp3": {
+      "size": 342730,
+      "sha256": "b9683e27a735c77d0fdf402e54af2db50c03dd1f26539507612cf016e20419de",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/96.mp3": {
+      "size": 279200,
+      "sha256": "056b361984d4550623043cca7c3599c9caf4d5008fa75ed1fa568abb69c30db5",
+      "category": "fortress_audio_arabic",
+      "required": false
+    },
+    "audio/fortress/arabic/dua/99.mp3": {
+      "size": 1938080,
+      "sha256": "57d9be074d4d46830d1846105da27d6a9cd692e5d439b6ef9c694e5db204fae6",
+      "category": "fortress_audio_arabic",
       "required": false
     }
   }

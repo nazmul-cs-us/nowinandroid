@@ -26,6 +26,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -106,6 +108,8 @@ import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.PopularSuggestion
 import com.starception.submission.ui.search.SearchHintAnimator
 import com.starception.submission.ui.search.SearchHints
+import kotlinx.coroutines.delay
+import kotlin.math.absoluteValue
 
 @Composable
 fun AppTopSearchBar(
@@ -190,6 +194,24 @@ fun AppTopSearchBar(
     // collapses out of view during the morph; no extra pause logic needed.
     LaunchedEffect(Unit) { SearchHintAnimator.ensureStarted() }
     val animatedHint by SearchHintAnimator.hintText.collectAsStateWithLifecycle()
+    var displayedHint by remember { mutableStateOf(animatedHint) }
+    val hintTransition = remember { Animatable(0f) }
+    LaunchedEffect(animatedHint) {
+        if (animatedHint == displayedHint) return@LaunchedEffect
+        // Lift and fade the old phrase, swap while invisible, then let the new
+        // phrase rise from below. This mirrors the sync and weather text motion.
+        hintTransition.animateTo(
+            targetValue = -1f,
+            animationSpec = tween(150, easing = FastOutSlowInEasing),
+        )
+        displayedHint = animatedHint
+        hintTransition.snapTo(1f)
+        delay(55)
+        hintTransition.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(300, easing = FastOutSlowInEasing),
+        )
+    }
     val whisperService = remember(context) { WhisperVoiceService(context.applicationContext) }
     // Drive the listening UI (wave + glow + hidden chrome) from the service's
     // actual recording state so it ends the instant recording stops — during
@@ -362,7 +384,7 @@ fun AppTopSearchBar(
             }
 
             // Hint will be overwritten on every `update` pass from the
-            // typewriter StateFlow; seed it with the current slot's first
+            // rotating phrase StateFlow; seed it with the current slot's first
             // phrase so the pill isn't blank for the one frame before the
             // singleton emits.
             searchBar.hint = SearchHints.hintFor()
@@ -473,7 +495,7 @@ fun AppTopSearchBar(
             // alpha (chromeVisible) so the field hands off to the wave smoothly
             // instead of blanking instantly.
             val chromeVisible = (1f - listenProgress).coerceIn(0f, 1f)
-            searchBar.hint = animatedHint
+            searchBar.hint = displayedHint
             searchView.hint = SearchHints.hintFor()
             val fadedHintColor = (pillTextColor and 0x00FFFFFF) or ((chromeVisible * 255f).toInt() shl 24)
             searchBar.textView?.setHintTextColor(fadedHintColor)
@@ -573,7 +595,10 @@ fun AppTopSearchBar(
             val sinkPx = searchBar.height * 0.7f * listenProgress
             searchBar.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
             searchBar.firstImageButtonChild()?.translationY = sinkPx
-            searchBar.textView?.translationY = sinkPx
+            val hintShiftPx = 7f * density * hintTransition.value
+            searchBar.textView?.translationY = sinkPx + hintShiftPx
+            searchBar.textView?.alpha =
+                (1f - hintTransition.value.absoluteValue).coerceIn(0f, 1f)
             searchView.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
             searchView.toolbar.firstImageButtonChild()?.translationY = sinkPx
             searchView.getEditText().isCursorVisible = !isListening
