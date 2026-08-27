@@ -8,12 +8,23 @@ import SwiftUI
 /// This view only formats the result, which is the whole point: one calculation,
 /// two platforms, no chance of the two drifting on what time a prayer falls.
 struct PrayerTimesView: View {
-    /// Dubai. Hardcoded for this first slice; Core Location comes with the
-    /// location slice rather than being guessed at here.
-    private static let latitude = 25.276987
-    private static let longitude = 55.296249
+    /// Hardcoded for this first slice; Core Location arrives with the location
+    /// slice rather than being guessed at here.
+    ///
+    /// These are the Android test device's real coordinates and settings, taken
+    /// from its own logs, so the two apps can be compared directly. Passing
+    /// different angles here was the entire cause of an apparent mismatch that
+    /// briefly looked like an engine bug — the engine agreed all along.
+    private static let latitude = 25.1030198
+    private static let longitude = 55.1677409
     private static let timeZoneOffset = 4.0
-    private static let placeName = "Dubai, UAE"
+    private static let placeName = "Nad Al Hamar, Dubai"
+
+    /// UAE_IACAD uses 18.2° for both Fajr and Isha. Asr shadow factor 1 is the
+    /// standard (Shafi'i/Maliki/Hanbali) madhhab; Hanafi would be 2.
+    private static let fajrAngle = 18.2
+    private static let ishaAngle = 18.2
+    private static let asrShadowFactor: Int32 = 1
 
     private let slots: [SharedPrayerSlot]
     private let dateLabel: String
@@ -30,9 +41,9 @@ struct PrayerTimesView: View {
             latitude: Self.latitude,
             longitude: Self.longitude,
             timeZoneOffset: Self.timeZoneOffset,
-            fajrAngle: 18.0,
-            ishaAngle: 17.0,
-            asrShadowFactor: 1
+            fajrAngle: Self.fajrAngle,
+            ishaAngle: Self.ishaAngle,
+            asrShadowFactor: Self.asrShadowFactor
         )
 
         let formatter = DateFormatter()
