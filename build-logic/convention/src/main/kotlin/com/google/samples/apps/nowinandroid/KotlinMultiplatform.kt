@@ -77,5 +77,12 @@ internal fun Project.configureKotlinMultiplatform(
             sourceCompatibility = NIA_JAVA_VERSION
             targetCompatibility = NIA_JAVA_VERSION
         }
+
+        // android.util.Log is an unimplemented stub on the JVM and throws by
+        // default. Shared modules reach it through SharedLog's Android actual, so
+        // without this any commonTest that logs fails on the Android target while
+        // passing on Kotlin/Native — a confusing split for tests whose whole
+        // purpose is proving the two platforms agree.
+        testOptions.unitTests.isReturnDefaultValues = true
     }
 }
