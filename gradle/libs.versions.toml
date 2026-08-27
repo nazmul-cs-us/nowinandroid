@@ -10,6 +10,10 @@ androidxBrowser = "1.8.0"
 androidxCredentials = "1.3.0"
 googleid = "1.1.1"
 androidxComposeBom = "2025.02.00"
+# Compose Multiplatform, used only by :shared for the iOS UI. Deliberately not the
+# newest (1.12.0): 1.9.x is contemporaneous with Kotlin 2.2.x, and the port plan
+# calls for treating Kotlin/AGP/Compose upgrades as one tested toolchain change.
+composeMultiplatform = "1.9.3"
 androidxComposeFoundation = "1.8.0-alpha07"
 androidxComposeMaterial3 = "1.4.0"
 androidxComposeMaterial3Adaptive = "1.1.0-rc01"
@@ -209,6 +213,7 @@ android-lint = { id = "com.android.lint", version.ref = "androidGradlePlugin" }
 android-test = { id = "com.android.test", version.ref = "androidGradlePlugin" }
 baselineprofile = { id = "androidx.baselineprofile", version.ref = "androidxMacroBenchmark"}
 compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 dependencyGuard = { id = "com.dropbox.dependency-guard", version.ref = "dependencyGuard" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 firebase-perf = { id = "com.google.firebase.firebase-perf", version.ref = "firebasePerfPlugin" }

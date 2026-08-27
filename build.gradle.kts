@@ -49,6 +49,7 @@ plugins {
     alias(libs.plugins.android.test) apply false
     alias(libs.plugins.baselineprofile) apply false
     alias(libs.plugins.compose) apply false
+    alias(libs.plugins.compose.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     // Declared here rather than in shared/build.gradle.kts: build-logic is an
     // included build, so the Kotlin plugin is already on the classpath with an
