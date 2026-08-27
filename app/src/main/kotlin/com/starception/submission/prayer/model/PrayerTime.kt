@@ -1,6 +1,7 @@
 package com.starception.submission.prayer.model
 
 import java.time.LocalDateTime
+import kotlinx.datetime.toKotlinLocalTime
 import java.time.LocalTime
 
 /**
@@ -699,10 +700,9 @@ data class DayPrayerTimes(
      *    `[start, midnight)` and `[midnight, end)`.
      */
     private fun isWithinWindow(now: LocalTime, start: LocalTime, end: LocalTime): Boolean =
-        if (end > start) {
-            now >= start && now < end
-        } else {
-            // Wraps past midnight: after the start today, or before the end tomorrow.
-            now >= start || now < end
-        }
+        PrayerWindows.isWithinWindow(
+            now.toKotlinLocalTime(),
+            start.toKotlinLocalTime(),
+            end.toKotlinLocalTime(),
+        )
 }
