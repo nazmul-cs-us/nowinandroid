@@ -26,6 +26,11 @@ android {
 }
 
 dependencies {
+    // Colour palette, schemes and dimensions now live in a multiplatform module so
+    // the iOS UI uses the real palette. `api` so consumers of this module are
+    // unaffected.
+    api(projects.core.theme)
+
     lintPublish(projects.lint)
     
     implementation(projects.core.model)

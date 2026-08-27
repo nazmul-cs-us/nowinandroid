@@ -16,8 +16,11 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.window.ComposeUIViewController
+import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
+import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
 import com.starception.submission.shared.PrayerSchedule
 import platform.UIKit.UIViewController
 
@@ -55,9 +58,15 @@ fun PrayerTimesViewController(
         asrShadowFactor = asrShadowFactor,
     )
 
-    // The app's own theme comes across with the design-system slice; until then
-    // the platform default keeps light and dark mode working.
-    MaterialTheme {
+    // The app's real Coastal palette from :core:theme, not stock Material. These
+    // are the same scheme objects NiaTheme uses on Android, so the two platforms
+    // cannot drift apart on colour.
+    //
+    // Dynamic colour is deliberately absent: it is Material You, an Android-only
+    // feature with no iOS equivalent, and it stays behind in core:designsystem.
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
+    ) {
         PrayerTimesScreen(placeName = placeName, slots = slots)
     }
 }
