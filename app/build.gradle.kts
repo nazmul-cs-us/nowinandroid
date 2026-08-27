@@ -130,6 +130,7 @@ dependencies {
     implementation(projects.core.model)
     implementation(projects.core.logging)
     implementation(projects.core.prayerEngine)
+    implementation(projects.core.images)
     implementation(projects.core.analytics)
     implementation(projects.sync.work)
 
