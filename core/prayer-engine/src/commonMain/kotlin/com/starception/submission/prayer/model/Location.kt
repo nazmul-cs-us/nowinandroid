@@ -132,7 +132,22 @@ data class Location(
             subLocality.isNotEmpty() -> subLocality
 
             // FINAL FALLBACK: Show coordinates (6 decimal places = ~0.11 meter accuracy, matches GPS precision)
-            else -> "${String.format("%.6f", latitude)}, ${String.format("%.6f", longitude)}"
+            else -> "${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}"
         }
     }
+}
+
+/**
+ * Formats a coordinate to six decimal places — about 0.11 m, matching GPS precision.
+ *
+ * Hand-rolled rather than `String.format("%.6f", …)`, which is JVM-only and would
+ * keep this file out of `commonMain`. Rounds half-away-from-zero, as `%.6f` does
+ * for these magnitudes, and pads so the fraction is always six digits.
+ */
+private fun formatCoordinate(value: Double): String {
+    val negative = value < 0
+    val scaled = kotlin.math.round(kotlin.math.abs(value) * 1_000_000.0).toLong()
+    val whole = scaled / 1_000_000
+    val fraction = (scaled % 1_000_000).toString().padStart(6, '0')
+    return "${if (negative) "-" else ""}$whole.$fraction"
 }

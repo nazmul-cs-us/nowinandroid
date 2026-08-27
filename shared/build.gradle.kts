@@ -32,6 +32,7 @@ kotlin {
             // see no model types at all.
             export(projects.core.model)
             export(projects.core.logging)
+            export(projects.core.prayerEngine)
         }
     }
 
@@ -41,6 +42,7 @@ kotlin {
             // directly, rather than making iosApp/ depend on :core:model itself.
             api(projects.core.model)
             api(projects.core.logging)
+            api(projects.core.prayerEngine)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
         }

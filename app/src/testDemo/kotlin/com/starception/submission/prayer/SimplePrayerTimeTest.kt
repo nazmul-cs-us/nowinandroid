@@ -3,8 +3,8 @@ package com.starception.submission.prayer
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
 import com.starception.submission.prayer.model.*
 import org.junit.Test
-import java.time.LocalDate
-import java.time.LocalTime
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
 
 /**
  * Simple test of prayer time calculations for Dubai, UAE
@@ -29,7 +29,7 @@ class SimplePrayerTimeTest {
             altitude = 5.0
         )
         
-        val date = LocalDate.of(2025, 8, 12)
+        val date = LocalDate(2025, 8, 12)
         val julianDay = calculator.calculateJulianDay(date)
         
         println("=== Dubai Prayer Time Test - August 12, 2025 ===")
@@ -103,7 +103,7 @@ class SimplePrayerTimeTest {
         val parts = timeStr.split(":")
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
-        return LocalTime.of(hour, minute)
+        return LocalTime(hour, minute)
     }
     
     private fun isTimeClose(actual: LocalTime?, expected: LocalTime, toleranceMinutes: Int = 5): Boolean {
