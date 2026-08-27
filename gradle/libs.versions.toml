@@ -14,6 +14,10 @@ androidxComposeBom = "2025.02.00"
 # newest (1.12.0): 1.9.x is contemporaneous with Kotlin 2.2.x, and the port plan
 # calls for treating Kotlin/AGP/Compose upgrades as one tested toolchain change.
 composeMultiplatform = "1.9.3"
+# The multiplatform build of the same navigation library the Android app uses, so
+# screens move between them without their navigation being rewritten. Only
+# :shared depends on it; app keeps androidx.navigation.
+composeNavigation = "2.9.2"
 androidxComposeFoundation = "1.8.0-alpha07"
 androidxComposeMaterial3 = "1.4.0"
 androidxComposeMaterial3Adaptive = "1.1.0-rc01"
@@ -130,6 +134,7 @@ androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-p
 androidx-lint-gradle = { group = "androidx.lint", name = "lint-gradle", version.ref = "androidxLintGradle" }
 androidx-metrics = { group = "androidx.metrics", name = "metrics-performance", version.ref = "androidxMetrics" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
+compose-navigation = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "composeNavigation" }
 androidx-navigation-testing = { group = "androidx.navigation", name = "navigation-testing", version.ref = "androidxNavigation" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "androidxProfileinstaller" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }

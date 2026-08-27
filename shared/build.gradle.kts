@@ -55,6 +55,7 @@ kotlin {
             api(projects.core.theme)
             api(projects.core.images)
             api(projects.core.components)
+            implementation(libs.compose.navigation)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

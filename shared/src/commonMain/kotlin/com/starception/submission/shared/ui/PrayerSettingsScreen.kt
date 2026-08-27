@@ -20,20 +20,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.settings.components.PrayerTimesSection
 
 /**
- * Presents the app's prayer settings on iOS.
+ * The prayer settings screen.
  *
  * Deliberately only a container. The controls inside are [PrayerTimesSection],
  * the same composable the Android settings screen uses, moved to :core:components
@@ -42,34 +47,46 @@ import com.starception.submission.settings.components.PrayerTimesSection
  * deleted, because a settings screen that merely resembles the real one is worse
  * than none — it looks authoritative while disagreeing about what the app does.
  *
- * A sheet rather than a screen only because there is no navigation on iOS yet.
- * When there is, this becomes a destination and the section moves with it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PrayerSettingsSheet(
+fun PrayerSettingsScreen(
     settings: PrayerSettings,
     countryName: String?,
     onSettingsChange: (PrayerSettings) -> Unit,
     onRestore: () -> Unit,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
             modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 40.dp),
         ) {
-            Text(
-                text = "Prayer times",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Prayer times",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                // The gesture works too, but a visible control is needed: this
+                // is reached from a tap, not a sheet the user swiped up.
+                IconTapTarget(
+                    icon = NiaIcons.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    onClick = onBack,
+                )
+            }
 
             PrayerTimesSection(
                 prayerSettings = settings,
