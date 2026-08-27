@@ -55,8 +55,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     // One tracker for the life of the screen; it reads and writes through
     // NSUserDefaults, so the marks survive relaunch.
     val tracker = remember { SalahTracker() }
-    val settings = remember { UserPrayerSettings() }
-    var userOffsets by remember { mutableStateOf(settings.offsets()) }
+    val settingsStore = remember { UserPrayerSettings() }
+    var showSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         location = LocationProvider().current()
@@ -76,6 +76,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     }
 
     val place = location ?: FALLBACK_LOCATION
+    val country = prayerDefaultsFor(place.countryCode)
+    var prayerSettings by remember(country) { mutableStateOf(settingsStore.settings(country)) }
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
     var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
@@ -89,8 +91,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         timeZoneOffset = place.timeZoneOffset,
         // The country's own method, so Fajr and Isha use the angles its
         // authority publishes rather than one country's convention everywhere.
-        defaults = prayerDefaultsFor(place.countryCode),
-        userOffsets = userOffsets,
+        defaults = country,
+        settings = prayerSettings,
         // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
         weatherCode = weatherCode,
     )
@@ -104,11 +106,30 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
             day = day,
             salah = SalahProgress.from(completed),
             onTogglePrayer = { completed = tracker.toggle(today, it) },
-            offsets = userOffsets,
-            onAdjustPrayer = { prayer, delta -> userOffsets = settings.adjust(prayer, delta) },
+            offsets = prayerSettings.timeOffsets,
+            onAdjustPrayer = { prayer, delta ->
+                prayerSettings = settingsStore.adjust(country, prayer, delta)
+            },
+            onOpenSettings = { showSettings = true },
             today = today,
             isLocating = !resolved,
         )
+
+        if (showSettings) {
+            PrayerSettingsSheet(
+                settings = prayerSettings,
+                countryName = country?.countryName,
+                onSettingsChange = {
+                    prayerSettings = it
+                    settingsStore.save(it)
+                },
+                onRestore = {
+                    settingsStore.restoreDefaults()
+                    prayerSettings = settingsStore.settings(country)
+                },
+                onDismiss = { showSettings = false },
+            )
+        }
     }
 }
 

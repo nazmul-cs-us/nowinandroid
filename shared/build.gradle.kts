@@ -41,6 +41,7 @@ kotlin {
             export(projects.core.prayerEngine)
             export(projects.core.theme)
             export(projects.core.images)
+            export(projects.core.components)
         }
     }
 
@@ -53,6 +54,7 @@ kotlin {
             api(projects.core.prayerEngine)
             api(projects.core.theme)
             api(projects.core.images)
+            api(projects.core.components)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

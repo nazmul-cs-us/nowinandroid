@@ -72,6 +72,7 @@ fun PrayerTimesScreen(
     today: LocalDate,
     offsets: PrayerTimeOffsets,
     onAdjustPrayer: (prayer: String, delta: Int) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     isLocating: Boolean = false,
 ) {
@@ -85,12 +86,21 @@ fun PrayerTimesScreen(
                 .safeDrawingPadding()
                 .padding(16.dp),
         ) {
-            Text(
-                text = "Prayer Times",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Prayer Times",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                AdjustButton(symbol = "\u2699", tint = MaterialTheme.colorScheme.onBackground) {
+                    onOpenSettings()
+                }
+            }
             Text(
                 // Marked while the fix is pending, because the times on screen
                 // are for the fallback location and silently showing them as if

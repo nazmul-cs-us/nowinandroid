@@ -16,55 +16,88 @@
 
 package com.starception.submission.shared.settings
 
+import com.starception.submission.prayer.model.AsrMadhhab
+import com.starception.submission.prayer.model.CountryPrayerDefaults
+import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.storage.KeyValueStore
 import com.starception.submission.shared.storage.platformKeyValueStore
 import kotlinx.serialization.json.Json
 
 /**
- * The adjustments a user has made to their prayer times.
+ * The user's prayer settings, persisted.
  *
- * Separate from the country's published offsets: those describe what the local
- * authority announces, these describe the user disagreeing with the calculation
- * — usually to match the mosque they actually pray at. Both apply, which is why
- * they are added rather than one overriding the other.
- *
- * Reuses [PrayerTimeOffsets] from the shared engine rather than defining another
- * offsets type, so a value written on one platform means the same on the other.
+ * Stores [PrayerSettings] itself rather than a reduced set of fields. That is the
+ * model the Android settings screen already edits and the app already persists as
+ * JSON, so the two platforms describe a configuration the same way and the shared
+ * settings UI can be handed the real type instead of an adapter.
  */
 class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStore()) {
 
-    private val json = Json { ignoreUnknownKeys = true }
-
-    fun offsets(): PrayerTimeOffsets {
-        val stored = store.getString(KEY_OFFSETS) ?: return PrayerTimeOffsets()
-        // A corrupt or outdated value should not stop the app showing times;
-        // falling back to no adjustment is both safe and obvious to the user.
-        return runCatching { json.decodeFromString<PrayerTimeOffsets>(stored) }
-            .getOrElse { PrayerTimeOffsets() }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 
-    fun setOffsets(offsets: PrayerTimeOffsets) {
-        store.putString(KEY_OFFSETS, json.encodeToString(offsets))
+    /** True once the user has saved anything, so defaults can stop being applied. */
+    fun hasSaved(): Boolean = !store.getString(KEY_SETTINGS).isNullOrBlank()
+
+    /**
+     * The stored settings, or the country's defaults where nothing is stored.
+     *
+     * Falling back to the country rather than a fixed default is what lets
+     * someone who has never opened settings still get their local method, and
+     * keeps working when they travel.
+     */
+    fun settings(country: CountryPrayerDefaults?): PrayerSettings {
+        val stored = store.getString(KEY_SETTINGS)
+        if (stored.isNullOrBlank()) return defaultsFrom(country)
+
+        // A value that will not parse means a format change or hand-editing.
+        // Falling back to the country's defaults keeps prayer times on screen;
+        // failing here would leave the user with no times at all.
+        return runCatching { json.decodeFromString<PrayerSettings>(stored) }
+            .getOrElse { defaultsFrom(country) }
     }
 
-    /** Adjusts one prayer by [delta] minutes, clamped to the supported range. */
-    fun adjust(prayer: String, delta: Int): PrayerTimeOffsets {
-        val current = offsets()
-        val updated = current.withOffset(
-            prayer = prayer,
-            minutes = (current.getOffset(prayer) + delta).coerceIn(-MAX_OFFSET, MAX_OFFSET),
+    fun save(settings: PrayerSettings) {
+        store.putString(KEY_SETTINGS, json.encodeToString(settings))
+    }
+
+    /** Clears the user's choices so the country's defaults apply again. */
+    fun restoreDefaults() {
+        store.putString(KEY_SETTINGS, "")
+    }
+
+    /** Adjusts one prayer by [delta] minutes, clamped to the dial's range. */
+    fun adjust(country: CountryPrayerDefaults?, prayer: String, delta: Int): PrayerSettings {
+        val current = settings(country)
+        val updated = current.copy(
+            timeOffsets = current.timeOffsets.withOffset(
+                prayer = prayer,
+                minutes = (current.timeOffsets.getOffset(prayer) + delta)
+                    .coerceIn(-MAX_OFFSET, MAX_OFFSET),
+            ),
         )
-        setOffsets(updated)
+        save(updated)
         return updated
     }
 
+    private fun defaultsFrom(country: CountryPrayerDefaults?) = PrayerSettings(
+        calculationMethod = country?.method ?: PrayerSettings().calculationMethod,
+        asrMadhhab = if (country?.asrShadowFactor == AsrMadhhab.HANAFI.shadowFactor) {
+            AsrMadhhab.HANAFI
+        } else {
+            AsrMadhhab.STANDARD
+        },
+    )
+
     private companion object {
-        const val KEY_OFFSETS = "prayer_time_offsets"
+        const val KEY_SETTINGS = "cached_prayer_settings"
 
         /**
          * The same range the Android dial allows: three hours either way. Wide
-         * enough for any mosque's practice, bounded so a runaway drag cannot put
+         * enough for any mosque's practice, bounded so a runaway input cannot put
          * a prayer on the wrong day.
          */
         const val MAX_OFFSET = 180

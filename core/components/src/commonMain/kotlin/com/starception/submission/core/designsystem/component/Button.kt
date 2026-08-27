@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.icon.NiaIcons
-import com.starception.submission.core.designsystem.theme.NiaTheme
 
 /**
  * Now in Android button with generic content slot. Wraps Material 3 [OutlinedButton],
@@ -280,40 +279,6 @@ private fun NiaButtonContent(
             ),
     ) {
         text()
-    }
-}
-
-@ThemePreviews
-@Composable
-fun NiaButtonPreview() {
-    NiaTheme {
-        NiaBackground(modifier = Modifier.size(150.dp, 50.dp)) {
-            NiaButton(onClick = {}, text = { Text("Test button") })
-        }
-    }
-}
-
-@ThemePreviews
-@Composable
-fun NiaOutlinedButtonPreview() {
-    NiaTheme {
-        NiaBackground(modifier = Modifier.size(150.dp, 50.dp)) {
-            NiaOutlinedButton(onClick = {}, text = { Text("Test button") })
-        }
-    }
-}
-
-@ThemePreviews
-@Composable
-fun NiaButtonLeadingIconPreview() {
-    NiaTheme {
-        NiaBackground(modifier = Modifier.size(150.dp, 50.dp)) {
-            NiaButton(
-                onClick = {},
-                text = { Text("Test button") },
-                leadingIcon = { Icon(imageVector = NiaIcons.Add, contentDescription = null) },
-            )
-        }
     }
 }
 
