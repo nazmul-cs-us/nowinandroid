@@ -171,6 +171,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
+import com.starception.submission.core.images.PrayerSkyPhase
+import com.starception.submission.core.images.PrayerSkyWeather
+import com.starception.submission.core.images.prayerSkyResource
+import com.starception.submission.core.images.prayerSkyWeather
+// The prayer sky artwork moved to :core:images so iOS renders the same skies.
+// It loads through Compose Resources rather than R.drawable, hence the alias:
+// the other painterResource above still serves the ground and foreground layers.
+import com.starception.submission.core.images.resources.Res as ImageRes
+import com.starception.submission.core.images.resources.insight_prayer_background
+import com.starception.submission.core.images.resources.insight_qibla_background
+import com.starception.submission.core.images.resources.insight_quran_background
+import com.starception.submission.core.images.resources.insight_suggestion
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource as composePainterResource
 import androidx.compose.foundation.Image
 import com.starception.submission.R
 import com.starception.submission.core.duadatabase.Dua
@@ -1165,25 +1179,6 @@ private data class PrayerSkyKeyframe(
     val palette: PrayerSkyPalette,
 )
 
-private enum class PrayerSkyPhase {
-    Fajr,
-    Sunrise,
-    Dhuhr,
-    Asr,
-    Maghrib,
-    Isha,
-}
-
-private enum class PrayerSkyWeather {
-    Clear,
-    PartlyCloudy,
-    Overcast,
-    Fog,
-    Rain,
-    Snow,
-    Thunderstorm,
-}
-
 /** Resolves the current visual phase around the calculated local prayer boundaries. */
 private fun prayerSkyPhase(
     currentTime: LocalTime,
@@ -1211,65 +1206,6 @@ private fun prayerSkyPhase(
     }
 }
 
-/** Groups Open-Meteo WMO codes into the seven generated sky families. */
-private fun prayerSkyWeather(weatherCode: Int?): PrayerSkyWeather = when (weatherCode) {
-    1, 2 -> PrayerSkyWeather.PartlyCloudy
-    3 -> PrayerSkyWeather.Overcast
-    45, 48 -> PrayerSkyWeather.Fog
-    in 51..67, in 80..82 -> PrayerSkyWeather.Rain
-    in 71..77, 85, 86 -> PrayerSkyWeather.Snow
-    in 95..99 -> PrayerSkyWeather.Thunderstorm
-    else -> PrayerSkyWeather.Clear
-}
-
-private fun prayerSkyResource(
-    phase: PrayerSkyPhase,
-    weather: PrayerSkyWeather,
-): Int = when (phase to weather) {
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_fajr_clear
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_fajr_partly_cloudy
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_fajr_overcast
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_fajr_fog
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_fajr_rain
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_fajr_snow
-    PrayerSkyPhase.Fajr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_fajr_thunderstorm
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_sunrise_clear
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_sunrise_partly_cloudy
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_sunrise_overcast
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_sunrise_fog
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_sunrise_rain
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_sunrise_snow
-    PrayerSkyPhase.Sunrise to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_sunrise_thunderstorm
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_dhuhr_clear
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_dhuhr_partly_cloudy
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_dhuhr_overcast
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_dhuhr_fog
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_dhuhr_rain
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_dhuhr_snow
-    PrayerSkyPhase.Dhuhr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_dhuhr_thunderstorm
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_asr_clear
-    PrayerSkyPhase.Asr to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_asr_partly_cloudy
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_asr_overcast
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_asr_fog
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_asr_rain
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_asr_snow
-    PrayerSkyPhase.Asr to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_asr_thunderstorm
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_maghrib_clear
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_maghrib_partly_cloudy
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_maghrib_overcast
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_maghrib_fog
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_maghrib_rain
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_maghrib_snow
-    PrayerSkyPhase.Maghrib to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_maghrib_thunderstorm
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Clear -> R.drawable.prayer_sky_isha_clear
-    PrayerSkyPhase.Isha to PrayerSkyWeather.PartlyCloudy -> R.drawable.prayer_sky_isha_partly_cloudy
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Overcast -> R.drawable.prayer_sky_isha_overcast
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Fog -> R.drawable.prayer_sky_isha_fog
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Rain -> R.drawable.prayer_sky_isha_rain
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Snow -> R.drawable.prayer_sky_isha_snow
-    PrayerSkyPhase.Isha to PrayerSkyWeather.Thunderstorm -> R.drawable.prayer_sky_isha_thunderstorm
-    else -> R.drawable.prayer_sky_dhuhr_clear
-}
 
 /**
  * Resolves the insight artwork's sky treatment from the calculated prayer
@@ -2028,7 +1964,7 @@ fun SwipeableBigTiles(
                                     "$prayersRemaining remain · $nextUnmarkedPrayer is next"
                                 else -> "$prayersRemaining prayers remain today"
                             },
-                            backgroundPainterRes = R.drawable.insight_prayer_background,
+                            backgroundPainterRes = ImageRes.drawable.insight_prayer_background,
                             foregroundPainterRes = R.drawable.insight_prayer_foreground,
                             foregroundBaseScale = 0.84f,
                             foregroundOffsetFraction = Offset(0f, 0.08f),
@@ -2085,7 +2021,7 @@ fun SwipeableBigTiles(
                             title = dailySurah.nameEnglish,
                             supportingText = dailySurah.nameArabic,
                             footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
-                            backgroundPainterRes = R.drawable.insight_quran_background,
+                            backgroundPainterRes = ImageRes.drawable.insight_quran_background,
                             foregroundPainterRes = R.drawable.insight_quran_foreground_v2,
                             // Let more of the reading scene breathe around the Quran.
                             foregroundBaseScale = 0.74f,
@@ -2135,7 +2071,7 @@ fun SwipeableBigTiles(
                                 ?: "Direction to Makkah",
                             supportingText = qiblaBearing?.let(::qiblaCardinalDirection),
                             footerText = "Open the live compass and 3D globe",
-                            backgroundPainterRes = R.drawable.insight_qibla_background,
+                            backgroundPainterRes = ImageRes.drawable.insight_qibla_background,
                             foregroundPainterRes = R.drawable.insight_qibla_foreground_v2,
                             // Keep the compass present without dominating the Qibla scene.
                             foregroundBaseScale = 0.75f,
@@ -2174,7 +2110,7 @@ fun SwipeableBigTiles(
                             title = aiRecommendation.title,
                             supportingText = aiRecommendation.supportingText,
                             footerText = aiRecommendation.footerText,
-                            backgroundPainterRes = R.drawable.insight_suggestion,
+                            backgroundPainterRes = ImageRes.drawable.insight_suggestion,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
@@ -2559,7 +2495,7 @@ internal fun formatPrayerForecastMetric(
 private fun InsightPreviewCard(
     label: String,
     title: String,
-    backgroundPainterRes: Int,
+    backgroundPainterRes: DrawableResource,
     groundPainterRes: Int? = null,
     groundFadeStartFraction: Float = 0.68f,
     foregroundPainterRes: Int? = null,
@@ -2792,7 +2728,7 @@ private fun InsightPreviewCard(
                 modifier = Modifier.fillMaxSize(),
             ) { resolvedBackgroundRes ->
                 Image(
-                    painter = painterResource(resolvedBackgroundRes),
+                    painter = composePainterResource(resolvedBackgroundRes),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
