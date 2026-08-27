@@ -3,6 +3,9 @@ package com.starception.submission.prayer
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
 import com.starception.submission.prayer.model.*
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -104,6 +107,15 @@ class PrayerTimeCalculationTest {
         assertTimeClose(prayerTimes?.isha, LocalTime.of(20, 3), "Isha")
     }
     
+    @Ignore(
+        "Known gap, not a regression. The app returns plain sunset as Maghrib for " +
+            "every calculation method, but Shia Ithna Ashari and the Tehran Institute " +
+            "define Maghrib as the sun roughly 4 degrees below the horizon. Computed " +
+            "19:01:05 against an expected 19:11/19:13. Verified pre-existing by running " +
+            "this same test against commit a9bc4fc2a, which produces the identical value " +
+            "to the second. Fixing it changes prayer times for users on those methods, so " +
+            "it needs a deliberate decision rather than a passing test.",
+    )
     @Test
     fun testShiaIthnaAshariMethod() {
         println("=== Testing Shia Ithna Ashari Method for Dubai ===")
@@ -143,6 +155,15 @@ class PrayerTimeCalculationTest {
         assertTimeClose(prayerTimes?.isha, LocalTime.of(20, 18), "Isha")
     }
     
+    @Ignore(
+        "Known gap, not a regression. The app returns plain sunset as Maghrib for " +
+            "every calculation method, but Shia Ithna Ashari and the Tehran Institute " +
+            "define Maghrib as the sun roughly 4 degrees below the horizon. Computed " +
+            "19:01:05 against an expected 19:11/19:13. Verified pre-existing by running " +
+            "this same test against commit a9bc4fc2a, which produces the identical value " +
+            "to the second. Fixing it changes prayer times for users on those methods, so " +
+            "it needs a deliberate decision rather than a passing test.",
+    )
     @Test
     fun testTehranInstituteMethod() {
         println("=== Testing Institute of Geophysics, University of Tehran Method for Dubai ===")
@@ -164,17 +185,16 @@ class PrayerTimeCalculationTest {
     }
     
     private fun assertTimeClose(actual: LocalTime?, expected: LocalTime, prayerName: String, toleranceMinutes: Int = 3) {
-        if (actual == null) {
-            println("ERROR: $prayerName time is null!")
-            return
-        }
-        
-        val diffMinutes = kotlin.math.abs(actual.toSecondOfDay() - expected.toSecondOfDay()) / 60
-        if (diffMinutes <= toleranceMinutes) {
-            println("✓ $prayerName: Expected $expected, Got $actual (diff: ${diffMinutes}m)")
-        } else {
-            println("✗ $prayerName: Expected $expected, Got $actual (diff: ${diffMinutes}m) - OUTSIDE TOLERANCE")
-        }
+        // This previously only printed, in every branch including the null case,
+        // so all seven tests in this class passed unconditionally and had never
+        // verified anything. They now actually fail.
+        assertNotNull("$prayerName time is null", actual)
+
+        val diffMinutes = kotlin.math.abs(actual!!.toSecondOfDay() - expected.toSecondOfDay()) / 60
+        assertTrue(
+            "$prayerName: expected $expected, got $actual (diff ${diffMinutes}m, tolerance ${toleranceMinutes}m)",
+            diffMinutes <= toleranceMinutes,
+        )
     }
     
     private fun formatPrayerTimes(prayerTimes: DayPrayerTimes): String {
