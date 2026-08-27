@@ -20,6 +20,8 @@ plugins {
     // nothing on the Android build path depends on :shared.
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose)
+    // For parsing the Open-Meteo response in commonMain.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -53,6 +55,7 @@ kotlin {
             api(projects.core.images)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

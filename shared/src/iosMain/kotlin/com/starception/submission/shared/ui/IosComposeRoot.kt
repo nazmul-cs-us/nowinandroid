@@ -30,6 +30,7 @@ import com.starception.submission.core.designsystem.theme.sharedTypography
 import com.starception.submission.shared.PrayerSchedule
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
+import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -45,6 +46,7 @@ import platform.UIKit.UIViewController
 fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     var location by remember { mutableStateOf<DeviceLocation?>(null) }
     var resolved by remember { mutableStateOf(false) }
+    var weatherCode by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(Unit) {
         location = LocationProvider().current()
@@ -52,6 +54,15 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         // denied permission looks like — without this the UI cannot tell
         // "still asking" from "asked and refused".
         resolved = true
+    }
+
+    // Keyed on the resolved position so the forecast follows the user rather
+    // than being fetched once for wherever they happened to start.
+    LaunchedEffect(location?.latitude, location?.longitude) {
+        val place = location ?: return@LaunchedEffect
+        weatherCode = CurrentConditionsClient
+            .fetch(place.latitude, place.longitude)
+            ?.weatherCode
     }
 
     val place = location ?: FALLBACK_LOCATION
@@ -67,6 +78,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         fajrAngle = UAE_FAJR_ANGLE,
         ishaAngle = UAE_ISHA_ANGLE,
         asrShadowFactor = STANDARD_ASR_SHADOW,
+        // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
+        weatherCode = weatherCode,
     )
 
     MaterialTheme(
