@@ -99,6 +99,7 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
             day = day,
             salah = SalahProgress.from(completed),
             onTogglePrayer = { completed = tracker.toggle(today, it) },
+            today = today,
             isLocating = !resolved,
         )
     }

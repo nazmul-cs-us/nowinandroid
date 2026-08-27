@@ -24,6 +24,9 @@ plugins {
 
 kotlin {
     sourceSets {
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
         commonMain.dependencies {
             api(libs.kotlinx.datetime)
         }
