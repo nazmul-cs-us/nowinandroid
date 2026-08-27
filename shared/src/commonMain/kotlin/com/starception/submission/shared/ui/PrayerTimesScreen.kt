@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.salah.SalahProgress
+import kotlinx.datetime.LocalDate
 import com.starception.submission.shared.SharedPrayerSlot
 
 /**
@@ -60,6 +61,7 @@ fun PrayerTimesScreen(
     day: SharedPrayerDay,
     salah: SalahProgress,
     onTogglePrayer: (String) -> Unit,
+    today: LocalDate,
     modifier: Modifier = Modifier,
     isLocating: Boolean = false,
 ) {
@@ -100,6 +102,7 @@ fun PrayerTimesScreen(
                         placeName = placeName,
                         salah = salah,
                         onTogglePrayer = onTogglePrayer,
+                        today = today,
                     )
                 }
                 item {

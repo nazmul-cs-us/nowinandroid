@@ -174,6 +174,10 @@ import androidx.compose.ui.res.painterResource
 import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyPhase
+import com.starception.submission.feature.quran.dailyReading
+// Aliased: this file already works in java.time, and the shared rule speaks
+// kotlinx. Only the conversion at the call site crosses between them.
+import kotlinx.datetime.LocalDate as KotlinLocalDate
 import com.starception.submission.core.images.prayerSkyResource
 import com.starception.submission.core.images.prayerSkyWeather
 // The prayer sky artwork moved to :core:images so iOS renders the same skies.
@@ -1580,12 +1584,10 @@ fun SwipeableBigTiles(
     val prayersRemaining = (totalPrayers - prayedCount).coerceAtLeast(0)
     val nextUnmarkedPrayer = prayerRecap.firstOrNull { !it.isPrayed }?.name
     val today = LocalDate.now()
+    // The Friday/day-of-year rule lives in shared code so iOS suggests the same
+    // surah on the same day; this only converts java.time to kotlinx.
     val dailySurah = remember(today) {
-        if (today.dayOfWeek == DayOfWeek.FRIDAY) {
-            QuranData.surahs.first { it.number == 18 }
-        } else {
-            QuranData.surahs[(today.dayOfYear - 1) % QuranData.surahs.size]
-        }
+        dailyReading(KotlinLocalDate(today.year, today.monthValue, today.dayOfMonth))
     }
     val aiRecommendation = remember(today, currentTime.hour, fortressDuasByChapter) {
         buildContextualInsightRecommendation(

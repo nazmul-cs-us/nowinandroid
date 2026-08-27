@@ -50,7 +50,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.salah.FARD_PRAYERS
+import com.starception.submission.feature.quran.dailyReading
+import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.shared.salah.SalahProgress
+import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -71,6 +74,7 @@ fun InsightPager(
     placeName: String,
     salah: SalahProgress,
     onTogglePrayer: (String) -> Unit,
+    today: LocalDate,
     modifier: Modifier = Modifier,
 ) {
     val pageCount = 3
@@ -140,12 +144,16 @@ fun InsightPager(
                     )
                 }
 
-                else -> ArtworkTile(
-                    artwork = Res.drawable.insight_quran_background,
-                    label = "Today's reading",
-                    title = "Al-Fatihah",
-                    subtitle = "Surah 1 · Meccan",
-                )
+                else -> {
+                    val surah = dailyReading(today)
+                    ArtworkTile(
+                        artwork = Res.drawable.insight_quran_background,
+                        label = "Today's reading",
+                        title = surah.nameEnglish,
+                        subtitle = surah.subtitle(),
+                        arabicTitle = surah.nameArabic,
+                    )
+                }
             }
         }
     }
@@ -159,6 +167,7 @@ private fun ArtworkTile(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    arabicTitle: String? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     Box(
@@ -211,6 +220,13 @@ private fun ArtworkTile(
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
+            if (arabicTitle != null) {
+                Text(
+                    text = arabicTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                )
+            }
             if (subtitle.isNotEmpty()) {
                 Text(
                     text = subtitle,
