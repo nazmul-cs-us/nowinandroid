@@ -571,12 +571,16 @@ class SherpaOnnxKwsService @Inject constructor(
     /**
      * Stop recording.
      */
+    @Synchronized
     private fun stopRecording() {
         isRecording = false
+        val recorder = audioRecord
+        audioRecord = null
         try {
-            audioRecord?.stop()
-            audioRecord?.release()
-            audioRecord = null
+            if (recorder?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                recorder.stop()
+            }
+            recorder?.release()
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping AudioRecord", e)
         }

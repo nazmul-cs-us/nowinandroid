@@ -3,6 +3,7 @@ package com.starception.submission.settings.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -38,12 +39,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.RecordVoiceOver
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +52,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import android.Manifest
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,12 +61,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -430,9 +438,15 @@ private fun GoogleHumVisualization(
         label = "rotationAngle"
     )
 
+    val activityLevel by animateFloatAsState(
+        targetValue = if (isAnimating) 1f else 0f,
+        animationSpec = tween(420, easing = FastOutSlowInEasing),
+        label = "globeActivityLevel",
+    )
+
     val smoothAmplitude by animateFloatAsState(
         targetValue = amplitude,
-        animationSpec = tween(150, easing = LinearEasing),
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
         label = "smoothAmplitude"
     )
 
@@ -444,7 +458,13 @@ private fun GoogleHumVisualization(
         val dynamicRadius = baseRadius * (1f + amp * 0.5f)
 
         dots.forEach { dot ->
-            val rotatedTheta = dot.baseX + rotationAngle * dot.speedMultiplier
+            // The primary rotation must advance by exactly one full turn so the
+            // 2π -> 0 loop boundary is visually identical. Multiplying the angle
+            // by each dot's speed caused the previous ten-second reset snap.
+            val organicDrift = sin(rotationAngle + dot.phaseOffset) *
+                (dot.speedMultiplier - 1f) *
+                (0.5f + activityLevel * 0.4f)
+            val rotatedTheta = dot.baseX + rotationAngle + organicDrift
             val x3d = sin(dot.baseY) * cos(rotatedTheta)
             val y3d = cos(dot.baseY)
             val z3d = sin(dot.baseY) * sin(rotatedTheta)
@@ -453,7 +473,9 @@ private fun GoogleHumVisualization(
             val projectedY = centerY + y3d * dynamicRadius
             val baseSize = dot.size * perspective
             val amplitudeBoost = 1f + amp * 2f
-            val finalSize = baseSize * amplitudeBoost
+            val particlePulse = 1f +
+                sin(rotationAngle * 2f + dot.phaseOffset) * 0.035f * activityLevel
+            val finalSize = baseSize * amplitudeBoost * particlePulse
             val alpha = (0.4f + perspective * 0.6f).coerceIn(0f, 1f)
 
             drawCircle(
@@ -694,7 +716,7 @@ private fun ModernVoiceTestCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(148.dp)
+                        .height(108.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -761,12 +783,6 @@ private fun BubbleSpeakerPad(
         ),
         label = "bubblePulse"
     )
-    val level by animateFloatAsState(
-        targetValue = if (isActive) (0.6f + amplitude * 0.25f).coerceIn(0.5f, 0.9f) else 0.35f,
-        animationSpec = tween(180),
-        label = "level"
-    )
-
     BoxWithConstraints(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -794,51 +810,12 @@ private fun BubbleSpeakerPad(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width((maxWidth * level).coerceAtMost(maxWidth * 0.72f))
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFF0B4B83),
-                            Color(0xFF0E3A67)
-                        )
-                    )
-                )
-        )
-
-        Box(
+        VoiceStartStopButton(
+            isActive = isActive,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = 10.dp)
-                .size(94.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center
-        ) {
-            GoogleHumVisualization(
-                isAnimating = isActive,
-                amplitude = amplitude,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-            )
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF112A43).copy(alpha = 0.88f)),
-                contentAlignment = Alignment.Center
-            ) {
-                DotPlayPauseGlyph(
-                    isPause = isActive,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
+                .padding(start = 18.dp),
+        )
 
         Box(
             modifier = Modifier
@@ -876,43 +853,201 @@ private fun BubbleSpeakerPad(
 }
 
 @Composable
-private fun DotPlayPauseGlyph(
-    isPause: Boolean,
-    modifier: Modifier = Modifier
+private fun VoiceStartStopButton(
+    isActive: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    val dotColor = Color.White
-    val dotSize = 4.dp
+    val outerColor by animateColorAsState(
+        targetValue = if (isActive) Color(0xFF5872AE) else Color(0xFF4A6299),
+        animationSpec = tween(180),
+        label = "voiceControlRing",
+    )
+    val iconMorphProgress by animateFloatAsState(
+        targetValue = if (isActive) 1f else 0f,
+        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        label = "voiceControlIconMorph",
+    )
+    val density = LocalDensity.current
+    val ambientShadowBlurPx = with(density) { 4.5.dp.toPx() }
+    val spotShadowBlurPx = with(density) { 8.dp.toPx() }
+    val innerShadowBlurPx = with(density) { 3.dp.toPx() }
+    val shadowOffsetPx = with(density) { 4.5.dp.toPx() }
+    val innerShadowOffsetPx = with(density) { 1.5.dp.toPx() }
+    val ambientShadowPaint = remember(ambientShadowBlurPx) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(82, 0, 0, 0)
+            maskFilter = BlurMaskFilter(ambientShadowBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+    val spotShadowPaint = remember(spotShadowBlurPx) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(168, 0, 0, 0)
+            maskFilter = BlurMaskFilter(spotShadowBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+    val innerShadowPaint = remember(innerShadowBlurPx) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(112, 0, 0, 0)
+            maskFilter = BlurMaskFilter(innerShadowBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        if (isPause) {
-            listOf((-7).dp, 7.dp).forEach { xOffset ->
-                listOf((-7).dp, 0.dp, 7.dp).forEach { yOffset ->
-                    Box(
-                        modifier = Modifier
-                            .offset(x = xOffset, y = yOffset)
-                            .size(dotSize)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                    )
-                }
+    Canvas(
+        modifier = modifier
+            .size(108.dp),
+    ) {
+        val controlRadius = 40.dp.toPx()
+        val ringWidth = 8.dp.toPx()
+        val innerRadius = controlRadius - ringWidth
+
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawCircle(
+                center.x,
+                center.y,
+                controlRadius - 0.5.dp.toPx(),
+                ambientShadowPaint,
+            )
+            canvas.nativeCanvas.drawCircle(
+                center.x,
+                center.y + shadowOffsetPx,
+                controlRadius - 1.dp.toPx(),
+                spotShadowPaint,
+            )
+        }
+
+        drawCircle(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF5A72AD),
+                    outerColor.copy(alpha = 0.96f),
+                    Color(0xFF2D426F),
+                ),
+                start = Offset(center.x, center.y - controlRadius),
+                end = Offset(center.x, center.y + controlRadius),
+            ),
+            radius = controlRadius,
+        )
+        drawIntoCanvas { canvas ->
+            canvas.nativeCanvas.drawCircle(
+                center.x,
+                center.y + innerShadowOffsetPx,
+                innerRadius - 0.5.dp.toPx(),
+                innerShadowPaint,
+            )
+        }
+        drawCircle(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFF38393F), Color(0xFF303137), Color(0xFF292B30)),
+                start = Offset(center.x, center.y - innerRadius),
+                end = Offset(center.x, center.y + innerRadius),
+            ),
+            radius = innerRadius,
+        )
+        val innerDiscTopLeft = Offset(center.x - innerRadius, center.y - innerRadius)
+        val innerDiscSize = Size(innerRadius * 2f, innerRadius * 2f)
+        drawArc(
+            color = Color.White.copy(alpha = 0.10f),
+            startAngle = 195f,
+            sweepAngle = 150f,
+            useCenter = false,
+            topLeft = innerDiscTopLeft,
+            size = innerDiscSize,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2.dp.toPx()),
+        )
+        drawArc(
+            color = Color.Black.copy(alpha = 0.18f),
+            startAngle = 15f,
+            sweepAngle = 150f,
+            useCenter = false,
+            topLeft = innerDiscTopLeft,
+            size = innerDiscSize,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()),
+        )
+
+        val glyphBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF79A4F2), Color(0xFF527BD0)),
+            start = Offset(center.x, center.y - 18.dp.toPx()),
+            end = Offset(center.x, center.y + 18.dp.toPx()),
+        )
+
+        val playAlpha = (1f - iconMorphProgress * 1.55f).coerceIn(0f, 1f)
+        if (playAlpha > 0f) {
+            val playScale = 1f - iconMorphProgress * 0.12f
+            val left = center.x - 7.5.dp.toPx() * playScale
+            val top = center.y - 11.5.dp.toPx() * playScale
+            val bottom = center.y + 11.5.dp.toPx() * playScale
+            val tip = center.x + 14.dp.toPx() * playScale
+            val cornerInset = 3.dp.toPx() * playScale
+            val playPath = Path().apply {
+                moveTo(left, top + cornerInset)
+                quadraticTo(left, top, left + cornerInset, top + cornerInset * 0.55f)
+                lineTo(tip - cornerInset, center.y - cornerInset * 0.7f)
+                quadraticTo(tip, center.y, tip - cornerInset, center.y + cornerInset * 0.7f)
+                lineTo(left + cornerInset, bottom - cornerInset * 0.55f)
+                quadraticTo(left, bottom, left, bottom - cornerInset)
+                close()
             }
-        } else {
-            listOf(
-                Pair((-8).dp, 0.dp),
-                Pair((-2).dp, (-4).dp),
-                Pair((-2).dp, 4.dp),
-                Pair(4.dp, (-8).dp),
-                Pair(4.dp, 0.dp),
-                Pair(4.dp, 8.dp)
-            ).forEach { (xOffset, yOffset) ->
-                Box(
-                    modifier = Modifier
-                        .offset(x = xOffset, y = yOffset)
-                        .size(dotSize)
-                        .clip(CircleShape)
-                        .background(dotColor)
+            // A soft two-stage shadow and a faint upper rim lift the glyph away
+            // from the dark inner disc without making it look outlined.
+            translate(top = 2.dp.toPx()) {
+                drawPath(path = playPath, color = Color.Black.copy(alpha = 0.18f * playAlpha))
+            }
+            translate(top = 1.dp.toPx()) {
+                drawPath(path = playPath, color = Color.Black.copy(alpha = 0.30f * playAlpha))
+            }
+            drawPath(path = playPath, brush = glyphBrush, alpha = playAlpha)
+            translate(top = (-0.6).dp.toPx()) {
+                drawPath(
+                    path = playPath,
+                    color = Color.White.copy(alpha = 0.10f * playAlpha),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()),
                 )
             }
+        }
+
+        val pauseAlpha = ((iconMorphProgress - 0.18f) / 0.82f).coerceIn(0f, 1f)
+        if (pauseAlpha > 0f) {
+            val barWidth = 5.5.dp.toPx()
+            val barHeight = (7.dp + 16.dp * pauseAlpha).toPx()
+            val barGap = (1.dp + 3.dp * pauseAlpha).toPx()
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.30f * pauseAlpha),
+                topLeft = Offset(
+                    center.x - barGap / 2f - barWidth,
+                    center.y - barHeight / 2f + 1.5.dp.toPx(),
+                ),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(3.dp.toPx()),
+            )
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.30f * pauseAlpha),
+                topLeft = Offset(
+                    center.x + barGap / 2f,
+                    center.y - barHeight / 2f + 1.5.dp.toPx(),
+                ),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(3.dp.toPx()),
+            )
+            drawRoundRect(
+                brush = glyphBrush,
+                topLeft = Offset(
+                    center.x - barGap / 2f - barWidth,
+                    center.y - barHeight / 2f,
+                ),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(3.dp.toPx()),
+                alpha = pauseAlpha,
+            )
+            drawRoundRect(
+                brush = glyphBrush,
+                topLeft = Offset(
+                    center.x + barGap / 2f,
+                    center.y - barHeight / 2f,
+                ),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(3.dp.toPx()),
+                alpha = pauseAlpha,
+            )
         }
     }
 }

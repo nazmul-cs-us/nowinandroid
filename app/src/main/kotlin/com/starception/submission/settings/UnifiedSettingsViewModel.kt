@@ -132,6 +132,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     // Voice settings state
     private val _voiceSettings = MutableStateFlow(VoiceSettingsState())
     val voiceSettings: StateFlow<VoiceSettingsState> = _voiceSettings.asStateFlow()
+    private var voiceTestSessionId = 0L
 
     // TTS settings
     private val _ttsSettings = MutableStateFlow(TtsSettingsState())
@@ -838,6 +839,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     fun startVoiceTest() {
         viewModelScope.launch {
             Log.i(TAG, "🎤 Starting voice test...")
+            val sessionId = ++voiceTestSessionId
 
             // Update state to listening
             _voiceSettings.value = _voiceSettings.value.copy(
@@ -854,6 +856,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                         callback = object : SherpaOnnxKwsService.VoiceRecognitionCallback {
                             override fun onResult(result: SherpaOnnxKwsService.VoiceResult) {
                                 viewModelScope.launch {
+                                    if (sessionId != voiceTestSessionId) return@launch
                                     when (result) {
                                         is SherpaOnnxKwsService.VoiceResult.Yes -> {
                                             Log.i(TAG, "🎤 Voice test result: YES")
@@ -893,9 +896,11 @@ class UnifiedSettingsViewModel @Inject constructor(
                                     }
 
                                     delay(3000)
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.IDLE
-                                    )
+                                    if (sessionId == voiceTestSessionId) {
+                                        _voiceSettings.value = _voiceSettings.value.copy(
+                                            testState = VoiceTestState.IDLE
+                                        )
+                                    }
                                 }
                             }
 
@@ -906,9 +911,14 @@ class UnifiedSettingsViewModel @Inject constructor(
                             override fun onListeningStopped() {
                                 Log.i(TAG, "🎤 Voice test listening stopped")
                                 viewModelScope.launch {
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.PROCESSING
-                                    )
+                                    if (
+                                        sessionId == voiceTestSessionId &&
+                                        _voiceSettings.value.testState == VoiceTestState.LISTENING
+                                    ) {
+                                        _voiceSettings.value = _voiceSettings.value.copy(
+                                            testState = VoiceTestState.PROCESSING
+                                        )
+                                    }
                                 }
                             }
 
@@ -926,6 +936,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                         callback = object : WhisperVoiceService.VoiceRecognitionCallback {
                             override fun onResult(result: WhisperVoiceService.VoiceResult) {
                                 viewModelScope.launch {
+                                    if (sessionId != voiceTestSessionId) return@launch
                                     when (result) {
                                         is WhisperVoiceService.VoiceResult.Yes -> {
                                             Log.i(TAG, "🎤 Voice test result: YES")
@@ -965,9 +976,11 @@ class UnifiedSettingsViewModel @Inject constructor(
                                     }
 
                                     delay(3000)
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.IDLE
-                                    )
+                                    if (sessionId == voiceTestSessionId) {
+                                        _voiceSettings.value = _voiceSettings.value.copy(
+                                            testState = VoiceTestState.IDLE
+                                        )
+                                    }
                                 }
                             }
 
@@ -978,9 +991,14 @@ class UnifiedSettingsViewModel @Inject constructor(
                             override fun onListeningStopped() {
                                 Log.i(TAG, "🎤 Voice test listening stopped")
                                 viewModelScope.launch {
-                                    _voiceSettings.value = _voiceSettings.value.copy(
-                                        testState = VoiceTestState.PROCESSING
-                                    )
+                                    if (
+                                        sessionId == voiceTestSessionId &&
+                                        _voiceSettings.value.testState == VoiceTestState.LISTENING
+                                    ) {
+                                        _voiceSettings.value = _voiceSettings.value.copy(
+                                            testState = VoiceTestState.PROCESSING
+                                        )
+                                    }
                                 }
                             }
 
@@ -1003,6 +1021,8 @@ class UnifiedSettingsViewModel @Inject constructor(
      */
     fun stopVoiceTest() {
         Log.i(TAG, "🎤 Stopping voice test...")
+        voiceTestSessionId += 1
+        sherpaOnnxKwsService.stopListening()
         whisperVoiceService.stopListening()
         _voiceSettings.value = _voiceSettings.value.copy(
             testState = VoiceTestState.IDLE,
