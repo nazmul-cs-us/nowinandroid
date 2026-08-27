@@ -46,7 +46,11 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_quran_background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import com.starception.submission.shared.SharedPrayerDay
+import com.starception.submission.shared.salah.FARD_PRAYERS
+import com.starception.submission.shared.salah.SalahProgress
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -65,6 +69,8 @@ import org.jetbrains.compose.resources.painterResource
 fun InsightPager(
     day: SharedPrayerDay,
     placeName: String,
+    salah: SalahProgress,
+    onTogglePrayer: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val pageCount = 3
@@ -125,9 +131,14 @@ fun InsightPager(
                 1 -> ArtworkTile(
                     artwork = Res.drawable.insight_prayer_background,
                     label = "Today's salah",
-                    title = "0 prayers complete",
-                    subtitle = day.nextPrayer?.let { "5 remain · $it is next" }.orEmpty(),
-                )
+                    title = salah.headline,
+                    subtitle = salah.detail,
+                ) {
+                    SalahMarkers(
+                        completed = salah.completed,
+                        onToggle = onTogglePrayer,
+                    )
+                }
 
                 else -> ArtworkTile(
                     artwork = Res.drawable.insight_quran_background,
@@ -148,6 +159,7 @@ private fun ArtworkTile(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    content: @Composable (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
@@ -192,6 +204,7 @@ private fun ArtworkTile(
                 .padding(16.dp),
             verticalArrangement = Arrangement.Bottom,
         ) {
+            content?.invoke()
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -203,6 +216,59 @@ private fun ArtworkTile(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One tappable marker per obligatory prayer, in order.
+ *
+ * Tapping toggles rather than only setting, so a mistake is undone the same way
+ * it was made — there is no other affordance on the tile to correct one.
+ */
+@Composable
+private fun SalahMarkers(
+    completed: Set<String>,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        FARD_PRAYERS.forEach { prayer ->
+            val isDone = prayer in completed
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isDone) Color.White else Color.White.copy(alpha = 0.15f),
+                        )
+                        .border(
+                            width = 1.5.dp,
+                            color = Color.White.copy(alpha = if (isDone) 1f else 0.6f),
+                            shape = CircleShape,
+                        )
+                        .clickable { onToggle(prayer) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = prayer.take(1),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        // Dark on the filled state, light on the empty one, so
+                        // the letter stays legible either way.
+                        color = if (isDone) Color(0xFF1B3A2A) else Color.White,
+                    )
+                }
+                Text(
+                    text = prayer,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.8f),
                 )
             }
         }
