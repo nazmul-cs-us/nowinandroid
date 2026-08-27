@@ -29,6 +29,11 @@ data class DeviceLocation(
     /** Hours from UTC, as the calculator expects — e.g. 4.0 for Gulf Standard Time. */
     val timeZoneOffset: Double,
     val placeName: String,
+    /**
+     * ISO 3166-1 alpha-2, used to pick the calculation method. Empty when reverse
+     * geocoding failed, in which case the caller falls back to a global default.
+     */
+    val countryCode: String = "",
 )
 
 /**

@@ -21,6 +21,8 @@ import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyPhase
 import com.starception.submission.core.images.prayerSkyWeather
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
+import com.starception.submission.prayer.model.ASR_SHADOW_STANDARD
+import com.starception.submission.prayer.model.CountryPrayerDefaults
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
 import com.starception.submission.prayer.model.PrayerWindows
@@ -82,8 +84,11 @@ object PrayerSchedule {
     /**
      * Computes a day's schedule and resolves its status against [now].
      *
-     * Angles default to the Muslim World League convention (Fajr 18°, Isha 17°).
-     * [asrShadowFactor] is 1 for Shafi/Maliki/Hanbali and 2 for Hanafi.
+     * [defaults] carries the country's calculation method, Asr shadow factor and
+     * any per-prayer offsets its authority publishes. Without it the Muslim World
+     * League convention is used, which is a reasonable global default but wrong
+     * for plenty of places — passing the real country is what makes the times
+     * correct rather than merely plausible.
      *
      * Any prayer the calculator cannot resolve — which happens at high latitudes
      * where the sun never reaches the required angle — is omitted rather than
@@ -97,9 +102,7 @@ object PrayerSchedule {
         latitude: Double,
         longitude: Double,
         timeZoneOffset: Double,
-        fajrAngle: Double = 18.0,
-        ishaAngle: Double = 17.0,
-        asrShadowFactor: Int = 1,
+        defaults: CountryPrayerDefaults? = null,
         nowHour: Int = -1,
         nowMinute: Int = -1,
         weatherCode: Int? = null,
@@ -112,15 +115,30 @@ object PrayerSchedule {
         )
         val julianDay = calculator.calculateJulianDay(LocalDate(year, month, day))
 
+        val method = defaults?.method
+        val fajrAngle = method?.fajrAngle ?: MWL_FAJR_ANGLE
+        val shadowFactor = defaults?.asrShadowFactor ?: ASR_SHADOW_STANDARD
+
         val computed = listOf(
             "Fajr" to calculator.calculateFajr(location, julianDay, fajrAngle),
             "Sunrise" to calculator.calculateSunrise(location, julianDay),
             "Dhuhr" to calculator.calculateSolarNoon(location, julianDay),
-            "Asr" to calculator.calculateAsr(location, julianDay, asrShadowFactor),
+            "Asr" to calculator.calculateAsr(location, julianDay, shadowFactor),
             "Maghrib" to calculator.calculateSunset(location, julianDay),
-            "Isha" to calculator.calculateIsha(location, julianDay, ishaAngle, null, 0),
+            // Isha is an angle for most methods and a delay after Maghrib for
+            // others, notably Umm al-Qura's 90 minutes. Passing an angle of 0.0
+            // for those would put Isha at sunset.
+            "Isha" to calculator.calculateIsha(
+                location,
+                julianDay,
+                defaults?.ishaAngle ?: if (defaults == null) MWL_ISHA_ANGLE else null,
+                defaults?.ishaDelay,
+                method?.maghribOffset ?: 0,
+            ),
         ).mapNotNull { (name, decimalHour) ->
-            calculator.decimalHourToLocalTime(decimalHour)?.let { PrayerInstant(name, it) }
+            calculator.decimalHourToLocalTime(decimalHour)?.let { instant ->
+                PrayerInstant(name, instant.plusMinutes(defaults.offsetFor(name)))
+            }
         }
 
         // Callers may pin the moment; otherwise use the device clock. Pinning is
@@ -169,3 +187,26 @@ object PrayerSchedule {
         )
     }
 }
+
+/** Muslim World League, used when the country is unknown. */
+private const val MWL_FAJR_ANGLE = 18.0
+private const val MWL_ISHA_ANGLE = 17.0
+
+/**
+ * The country's published adjustment for a prayer, in minutes.
+ *
+ * Keys in the source data are lowercase prayer names; the schedule uses
+ * capitalised ones.
+ */
+private fun CountryPrayerDefaults?.offsetFor(prayerName: String): Int =
+    this?.timeOffsets?.get(prayerName.lowercase()) ?: 0
+
+/** Adds minutes, wrapping past midnight. */
+private fun LocalTime.plusMinutes(minutes: Int): LocalTime =
+    if (minutes == 0) {
+        this
+    } else {
+        LocalTime.fromSecondOfDay(
+            (toSecondOfDay() + minutes * 60).mod(24 * 60 * 60),
+        )
+    }
