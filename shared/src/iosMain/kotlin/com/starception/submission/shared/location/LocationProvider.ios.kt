@@ -76,6 +76,7 @@ actual class LocationProvider actual constructor() {
             timeZoneOffset = place?.offsetHours
                 ?: (NSTimeZone.localTimeZone.secondsFromGMT / 3600.0),
             placeName = place?.name.orEmpty(),
+            countryCode = place?.countryCode.orEmpty(),
         )
     }
 
@@ -126,7 +127,7 @@ actual class LocationProvider actual constructor() {
             continuation.invokeOnCancellation { manager.stopUpdatingLocation() }
         }
 
-    private class Place(val name: String, val offsetHours: Double?)
+    private class Place(val name: String, val offsetHours: Double?, val countryCode: String)
 
     /**
      * Reverse geocodes for the place name *and* its timezone.
@@ -150,7 +151,9 @@ actual class LocationProvider actual constructor() {
                 // Seconds, and not every offset is a whole hour: India is +5.5,
                 // Nepal +5.75. secondsFromGMT already accounts for daylight saving.
                 val offset = placemark?.timeZone?.secondsFromGMT?.let { it / 3600.0 }
-                continuation.resume(Place(name, offset))
+                continuation.resume(
+                    Place(name, offset, placemark?.ISOcountryCode.orEmpty()),
+                )
             }
         }
 }

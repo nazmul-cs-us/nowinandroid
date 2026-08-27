@@ -27,6 +27,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.sharedTypography
+import com.starception.submission.prayer.model.prayerDefaultsFor
 import com.starception.submission.shared.PrayerSchedule
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
@@ -83,9 +84,9 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         latitude = place.latitude,
         longitude = place.longitude,
         timeZoneOffset = place.timeZoneOffset,
-        fajrAngle = UAE_FAJR_ANGLE,
-        ishaAngle = UAE_ISHA_ANGLE,
-        asrShadowFactor = STANDARD_ASR_SHADOW,
+        // The country's own method, so Fajr and Isha use the angles its
+        // authority publishes rather than one country's convention everywhere.
+        defaults = prayerDefaultsFor(place.countryCode),
         // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
         weatherCode = weatherCode,
     )
@@ -117,11 +118,5 @@ private val FALLBACK_LOCATION = DeviceLocation(
     longitude = 55.1677409,
     timeZoneOffset = 4.0,
     placeName = "Nad Al Hamar, Dubai",
+    countryCode = "AE",
 )
-
-/** UAE_IACAD: 18.2° for both Fajr and Isha. */
-private const val UAE_FAJR_ANGLE = 18.2
-private const val UAE_ISHA_ANGLE = 18.2
-
-/** 1 for Shafi'i/Maliki/Hanbali; Hanafi would be 2. */
-private const val STANDARD_ASR_SHADOW = 1
