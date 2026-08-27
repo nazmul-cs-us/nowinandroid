@@ -17,6 +17,8 @@
 package com.starception.submission.core.logging
 
 import platform.Foundation.NSLog
+import platform.Foundation.NSString
+import platform.Foundation.create
 
 /**
  * `NSLog` is the closest analogue to logcat: it reaches both the Xcode console
@@ -27,7 +29,16 @@ import platform.Foundation.NSLog
 actual object SharedLog {
     private fun log(level: String, tag: String, message: String, throwable: Throwable? = null) {
         val suffix = throwable?.let { "\n$it\n${it.stackTraceToString()}" } ?: ""
-        NSLog("%s", "$level/$tag: $message$suffix")
+        // "%@" with an explicit NSString, not "%s" and not a bare Kotlin String.
+        //
+        // %s takes a C string and renders multi-byte UTF-8 as Latin-1, so the
+        // calculator's emoji arrived as "üïê" and Arabic would fare no better.
+        //
+        // Passing a Kotlin String to %@ is worse than wrong: Kotlin/Native does
+        // not bridge it to NSString through varargs, so CoreFoundation calls
+        // -description on the raw string bytes and the process segfaults on
+        // launch. The faulting address reads back as ASCII, which is the clue.
+        NSLog("%@", NSString.create(string = "$level/$tag: $message$suffix"))
     }
 
     actual fun v(tag: String, message: String) = log("V", tag, message)
