@@ -56,7 +56,6 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     // NSUserDefaults, so the marks survive relaunch.
     val tracker = remember { SalahTracker() }
     val settingsStore = remember { UserPrayerSettings() }
-    var showSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         location = LocationProvider().current()
@@ -101,35 +100,38 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
         typography = sharedTypography(),
     ) {
-        PrayerTimesScreen(
-            placeName = place.placeName.ifEmpty { "Locating…" },
-            day = day,
-            salah = SalahProgress.from(completed),
-            onTogglePrayer = { completed = tracker.toggle(today, it) },
-            offsets = prayerSettings.timeOffsets,
-            onAdjustPrayer = { prayer, delta ->
-                prayerSettings = settingsStore.adjust(country, prayer, delta)
+        SharedNavHost(
+            home = { onOpenSettings ->
+                PrayerTimesScreen(
+                    placeName = place.placeName.ifEmpty { "Locating…" },
+                    day = day,
+                    salah = SalahProgress.from(completed),
+                    onTogglePrayer = { completed = tracker.toggle(today, it) },
+                    offsets = prayerSettings.timeOffsets,
+                    onAdjustPrayer = { prayer, delta ->
+                        prayerSettings = settingsStore.adjust(country, prayer, delta)
+                    },
+                    onOpenSettings = onOpenSettings,
+                    today = today,
+                    isLocating = !resolved,
+                )
             },
-            onOpenSettings = { showSettings = true },
-            today = today,
-            isLocating = !resolved,
+            settings = { onBack ->
+                PrayerSettingsScreen(
+                    settings = prayerSettings,
+                    countryName = country?.countryName,
+                    onSettingsChange = { updated ->
+                        prayerSettings = updated
+                        settingsStore.save(updated)
+                    },
+                    onRestore = {
+                        settingsStore.restoreDefaults()
+                        prayerSettings = settingsStore.settings(country)
+                    },
+                    onBack = onBack,
+                )
+            },
         )
-
-        if (showSettings) {
-            PrayerSettingsSheet(
-                settings = prayerSettings,
-                countryName = country?.countryName,
-                onSettingsChange = {
-                    prayerSettings = it
-                    settingsStore.save(it)
-                },
-                onRestore = {
-                    settingsStore.restoreDefaults()
-                    prayerSettings = settingsStore.settings(country)
-                },
-                onDismiss = { showSettings = false },
-            )
-        }
     }
 }
 

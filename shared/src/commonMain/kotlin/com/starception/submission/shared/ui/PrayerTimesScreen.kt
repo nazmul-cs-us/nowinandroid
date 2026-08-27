@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.prayer.model.PrayerTimeOffsets
+import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
@@ -97,9 +98,14 @@ fun PrayerTimesScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                AdjustButton(symbol = "\u2699", tint = MaterialTheme.colorScheme.onBackground) {
-                    onOpenSettings()
-                }
+                // An icon, not a "\u2699" glyph: Ubuntu Sans has no gear, so the
+                // character rendered as a missing-glyph box.
+                IconTapTarget(
+                    icon = NiaIcons.Settings,
+                    contentDescription = "Prayer settings",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    onClick = onOpenSettings,
+                )
             }
             Text(
                 // Marked while the fix is pending, because the times on screen
@@ -217,7 +223,32 @@ private fun PrayerCard(
  * ported: they reach the same stored value, one minute at a time.
  */
 @Composable
-private fun AdjustButton(
+internal fun IconTapTarget(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.08f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+internal fun AdjustButton(
     symbol: String,
     tint: Color,
     modifier: Modifier = Modifier,
