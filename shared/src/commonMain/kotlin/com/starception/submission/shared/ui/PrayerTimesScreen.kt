@@ -58,6 +58,7 @@ fun PrayerTimesScreen(
     placeName: String,
     day: SharedPrayerDay,
     modifier: Modifier = Modifier,
+    isLocating: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -76,7 +77,10 @@ fun PrayerTimesScreen(
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = placeName,
+                // Marked while the fix is pending, because the times on screen
+                // are for the fallback location and silently showing them as if
+                // they were the user's would be the worst of the options.
+                text = if (isLocating) "$placeName · locating…" else placeName,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

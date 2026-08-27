@@ -18,11 +18,21 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ComposeUIViewController
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
 import com.starception.submission.core.designsystem.theme.sharedTypography
 import com.starception.submission.shared.PrayerSchedule
+import com.starception.submission.shared.location.DeviceLocation
+import com.starception.submission.shared.location.LocationProvider
+import kotlin.time.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import platform.UIKit.UIViewController
 
 /**
@@ -30,45 +40,64 @@ import platform.UIKit.UIViewController
  *
  * This is the whole iOS UI boundary: Swift owns the app lifecycle and hands the
  * screen to Compose. Everything below this line is shared with Android.
- *
- * Parameters are primitives rather than Kotlin types so the Swift call site stays
- * free of Kotlin date and settings classes.
  */
-@Suppress("FunctionName", "LongParameterList")
-fun PrayerTimesViewController(
-    year: Int,
-    month: Int,
-    day: Int,
-    latitude: Double,
-    longitude: Double,
-    timeZoneOffset: Double,
-    placeName: String,
-    fajrAngle: Double,
-    ishaAngle: Double,
-    asrShadowFactor: Int,
-): UIViewController = ComposeUIViewController {
+@Suppress("FunctionName")
+fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
+    var location by remember { mutableStateOf<DeviceLocation?>(null) }
+    var resolved by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        location = LocationProvider().current()
+        // Tracked separately from `location` being null, which is also what a
+        // denied permission looks like — without this the UI cannot tell
+        // "still asking" from "asked and refused".
+        resolved = true
+    }
+
+    val place = location ?: FALLBACK_LOCATION
+    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
     val day = PrayerSchedule.forDate(
-        year = year,
-        month = month,
-        day = day,
-        latitude = latitude,
-        longitude = longitude,
-        timeZoneOffset = timeZoneOffset,
-        fajrAngle = fajrAngle,
-        ishaAngle = ishaAngle,
-        asrShadowFactor = asrShadowFactor,
+        year = today.year,
+        month = today.monthNumber,
+        day = today.dayOfMonth,
+        latitude = place.latitude,
+        longitude = place.longitude,
+        timeZoneOffset = place.timeZoneOffset,
+        fajrAngle = UAE_FAJR_ANGLE,
+        ishaAngle = UAE_ISHA_ANGLE,
+        asrShadowFactor = STANDARD_ASR_SHADOW,
     )
 
-    // The app's real Coastal palette from :core:theme, not stock Material. These
-    // are the same scheme objects NiaTheme uses on Android, so the two platforms
-    // cannot drift apart on colour.
-    //
-    // Dynamic colour is deliberately absent: it is Material You, an Android-only
-    // feature with no iOS equivalent, and it stays behind in core:designsystem.
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
         typography = sharedTypography(),
     ) {
-        PrayerTimesScreen(placeName = placeName, day = day)
+        PrayerTimesScreen(
+            placeName = place.placeName.ifEmpty { "Locating…" },
+            day = day,
+            isLocating = !resolved,
+        )
     }
 }
+
+/**
+ * Used until Core Location answers, and if it never does.
+ *
+ * Prayer times are wrong for the wrong place, so this is a stopgap, not a
+ * default worth keeping: the settings slice brings the user's chosen location
+ * across and this goes away.
+ */
+private val FALLBACK_LOCATION = DeviceLocation(
+    latitude = 25.1030198,
+    longitude = 55.1677409,
+    timeZoneOffset = 4.0,
+    placeName = "Nad Al Hamar, Dubai",
+)
+
+/** UAE_IACAD: 18.2° for both Fajr and Isha. */
+private const val UAE_FAJR_ANGLE = 18.2
+private const val UAE_ISHA_ANGLE = 18.2
+
+/** 1 for Shafi'i/Maliki/Hanbali; Hanafi would be 2. */
+private const val STANDARD_ASR_SHADOW = 1

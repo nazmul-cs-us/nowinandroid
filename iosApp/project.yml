@@ -34,6 +34,11 @@ targets:
         # aborts the process. It lifts the 60 Hz cap so Compose can drive
         # ProMotion displays at their full refresh rate.
         CADisableMinimumFrameDurationOnPhone: true
+        # Core Location refuses to prompt without this string, and the refusal is
+        # silent — no fix ever arrives and the app just shows the fallback city.
+        NSLocationWhenInUseUsageDescription: >-
+          Prayer times depend on where you are. Your location is used on device to
+          calculate them and is never sent anywhere.
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
