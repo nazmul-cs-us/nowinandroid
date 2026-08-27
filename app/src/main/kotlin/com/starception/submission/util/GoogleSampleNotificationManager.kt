@@ -16,6 +16,8 @@
 
 package com.starception.submission.util
 
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.NotificationManager.IMPORTANCE_DEFAULT
@@ -35,7 +37,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.starception.submission.MainActivity
 import com.starception.submission.R
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationTrackerIcon
 import com.starception.submission.prayer.model.PrayerNotificationPreferences

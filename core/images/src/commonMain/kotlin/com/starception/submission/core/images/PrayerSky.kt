@@ -188,3 +188,23 @@ fun prayerSkyResource(
         PrayerSkyPhase.Isha to PrayerSkyWeather.Thunderstorm -> Res.drawable.prayer_sky_isha_thunderstorm
         else -> Res.drawable.prayer_sky_dhuhr_clear
 }
+
+/**
+ * A short human label for a WMO code, e.g. "Clear sky".
+ *
+ * Lives beside the artwork mapping because both describe the same forecast: if
+ * the label and the sky disagreed, one of them would be lying to the user.
+ */
+fun weatherConditionLabel(weatherCode: Int?): String = when (weatherCode) {
+    null -> ""
+    0 -> "Clear sky"
+    1 -> "Mainly clear"
+    2 -> "Partly cloudy"
+    3 -> "Overcast"
+    45, 48 -> "Fog"
+    in 51..57 -> "Drizzle"
+    in 61..67, in 80..82 -> "Rain"
+    in 71..77, 85, 86 -> "Snow"
+    in 95..99 -> "Thunderstorm"
+    else -> "Clear sky"
+}

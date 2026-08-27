@@ -36,6 +36,7 @@ import com.starception.submission.shared.salah.SalahTracker
 import com.starception.submission.shared.settings.UserPrayerSettings
 import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.UIKit.UIViewController
@@ -51,6 +52,7 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     var location by remember { mutableStateOf<DeviceLocation?>(null) }
     var resolved by remember { mutableStateOf(false) }
     var weatherCode by remember { mutableStateOf<Int?>(null) }
+    var temperature by remember { mutableStateOf<Double?>(null) }
 
     // One tracker for the life of the screen; it reads and writes through
     // NSUserDefaults, so the marks survive relaunch.
@@ -69,9 +71,9 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     // than being fetched once for wherever they happened to start.
     LaunchedEffect(location?.latitude, location?.longitude) {
         val place = location ?: return@LaunchedEffect
-        weatherCode = CurrentConditionsClient
-            .fetch(place.latitude, place.longitude)
-            ?.weatherCode
+        val conditions = CurrentConditionsClient.fetch(place.latitude, place.longitude)
+        weatherCode = conditions?.weatherCode
+        temperature = conditions?.temperatureCelsius
     }
 
     val place = location ?: FALLBACK_LOCATION
@@ -94,6 +96,9 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         settings = prayerSettings,
         // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
         weatherCode = weatherCode,
+        temperatureCelsius = temperature,
+        countryCode = place.countryCode,
+        isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
     )
 
     MaterialTheme(

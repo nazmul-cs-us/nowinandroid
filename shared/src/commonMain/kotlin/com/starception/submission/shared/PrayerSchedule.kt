@@ -20,11 +20,13 @@ import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyPhase
 import com.starception.submission.core.images.prayerSkyWeather
+import com.starception.submission.core.images.weatherConditionLabel
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
 import com.starception.submission.prayer.model.CountryPrayerDefaults
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
 import com.starception.submission.prayer.model.PrayerSettings
+import com.starception.submission.prayer.model.getPrayerNameInLocalLanguage
 import com.starception.submission.prayer.model.PrayerWindows
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDate
@@ -41,6 +43,8 @@ import kotlinx.datetime.toLocalDateTime
  */
 data class SharedPrayerSlot(
     val name: String,
+    /** The prayer's name in the local language, e.g. ٱلْعَصْر in the Gulf. */
+    val localName: String = "",
     val hour: Int,
     val minute: Int,
     val isCurrent: Boolean = false,
@@ -64,6 +68,10 @@ data class SharedPrayerDay(
     val skyPhase: PrayerSkyPhase,
     /** Which sky artwork suits the forecast. */
     val skyWeather: PrayerSkyWeather,
+    /** Present temperature in Celsius, when the forecast has arrived. */
+    val temperatureCelsius: Double? = null,
+    /** A short description of the sky, e.g. "Clear sky". */
+    val conditionLabel: String = "",
 )
 
 /**
@@ -104,9 +112,12 @@ object PrayerSchedule {
         timeZoneOffset: Double,
         defaults: CountryPrayerDefaults? = null,
         settings: PrayerSettings = PrayerSettings(),
+        countryCode: String? = null,
+        isFriday: Boolean = false,
         nowHour: Int = -1,
         nowMinute: Int = -1,
         weatherCode: Int? = null,
+        temperatureCelsius: Double? = null,
     ): SharedPrayerDay {
         val calculator = AstronomicalCalculator()
         val location = Location(
@@ -173,6 +184,11 @@ object PrayerSchedule {
             val status = annotated[instant.name]
             SharedPrayerSlot(
                 name = instant.name,
+                localName = getPrayerNameInLocalLanguage(
+                    englishName = instant.name,
+                    countryCode = countryCode,
+                    isFriday = isFriday,
+                ),
                 hour = instant.time.hour,
                 minute = instant.time.minute,
                 isCurrent = status?.isCurrent == true,
@@ -200,6 +216,8 @@ object PrayerSchedule {
                 ishaMinute = minuteOf("Isha") ?: 1_200,
             ),
             skyWeather = prayerSkyWeather(weatherCode),
+            temperatureCelsius = temperatureCelsius,
+            conditionLabel = weatherConditionLabel(weatherCode),
         )
     }
 }

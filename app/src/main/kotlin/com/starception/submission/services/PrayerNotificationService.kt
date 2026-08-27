@@ -1,5 +1,7 @@
 package com.starception.submission.services
 
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -44,7 +46,6 @@ import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.Duration
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import javax.inject.Inject

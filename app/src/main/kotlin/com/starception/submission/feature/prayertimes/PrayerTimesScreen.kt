@@ -27,6 +27,8 @@
  */
 package com.starception.submission.feature.prayertimes
 
+import kotlinx.datetime.LocalDate as KotlinLocalDate
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -208,7 +210,6 @@ import com.starception.submission.feature.prayertimes.SwipeableBigTiles
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
 import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
-import com.starception.submission.feature.prayertimes.getPrayerNameInLocalLanguage
 import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.prayer.service.CountryCodeMapper
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView

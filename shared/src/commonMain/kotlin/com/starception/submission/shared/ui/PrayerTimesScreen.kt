@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.prayer.model.PrayerTimeOffsets
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.LocationOn
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
@@ -81,6 +84,7 @@ fun PrayerTimesScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,14 +144,43 @@ fun PrayerTimesScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                items(day.slots) { slot ->
-                    PrayerCard(
-                        slot = slot,
-                        offsetMinutes = offsets.getOffset(slot.name),
-                        onAdjust = { delta -> onAdjustPrayer(slot.name, delta) },
+                // Two to a row, as on Android: the schedule is glanceable rather
+                // than a list to read down.
+                items(day.slots.chunked(2)) { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pair.forEach { slot ->
+                            PrayerCard(
+                                slot = slot,
+                                offsetMinutes = offsets.getOffset(slot.name),
+                                onAdjust = { delta -> onAdjustPrayer(slot.name, delta) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // Keeps the last tile half-width when the count is odd,
+                        // instead of stretching it across the row.
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+
+                item {
+                    LocationWeatherRow(
+                        placeName = placeName,
+                        temperatureCelsius = day.temperatureCelsius,
+                        conditionLabel = day.conditionLabel,
                     )
+                    // The pill floats above the list, so the last row needs
+                    // clearance or it sits under it.
+                    Spacer(Modifier.height(96.dp))
                 }
             }
+        }
+
+        FloatingBottomBar(
+            items = SharedBottomBarItems,
+            selectedIndex = 0,
+            onSelect = { },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
         }
     }
 }
@@ -182,34 +215,45 @@ private fun PrayerCard(
                 .background(container)
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = slot.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = FontWeight.Bold,
                     color = content,
                 )
-                val label = formatOffset(offsetMinutes)
-                if (label.isNotEmpty()) {
+                if (slot.localName.isNotEmpty()) {
                     Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
+                        text = slot.localName,
+                        style = MaterialTheme.typography.bodySmall,
                         color = content.copy(alpha = 0.7f),
                     )
                 }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = slot.display,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = content,
+                    )
+                    val label = formatOffset(offsetMinutes)
+                    if (label.isNotEmpty()) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = content.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AdjustButton(symbol = "\u2212", tint = content) { onAdjust(-1) }
-                Text(
-                    text = slot.display,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = content,
-                    modifier = Modifier.padding(horizontal = 10.dp),
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 AdjustButton(symbol = "+", tint = content) { onAdjust(1) }
+                Spacer(Modifier.height(4.dp))
+                AdjustButton(symbol = "\u2212", tint = content) { onAdjust(-1) }
             }
         }
     }
@@ -267,5 +311,68 @@ internal fun AdjustButton(
             style = MaterialTheme.typography.titleMedium,
             color = tint,
         )
+    }
+}
+
+/**
+ * Where the times are for, and what the sky is doing there.
+ *
+ * Sits below the schedule as on Android: it answers "where is this?", which only
+ * matters once the times themselves have been read.
+ */
+@Composable
+private fun LocationWeatherRow(
+    placeName: String,
+    temperatureCelsius: Double?,
+    conditionLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(top = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = placeName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            // Only shown once the forecast has arrived; an empty slot reads
+            // better than a placeholder temperature that might be wrong.
+            if (temperatureCelsius != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${temperatureCelsius.toInt()}\u00B0C",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (conditionLabel.isNotEmpty()) {
+                        Text(
+                            text = conditionLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ package com.starception.submission.feature.prayertimes.components
 
 import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.isJumuahDay
+
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
