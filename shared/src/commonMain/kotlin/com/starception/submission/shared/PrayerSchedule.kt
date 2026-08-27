@@ -25,6 +25,7 @@ import com.starception.submission.prayer.model.ASR_SHADOW_STANDARD
 import com.starception.submission.prayer.model.CountryPrayerDefaults
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
+import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.PrayerWindows
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDate
@@ -103,6 +104,7 @@ object PrayerSchedule {
         longitude: Double,
         timeZoneOffset: Double,
         defaults: CountryPrayerDefaults? = null,
+        userOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
         nowHour: Int = -1,
         nowMinute: Int = -1,
         weatherCode: Int? = null,
@@ -137,7 +139,15 @@ object PrayerSchedule {
             ),
         ).mapNotNull { (name, decimalHour) ->
             calculator.decimalHourToLocalTime(decimalHour)?.let { instant ->
-                PrayerInstant(name, instant.plusMinutes(defaults.offsetFor(name)))
+                // The country's published adjustment and the user's own both
+                // apply: the first is what the local authority announces, the
+                // second is the user reconciling it with their mosque.
+                PrayerInstant(
+                    name,
+                    instant.plusMinutes(
+                        defaults.offsetFor(name) + userOffsets.getOffset(name),
+                    ),
+                )
             }
         }
 

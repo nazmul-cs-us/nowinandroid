@@ -17,6 +17,11 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,10 +42,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
+import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
 import com.starception.submission.shared.SharedPrayerSlot
 
@@ -62,6 +70,8 @@ fun PrayerTimesScreen(
     salah: SalahProgress,
     onTogglePrayer: (String) -> Unit,
     today: LocalDate,
+    offsets: PrayerTimeOffsets,
+    onAdjustPrayer: (prayer: String, delta: Int) -> Unit,
     modifier: Modifier = Modifier,
     isLocating: Boolean = false,
 ) {
@@ -115,7 +125,11 @@ fun PrayerTimesScreen(
                     )
                 }
                 items(day.slots) { slot ->
-                    PrayerCard(slot = slot)
+                    PrayerCard(
+                        slot = slot,
+                        offsetMinutes = offsets.getOffset(slot.name),
+                        onAdjust = { delta -> onAdjustPrayer(slot.name, delta) },
+                    )
                 }
             }
         }
@@ -125,6 +139,8 @@ fun PrayerTimesScreen(
 @Composable
 private fun PrayerCard(
     slot: SharedPrayerSlot,
+    offsetMinutes: Int,
+    onAdjust: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isCurrent = slot.isCurrent
@@ -152,18 +168,63 @@ private fun PrayerCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = slot.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                color = content,
-            )
-            Text(
-                text = slot.display,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                color = content,
-            )
+            Column {
+                Text(
+                    text = slot.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                    color = content,
+                )
+                val label = formatOffset(offsetMinutes)
+                if (label.isNotEmpty()) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = content.copy(alpha = 0.7f),
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AdjustButton(symbol = "\u2212", tint = content) { onAdjust(-1) }
+                Text(
+                    text = slot.display,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = content,
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                )
+                AdjustButton(symbol = "+", tint = content) { onAdjust(1) }
+            }
         }
+    }
+}
+
+/**
+ * A minus/plus control for nudging a prayer by a minute.
+ *
+ * The Android app does this with a long-press circular dial, which is a better
+ * fit for a large adjustment. Steppers are the honest stand-in until that dial is
+ * ported: they reach the same stored value, one minute at a time.
+ */
+@Composable
+private fun AdjustButton(
+    symbol: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.10f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = symbol,
+            style = MaterialTheme.typography.titleMedium,
+            color = tint,
+        )
     }
 }
