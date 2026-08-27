@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.SharedPrayerSlot
 
 /**
@@ -55,9 +56,8 @@ import com.starception.submission.shared.SharedPrayerSlot
 @Composable
 fun PrayerTimesScreen(
     placeName: String,
-    slots: List<SharedPrayerSlot>,
+    day: SharedPrayerDay,
     modifier: Modifier = Modifier,
-    currentPrayerName: String? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -83,10 +83,57 @@ fun PrayerTimesScreen(
 
             Spacer(Modifier.height(16.dp))
 
+            if (day.nextPrayer != null) {
+                NextPrayerBanner(name = day.nextPrayer, countdown = day.countdown)
+                Spacer(Modifier.height(16.dp))
+            }
+
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(slots) { slot ->
-                    PrayerCard(slot = slot, isCurrent = slot.name == currentPrayerName)
+                items(day.slots) { slot ->
+                    PrayerCard(slot = slot)
                 }
+            }
+        }
+    }
+}
+
+/** Headline for the prayer coming up, with time remaining. */
+@Composable
+private fun NextPrayerBanner(
+    name: String,
+    countdown: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                text = "Next prayer",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = countdown,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
         }
     }
@@ -95,9 +142,9 @@ fun PrayerTimesScreen(
 @Composable
 private fun PrayerCard(
     slot: SharedPrayerSlot,
-    isCurrent: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val isCurrent = slot.isCurrent
     val container = if (isCurrent) {
         MaterialTheme.colorScheme.primaryContainer
     } else {

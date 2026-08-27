@@ -47,7 +47,7 @@ fun PrayerTimesViewController(
     ishaAngle: Double,
     asrShadowFactor: Int,
 ): UIViewController = ComposeUIViewController {
-    val slots = PrayerSchedule.forDate(
+    val day = PrayerSchedule.forDate(
         year = year,
         month = month,
         day = day,
@@ -69,6 +69,6 @@ fun PrayerTimesViewController(
         colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
         typography = sharedTypography(),
     ) {
-        PrayerTimesScreen(placeName = placeName, slots = slots)
+        PrayerTimesScreen(placeName = placeName, day = day)
     }
 }
