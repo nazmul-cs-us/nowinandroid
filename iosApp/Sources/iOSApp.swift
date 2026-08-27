@@ -5,8 +5,7 @@ import SwiftUI
 ///
 /// Deliberately thin. This is a host for shared Kotlin, not a place for logic —
 /// anything that decides behaviour belongs in `shared/` where both platforms get
-/// it. Today it renders the prayer schedule computed by the shared astronomical
-/// engine; in the next slice it hosts the Compose root instead.
+/// it. The screen itself is Compose, written once in `shared/commonMain`.
 @main
 struct iOSApp: App {
     init() {
@@ -17,7 +16,8 @@ struct iOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            PrayerTimesView()
+            ComposePrayerTimesView()
+                .ignoresSafeArea()
         }
     }
 }

@@ -16,6 +16,10 @@
 
 plugins {
     alias(libs.plugins.nowinandroid.kmp.library)
+    // Compose Multiplatform, for the UI shared with iOS. Contained to this module:
+    // nothing on the Android build path depends on :shared.
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose)
 }
 
 kotlin {
@@ -45,6 +49,12 @@ kotlin {
             api(projects.core.prayerEngine)
             api(libs.kotlinx.datetime)
             implementation(libs.kotlinx.coroutines.core)
+
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
