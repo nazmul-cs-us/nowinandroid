@@ -1,5 +1,7 @@
 package com.starception.submission.prayer.worker
 
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -16,7 +18,6 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import com.starception.submission.R
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
 import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.prayer.model.DayPrayerTimes

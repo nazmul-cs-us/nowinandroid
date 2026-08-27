@@ -1,5 +1,7 @@
 package com.starception.submission.islamic.shared.util
 
+import com.starception.submission.feature.prayertimes.isJumuahDay
+
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

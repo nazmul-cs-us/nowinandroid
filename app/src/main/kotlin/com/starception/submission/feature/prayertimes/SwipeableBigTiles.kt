@@ -27,6 +27,7 @@
  */
 package com.starception.submission.feature.prayertimes
 
+
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent

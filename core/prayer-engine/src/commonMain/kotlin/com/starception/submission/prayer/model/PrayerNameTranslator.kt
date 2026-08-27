@@ -1,7 +1,10 @@
-package com.starception.submission.feature.prayertimes
+package com.starception.submission.prayer.model
 
-import java.time.DayOfWeek
-import java.time.LocalDate
+// No date type here on purpose. Naming is the shared concern; deciding whether
+// today is Friday is the caller's, and each platform already has a calendar it
+// trusts. An earlier version took kotlinx's LocalDate and the change rippled
+// into the notification receivers, workers and service — six call sites deep in
+// code that schedules alarms — for no benefit to either platform.
 
 /**
  * Friday is Jumu'ah day: the midday (Dhuhr) prayer is the congregational Jumu'ah
@@ -9,11 +12,12 @@ import java.time.LocalDate
  * underlying "Dhuhr" key is still used everywhere for time lookup, offsets,
  * notifications and tracking.
  */
-fun isJumuahDay(date: LocalDate = LocalDate.now()): Boolean = date.dayOfWeek == DayOfWeek.FRIDAY
+fun isJumuah(englishName: String, isFriday: Boolean): Boolean =
+    englishName == "Dhuhr" && isFriday
 
 /** User-facing English prayer label, substituting "Jumu'ah" for Dhuhr on Fridays. */
-fun getPrayerDisplayName(englishName: String, date: LocalDate = LocalDate.now()): String =
-    if (englishName == "Dhuhr" && isJumuahDay(date)) "Jumu'ah" else englishName
+fun getPrayerDisplayName(englishName: String, isFriday: Boolean): String =
+    if (isJumuah(englishName, isFriday)) "Jumu'ah" else englishName
 
 /** Local-language Jumu'ah name, mirroring the language buckets in [getPrayerNameInLocalLanguage]. */
 private fun getJumuahNameInLocalLanguage(countryCode: String?): String = when (countryCode?.uppercase()) {
@@ -53,9 +57,9 @@ private fun getJumuahNameInLocalLanguage(countryCode: String?): String = when (c
 fun getPrayerNameInLocalLanguage(
     englishName: String,
     countryCode: String?,
-    date: LocalDate = LocalDate.now(),
+    isFriday: Boolean = false,
 ): String {
-    if (englishName == "Dhuhr" && isJumuahDay(date)) {
+    if (isJumuah(englishName, isFriday)) {
         return getJumuahNameInLocalLanguage(countryCode)
     }
     return when (countryCode?.uppercase()) {
