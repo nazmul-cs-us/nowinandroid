@@ -173,6 +173,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
 import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
+import com.starception.submission.core.images.prayerSkyPhase
 import com.starception.submission.core.images.prayerSkyResource
 import com.starception.submission.core.images.prayerSkyWeather
 // The prayer sky artwork moved to :core:images so iOS renders the same skies.
@@ -1179,32 +1180,24 @@ private data class PrayerSkyKeyframe(
     val palette: PrayerSkyPalette,
 )
 
-/** Resolves the current visual phase around the calculated local prayer boundaries. */
+/**
+ * Resolves the current visual phase around the calculated local prayer boundaries.
+ *
+ * The phase rules themselves live in :core:images alongside the artwork they
+ * select, so iOS paints the same sky. This only converts java.time values into
+ * the minute-of-day integers that function takes.
+ */
 private fun prayerSkyPhase(
     currentTime: LocalTime,
     prayerTimes: DayPrayerTimes?,
-): PrayerSkyPhase {
-    val now = currentTime.toSecondOfDay() / 60
-    val fajr = prayerTimes?.fajr?.let { it.toSecondOfDay() / 60 } ?: 300
-    val sunrise = prayerTimes?.sunrise?.let { it.toSecondOfDay() / 60 } ?: 390
-    val asr = prayerTimes?.asr?.let { it.toSecondOfDay() / 60 } ?: 930
-    val maghrib = prayerTimes?.maghrib?.let { it.toSecondOfDay() / 60 } ?: 1_080
-    val isha = prayerTimes?.isha?.let { it.toSecondOfDay() / 60 } ?: 1_200
-
-    val fajrApproach = (fajr - 45).coerceAtLeast(0)
-    val sunriseEnd = (sunrise + 75).coerceAtMost(1_439)
-    val maghribApproach = (maghrib - 45).coerceAtLeast(asr)
-
-    return when {
-        now < fajrApproach -> PrayerSkyPhase.Isha
-        now < sunrise -> PrayerSkyPhase.Fajr
-        now < sunriseEnd -> PrayerSkyPhase.Sunrise
-        now < asr -> PrayerSkyPhase.Dhuhr
-        now < maghribApproach -> PrayerSkyPhase.Asr
-        now < isha -> PrayerSkyPhase.Maghrib
-        else -> PrayerSkyPhase.Isha
-    }
-}
+): PrayerSkyPhase = prayerSkyPhase(
+    nowMinute = currentTime.toSecondOfDay() / 60,
+    fajrMinute = prayerTimes?.fajr?.let { it.toSecondOfDay() / 60 } ?: 300,
+    sunriseMinute = prayerTimes?.sunrise?.let { it.toSecondOfDay() / 60 } ?: 390,
+    asrMinute = prayerTimes?.asr?.let { it.toSecondOfDay() / 60 } ?: 930,
+    maghribMinute = prayerTimes?.maghrib?.let { it.toSecondOfDay() / 60 } ?: 1_080,
+    ishaMinute = prayerTimes?.isha?.let { it.toSecondOfDay() / 60 } ?: 1_200,
+)
 
 
 /**

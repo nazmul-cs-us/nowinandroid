@@ -83,6 +83,41 @@ enum class PrayerSkyWeather {
 }
 
 /**
+ * Which sky phase to paint, from minutes since midnight.
+ *
+ * Takes plain minute-of-day integers rather than a date type so it needs no
+ * datetime dependency and both platforms can call it directly — Android already
+ * had these values as minutes.
+ *
+ * The phases do not line up exactly with the prayers: the sky is already Fajr's
+ * 45 minutes before Fajr, stays sunrise-lit for 75 minutes after sunrise, and
+ * turns toward Maghrib 45 minutes early. That lead-in is what makes the artwork
+ * track the sky rather than the schedule.
+ */
+fun prayerSkyPhase(
+    nowMinute: Int,
+    fajrMinute: Int = 300,
+    sunriseMinute: Int = 390,
+    asrMinute: Int = 930,
+    maghribMinute: Int = 1_080,
+    ishaMinute: Int = 1_200,
+): PrayerSkyPhase {
+    val fajrApproach = (fajrMinute - 45).coerceAtLeast(0)
+    val sunriseEnd = (sunriseMinute + 75).coerceAtMost(1_439)
+    val maghribApproach = (maghribMinute - 45).coerceAtLeast(asrMinute)
+
+    return when {
+        nowMinute < fajrApproach -> PrayerSkyPhase.Isha
+        nowMinute < sunriseMinute -> PrayerSkyPhase.Fajr
+        nowMinute < sunriseEnd -> PrayerSkyPhase.Sunrise
+        nowMinute < asrMinute -> PrayerSkyPhase.Dhuhr
+        nowMinute < maghribApproach -> PrayerSkyPhase.Asr
+        nowMinute < ishaMinute -> PrayerSkyPhase.Maghrib
+        else -> PrayerSkyPhase.Isha
+    }
+}
+
+/**
  * Groups Open-Meteo WMO codes into the seven sky families.
  *
  * Shared because the grouping decides which artwork shows: if the platforms
