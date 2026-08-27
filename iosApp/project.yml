@@ -1,0 +1,68 @@
+# Xcode project definition, generated with XcodeGen (`xcodegen generate`).
+#
+# The .xcodeproj is generated rather than committed. A pbxproj is a large
+# machine-written file that conflicts badly, and this repo already has two agents
+# editing concurrently — a 30-line spec is reviewable, a pbxproj is not.
+#
+# Regenerate after changing this file:
+#   cd iosApp && xcodegen generate
+name: iosApp
+options:
+  bundleIdPrefix: com.starception
+  createIntermediateGroups: true
+  deploymentTarget:
+    # iOS 16.0. Compose Multiplatform itself supports 14+, but the product needs
+    # ActivityKit for the prayer Live Update (16.1) and WidgetKit's modern
+    # families. Holding at 16.0 keeps the floor honest until the Live Update
+    # slice actually lands, at which point this becomes 16.1.
+    iOS: "16.0"
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Starception
+        CFBundleShortVersionString: "0.1.2"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission
+        # iPhone and iPad. Required for "Designed for iPad", which is how this
+        # ships to Apple Silicon Macs — there is no separate Mac target.
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        # Unsigned simulator builds; device builds need a real team.
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        # The Gradle build phase writes into the build directory, which the
+        # script sandbox otherwise blocks.
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - Shared
+    preBuildScripts:
+      # Direct local integration: Gradle builds and embeds the framework as part
+      # of the Xcode build, so the app can never link a stale copy. Copying a
+      # prebuilt framework in by hand is the usual way that goes wrong.
+      - name: Build Shared framework
+        basedOnDependencyAnalysis: false
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
