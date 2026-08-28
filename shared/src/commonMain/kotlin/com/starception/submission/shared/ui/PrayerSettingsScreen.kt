@@ -34,8 +34,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
+import com.starception.submission.settings.ThemeSettingsState
+import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
+import com.starception.submission.settings.components.SettingsSection
 
 /**
  * The prayer settings screen.
@@ -55,7 +66,15 @@ fun PrayerSettingsScreen(
     onSettingsChange: (PrayerSettings) -> Unit,
     onRestore: () -> Unit,
     onBack: () -> Unit,
+    notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
+    onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
+    themeSettings: ThemeSettingsState = ThemeSettingsState(),
+    onThemeBrandChange: (ThemeBrand) -> Unit = {},
+    onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
 ) {
+    // One section open at a time, as on Android: the sections are long enough
+    // that several open at once buries the one being read.
+    var expanded by remember { mutableStateOf<String?>(SECTION_PRAYER) }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -88,15 +107,69 @@ fun PrayerSettingsScreen(
                 )
             }
 
-            PrayerTimesSection(
-                prayerSettings = settings,
-                // Offered whenever a country is known, so a user who has changed
-                // something can always get back to their local defaults.
-                showRestoreOption = countryName != null,
-                autoDetectedCountryName = countryName,
-                onSettingsChange = onSettingsChange,
-                onRestoreClick = onRestore,
-            )
+            SettingsSection(
+                title = "Prayer Times",
+                subtitle = "Calculation method & location",
+                icon = NiaIcons.Home,
+                isExpanded = expanded == SECTION_PRAYER,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_PRAYER) null else SECTION_PRAYER
+                },
+            ) {
+                PrayerTimesSection(
+                    prayerSettings = settings,
+                    // Offered whenever a country is known, so a user who has
+                    // changed something can always get back to their local
+                    // defaults.
+                    showRestoreOption = countryName != null,
+                    autoDetectedCountryName = countryName,
+                    onSettingsChange = onSettingsChange,
+                    onRestoreClick = onRestore,
+                )
+            }
+
+            SettingsSection(
+                title = "Notifications",
+                subtitle = "Prayer alerts & reminders",
+                icon = NiaIcons.Upcoming,
+                isExpanded = expanded == SECTION_NOTIFICATIONS,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_NOTIFICATIONS) null else SECTION_NOTIFICATIONS
+                },
+            ) {
+                NotificationsSection(
+                    preferences = notifications,
+                    onPreferencesChanged = onNotificationsChange,
+                    // iOS has no Do Not Disturb permission to grant: Focus is the
+                    // user's to set, so there is nothing to prompt for.
+                    hasDndAccess = true,
+                )
+            }
+
+            SettingsSection(
+                title = "Appearance",
+                subtitle = "Theme, colors & display mode",
+                icon = NiaIcons.ViewDay,
+                isExpanded = expanded == SECTION_APPEARANCE,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_APPEARANCE) null else SECTION_APPEARANCE
+                },
+            ) {
+                AppearanceSection(
+                    themeSettings = themeSettings,
+                    onChangeThemeBrand = onThemeBrandChange,
+                    onChangeDynamicColorPreference = {},
+                    onChangeDarkThemeConfig = onDarkThemeConfigChange,
+                    // Material You does not exist here, and the colour wheel is
+                    // drawn with Android graphics, so neither is offered.
+                    supportDynamicColor = false,
+                    colorPickerDialog = null,
+                )
+            }
         }
     }
 }
+
+private const val SECTION_PRAYER = "prayer"
+private const val SECTION_NOTIFICATIONS = "notifications"
+private const val SECTION_APPEARANCE = "appearance"

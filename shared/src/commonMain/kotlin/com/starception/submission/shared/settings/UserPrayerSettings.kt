@@ -18,6 +18,7 @@ package com.starception.submission.shared.settings
 
 import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.CountryPrayerDefaults
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.storage.KeyValueStore
@@ -64,6 +65,24 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         store.putString(KEY_SETTINGS, json.encodeToString(settings))
     }
 
+    /**
+     * Notification preferences, stored separately from calculation settings.
+     *
+     * Separate because they change for different reasons: one is about how times
+     * are computed, the other about being told when they arrive. Keeping them in
+     * one blob would mean a notification toggle rewriting the calculation record.
+     */
+    fun notifications(): PrayerNotificationPreferences {
+        val stored = store.getString(KEY_NOTIFICATIONS)
+        if (stored.isNullOrBlank()) return PrayerNotificationPreferences()
+        return runCatching { json.decodeFromString<PrayerNotificationPreferences>(stored) }
+            .getOrElse { PrayerNotificationPreferences() }
+    }
+
+    fun saveNotifications(preferences: PrayerNotificationPreferences) {
+        store.putString(KEY_NOTIFICATIONS, json.encodeToString(preferences))
+    }
+
     /** Clears the user's choices so the country's defaults apply again. */
     fun restoreDefaults() {
         store.putString(KEY_SETTINGS, "")
@@ -94,6 +113,7 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
 
     private companion object {
         const val KEY_SETTINGS = "cached_prayer_settings"
+        const val KEY_NOTIFICATIONS = "prayer_notification_preferences"
 
         /**
          * The same range the Android dial allows: three hours either way. Wide

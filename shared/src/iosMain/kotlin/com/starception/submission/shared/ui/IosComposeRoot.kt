@@ -79,6 +79,7 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
     val place = location ?: FALLBACK_LOCATION
     val country = prayerDefaultsFor(place.countryCode)
     var prayerSettings by remember(country) { mutableStateOf(settingsStore.settings(country)) }
+    var notificationPrefs by remember { mutableStateOf(settingsStore.notifications()) }
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
     var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
@@ -134,6 +135,11 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
                         prayerSettings = settingsStore.settings(country)
                     },
                     onBack = onBack,
+                    notifications = notificationPrefs,
+                    onNotificationsChange = { updated ->
+                        notificationPrefs = updated
+                        settingsStore.saveNotifications(updated)
+                    },
                 )
             },
         )
