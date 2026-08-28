@@ -20,8 +20,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,7 +100,10 @@ fun InsightPager(
                     val selected = pagerState.currentPage == index
                     Box(
                         modifier = Modifier
-                            .size(if (selected) 10.dp else 8.dp)
+                            .size(
+                                width = if (selected) 18.dp else 6.dp,
+                                height = 6.dp,
+                            )
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
@@ -113,46 +117,49 @@ fun InsightPager(
             }
         }
 
-        HorizontalPager(
-            state = pagerState,
-            // A peek of the next tile is what signals the pager is swipeable at
-            // all; without it the row reads as a single static card.
-            contentPadding = PaddingValues(end = 48.dp),
-            pageSpacing = 12.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) { page ->
-            when (page) {
-                0 -> PrayerNowTile(
-                    phase = day.skyPhase,
-                    weather = day.skyWeather,
-                    headline = day.currentPrayer?.let { "Best Time to Pray $it" }
-                        ?: "Prayer Times",
-                    subtitle = placeName,
-                    nextPrayer = day.nextPrayer.orEmpty(),
-                    countdown = day.countdown,
-                )
-
-                1 -> ArtworkTile(
-                    artwork = Res.drawable.insight_prayer_background,
-                    label = "Today's salah",
-                    title = salah.headline,
-                    subtitle = salah.detail,
-                ) {
-                    SalahMarkers(
-                        completed = salah.completed,
-                        onToggle = onTogglePrayer,
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            // Match the compact Android dashboard: two useful cards remain in
+            // view while the next page still reads as horizontally swipeable.
+            val pageWidth = (maxWidth - 12.dp) / 2
+            HorizontalPager(
+                state = pagerState,
+                pageSize = PageSize.Fixed(pageWidth),
+                pageSpacing = 12.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) { page ->
+                when (page) {
+                    0 -> PrayerNowTile(
+                        phase = day.skyPhase,
+                        weather = day.skyWeather,
+                        headline = day.currentPrayer?.let { "Time for $it" }
+                            ?: "Prayer Times",
+                        subtitle = placeName,
+                        nextPrayer = day.nextPrayer.orEmpty(),
+                        countdown = day.countdown,
                     )
-                }
 
-                else -> {
-                    val surah = dailyReading(today)
-                    ArtworkTile(
-                        artwork = Res.drawable.insight_quran_background,
-                        label = "Today's reading",
-                        title = surah.nameEnglish,
-                        subtitle = surah.subtitle(),
-                        arabicTitle = surah.nameArabic,
-                    )
+                    1 -> ArtworkTile(
+                        artwork = Res.drawable.insight_prayer_background,
+                        label = "Today's salah",
+                        title = salah.headline,
+                        subtitle = salah.detail,
+                    ) {
+                        SalahMarkers(
+                            completed = salah.completed,
+                            onToggle = onTogglePrayer,
+                        )
+                    }
+
+                    else -> {
+                        val surah = dailyReading(today)
+                        ArtworkTile(
+                            artwork = Res.drawable.insight_quran_background,
+                            label = "Reading",
+                            title = surah.nameEnglish,
+                            subtitle = surah.subtitle(),
+                            arabicTitle = surah.nameArabic,
+                        )
+                    }
                 }
             }
         }
@@ -173,8 +180,8 @@ private fun ArtworkTile(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(16.dp)),
+            .height(210.dp)
+            .clip(RoundedCornerShape(20.dp)),
     ) {
         Image(
             painter = painterResource(artwork),
@@ -196,10 +203,10 @@ private fun ArtworkTile(
         )
         Box(
             modifier = Modifier
-                .padding(12.dp)
+                .padding(10.dp)
                 .clip(RoundedCornerShape(50))
                 .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
             Text(
                 text = label,
@@ -210,13 +217,13 @@ private fun ArtworkTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalArrangement = Arrangement.Bottom,
         ) {
             content?.invoke()
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
@@ -251,15 +258,15 @@ private fun SalahMarkers(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.fillMaxWidth().padding(bottom = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         FARD_PRAYERS.forEach { prayer ->
             val isDone = prayer in completed
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(28.dp)
                         .clip(CircleShape)
                         .background(
                             if (isDone) Color.White else Color.White.copy(alpha = 0.15f),
@@ -274,18 +281,13 @@ private fun SalahMarkers(
                 ) {
                     Text(
                         text = prayer.take(1),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         // Dark on the filled state, light on the empty one, so
                         // the letter stays legible either way.
                         color = if (isDone) Color(0xFF1B3A2A) else Color.White,
                     )
                 }
-                Text(
-                    text = prayer,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
             }
         }
     }

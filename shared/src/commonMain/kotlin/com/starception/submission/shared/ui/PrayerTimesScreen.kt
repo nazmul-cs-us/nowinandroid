@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +41,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +86,8 @@ fun PrayerTimesScreen(
     modifier: Modifier = Modifier,
     isLocating: Boolean = false,
 ) {
+    var showAllPrayers by remember { mutableStateOf(false) }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -89,7 +97,8 @@ fun PrayerTimesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -98,7 +107,7 @@ fun PrayerTimesScreen(
             ) {
                 Text(
                     text = "Prayer Times",
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -116,16 +125,19 @@ fun PrayerTimesScreen(
                 // are for the fallback location and silently showing them as if
                 // they were the user's would be the worst of the options.
                 text = if (isLocating) "$placeName · locating…" else placeName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
 
             // The pager and the schedule scroll together: on a phone the tiles
             // alone fill most of the screen, so a fixed header would leave the
             // list a few rows tall.
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 84.dp),
+            ) {
                 item {
                     InsightPager(
                         day = day,
@@ -138,15 +150,15 @@ fun PrayerTimesScreen(
                 item {
                     Text(
                         text = "Prayer times",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
                 // Two to a row, as on Android: the schedule is glanceable rather
                 // than a list to read down.
-                items(day.slots.chunked(2)) { pair ->
+                items(day.slots.take(if (showAllPrayers) 6 else 4).chunked(2)) { pair ->
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         pair.forEach { slot ->
                             PrayerCard(
@@ -163,14 +175,21 @@ fun PrayerTimesScreen(
                 }
 
                 item {
+                    TextButton(
+                        onClick = { showAllPrayers = !showAllPrayers },
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                    ) {
+                        Text(if (showAllPrayers) "Show Less" else "Show All Prayers")
+                    }
+                }
+
+                item {
                     LocationWeatherRow(
                         placeName = placeName,
                         temperatureCelsius = day.temperatureCelsius,
                         conditionLabel = day.conditionLabel,
                     )
-                    // The pill floats above the list, so the last row needs
-                    // clearance or it sits under it.
-                    Spacer(Modifier.height(96.dp))
                 }
             }
         }
@@ -205,7 +224,7 @@ private fun PrayerCard(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().height(104.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = container),
     ) {
@@ -213,9 +232,9 @@ private fun PrayerCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(container)
-                .padding(16.dp),
+                .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
@@ -231,11 +250,11 @@ private fun PrayerCard(
                         color = content.copy(alpha = 0.7f),
                     )
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = slot.display,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = content,
                     )
@@ -252,7 +271,7 @@ private fun PrayerCard(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 AdjustButton(symbol = "+", tint = content) { onAdjust(1) }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
                 AdjustButton(symbol = "\u2212", tint = content) { onAdjust(-1) }
             }
         }
@@ -300,7 +319,7 @@ internal fun AdjustButton(
 ) {
     Box(
         modifier = modifier
-            .size(30.dp)
+            .size(26.dp)
             .clip(CircleShape)
             .background(tint.copy(alpha = 0.10f))
             .clickable(onClick = onClick),
@@ -328,14 +347,14 @@ private fun LocationWeatherRow(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,10 +67,10 @@ data class BottomBarItem(
  */
 val SharedBottomBarItems = listOf(
     BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder),
-    BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder, enabled = false),
-    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder, enabled = false),
     BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder, enabled = false),
-    BottomBarItem("Topics", NiaIcons.Grid3x3, NiaIcons.Grid3x3, enabled = false),
+    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder, enabled = false),
+    BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder, enabled = false),
+    BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3, enabled = false),
 )
 
 /**
@@ -102,8 +103,10 @@ fun FloatingBottomBar(
     )
 
     Surface(
-        modifier = modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(28.dp),
+        modifier = modifier
+            .safeDrawingPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
@@ -111,7 +114,7 @@ fun FloatingBottomBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(52.dp)
                 .onSizeChanged { barWidth = it.width },
         ) {
             if (barWidth > 0) {
@@ -119,14 +122,14 @@ fun FloatingBottomBar(
                     modifier = Modifier
                         .offset(x = indicatorOffset)
                         .padding(6.dp)
-                        .size(width = itemWidth - 12.dp, height = 44.dp)
+                        .size(width = itemWidth - 12.dp, height = 40.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                 )
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -135,7 +138,7 @@ fun FloatingBottomBar(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp)
+                            .height(52.dp)
                             // Disabled items stay visible but take no taps, so a
                             // press does not silently do nothing.
                             .clickable(enabled = item.enabled) { onSelect(index) },
