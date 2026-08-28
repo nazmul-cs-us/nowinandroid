@@ -21,6 +21,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.PowerManager
 import android.util.Log
 import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.OfflineTts
@@ -102,6 +103,12 @@ class SherpaOnnxTtsService @Inject constructor(
 
     private var tts: OfflineTts? = null
     private var audioTrack: AudioTrack? = null
+    private val playbackWakeLock: PowerManager.WakeLock by lazy {
+        (context.getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Starception:HadithTtsPlayback",
+        ).apply { setReferenceCounted(true) }
+    }
     private var isInitialized = false
     private var isInitializing = false
     private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
@@ -345,6 +352,7 @@ class SherpaOnnxTtsService @Inject constructor(
             }
         }
 
+        acquirePlaybackWakeLock()
         return try {
             isSpeakingNow = true
             speakInternal(text, speed, speakerId, onComplete, onPlaybackStart)
@@ -353,6 +361,7 @@ class SherpaOnnxTtsService @Inject constructor(
             // playback the flag already cleared when audio started.
             _isPreparingAudio.value = false
             isSpeakingNow = false
+            releasePlaybackWakeLock()
         }
     }
 
@@ -627,9 +636,13 @@ class SherpaOnnxTtsService @Inject constructor(
             audioTrack?.write(pcmData, 0, pcmData.size)
             audioTrack?.play()
 
-            // Wait for playback to complete
+            // Wait in short intervals so notification/UI stop requests interrupt a
+            // long cached hadith promptly instead of sleeping for the entire clip.
             val durationMs = (samples.size * 1000L) / sampleRate
-            Thread.sleep(durationMs + 100) // Buffer for audio cleanup
+            val deadline = android.os.SystemClock.elapsedRealtime() + durationMs + 100
+            while (!stopRequested && android.os.SystemClock.elapsedRealtime() < deadline) {
+                Thread.sleep(100)
+            }
 
             stopAudioTrack()
 
@@ -678,6 +691,23 @@ class SherpaOnnxTtsService @Inject constructor(
             audioTrack = null
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping AudioTrack", e)
+        }
+    }
+
+    private fun acquirePlaybackWakeLock() {
+        try {
+            // The timeout is a safety net if native playback ever fails to return.
+            playbackWakeLock.acquire(60 * 60 * 1000L)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to acquire TTS playback wake lock", e)
+        }
+    }
+
+    private fun releasePlaybackWakeLock() {
+        try {
+            if (playbackWakeLock.isHeld) playbackWakeLock.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to release TTS playback wake lock", e)
         }
     }
 
@@ -952,6 +982,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onPlaybackStart: (() -> Unit)? = null,
         retainCache: Boolean = false,
     ): Boolean {
+        stopRequested = false
         val textHash = text.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
         // playback starts (playAudioSamples) or by speak()'s finally on the
@@ -983,6 +1014,7 @@ class SherpaOnnxTtsService @Inject constructor(
             // But DO delete the disk file to allow new hadith caching
             if (!retainCache) deleteDiskCache(textHash)
             try {
+                acquirePlaybackWakeLock()
                 isSpeakingNow = true
                 onPlaybackStart?.invoke()
                 // playAudioSamples blocks (Thread.sleep) for the whole clip. The
@@ -993,6 +1025,7 @@ class SherpaOnnxTtsService @Inject constructor(
                 }
             } finally {
                 isSpeakingNow = false
+                releasePlaybackWakeLock()
             }
             if (!retainCache) audioCache.remove(textHash) // Remove from memory after playing
             onComplete?.invoke()

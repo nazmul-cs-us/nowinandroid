@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -48,6 +49,12 @@ class ChapterRecitationService : Service() {
     // Sherpa/Android TTS owns its audio pipeline, but still needs this service's
     // MediaSession and foreground notification. In that mode there is no MediaPlayer.
     private var isExternalPlayback = false
+    private val externalPlaybackWakeLock: PowerManager.WakeLock by lazy {
+        (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Starception:ChapterRecitation",
+        ).apply { setReferenceCounted(false) }
+    }
 
     companion object {
         private const val TAG = "ChapterRecitationSvc"
@@ -65,13 +72,22 @@ class ChapterRecitationService : Service() {
 
         /** Start (or switch) playback of an already-resolved [source] with display metadata. */
         fun play(context: Context, source: String, title: String, subtitle: String) {
+            // A Play-all sequence can advance while the app is backgrounded. Reuse the
+            // already-running service directly because Android 12+ rejects another
+            // startForegroundService() call from the background, even for a track update.
+            if (ChapterRecitationState.requestSourcePlayback(source, title, subtitle)) return
+
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_PLAY_SOURCE
                 putExtra(EXTRA_SOURCE, source)
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
             }
-            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            try {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to start recitation service for $title", e)
+            }
         }
 
         /**
@@ -80,12 +96,18 @@ class ChapterRecitationService : Service() {
          * this service owns the foreground lifetime and MediaSession notification.
          */
         fun showExternalPlayback(context: Context, title: String, subtitle: String) {
+            if (ChapterRecitationState.requestExternalPlayback(title, subtitle)) return
+
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_SHOW_EXTERNAL_PLAYBACK
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
             }
-            androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            try {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to start external recitation service for $title", e)
+            }
         }
 
         fun toggle(context: Context) {
@@ -95,6 +117,7 @@ class ChapterRecitationService : Service() {
         }
 
         fun stop(context: Context) {
+            if (ChapterRecitationState.requestStop()) return
             context.startService(
                 Intent(context, ChapterRecitationService::class.java).apply { action = ACTION_STOP },
             )
@@ -107,6 +130,15 @@ class ChapterRecitationService : Service() {
         super.onCreate()
         createNotificationChannel()
         initSession()
+        ChapterRecitationState.onSourcePlaybackRequested = { source, title, subtitle ->
+            handler.post { startPlayback(source, title, subtitle) }
+        }
+        ChapterRecitationState.onExternalPlaybackRequested = { title, subtitle ->
+            handler.post { startExternalPlayback(title, subtitle) }
+        }
+        ChapterRecitationState.onStopRequested = {
+            handler.post { stopPlaybackAndSelf() }
+        }
     }
 
     private fun initSession() {
@@ -162,9 +194,11 @@ class ChapterRecitationService : Service() {
         currentTitle = title
         currentSubtitle = subtitle
         isExternalPlayback = false
+        releaseExternalPlaybackWakeLock()
 
         mediaPlayer?.let { runCatching { it.stop() }; it.release() }
         val player = MediaPlayer()
+        player.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
         player.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -185,19 +219,30 @@ class ChapterRecitationService : Service() {
             ChapterRecitationState.markStopped()
             stopProgressUpdates()
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
-            stopForeground(STOP_FOREGROUND_REMOVE)
             // Route natural completion to the active content type. Hadith details
             // advance their own numbered sequence; Fortress playback keeps its
             // existing chapter/dua playlist behavior.
             if (currentTitle.startsWith("Hadith #")) {
-                ChapterRecitationState.onHadithCompletion?.invoke()
+                val completion = ChapterRecitationState.onHadithCompletion
+                if (completion != null) {
+                    // Keep foreground eligibility across the small gap before the
+                    // playlist coroutine supplies the next track. Its final cleanup
+                    // stops the service when there is no next Hadith.
+                    completion.invoke()
+                } else {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                }
             } else {
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 ChapterRecitationState.onCompletion?.invoke()
             }
         }
         player.setOnErrorListener { _, what, extra ->
             Log.e(TAG, "MediaPlayer error what=$what extra=$extra")
             ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
+            if (currentTitle.startsWith("Hadith #")) {
+                ChapterRecitationState.onHadithCompletion?.invoke()
+            }
             true
         }
         mediaPlayer = player
@@ -211,6 +256,9 @@ class ChapterRecitationService : Service() {
             Log.e(TAG, "setDataSource failed for $source", e)
             ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
             stopForeground(STOP_FOREGROUND_REMOVE)
+            if (currentTitle.startsWith("Hadith #")) {
+                ChapterRecitationState.onHadithCompletion?.invoke()
+            }
         }
     }
 
@@ -221,6 +269,7 @@ class ChapterRecitationService : Service() {
         currentTitle = title
         currentSubtitle = subtitle
         isExternalPlayback = true
+        acquireExternalPlaybackWakeLock()
 
         ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
         updateMetadata(0L)
@@ -274,6 +323,7 @@ class ChapterRecitationService : Service() {
         mediaPlayer = null
         currentSource = null
         isExternalPlayback = false
+        releaseExternalPlaybackWakeLock()
         ChapterRecitationState.markStopped()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -403,12 +453,33 @@ class ChapterRecitationService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        ChapterRecitationState.clearServiceRequests()
         stopProgressUpdates()
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null
         mediaPlayer?.release()
         mediaPlayer = null
+        releaseExternalPlaybackWakeLock()
+    }
+
+    private fun acquireExternalPlaybackWakeLock() {
+        try {
+            // Refreshed for each track; prevents a stale external renderer from
+            // holding the CPU forever if its completion callback is lost.
+            if (externalPlaybackWakeLock.isHeld) externalPlaybackWakeLock.release()
+            externalPlaybackWakeLock.acquire(60 * 60 * 1000L)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to acquire recitation wake lock", e)
+        }
+    }
+
+    private fun releaseExternalPlaybackWakeLock() {
+        try {
+            if (externalPlaybackWakeLock.isHeld) externalPlaybackWakeLock.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to release recitation wake lock", e)
+        }
     }
 }
 
@@ -427,6 +498,13 @@ object ChapterRecitationState {
     var onHadithCompletion: (() -> Unit)? = null
     /** MediaSession play/pause request for audio rendered by an external TTS engine. */
     var onExternalToggle: (() -> Unit)? = null
+
+    @Volatile
+    internal var onSourcePlaybackRequested: ((String, String, String) -> Unit)? = null
+    @Volatile
+    internal var onExternalPlaybackRequested: ((String, String) -> Unit)? = null
+    @Volatile
+    internal var onStopRequested: (() -> Unit)? = null
 
     // Last-known snapshot so the UI can re-sync on app resume even if the process/Activity was
     // recreated while the service kept playing (e.g. user closed and reopened the app).
@@ -466,5 +544,33 @@ object ChapterRecitationState {
         isActive = false
         isPlaying = false
         onStateChanged?.invoke(false, title, subtitle)
+    }
+
+    internal fun requestSourcePlayback(
+        source: String,
+        title: String,
+        subtitle: String,
+    ): Boolean {
+        val callback = onSourcePlaybackRequested ?: return false
+        callback(source, title, subtitle)
+        return true
+    }
+
+    internal fun requestExternalPlayback(title: String, subtitle: String): Boolean {
+        val callback = onExternalPlaybackRequested ?: return false
+        callback(title, subtitle)
+        return true
+    }
+
+    internal fun requestStop(): Boolean {
+        val callback = onStopRequested ?: return false
+        callback()
+        return true
+    }
+
+    internal fun clearServiceRequests() {
+        onSourcePlaybackRequested = null
+        onExternalPlaybackRequested = null
+        onStopRequested = null
     }
 }

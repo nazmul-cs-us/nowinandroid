@@ -20,6 +20,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -100,7 +101,7 @@ fun BukhariBookScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(book?.nameEnglish ?: "Sahih Bukhari") },
+                title = { Text("Sahih Bukhari") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         FlaticonIcon(
@@ -183,30 +184,35 @@ private fun BukhariHadithList(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "book-header") {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(
+                    topStart = 28.dp,
+                    topEnd = 28.dp,
+                    bottomEnd = 28.dp,
+                    bottomStart = 10.dp,
+                ),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         FlaticonBookIcon(
                             contentDescription = "Bukhari book",
-                            iconSize = 32.dp,
+                            iconSize = 28.dp,
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = "Book ${book.id} of 97",
+                            text = "BOOK ${book.id.toString().padStart(2, '0')} / 97",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -214,15 +220,15 @@ private fun BukhariHadithList(
                     }
                     Text(
                         text = book.nameEnglish,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
                         text = book.nameArabic,
                         modifier = Modifier.fillMaxWidth(),
-                        style = MaterialTheme.typography.headlineSmall.copy(
+                        style = MaterialTheme.typography.titleLarge.copy(
                             fontFamily = arabicFontFamily,
-                            lineHeight = 34.sp,
+                            lineHeight = 30.sp,
                         ),
                         textAlign = TextAlign.End,
                     )
@@ -231,12 +237,24 @@ private fun BukhariHadithList(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = "${book.hadithCount} hadiths · ${book.firstHadithId}–${book.lastHadithId}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-                        )
-                        FilledTonalButton(onClick = onPlayAllClick) {
+                        NiaTopicTag(
+                            followed = false,
+                            onClick = {},
+                        ) {
+                            Text(
+                                text = "${book.hadithCount} HADITHS · ${book.firstHadithId}–${book.lastHadithId}",
+                                maxLines = 1,
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = onPlayAllClick,
+                            shape = RoundedCornerShape(
+                                topStart = 20.dp,
+                                topEnd = 20.dp,
+                                bottomEnd = 8.dp,
+                                bottomStart = 20.dp,
+                            ),
+                        ) {
                             FlaticonPlayIcon(
                                 contentDescription = null,
                                 iconSize = 20.dp,
@@ -262,9 +280,17 @@ private fun BukhariHadithList(
                     FlaticonSearchIcon(contentDescription = null)
                 },
                 placeholder = { Text("Search within this book") },
-                supportingText = {
-                    Text("${filteredHadiths.size} of ${hadiths.size} hadiths")
+                trailingIcon = {
+                    Text(
+                        text = "${filteredHadiths.size}/${hadiths.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
             )
         }
 
@@ -304,36 +330,43 @@ private fun BukhariHadithCard(
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(
+            topStart = 22.dp,
+            topEnd = 22.dp,
+            bottomEnd = 22.dp,
+            bottomStart = 8.dp,
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             NiaTopicTag(
                 followed = true,
                 onClick = onClick,
-                text = { Text("Hadith ${hadith.id}") },
+                text = { Text("HADITH ${hadith.id}") },
             )
             hadith.textPlain?.takeIf(String::isNotBlank)?.let { english ->
                 Text(
                     text = english.replace(Regex("\\s+"), " ").trim(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 5,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                    maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
                 text = hadith.textArabic.replace(Regex("\\s+"), " ").trim(),
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleLarge.copy(
+                style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = arabicFontFamily,
-                    lineHeight = 34.sp,
+                    lineHeight = 30.sp,
                 ),
                 textAlign = TextAlign.End,
-                maxLines = 4,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }

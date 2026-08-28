@@ -59,14 +59,35 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             TravelDuaSettings.KEY_LAST_RELIABLE_SPEED_MPS,
             0f,
         )
-        if (!TravelDuaPolicy.hasRecentDrivingEvidence(nowElapsed, lastReliableSpeedElapsed)) {
+        val hasRecentSpeed = TravelDuaPolicy.hasRecentDrivingEvidence(
+            nowElapsed,
+            lastReliableSpeedElapsed,
+        )
+        val googleDrivingConfirmed = prefs.getBoolean(
+            TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED,
+            false,
+        )
+        val googleConfirmationElapsed = prefs.getLong(
+            TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED,
+            0L,
+        )
+        val hasActiveGoogleDriving = TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
+            nowElapsedMillis = nowElapsed,
+            googleDrivingConfirmed = googleDrivingConfirmed,
+            confirmationElapsedMillis = googleConfirmationElapsed,
+        )
+        if (!hasRecentSpeed && !hasActiveGoogleDriving) {
             val evidenceAge = (nowElapsed - lastReliableSpeedElapsed)
                 .takeIf { lastReliableSpeedElapsed > 0L && it >= 0L }
+            val googleEvidenceAge = (nowElapsed - googleConfirmationElapsed)
+                .takeIf { googleConfirmationElapsed > 0L && it >= 0L }
             FileLogger.w(
                 TAG,
-                "Blocked Travel Dua: no recent reliable driving speed " +
+                "Blocked Travel Dua: no current driving evidence " +
                     "(evidenceAgeMs=${evidenceAge ?: "none"}, " +
-                    "lastSpeedKmh=${"%.1f".format(lastReliableSpeedMps * 3.6f)})",
+                    "lastSpeedKmh=${"%.1f".format(lastReliableSpeedMps * 3.6f)}, " +
+                    "googleConfirmed=$googleDrivingConfirmed, " +
+                    "googleEvidenceAgeMs=${googleEvidenceAge ?: "none"})",
             )
             clearPendingAlarm(prefs)
             return
@@ -96,8 +117,12 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             ContextCompat.startForegroundService(context, playbackIntent)
             FileLogger.i(
                 TAG,
-                "Travel Dua alarm accepted with recent speed " +
-                    "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h",
+                if (hasRecentSpeed) {
+                    "Travel Dua alarm accepted with recent speed " +
+                        "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h"
+                } else {
+                    "Travel Dua alarm accepted with active Google IN_VEHICLE confirmation"
+                },
             )
         } catch (e: Exception) {
             // Do not write a cooldown here: a failed start must remain eligible for retry.
