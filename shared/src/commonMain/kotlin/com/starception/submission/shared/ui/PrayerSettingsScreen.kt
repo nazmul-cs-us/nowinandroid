@@ -43,11 +43,13 @@ import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.settings.ThemeSettingsState
+import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
+import com.starception.submission.settings.components.TravelDuaSection
 
 /**
  * The prayer settings screen.
@@ -70,6 +72,8 @@ fun PrayerSettingsScreen(
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
+    travelDua: TravelDuaSettings = TravelDuaSettings(),
+    onTravelDuaChange: (TravelDuaSettings) -> Unit = {},
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
 ) {
@@ -169,6 +173,25 @@ fun PrayerSettingsScreen(
             }
 
             SettingsSection(
+                title = "Travel Dua",
+                subtitle = "Auto-play dua when driving",
+                icon = NiaIcons.Course,
+                isExpanded = expanded == SECTION_TRAVEL,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_TRAVEL) null else SECTION_TRAVEL
+                },
+            ) {
+                TravelDuaSection(
+                    settings = travelDua,
+                    onSettingsChanged = onTravelDuaChange,
+                    // Nothing plays on iOS yet — the audio chain is an Android
+                    // foreground service — so the controls show the settings
+                    // without pretending they will start something.
+                    isPlaying = false,
+                )
+            }
+
+            SettingsSection(
                 title = "About",
                 subtitle = "Version & licences",
                 icon = NiaIcons.Person,
@@ -189,3 +212,4 @@ private const val SECTION_PRAYER = "prayer"
 private const val SECTION_NOTIFICATIONS = "notifications"
 private const val SECTION_APPEARANCE = "appearance"
 private const val SECTION_ABOUT = "about"
+private const val SECTION_TRAVEL = "travel"

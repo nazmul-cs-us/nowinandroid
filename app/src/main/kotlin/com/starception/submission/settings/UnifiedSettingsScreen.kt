@@ -78,6 +78,7 @@ import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
+import com.starception.submission.settings.components.rememberAudioChainPermissionGate
 import com.starception.submission.settings.components.rememberDndAccess
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
@@ -349,6 +350,7 @@ fun UnifiedSettingsScreen(
                         isExpanded = expandedSections.contains("traveldua"),
                         onToggleExpanded = { viewModel.toggleSection("traveldua") }
                     ) {
+                        val audioChainPermissionGate = rememberAudioChainPermissionGate()
                         TravelDuaSection(
                             settings = travelDuaSettings,
                             onSettingsChanged = viewModel::updateTravelDuaSettings,
