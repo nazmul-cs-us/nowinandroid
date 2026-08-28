@@ -185,6 +185,15 @@ import com.starception.submission.core.images.prayerSkyWeather
 // It loads through Compose Resources rather than R.drawable, hence the alias:
 // the other painterResource above still serves the ground and foreground layers.
 import com.starception.submission.core.images.resources.Res as ImageRes
+import com.starception.submission.core.images.resources.prayer_ground_nabawi
+import com.starception.submission.core.images.resources.prayer_foreground_nabawi
+import com.starception.submission.core.images.resources.prayer_ground_local
+import com.starception.submission.core.images.resources.prayer_ground_kaaba
+import com.starception.submission.core.images.resources.prayer_foreground_kaaba
+import com.starception.submission.core.images.resources.insight_salah_foreground
+import com.starception.submission.core.images.resources.insight_quran_foreground_v2
+import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
+import com.starception.submission.core.images.resources.insight_prayer_foreground
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_quran_background
@@ -1492,16 +1501,16 @@ fun SwipeableBigTiles(
         ).mod(3)
     val prayerNowForegroundResource = remember(prayerNowSceneIndex) {
         when (prayerNowSceneIndex) {
-            0 -> R.drawable.insight_salah_foreground
-            1 -> R.drawable.prayer_foreground_kaaba
-            else -> R.drawable.prayer_foreground_nabawi
+            0 -> ImageRes.drawable.insight_salah_foreground
+            1 -> ImageRes.drawable.prayer_foreground_kaaba
+            else -> ImageRes.drawable.prayer_foreground_nabawi
         }
     }
     val prayerNowGroundResource = remember(prayerNowSceneIndex) {
         when (prayerNowSceneIndex) {
-            0 -> R.drawable.prayer_ground_local
-            1 -> R.drawable.prayer_ground_kaaba
-            else -> R.drawable.prayer_ground_nabawi
+            0 -> ImageRes.drawable.prayer_ground_local
+            1 -> ImageRes.drawable.prayer_ground_kaaba
+            else -> ImageRes.drawable.prayer_ground_nabawi
         }
     }
     val prayerNowGroundFadeStart = if (prayerNowSceneIndex == 0) 0.68f else 0.84f
@@ -1961,7 +1970,7 @@ fun SwipeableBigTiles(
                                 else -> "$prayersRemaining prayers remain today"
                             },
                             backgroundPainterRes = ImageRes.drawable.insight_prayer_background,
-                            foregroundPainterRes = R.drawable.insight_prayer_foreground,
+                            foregroundPainterRes = ImageRes.drawable.insight_prayer_foreground,
                             foregroundBaseScale = 0.84f,
                             foregroundOffsetFraction = Offset(0f, 0.08f),
                             skyTintTop = livePrayerSkyPalette.top,
@@ -2018,7 +2027,7 @@ fun SwipeableBigTiles(
                             supportingText = dailySurah.nameArabic,
                             footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
                             backgroundPainterRes = ImageRes.drawable.insight_quran_background,
-                            foregroundPainterRes = R.drawable.insight_quran_foreground_v2,
+                            foregroundPainterRes = ImageRes.drawable.insight_quran_foreground_v2,
                             // Let more of the reading scene breathe around the Quran.
                             foregroundBaseScale = 0.74f,
                             foregroundOffsetFraction = Offset(0f, 0.09f),
@@ -2068,7 +2077,7 @@ fun SwipeableBigTiles(
                             supportingText = qiblaBearing?.let(::qiblaCardinalDirection),
                             footerText = "Open the live compass and 3D globe",
                             backgroundPainterRes = ImageRes.drawable.insight_qibla_background,
-                            foregroundPainterRes = R.drawable.insight_qibla_foreground_v2,
+                            foregroundPainterRes = ImageRes.drawable.insight_qibla_foreground_v2,
                             // Keep the compass present without dominating the Qibla scene.
                             foregroundBaseScale = 0.75f,
                             foregroundOffsetFraction = Offset(0.025f, 0.11f),
@@ -2492,9 +2501,9 @@ private fun InsightPreviewCard(
     label: String,
     title: String,
     backgroundPainterRes: DrawableResource,
-    groundPainterRes: Int? = null,
+    groundPainterRes: DrawableResource? = null,
     groundFadeStartFraction: Float = 0.68f,
-    foregroundPainterRes: Int? = null,
+    foregroundPainterRes: DrawableResource? = null,
     foregroundBaseScale: Float = 1f,
     foregroundOffsetFraction: Offset = Offset.Zero,
     foregroundContentScale: ContentScale = ContentScale.Crop,
@@ -2877,7 +2886,7 @@ private fun InsightPreviewCard(
                     modifier = Modifier.fillMaxSize(),
                 ) { resolvedGroundRes ->
                     Image(
-                        painter = painterResource(resolvedGroundRes),
+                        painter = composePainterResource(resolvedGroundRes),
                         contentDescription = null,
                         contentScale = ContentScale.FillWidth,
                         alignment = Alignment.BottomCenter,
@@ -2919,7 +2928,7 @@ private fun InsightPreviewCard(
                     modifier = Modifier.fillMaxSize(),
                 ) { resolvedForegroundRes ->
                     Image(
-                        painter = painterResource(resolvedForegroundRes),
+                        painter = composePainterResource(resolvedForegroundRes),
                         contentDescription = null,
                         contentScale = foregroundContentScale,
                         modifier = Modifier
