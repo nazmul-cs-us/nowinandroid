@@ -16,8 +16,11 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -50,17 +53,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.rounded.LocationOn
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
 import com.starception.submission.shared.SharedPrayerSlot
+
+// Shared copies of the Android dashboard's reference palette. Keeping these
+// values identical makes light-mode prayer status read the same on both hosts.
+private val PrayerReferenceInk = Color(0xFF0A0808)
+private val PrayerReferenceCard = Color(0xFFFFFDF7)
+private val PrayerReferenceSlate = Color(0xFF5D6574)
+private val PrayerReferenceBlue = Color(0xFF4F779D)
+private val PrayerReferenceRust = Color(0xFF99593C)
+private val PrayerReferenceGold = Color(0xFFD8AB59)
 
 /**
  * The prayer schedule, written once in Compose and rendered by both platforms.
@@ -211,68 +228,161 @@ private fun PrayerCard(
     onAdjust: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isCurrent = slot.isCurrent
-    val container = if (isCurrent) {
-        MaterialTheme.colorScheme.primaryContainer
+    val isDarkTheme = isSystemInDarkTheme()
+    val accentColor = if (isDarkTheme) {
+        when {
+            slot.isCurrent -> MaterialTheme.colorScheme.tertiary
+            slot.isNext -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.secondary
+        }
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        when {
+            slot.isCurrent -> PrayerReferenceRust
+            slot.isNext -> PrayerReferenceBlue
+            slot.name == "Sunrise" -> PrayerReferenceGold
+            else -> PrayerReferenceSlate
+        }
     }
-    val content = if (isCurrent) {
-        MaterialTheme.colorScheme.onPrimaryContainer
+    val container = if (isDarkTheme) {
+        when {
+            slot.isCurrent -> lerp(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.colorScheme.tertiary,
+                0.12f,
+            )
+            slot.isNext -> lerp(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.colorScheme.primary,
+                0.10f,
+            )
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        }
     } else {
+        when {
+            slot.isCurrent -> lerp(PrayerReferenceCard, PrayerReferenceRust, 0.12f)
+            slot.isNext -> lerp(PrayerReferenceCard, PrayerReferenceBlue, 0.11f)
+            else -> PrayerReferenceCard
+        }
+    }
+    val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else PrayerReferenceInk
+    val supportingColor = if (isDarkTheme) {
         MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        PrayerReferenceSlate
     }
+    val hour12 = when {
+        slot.hour == 0 -> 12
+        slot.hour > 12 -> slot.hour - 12
+        else -> slot.hour
+    }
+    val displayTime = "$hour12:${slot.minute.toString().padStart(2, '0')}"
+    val period = if (slot.hour < 12) "AM" else "PM"
+    val offsetLabel = formatOffset(offsetMinutes).ifEmpty { "±0m" }
 
-    Card(
+    Surface(
         modifier = modifier.fillMaxWidth().height(104.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = container),
+        shape = RoundedCornerShape(28.dp),
+        color = container,
+        border = if (isDarkTheme) {
+            BorderStroke(
+                width = 1.dp,
+                color = when {
+                    slot.isCurrent -> accentColor.copy(alpha = 0.38f)
+                    slot.isNext -> accentColor.copy(alpha = 0.32f)
+                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+                },
+            )
+        } else {
+            null
+        },
+        tonalElevation = if (isDarkTheme) 1.dp else 0.dp,
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(container)
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+                .fillMaxSize()
+                .drawBehind {
+                    drawCircle(
+                        color = accentColor.copy(alpha = if (isDarkTheme) 0.13f else 0.065f),
+                        radius = size.minDimension * 0.42f,
+                        center = Offset(size.width * 0.96f, size.height * 0.98f),
+                    )
+                }
+                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = slot.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = content,
-                )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = slot.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = titleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (slot.name != "Sunrise") {
+                        Icon(
+                            imageVector = Icons.Filled.Notifications,
+                            contentDescription = "Prayer notification",
+                            tint = accentColor.copy(alpha = 0.42f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
                 if (slot.localName.isNotEmpty()) {
                     Text(
                         text = slot.localName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = content.copy(alpha = 0.7f),
+                        color = supportingColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                }
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = slot.display,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = content,
-                    )
-                    val label = formatOffset(offsetMinutes)
-                    if (label.isNotEmpty()) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = content.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(start = 6.dp),
-                        )
-                    }
                 }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AdjustButton(symbol = "+", tint = content) { onAdjust(1) }
-                Spacer(Modifier.height(2.dp))
-                AdjustButton(symbol = "\u2212", tint = content) { onAdjust(-1) }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = displayTime,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                    )
+                    Spacer(Modifier.size(3.dp))
+                    Text(
+                        text = period,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = accentColor.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.08f))
+                        .combinedClickable(
+                            onClick = { onAdjust(1) },
+                            onLongClick = { onAdjust(-1) },
+                        )
+                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = offsetLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accentColor.copy(alpha = 0.78f),
+                    )
+                }
             }
         }
     }
@@ -306,29 +416,6 @@ internal fun IconTapTarget(
             contentDescription = contentDescription,
             tint = tint,
             modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
-@Composable
-internal fun AdjustButton(
-    symbol: String,
-    tint: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(tint.copy(alpha = 0.10f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = symbol,
-            style = MaterialTheme.typography.titleMedium,
-            color = tint,
         )
     }
 }
