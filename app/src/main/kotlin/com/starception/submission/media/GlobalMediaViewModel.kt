@@ -10,6 +10,7 @@ import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.services.DrivingAudioService
+import com.starception.submission.services.ChapterRecitationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -172,6 +173,24 @@ class GlobalMediaViewModel(
 
     private var activeSource: MediaSource = MediaSource.None
 
+    private val chapterRecitationStateListener: (Boolean, String, String) -> Unit =
+        { isPlaying, title, subtitle ->
+            updateChapterRecitationState(isPlaying, title, subtitle)
+        }
+    private val chapterRecitationProgressListener: (Int, Int) -> Unit =
+        { currentPosition, duration ->
+            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress) {
+                _controllerState.update { current ->
+                    current.copy(
+                        playback = current.playback.copy(
+                            currentPosition = currentPosition,
+                            duration = duration,
+                        ),
+                    )
+                }
+            }
+        }
+
     init {
         // Auto-bind to Quran service if it's already running.
         // Uses BIND_AUTO_CREATE so the service is created if needed, but won't
@@ -233,6 +252,18 @@ class GlobalMediaViewModel(
                     )
                 }
             }
+        }
+
+        // Observe the foreground recitation service directly. Bukhari playback can outlive the
+        // detail composable, so relying only on its UI callback leaves PullToSyncContainer stale.
+        ChapterRecitationState.onGlobalStateChanged = chapterRecitationStateListener
+        ChapterRecitationState.onGlobalProgressChanged = chapterRecitationProgressListener
+        if (ChapterRecitationState.isActive) {
+            updateChapterRecitationState(
+                ChapterRecitationState.isPlaying,
+                ChapterRecitationState.title,
+                ChapterRecitationState.subtitle,
+            )
         }
     }
 
@@ -309,7 +340,61 @@ class GlobalMediaViewModel(
      */
     private fun onHadithPlaybackStopped() {
         if (activeSource is MediaSource.Hadith) {
-            hideController()
+            val recitation = ChapterRecitationState
+            if (recitation.isActive && recitation.title.startsWith("Hadith #")) {
+                updateChapterRecitationState(
+                    recitation.isPlaying,
+                    recitation.title,
+                    recitation.subtitle,
+                )
+            } else {
+                hideController()
+            }
+        }
+    }
+
+    /** Mirrors the foreground recitation service into the global media controller. */
+    private fun updateChapterRecitationState(
+        isPlaying: Boolean,
+        title: String,
+        subtitle: String,
+    ) {
+        if (!ChapterRecitationState.isActive) {
+            if (activeSource is MediaSource.Hadith || activeSource is MediaSource.Fortress) {
+                hideController()
+            }
+            return
+        }
+
+        if (title.startsWith("Hadith #")) {
+            val hadithNumber = title.substringAfter('#').toIntOrNull() ?: 0
+            val collectionName = subtitle.ifBlank { "Sahih Bukhari" }
+            activeSource = MediaSource.Hadith(hadithNumber, collectionName)
+            _controllerState.update { current ->
+                current.copy(
+                    isVisible = true,
+                    hasLanguageToggle = false,
+                    playback = MediaPlaybackState(
+                        isPlaying = isPlaying,
+                        title = title,
+                        subtitle = collectionName,
+                        currentPosition = ChapterRecitationState.positionMs,
+                        duration = ChapterRecitationState.durationMs,
+                        source = activeSource,
+                    ),
+                )
+            }
+        } else {
+            onFortressPlaybackStarted(title)
+            _controllerState.update { current ->
+                current.copy(
+                    playback = current.playback.copy(
+                        isPlaying = isPlaying,
+                        currentPosition = ChapterRecitationState.positionMs,
+                        duration = ChapterRecitationState.durationMs,
+                    ),
+                )
+            }
         }
     }
 
@@ -642,6 +727,12 @@ class GlobalMediaViewModel(
     fun cleanup() {
         // Remove static listener
         DrivingAudioService.onServiceStartedListener = null
+        if (ChapterRecitationState.onGlobalStateChanged === chapterRecitationStateListener) {
+            ChapterRecitationState.onGlobalStateChanged = null
+        }
+        if (ChapterRecitationState.onGlobalProgressChanged === chapterRecitationProgressListener) {
+            ChapterRecitationState.onGlobalProgressChanged = null
+        }
 
         if (quranBound) {
             try {

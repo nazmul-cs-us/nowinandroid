@@ -340,6 +340,7 @@ class SherpaOnnxTtsService @Inject constructor(
         onComplete: (() -> Unit)? = null,
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean {
+        val speechText = EnglishTtsTextNormalizer.normalize(text)
         _isPreparingAudio.value = true
         stopRequested = false
         if (!isInitialized) {
@@ -355,7 +356,7 @@ class SherpaOnnxTtsService @Inject constructor(
         acquirePlaybackWakeLock()
         return try {
             isSpeakingNow = true
-            speakInternal(text, speed, speakerId, onComplete, onPlaybackStart)
+            speakInternal(speechText, speed, speakerId, onComplete, onPlaybackStart)
         } finally {
             // Covers every exit (success, failure, cancellation); during normal
             // playback the flag already cleared when audio started.
@@ -723,7 +724,8 @@ class SherpaOnnxTtsService @Inject constructor(
         speakerId: Int = DEFAULT_SPEAKER_ID,
         speed: Float = DEFAULT_SPEED
     ) {
-        val textHash = text.hashCode()
+        val speechText = EnglishTtsTextNormalizer.normalize(text)
+        val textHash = speechText.hashCode()
 
         // Skip if already cached
         if (audioCache.containsKey(textHash)) {
@@ -756,7 +758,7 @@ class SherpaOnnxTtsService @Inject constructor(
                 // IMPORTANT: Acquire mutex PER-SENTENCE to allow priority speech to interrupt
                 // This prevents voice prompts from waiting 20+ seconds for entire pre-generation
                 try {
-                    val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
+                    val sentences = splitIntoSentences(speechText).filter { it.isNotBlank() }
                     val allSamples = mutableListOf<Float>()
                     var sampleRate = tts?.sampleRate() ?: 22050
 
@@ -834,6 +836,7 @@ class SherpaOnnxTtsService @Inject constructor(
             return false
         }
         val pending = texts
+            .map(EnglishTtsTextNormalizer::normalize)
             .filter { it.isNotBlank() }
             .distinct()
             .filterNot { audioCache.containsKey(it.hashCode()) }
@@ -872,7 +875,10 @@ class SherpaOnnxTtsService @Inject constructor(
      * Counterpart to [prepareTexts]; a session's audio is tens of megabytes of floats.
      */
     fun releaseCachedTexts(texts: List<String>) {
-        texts.distinct().forEach { audioCache.remove(it.hashCode()) }
+        texts
+            .map(EnglishTtsTextNormalizer::normalize)
+            .distinct()
+            .forEach { audioCache.remove(it.hashCode()) }
         Log.i(TAG, "🧹 Released prepared voice lines (${audioCache.size} entries remain)")
     }
 
@@ -880,7 +886,7 @@ class SherpaOnnxTtsService @Inject constructor(
      * Check if audio for given text is pre-generated and cached (memory or disk).
      */
     fun isCached(text: String): Boolean {
-        val hash = text.hashCode()
+        val hash = EnglishTtsTextNormalizer.normalize(text).hashCode()
 
         // First check memory cache
         if (audioCache.containsKey(hash)) {
@@ -983,7 +989,8 @@ class SherpaOnnxTtsService @Inject constructor(
         retainCache: Boolean = false,
     ): Boolean {
         stopRequested = false
-        val textHash = text.hashCode()
+        val speechText = EnglishTtsTextNormalizer.normalize(text)
+        val textHash = speechText.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when
         // playback starts (playAudioSamples) or by speak()'s finally on the
         // generate path.
@@ -1035,7 +1042,7 @@ class SherpaOnnxTtsService @Inject constructor(
         // Not cached, generate and play normally
         Log.d(TAG, "Cache miss (hash=$textHash), generating normally")
         return speak(
-            text = text,
+            text = speechText,
             speed = speed,
             speakerId = speakerId,
             onComplete = onComplete,

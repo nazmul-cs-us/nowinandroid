@@ -43,6 +43,7 @@ import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxKwsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.EnglishTtsTextNormalizer
 import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.feature.quran.QuranData
@@ -1393,6 +1394,11 @@ object ActivityTracker {
      * Speak using Android's built-in TextToSpeech
      */
     private fun speakWithAndroidTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale) {
+        val speechText = if (locale.language == Locale.ENGLISH.language) {
+            EnglishTtsTextNormalizer.normalize(text)
+        } else {
+            text
+        }
         // Initialize TTS if not already done
         if (textToSpeech == null) {
             textToSpeech = TextToSpeech(ctx) { status ->
@@ -1408,7 +1414,7 @@ object ActivityTracker {
                     // Set up utterance progress listener for completion callback
                     setupTtsCompletionListener(ctx)
 
-                    textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+                    textToSpeech?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
                 } else {
                     Log.e("ActivityTracker", "📚 Android TTS initialization failed with status: $status")
                 }
@@ -1423,7 +1429,7 @@ object ActivityTracker {
             // Ensure listener is set up
             setupTtsCompletionListener(ctx)
 
-            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
+            textToSpeech?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "hadith_$hadithNumber")
         }
     }
 

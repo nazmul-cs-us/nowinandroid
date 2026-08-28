@@ -11,11 +11,16 @@ import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.core.model.data.UserSearchResult
 import com.starception.submission.core.qurandatabase.AyahEntity
 import com.starception.submission.core.qurandatabase.QuranDao
+import com.starception.submission.core.hadithdatabase.HadithDatabase
+import com.starception.submission.core.hadithdatabase.HadithEntity
 import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.ui.search.InMemorySearchResult
 import com.starception.submission.ui.search.InMemorySearchService
 import com.starception.submission.ui.search.SearchTokenizer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,6 +48,8 @@ class TopBarSearchViewModel @Inject constructor(
     private val quranDao: QuranDao,
     private val inMemorySearchService: InMemorySearchService,
     private val assetDownloadManager: AssetDownloadManager,
+    @ApplicationContext private val appContext: Context,
+    private val assetRepository: AssetRepository,
 ) : ViewModel() {
 
     /** For the mic's missing-voice-model download card ([MissingContentCard]). */
@@ -192,6 +199,64 @@ class TopBarSearchViewModel @Inject constructor(
                 initialValue = emptyList(),
             )
 
+    /**
+     * Searches the downloaded Bukhari database directly. The general FTS database is a
+     * generated snapshot, so it can be older than a collection downloaded later.
+     */
+    val bukhariHadithResults: StateFlow<List<HadithEntity>> =
+        _searchQuery
+            .debounce(120)
+            .flatMapLatest { query ->
+                val trimmed = query.trim()
+                if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
+                    flowOf(emptyList())
+                } else {
+                    flow {
+                        if (!HadithDatabase.isDatabaseAvailable(appContext, BUKHARI_DATABASE)) {
+                            emit(emptyList())
+                            return@flow
+                        }
+                        val normalizedQuery = SearchTokenizer.normalize(trimmed)
+                        val hasBukhariIntent = BUKHARI_INTENT_WORDS.any { intent ->
+                            Regex("(?:^|\\s)$intent(?:\\s|$)").containsMatchIn(normalizedQuery)
+                        }
+                        val explicitId = when {
+                            trimmed.all(Char::isDigit) -> trimmed.toIntOrNull()
+                            hasBukhariIntent -> Regex("\\d{1,4}").find(normalizedQuery)
+                                ?.value?.toIntOrNull()
+                            else -> null
+                        }?.takeIf { it in 1..BUKHARI_HADITH_COUNT }
+                        val tokens = SearchTokenizer.tokenize(trimmed)
+                            .filterNot { it in BUKHARI_INTENT_WORDS }
+                            .take(3)
+                        val numericId = explicitId ?: tokens.singleOrNull()?.toIntOrNull()
+                            ?.takeIf { it in 1..BUKHARI_HADITH_COUNT }
+                        val dao = HadithDatabase.getInstance(
+                            appContext,
+                            BUKHARI_DATABASE,
+                            assetRepository,
+                        ).hadithDao()
+                        val results = when {
+                            numericId != null -> listOfNotNull(dao.getHadithById(numericId))
+                            tokens.isEmpty() -> emptyList()
+                            else -> dao.searchHadithsMultiToken(
+                                t0 = tokens[0],
+                                t1 = tokens.getOrElse(1) { "" },
+                                t2 = tokens.getOrElse(2) { "" },
+                                limit = BUKHARI_RESULT_LIMIT,
+                            )
+                        }
+                        emit(results)
+                    }.catch { emit(emptyList()) }
+                }
+            }
+            .flowOn(Dispatchers.IO)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList(),
+            )
+
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }
@@ -216,5 +281,11 @@ class TopBarSearchViewModel @Inject constructor(
 
     private companion object {
         const val SEARCH_QUERY_MIN_LENGTH = 2
+        const val BUKHARI_DATABASE = "sahih_bukhari.db"
+        const val BUKHARI_HADITH_COUNT = 7_277
+        const val BUKHARI_RESULT_LIMIT = 8
+        val BUKHARI_INTENT_WORDS = setOf(
+            "bukhari", "bukari", "sahih", "hadith", "hadis", "hadeeth", "number", "no",
+        )
     }
 }

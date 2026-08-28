@@ -190,7 +190,7 @@ private fun TitleBarContent(
     Spacer(modifier = GlanceModifier.width(8.dp))
     WidgetText(
       text = title.takeIf { showTitle() } ?: "",
-      size = 15.sp,
+      size = 16.sp,
       color = GlanceTheme.colors.onSurface,
       weight = WidgetFontWeight.Medium,
       modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
@@ -224,9 +224,9 @@ private fun TextStack(
   // the least important text on the card in the largest type — the prayer widget beside it
   // opens with its content at ~20sp, and these two should read as the same family.
   val bodySize = when {
-    width >= 300.dp -> 17.sp
-    width >= 220.dp -> 16.sp
-    else -> 15.sp
+    width >= 300.dp -> 19.sp
+    width >= 220.dp -> 18.sp
+    else -> 17.sp
   }
   // Set against the app's own Arabic, not against the Latin body beside it. The reader
   // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
@@ -290,7 +290,7 @@ private fun TextStack(
         ) {
           WidgetText(
             text = data.caption.uppercase(),
-            size = 10.sp,
+            size = 11.sp,
             color = GlanceTheme.colors.onPrimaryContainer,
             weight = WidgetFontWeight.Medium,
             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -353,7 +353,7 @@ private fun TextStack(
         ) {
           WidgetText(
             text = data.sourceName.orEmpty(),
-            size = 11.sp,
+            size = 12.sp,
             color = GlanceTheme.colors.outline,
             weight = WidgetFontWeight.Medium,
             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -362,7 +362,7 @@ private fun TextStack(
           if (data.sourceDetail != null) {
             WidgetText(
               text = data.sourceDetail,
-              size = 11.sp,
+              size = 12.sp,
               color = GlanceTheme.colors.outline,
               weight = WidgetFontWeight.Medium,
               // The chapter title a dua cites can be a full sentence; it gives way to the

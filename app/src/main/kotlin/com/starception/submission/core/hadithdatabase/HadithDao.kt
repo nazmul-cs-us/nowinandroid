@@ -57,6 +57,22 @@ interface HadithDao {
     """)
     suspend fun searchHadithsArabic(query: String, limit: Int = 50): List<HadithEntity>
 
+    /** Multi-token AND search used by the app-wide search surface. */
+    @Query("""
+        SELECT * FROM hadiths
+        WHERE (:t0 = '' OR text_plain LIKE '%' || :t0 || '%' OR text_arabic LIKE '%' || :t0 || '%')
+          AND (:t1 = '' OR text_plain LIKE '%' || :t1 || '%' OR text_arabic LIKE '%' || :t1 || '%')
+          AND (:t2 = '' OR text_plain LIKE '%' || :t2 || '%' OR text_arabic LIKE '%' || :t2 || '%')
+        ORDER BY id ASC
+        LIMIT :limit
+    """)
+    suspend fun searchHadithsMultiToken(
+        t0: String,
+        t1: String = "",
+        t2: String = "",
+        limit: Int = 20,
+    ): List<HadithEntity>
+
     /**
      * Get hadiths in range
      */

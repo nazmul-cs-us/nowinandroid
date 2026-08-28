@@ -49,6 +49,7 @@ data class SearchNavCallbacks(
     val onNewsClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit = {},
     val onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
     val onQuranicDuaClick: (com.starception.submission.core.quranicduas.QuranicDuaEntity) -> Unit = {},
+    val onBukhariHadithClick: (hadithNumber: Int) -> Unit = {},
     /** Tapped surah (X) + ayah (Y); also used for the curated SuggestedVerses rows. */
     val onVerseClick: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
 )

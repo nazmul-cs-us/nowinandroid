@@ -492,6 +492,11 @@ object ChapterRecitationState {
     var onStateChanged: ((Boolean, String, String) -> Unit)? = null
     /** (positionMs, durationMs) */
     var onProgressChanged: ((Int, Int) -> Unit)? = null
+    /** Independent observer for the app-wide media container. Kept separate from the app bridge
+     * so feature playback bookkeeping cannot replace or miss the global UI listener. */
+    var onGlobalStateChanged: ((Boolean, String, String) -> Unit)? = null
+    /** Progress observer paired with [onGlobalStateChanged]. */
+    var onGlobalProgressChanged: ((Int, Int) -> Unit)? = null
     /** Fired when a recitation finishes on its own (not a pause/stop) — drives dua auto-advance. */
     var onCompletion: (() -> Unit)? = null
     /** Fired when a downloaded Hadith recording naturally finishes. */
@@ -531,12 +536,14 @@ object ChapterRecitationState {
         // publish as "active" — the service explicitly calls markStopped() on teardown.
         this.isActive = true
         onStateChanged?.invoke(isPlaying, title, subtitle)
+        onGlobalStateChanged?.invoke(isPlaying, title, subtitle)
     }
 
     fun publishProgress(positionMs: Int, durationMs: Int) {
         this.positionMs = positionMs
         this.durationMs = durationMs
         onProgressChanged?.invoke(positionMs, durationMs)
+        onGlobalProgressChanged?.invoke(positionMs, durationMs)
     }
 
     /** Called when the service stops/completes so resync() knows there's nothing to restore. */
@@ -544,6 +551,7 @@ object ChapterRecitationState {
         isActive = false
         isPlaying = false
         onStateChanged?.invoke(false, title, subtitle)
+        onGlobalStateChanged?.invoke(false, title, subtitle)
     }
 
     internal fun requestSourcePlayback(

@@ -232,6 +232,13 @@ fun NiaNavHost(
                 topicId = "",
             )
         },
+        onBukhariHadithClick = { hadithNumber ->
+            navController.navigateToHadithDetail(
+                collectionName = "Sahih Bukhari",
+                hadithNumber = hadithNumber,
+                databaseFile = "sahih_bukhari.db",
+            )
+        },
         onVerseClick = { surah, ayah ->
             navController.navigateToSurah(surahNumber = surah, scrollToAyah = ayah)
         },
