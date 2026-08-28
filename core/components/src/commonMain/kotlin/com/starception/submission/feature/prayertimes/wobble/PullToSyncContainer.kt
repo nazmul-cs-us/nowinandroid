@@ -71,10 +71,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalHapticFeedback
-import android.content.res.Configuration
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
@@ -85,13 +84,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.starception.submission.feature.surah.MushafMiniBar
-import com.starception.submission.feature.surah.MushafMiniBarState
-import com.starception.submission.media.MediaAction
-import com.starception.submission.media.MediaControllerUiState
-import com.starception.submission.media.MediaMiniBar
-import com.starception.submission.ui.MiniBarRowHeight
 import kotlinx.coroutines.delay
+
+/**
+ * The height the bar row reserves. This was MiniBarRowHeight in the app module;
+ * it is a plain dimension, so it comes along rather than dragging the mini-bar
+ * shell across with it.
+ */
+private val MiniBarRowHeight = 30.dp
+
+/**
+ * A row the container can host inside its strip.
+ *
+ * The container reserves the space, animates the reveal and sweeps the progress
+ * line. It does not know whether the row is media playback or a Mushaf page —
+ * those features exist only on Android today, and this container is used on both
+ * platforms, so the feature passes in what to draw and how far along it is.
+ */
+data class SyncBarRow(
+    val isVisible: Boolean,
+    /** 0..1 along the strip, or 0 for a row with no notion of progress. */
+    val progress: Float = 0f,
+    val content: @Composable (statusText: String?) -> Unit,
+)
+
 
 /**
  * Sync container state forwarded to the content lambda. `pullModifier` carries
@@ -140,19 +156,16 @@ fun PullToSyncContainer(
     downloadProgress: Float = 0f,
     downloadLabel: String = "",
     isTtsPreparing: Boolean = false,
-    mediaState: MediaControllerUiState = MediaControllerUiState(),
-    onMediaAction: (MediaAction) -> Unit = {},
-    onMediaTitleClick: () -> Unit = {},
+    /** Fills the bar row when media is playing; supplied by the app. */
+    mediaBar: SyncBarRow? = null,
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
     weatherWarningText: String? = null,
     onWeatherWarningDismiss: () -> Unit = {},
     silentModeState: SilentModeState = SilentModeState(),
     islamicEventState: IslamicEventState = IslamicEventState(),
     onIslamicEventClick: (IslamicEventState) -> Unit = {},
-    mushafState: MushafMiniBarState? = null,
-    onMushafPrevious: () -> Unit = {},
-    onMushafNext: () -> Unit = {},
-    onMushafOpenInfo: () -> Unit = {},
+    /** Fills the bar row while a Mushaf page is open. */
+    mushafBar: SyncBarRow? = null,
     content: @Composable (syncState: SyncContainerState) -> Unit
 ) {
     val resolvedIdleContainerColor = if (idleContainerColor == Color.Unspecified) {
@@ -262,8 +275,11 @@ fun PullToSyncContainer(
     // same amount. Previously each state computed its own height (a sync banner
     // held 110dp while a prayer alert held ~60dp, and media grew by another row
     // when a status stacked on it), so the strip visibly jumped as state changed.
+    val windowSize = LocalWindowInfo.current.containerSize
     val baseMaxRevealDp =
-        if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 130f else 220f
+        // Window width against height rather than Configuration.orientation,
+        // which is Android-only. The same question, asked portably.
+        if (windowSize.width > windowSize.height) 130f else 220f
     val bannerDensity = LocalDensity.current
     val bannerTopInsetDp = with(bannerDensity) {
         WindowInsets.safeDrawing.getTop(this).toDp()
@@ -286,14 +302,14 @@ fun PullToSyncContainer(
     // labels never clip.
     val barRowDp = maxOf(MiniBarRowHeight, with(bannerDensity) { 17.sp.toDp() } + 13.dp)
     val standardBarHeightDp = barTopInsetPadding + barRowDp + barBottomPadding
-    val isMushafActive = mushafState != null
+    val isMushafActive = mushafBar?.isVisible == true
 
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
     val hasSyncResult = !syncResultText.isNullOrBlank()
     val hasStatus = isPrayerAlert || isWeatherWarning || isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
-    val targetHoldHeightDp = if (mediaState.isVisible || isMushafActive || hasStatus) {
+    val targetHoldHeightDp = if (mediaBar?.isVisible == true || isMushafActive || hasStatus) {
         standardBarHeightDp
     } else {
         0.dp
@@ -331,9 +347,8 @@ fun PullToSyncContainer(
         )
     )
     val animatedMushafPageProgress by animateFloatAsState(
-        targetValue = if (mushafState != null && mushafState.totalPages > 0) {
-            (mushafState.currentPage.toFloat() / mushafState.totalPages.toFloat())
-                .coerceIn(0f, 1f)
+        targetValue = if (mushafBar != null) {
+            mushafBar.progress.coerceIn(0f, 1f)
         } else {
             0f
         },
@@ -422,7 +437,7 @@ fun PullToSyncContainer(
         }
         // The media bar renders this as its own subtitle, so it would be a
         // duplicate here.
-        if (isTtsPreparing && !mediaState.isVisible) {
+        if (isTtsPreparing && mediaBar?.isVisible != true) {
             add(SyncBarStatus("tts", "Preparing audio…", SyncBarIcon.Spinner))
         }
         if (isPrayerAlert) {
@@ -509,7 +524,7 @@ fun PullToSyncContainer(
         val showSweep = (
             isRefreshing ||
                 isDownloading ||
-                mediaState.isVisible ||
+                mediaBar?.isVisible == true ||
                 isPrayerAlert ||
                 isMushafActive
             ) && wobbleIntensity > 0.01f
@@ -517,9 +532,9 @@ fun PullToSyncContainer(
             val fillProgress = when {
                 isDownloading -> animatedDownloadProgress
                 isRefreshing -> syncProgress.value
-                mediaState.isVisible -> {
-                    if (mediaState.playback.duration > 0) {
-                        (mediaState.playback.currentPosition.toFloat() / mediaState.playback.duration.toFloat())
+                mediaBar?.isVisible == true -> {
+                    if (mediaBar.progress > 0f) {
+                        mediaBar.progress
                             .coerceIn(0f, 1f)
                     } else {
                         0f
@@ -592,47 +607,16 @@ fun PullToSyncContainer(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    mediaState.isVisible -> {
-                        // Pull-up-to-dismiss is scoped to the title inside MediaMiniBar
-                        // (via titleDragModifier) so playback button taps are not swallowed.
-                        MediaMiniBar(
-                            state = mediaState,
-                            onAction = onMediaAction,
-                            onTitleClick = onMediaTitleClick,
-                            preparingAudio = isTtsPreparing,
-                            statusText = activeStatus?.text,
-                            // The strip's own sweep is the playback position, so a
-                            // track under the row would state it a second time.
-                            showProgressLine = false,
-                            titleDragModifier = Modifier.pointerInput(Unit) {
-                                var totalDrag = 0f
-                                detectVerticalDragGestures(
-                                    onDragStart = { totalDrag = 0f },
-                                    onVerticalDrag = { _, dragAmount ->
-                                        totalDrag += dragAmount
-                                    },
-                                    onDragEnd = {
-                                        if (totalDrag < -80f) {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onMediaAction(MediaAction.Dismiss)
-                                        }
-                                    },
-                                )
-                            },
-                        )
+                    mediaBar?.isVisible == true -> {
+                        // A slot rather than a direct call: the media and Mushaf
+                        // bars belong to features that exist only on Android
+                        // today. The container reserves and animates the row; it
+                        // does not need to know what fills it.
+                        mediaBar.content(activeStatus?.text)
                     }
 
-                    mushafState != null -> {
-                        MushafMiniBar(
-                            state = mushafState,
-                            onPrevious = onMushafPrevious,
-                            onNext = onMushafNext,
-                            onOpenInfo = onMushafOpenInfo,
-                            statusText = activeStatus?.text,
-                            // The strip's sweep is already the page position;
-                            // drawing the same fraction twice reads as clutter.
-                            showProgressLine = false,
-                        )
+                    mushafBar?.isVisible == true -> {
+                        mushafBar.content(activeStatus?.text)
                     }
 
                     else -> {

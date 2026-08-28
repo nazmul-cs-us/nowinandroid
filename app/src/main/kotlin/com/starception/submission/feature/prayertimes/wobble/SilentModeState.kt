@@ -10,10 +10,8 @@ import android.content.Context
 import com.starception.submission.prayer.silent.PrayerSilentModeController
 import kotlinx.coroutines.delay
 
-data class SilentModeState(
-    val isActive: Boolean = false,
-    val displayText: String = "",
-)
+// The state itself lives in :core:components so the shared sync banner can render
+// it; only this reader is Android-specific.
 
 /**
  * Surfaces the prayer-driven silent window to the pull-to-sync banner. The
