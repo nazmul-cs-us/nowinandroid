@@ -10,16 +10,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import com.starception.submission.core.images.resources.Res as ImageRes
+import com.starception.submission.core.images.resources.flaticon_magic_book_9061096
+import com.starception.submission.core.images.resources.flaticon_play_702132
+import com.starception.submission.core.images.resources.flaticon_search_152536
+import com.starception.submission.core.images.resources.flaticon_uicons_rounded_regular
+import org.jetbrains.compose.resources.Font
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.core.ui.R
 
 /**
  * UIcons Regular Rounded glyphs bundled with the app. Keep this catalog semantic so
@@ -87,7 +91,15 @@ object FlaticonIcons {
     const val VOICE = "\ufef1"
 }
 
-private val flaticonUiconsFont = FontFamily(Font(R.font.flaticon_uicons_rounded_regular))
+/**
+ * The Flaticon glyph font.
+ *
+ * Composable rather than a top-level val: Compose Multiplatform's Font() reads
+ * the generated resource table and needs composition scope, unlike Android's,
+ * which takes an int.
+ */
+@Composable
+private fun flaticonUiconsFont() = FontFamily(Font(ImageRes.font.flaticon_uicons_rounded_regular))
 
 /** A tintable Flaticon glyph that follows the surrounding Material content color. */
 @Composable
@@ -109,7 +121,7 @@ fun FlaticonIcon(
         Text(
             text = glyph,
             color = tint,
-            fontFamily = flaticonUiconsFont,
+            fontFamily = flaticonUiconsFont(),
             fontSize = fontSize,
             lineHeight = fontSize,
         )
@@ -125,7 +137,7 @@ fun FlaticonSearchIcon(
     iconSize: Dp = 22.dp,
 ) {
     Image(
-        painter = painterResource(R.drawable.flaticon_search_152536),
+        painter = painterResource(ImageRes.drawable.flaticon_search_152536),
         contentDescription = contentDescription,
         modifier = modifier.size(iconSize),
         colorFilter = ColorFilter.tint(tint),
@@ -141,7 +153,7 @@ fun FlaticonPlayIcon(
     iconSize: Dp = 22.dp,
 ) {
     Image(
-        painter = painterResource(R.drawable.flaticon_play_702132),
+        painter = painterResource(ImageRes.drawable.flaticon_play_702132),
         contentDescription = contentDescription,
         modifier = modifier.size(iconSize),
         colorFilter = ColorFilter.tint(tint),
@@ -156,7 +168,7 @@ fun FlaticonBookIcon(
     iconSize: Dp = 24.dp,
 ) {
     Image(
-        painter = painterResource(R.drawable.flaticon_magic_book_9061096),
+        painter = painterResource(ImageRes.drawable.flaticon_magic_book_9061096),
         contentDescription = contentDescription,
         modifier = modifier.size(iconSize),
     )

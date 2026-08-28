@@ -37,6 +37,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(projects.core.theme)
+            api(projects.core.images)
             api(projects.core.prayerEngine)
             api(compose.runtime)
             api(compose.ui)
