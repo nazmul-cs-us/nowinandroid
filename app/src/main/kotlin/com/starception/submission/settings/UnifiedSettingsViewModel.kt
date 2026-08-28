@@ -1334,15 +1334,3 @@ class UnifiedSettingsViewModel @Inject constructor(
     }
 }
 
-/**
- * Theme settings state
- */
-data class ThemeSettingsState(
-    val brand: ThemeBrand = ThemeBrand.COASTAL,
-    val useDynamicColor: Boolean = false,
-    val darkThemeConfig: DarkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
-    /** ARGB ints of the three custom accents (primary/secondary/tertiary) when [brand] == ThemeBrand.CUSTOM. 0 = none yet. */
-    val customColor: Int = 0,
-    val customSecondaryColor: Int = 0,
-    val customTertiaryColor: Int = 0,
-)

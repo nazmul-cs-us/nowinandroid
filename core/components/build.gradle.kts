@@ -38,6 +38,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.core.theme)
             api(projects.core.images)
+            api(projects.core.model)
             api(projects.core.prayerEngine)
             api(compose.runtime)
             api(compose.ui)

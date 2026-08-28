@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.settings.ThemeSettingsState
@@ -61,9 +61,26 @@ fun AppearanceSection(
     onChangeDynamicColorPreference: (Boolean) -> Unit,
     onChangeDarkThemeConfig: (DarkThemeConfig) -> Unit,
     onChangeCustomColors: (primary: Int, secondary: Int, tertiary: Int) -> Unit = { _, _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Whether the platform offers dynamic colour. On Android this is a
+     * Build.VERSION check for Material You; on iOS there is no such thing, so it
+     * passes false and the option is not offered.
+     */
+    supportDynamicColor: Boolean = false,
+    /**
+     * The custom-accent picker. Android's draws its wheel with Bitmap, Canvas and
+     * Paint, which do not cross, so the dialog comes from the caller. When null
+     * the custom colours option simply does not open one.
+     */
+    colorPickerDialog: (@Composable (
+        initialPrimary: Color,
+        initialSecondary: Color,
+        initialTertiary: Color,
+        onConfirm: (Color, Color, Color) -> Unit,
+        onDismiss: () -> Unit,
+    ) -> Unit)? = null,
 ) {
-    val supportDynamicColor = supportsDynamicTheming()
     val haptic = LocalHapticFeedback.current
     val showColorPickerState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val customColorOrFallback = if (themeSettings.customColor != 0) Color(themeSettings.customColor) else Color(0xFF6750A4)
@@ -135,22 +152,16 @@ fun AppearanceSection(
             }
         }
 
-        if (showColorPickerState.value) {
-            HsvColorWheelDialog(
-                initialPrimary = customColorOrFallback,
-                initialSecondary = customSecondaryOrFallback,
-                initialTertiary = customTertiaryOrFallback,
-                onConfirm = { p, s, t ->
-                    fun argb(c: Color) = android.graphics.Color.argb(
-                        (c.alpha * 255).toInt(),
-                        (c.red * 255).toInt(),
-                        (c.green * 255).toInt(),
-                        (c.blue * 255).toInt(),
-                    )
-                    onChangeCustomColors(argb(p), argb(s), argb(t))
+        if (showColorPickerState.value && colorPickerDialog != null) {
+            colorPickerDialog(
+                customColorOrFallback,
+                customSecondaryOrFallback,
+                customTertiaryOrFallback,
+                { primary, secondary, tertiary ->
+                    onChangeCustomColors(primary.toArgb(), secondary.toArgb(), tertiary.toArgb())
                     showColorPickerState.value = false
                 },
-                onDismiss = { showColorPickerState.value = false },
+                { showColorPickerState.value = false },
             )
         }
 
