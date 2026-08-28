@@ -1,6 +1,7 @@
 package com.starception.submission.feature.hadith
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -51,10 +53,14 @@ import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.FlaticonPlayIcon
 import com.starception.submission.core.ui.FlaticonSearchIcon
+import com.starception.submission.download.MissingContentCard
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private const val BUKHARI_DATABASE = "sahih_bukhari.db"
+private const val BUKHARI_DOWNLOAD_CATEGORY = "hadith_sahih_bukhari"
 
 private sealed interface BukhariBookLoadState {
     data object Loading : BukhariBookLoadState
@@ -72,6 +78,13 @@ fun BukhariBookScreen(
     onPlayAllClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val downloadManager = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            SherpaOnnxTtsEntryPoint::class.java,
+        ).assetDownloadManager()
+    }
+    var reloadTrigger by remember { mutableIntStateOf(0) }
     val selectedArabicFont by rememberHadithArabicFont(context)
     val arabicFontFamily = remember(selectedArabicFont) {
         hadithArabicFontFamily(selectedArabicFont)
@@ -80,6 +93,7 @@ fun BukhariBookScreen(
     val loadState by produceState<BukhariBookLoadState>(
         initialValue = BukhariBookLoadState.Loading,
         key1 = book,
+        key2 = reloadTrigger,
     ) {
         value = if (book == null) {
             BukhariBookLoadState.Error("This Bukhari book could not be found.")
@@ -129,11 +143,25 @@ fun BukhariBookScreen(
             }
 
             BukhariBookLoadState.MissingDatabase -> {
-                BukhariBookMessage(
-                    title = "Download Sahih Bukhari first",
-                    message = "Return to the Sahih Bukhari Interest and download the collection to browse this book.",
-                    modifier = Modifier.padding(innerPadding),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MissingContentCard(
+                        resourceName = "Sahih Bukhari Hadith Collection",
+                        category = BUKHARI_DOWNLOAD_CATEGORY,
+                        description = "Download the reader database to browse and play this Bukhari book.",
+                        downloadManager = downloadManager,
+                        onDownloadComplete = {
+                            // A deleted source can leave an open Room handle behind. Close it and
+                            // remove Room's managed copy so the next load opens the new CDN file.
+                            HadithDatabase.clearInstance(context, BUKHARI_DATABASE)
+                            reloadTrigger++
+                        },
+                    )
+                }
             }
 
             is BukhariBookLoadState.Error -> {

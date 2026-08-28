@@ -144,10 +144,16 @@ fun MissingContentCard(
                                         downloadState = DownloadCardState.Failed("No manifest available")
                                         return@launch
                                     }
-                                    withContext(Dispatchers.IO) {
+                                    val completed = withContext(Dispatchers.IO) {
                                         downloadManager.downloadCategory(category, manifest) { progress, _, _ ->
                                             downloadState = DownloadCardState.Downloading(progress)
                                         }
+                                    }
+                                    if (!completed) {
+                                        downloadState = DownloadCardState.Failed(
+                                            "Some files could not be downloaded. Please try again.",
+                                        )
+                                        return@launch
                                     }
                                     downloadState = DownloadCardState.Completed
                                     onDownloadComplete()

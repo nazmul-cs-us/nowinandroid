@@ -2913,7 +2913,11 @@ fun PrayerTimesScreen(
                         },
                         label = "locationCardOffsetY",
                     ) { expanded ->
-                        if (expanded) 0.dp else 40.dp
+                        // In the resting layout the Show All control starts at 2dp
+                        // and ends at 34dp. A 36dp card offset leaves a compact 2dp
+                        // gap, returning 4dp below the location card for navigation
+                        // clearance without changing the dashboard's total height.
+                        if (expanded) 0.dp else 36.dp
                     }
                     val locationCardEndInset by dashboardTransition.animateDp(
                         transitionSpec = {
@@ -2961,7 +2965,7 @@ fun PrayerTimesScreen(
                         // uses the difference.
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .offset(y = 4.dp)
+                            .offset(y = 2.dp)
                             .height(32.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp),
                     ) {

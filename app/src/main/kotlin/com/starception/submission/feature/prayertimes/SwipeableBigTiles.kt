@@ -1923,10 +1923,6 @@ fun SwipeableBigTiles(
                             // tinting it a second time.
                             skyTintStrength = 0f,
                             sceneDarkness = prayerNowSceneDarkness,
-                            adaptiveLightPosition = Offset(
-                                prayerNowSkyPalette.lightX,
-                                prayerNowSkyPalette.lightY,
-                            ),
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -1942,8 +1938,6 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            luminousAccent = Color(0xFFFFD27A),
-                            luminousAnchor = Offset(0.76f, 0.42f),
                             timelineProgress = prayerWindowProgress(prayerTimes, currentTime),
                             actionLabel = "Compass",
                             actionDescription = "Open prayer compass",
@@ -1977,10 +1971,6 @@ fun SwipeableBigTiles(
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.58f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.72f,
-                            adaptiveLightPosition = Offset(
-                                livePrayerSkyPalette.lightX,
-                                livePrayerSkyPalette.lightY,
-                            ),
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -1990,8 +1980,6 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            luminousAccent = Color(0xFFFFE2A8),
-                            luminousAnchor = Offset(0.80f, 0.24f),
                             prayerRecap = prayerRecap,
                             onPrayerToggle = { prayerName ->
                                 prayerRecap.firstOrNull { it.name == prayerName }?.let { prayer ->
@@ -2035,10 +2023,6 @@ fun SwipeableBigTiles(
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.46f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.64f,
-                            adaptiveLightPosition = Offset(
-                                livePrayerSkyPalette.lightX,
-                                livePrayerSkyPalette.lightY,
-                            ),
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -2048,8 +2032,6 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            luminousAccent = Color(0xFF8FE3C0),
-                            luminousAnchor = Offset(0.52f, 0.42f),
                             readingSurahIndex = dailySurah.number - 1,
                             readingPlayback = dailyReadingPlayback,
                             onReadingPlayPause = {
@@ -2085,10 +2067,6 @@ fun SwipeableBigTiles(
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.54f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.68f,
-                            adaptiveLightPosition = Offset(
-                                livePrayerSkyPalette.lightX,
-                                livePrayerSkyPalette.lightY,
-                            ),
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -2098,8 +2076,6 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            luminousAccent = Color(0xFFFFCE78),
-                            luminousAnchor = Offset(0.54f, 0.43f),
                             directionalHintBearing = qiblaBearing,
                             deviceHeadingDegrees = liveQiblaHeading,
                             actionDescription = "Open Qibla compass",
@@ -2120,10 +2096,6 @@ fun SwipeableBigTiles(
                             skyTintHorizon = livePrayerSkyPalette.horizon,
                             skyTintStrength = livePrayerSkyPalette.strength * 0.50f,
                             sceneDarkness = livePrayerSkyPalette.sceneDarkness * 0.70f,
-                            adaptiveLightPosition = Offset(
-                                livePrayerSkyPalette.lightX,
-                                livePrayerSkyPalette.lightY,
-                            ),
                             compactProgress = compactProgress,
                             expansionProgress = if (expandedLogicalPage != null) expansionProgress else 0f,
                             isExpanded = isExpandedCard,
@@ -2133,8 +2105,6 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            luminousAccent = Color(0xFFFFC978),
-                            luminousAnchor = Offset(0.50f, 0.36f),
                             actionLabel = when (aiRecommendation.target) {
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
@@ -2512,7 +2482,6 @@ private fun InsightPreviewCard(
     skyTintHorizon: Color? = null,
     skyTintStrength: Float = 0f,
     sceneDarkness: Float = 0f,
-    adaptiveLightPosition: Offset? = null,
     compactProgress: Float,
     expansionProgress: Float = 0f,
     isExpanded: Boolean = false,
@@ -2521,8 +2490,6 @@ private fun InsightPreviewCard(
     fullDayEffect: Boolean = false,
     isFocused: Boolean = false,
     backgroundPageOffset: () -> Float = { 0f },
-    luminousAccent: Color = Color(0xFFFFD27A),
-    luminousAnchor: Offset = Offset(0.72f, 0.32f),
     supportingText: String? = null,
     statusText: String? = null,
     statusMetaText: String? = null,
@@ -2596,16 +2563,6 @@ private fun InsightPreviewCard(
         targetValue = foregroundSceneDarkness,
         animationSpec = tween(durationMillis = 2_400, easing = FastOutSlowInEasing),
         label = "insightForegroundSceneDarkness",
-    )
-    val animatedLightX by animateFloatAsState(
-        targetValue = adaptiveLightPosition?.x ?: luminousAnchor.x,
-        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
-        label = "insightLightX",
-    )
-    val animatedLightY by animateFloatAsState(
-        targetValue = adaptiveLightPosition?.y ?: luminousAnchor.y,
-        animationSpec = tween(durationMillis = 4_000, easing = FastOutSlowInEasing),
-        label = "insightLightY",
     )
     Surface(
         modifier = Modifier
@@ -2827,55 +2784,6 @@ private fun InsightPreviewCard(
                         alpha = 0.13f + (restingLight * 0.05f)
                     }
                     .background(wallpaperTintBrush),
-            )
-
-            // A restrained bloom follows the natural light source or subject in
-            // each photograph. The gradient is cached as a render layer; only its
-            // transform and alpha move, so it does not add per-frame image work.
-            val luminousDiameter = minOf(cardMaxWidth, maxHeight) * 0.92f
-            val adaptiveLuminousAccent = lerpColor(
-                luminousAccent,
-                animatedSkyHorizon,
-                0.34f,
-            )
-            val luminousBrush = remember(adaptiveLuminousAccent) {
-                Brush.radialGradient(
-                    colorStops = arrayOf(
-                        0f to Color.White.copy(alpha = 0.72f),
-                        0.12f to adaptiveLuminousAccent.copy(alpha = 0.52f),
-                        0.48f to adaptiveLuminousAccent.copy(alpha = 0.18f),
-                        1f to Color.Transparent,
-                    ),
-                )
-            }
-            val resolvedLightX = lerp(luminousAnchor.x, animatedLightX, 0.38f)
-            val resolvedLightY = lerp(luminousAnchor.y, animatedLightY, 0.30f)
-            Box(
-                modifier = Modifier
-                    .requiredSize(luminousDiameter)
-                    .offset(
-                        x = (cardMaxWidth * resolvedLightX) - (luminousDiameter / 2f),
-                        y = (maxHeight * resolvedLightY) - (luminousDiameter / 2f),
-                    )
-                    .graphicsLayer {
-                        val pageOffset = backgroundPageOffset().coerceIn(-1f, 1f)
-                        val glowPhase = (ambientMotion + 1f) * 0.5f
-                        alpha = 0.13f +
-                            (focusedMotionStrength * (0.07f + (glowPhase * 0.07f)))
-                        translationX = (ambientMotion * 7.dp.toPx()) -
-                            (pageOffset * 10.dp.toPx())
-                        translationY = ambientMotion * -4.dp.toPx()
-                        val glowScale = 0.96f + (glowPhase * 0.08f)
-                        scaleX = glowScale
-                        scaleY = glowScale
-                    }
-                    .drawBehind {
-                        drawCircle(
-                            brush = luminousBrush,
-                            radius = size.minDimension / 2f,
-                            blendMode = BlendMode.Screen,
-                        )
-                    },
             )
 
             groundPainterRes?.let { groundRes ->
@@ -3554,6 +3462,12 @@ private fun InsightPreviewCard(
                                             preferFlat = true,
                                             animationSpeed = 1f,
                                             paletteColorOverride = heroAccent,
+                                            // Humidity's authored flat artwork uses dark
+                                            // source layers. A hue-only filter preserves
+                                            // that darkness and loses the glyph against
+                                            // Prayer Now's night scrim; thermometer/rain
+                                            // retain their authored shading normally.
+                                            useSolidTint = visual == PrayerWeatherVisual.Humidity,
                                             modifier = Modifier.size(if (narrowFooter) 17.dp else 20.dp),
                                         )
                                         Text(
