@@ -1,10 +1,5 @@
 package com.starception.submission.settings.components
 
-import android.Manifest
-import android.os.Build
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -59,7 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import androidx.core.content.ContextCompat
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.core.ui.FlaticonIcon
@@ -84,53 +77,23 @@ fun TravelDuaSection(
     onTriggerAudioChain: () -> Unit = {},
     onStopAudioChain: () -> Unit = {},
     isPlaying: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Asks for whatever the platform needs before the audio chain may play, and
+     * invokes the callback once it may. Android requests RECORD_AUDIO and audio
+     * storage; a platform with nothing to ask can invoke it immediately.
+     */
+    onRequestPlaybackPermission: (onGranted: () -> Unit) -> Unit = { it() },
 ) {
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
     // State to track if we need to trigger audio chain after permissions are granted
     var pendingAudioChainTrigger by remember { mutableStateOf(false) }
 
-    // Permission launcher for required audio-chain permissions.
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { grantResults ->
-        val allGranted = grantResults.values.all { it }
-        if (allGranted && pendingAudioChainTrigger) {
-            onTriggerAudioChain()
-        }
-        pendingAudioChainTrigger = false
-    }
-
-    // Helper function to check permission and trigger audio chain
-    fun checkPermissionAndPlay() {
-        val hasMicPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        val hasStoragePermission = ContextCompat.checkSelfPermission(
-            context,
-            storagePermission
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasMicPermission && hasStoragePermission) {
-            onTriggerAudioChain()
-        } else {
-            pendingAudioChainTrigger = true
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.RECORD_AUDIO,
-                    storagePermission
-                )
-            )
-        }
-    }
+    // Playing the chain needs microphone and audio-storage permission on
+    // Android, and neither concept maps to iOS in the same shape. The caller
+    // decides what "may I play this" means and calls back when it may.
+    fun checkPermissionAndPlay() = onRequestPlaybackPermission { onTriggerAudioChain() }
 
     Column(
         modifier = modifier,
