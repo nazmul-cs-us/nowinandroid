@@ -73,7 +73,9 @@ import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.settings.components.AboutSection
+import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.rememberDndAccess
@@ -275,6 +277,20 @@ fun UnifiedSettingsScreen(
                             onChangeDynamicColorPreference = viewModel::updateDynamicColorPreference,
                             onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
                             onChangeCustomColors = viewModel::updateCustomThemeColors,
+                            // Both of these are Android-only and are supplied
+                            // here so the section itself can be shared: Material
+                            // You is a Build.VERSION check, and the colour wheel
+                            // is drawn with Bitmap, Canvas and Paint.
+                            supportDynamicColor = supportsDynamicTheming(),
+                            colorPickerDialog = { primary, secondary, tertiary, onConfirm, onDismiss ->
+                                HsvColorWheelDialog(
+                                    initialPrimary = primary,
+                                    initialSecondary = secondary,
+                                    initialTertiary = tertiary,
+                                    onConfirm = onConfirm,
+                                    onDismiss = onDismiss,
+                                )
+                            },
                         )
                     }
                 }
