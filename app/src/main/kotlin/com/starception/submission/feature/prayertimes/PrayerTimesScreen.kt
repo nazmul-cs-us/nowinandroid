@@ -277,6 +277,13 @@ internal fun shouldReplacePrayerBellWithWeather(
     prayerTimeEditMode: Boolean,
 ): Boolean = !prayerTimeEditMode && (prayerStatus == "Current" || prayerStatus == "Next")
 
+/** Chooses one tile for weather decoration, preferring the prayer already in progress. */
+internal fun selectPrayerWeatherAlertTarget(
+    prayersWithAlerts: Set<String>,
+    statusForPrayer: (String) -> String,
+): String? = prayersWithAlerts.firstOrNull { statusForPrayer(it) == "Current" }
+    ?: prayersWithAlerts.firstOrNull { statusForPrayer(it) == "Next" }
+
 private sealed interface CurrentWeatherLoadState {
     data object Loading : CurrentWeatherLoadState
     data object Unavailable : CurrentWeatherLoadState
@@ -751,6 +758,16 @@ fun PrayerTimesScreen(
                 ),
             )
         }.toMap()
+    }
+
+    val prayerTileWeatherAlertTarget = remember(
+        prayerTileWeatherAlerts,
+        currentTime,
+        prayerTimes,
+    ) {
+        selectPrayerWeatherAlertTarget(prayerTileWeatherAlerts.keys) { prayerName ->
+            PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)
+        }
     }
 
     // Observe AI suggestions flow
@@ -1566,6 +1583,7 @@ fun PrayerTimesScreen(
                                     ) {
                                         val weatherAlert = prayerTileWeatherAlerts[prayerName]
                                             .takeIf {
+                                                prayerName == prayerTileWeatherAlertTarget &&
                                                 shouldReplacePrayerBellWithWeather(
                                                     prayerStatus = prayerStatus,
                                                     prayerTimeEditMode = prayerTimeEditMode,

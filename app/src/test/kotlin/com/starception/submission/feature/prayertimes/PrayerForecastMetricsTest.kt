@@ -24,6 +24,26 @@ class PrayerForecastMetricsTest {
     }
 
     @Test
+    fun onlyOneWeatherTileIsSelectedWithCurrentPrayerPreferred() {
+        val statuses = mapOf("Dhuhr" to "Current", "Asr" to "Next")
+
+        assertEquals(
+            "Dhuhr",
+            selectPrayerWeatherAlertTarget(statuses.keys, statuses::getValue),
+        )
+    }
+
+    @Test
+    fun nextPrayerIsSelectedWhenCurrentPrayerHasNoWeatherAlert() {
+        val statuses = mapOf("Asr" to "Next", "Maghrib" to "Upcoming")
+
+        assertEquals(
+            "Asr",
+            selectPrayerWeatherAlertTarget(statuses.keys, statuses::getValue),
+        )
+    }
+
+    @Test
     fun heatAndHumidity_keepsBothThresholdValues() {
         assertEquals(
             "44°C · 62% RH",

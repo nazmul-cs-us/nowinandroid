@@ -135,6 +135,7 @@ fun AppTopSearchBar(
     val onNewsClick = searchNav.onNewsClick
     val onFortressDuaClick = searchNav.onFortressDuaClick
     val onQuranicDuaClick = searchNav.onQuranicDuaClick
+    val onBukhariHadithClick = searchNav.onBukhariHadithClick
     // Use primaryContainer so the SearchBar pill takes on the user's selected
     // brand color (e.g. Royal -> pale Lapis blue) instead of the near-cream
     // surfaceVariant that's visually indistinguishable from the page background.
@@ -174,12 +175,14 @@ fun AppTopSearchBar(
     val inMemoryResults by viewModel.inMemoryResults.collectAsStateWithLifecycle()
     val ayahResults by viewModel.ayahResults.collectAsStateWithLifecycle()
     val fortressDuaResults by viewModel.fortressDuaResults.collectAsStateWithLifecycle()
+    val bukhariHadithResults by viewModel.bukhariHadithResults.collectAsStateWithLifecycle()
     val currentOnVerseClick by rememberUpdatedState(onVerseClick)
     val currentOnSearchSubmit by rememberUpdatedState(onSearchSubmit)
     val currentOnTopicClick by rememberUpdatedState(onTopicClick)
     val currentOnNewsClick by rememberUpdatedState(onNewsClick)
     val currentOnFortressDuaClick by rememberUpdatedState(onFortressDuaClick)
     val currentOnQuranicDuaClick by rememberUpdatedState(onQuranicDuaClick)
+    val currentOnBukhariHadithClick by rememberUpdatedState(onBukhariHadithClick)
     val currentOnProfileClick by rememberUpdatedState(onProfileClick)
 
     val context = LocalContext.current
@@ -647,6 +650,7 @@ fun AppTopSearchBar(
                 inMemoryResults = inMemoryResults,
                 ayahResults = ayahResults,
                 fortressDuaResults = fortressDuaResults,
+                bukhariHadithResults = bukhariHadithResults,
                 accentColor = accentColor,
                 titleColor = titleColor,
                 subtitleColor = subtitleColor,
@@ -691,6 +695,11 @@ fun AppTopSearchBar(
                     viewModel.saveSearchQuery(liveQuery)
                     searchView.hide()
                     currentOnQuranicDuaClick(dua)
+                },
+                onBukhariHadithClick = { hadithNumber ->
+                    viewModel.saveSearchQuery(liveQuery)
+                    searchView.hide()
+                    currentOnBukhariHadithClick(hadithNumber)
                 },
             )
 
@@ -983,6 +992,7 @@ private fun renderSuggestions(
     inMemoryResults: InMemorySearchResult,
     ayahResults: List<com.starception.submission.core.qurandatabase.AyahEntity>,
     fortressDuaResults: List<com.starception.submission.core.duadatabase.Dua>,
+    bukhariHadithResults: List<com.starception.submission.core.hadithdatabase.HadithEntity>,
     accentColor: Int,
     titleColor: Int,
     subtitleColor: Int,
@@ -995,6 +1005,7 @@ private fun renderSuggestions(
     onNewsClick: (com.starception.submission.core.model.data.UserNewsResource) -> Unit,
     onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit,
     onQuranicDuaClick: (com.starception.submission.core.quranicduas.QuranicDuaEntity) -> Unit,
+    onBukhariHadithClick: (Int) -> Unit,
 ) {
     val trimmedQuery = query.trim()
     val isFiltering = trimmedQuery.isNotEmpty()
@@ -1028,8 +1039,14 @@ private fun renderSuggestions(
     val cappedFortressDuas = (
         rankedFortressDuas.map { it.item } + fortressDuaResults
         ).distinctBy { it.id }.take(8)
+    val cappedBukhariHadiths = bukhariHadithResults.take(8)
     val ftsTopics = searchResults.topics.take(5)
-    val ftsNews = searchResults.newsResources.take(8)
+    val ftsNews = searchResults.newsResources
+        .filterNot { news ->
+            cappedBukhariHadiths.isNotEmpty() &&
+                news.url.startsWith("hadith://sahih_bukhari/")
+        }
+        .take(8)
 
     val stateKey = buildString {
         append(trimmedQuery)
@@ -1047,6 +1064,8 @@ private fun renderSuggestions(
         append(cappedAyahs.joinToString("|") { "a${it.surahNumber}:${it.numberInSurah}" })
         append("##")
         append(cappedFortressDuas.joinToString("|") { "f${it.id}" })
+        append("##")
+        append(cappedBukhariHadiths.joinToString("|") { "b${it.id}" })
         append("##")
         append(ftsTopics.joinToString("|") { it.topic.id })
         append("##")
@@ -1171,6 +1190,22 @@ private fun renderSuggestions(
                         container, inflater, dua,
                         accentColor, titleColor, subtitleColor,
                     ) { onFortressDuaClick(dua) }
+                }
+            },
+        )
+    }
+    if (!restrictToSurahs && cappedBukhariHadiths.isNotEmpty()) {
+        sections.add(
+            RenderableSection(title = "Sahih Bukhari", score = SQL_BUKHARI_PRIOR) {
+                cappedBukhariHadiths.forEach { hadith ->
+                    addBukhariHadithItem(
+                        parent = container,
+                        inflater = inflater,
+                        hadith = hadith,
+                        accentColor = accentColor,
+                        titleColor = titleColor,
+                        subtitleColor = subtitleColor,
+                    ) { onBukhariHadithClick(hadith.id) }
                 }
             },
         )
@@ -1318,6 +1353,7 @@ private data class RenderableSection(
 // sums; left there, every SQL section would now outrank every in-memory one.)
 private const val SQL_AYAH_PRIOR = 0.60
 private const val SQL_FORTRESS_PRIOR = 0.54
+private const val SQL_BUKHARI_PRIOR = 0.52
 private const val FTS_TOPICS_PRIOR = 0.46
 private const val FTS_NEWS_PRIOR = 0.40
 
@@ -1521,6 +1557,48 @@ private fun addFortressDuaItem(
         setTextColor(subtitleColor)
         typeface = appTypeface
         maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        visibility = if (snippet.isBlank()) View.GONE else View.VISIBLE
+    }
+    view.setOnClickListener { onClick() }
+    parent.addView(view)
+}
+
+private fun addBukhariHadithItem(
+    parent: ViewGroup,
+    inflater: LayoutInflater,
+    hadith: com.starception.submission.core.hadithdatabase.HadithEntity,
+    accentColor: Int,
+    titleColor: Int,
+    subtitleColor: Int,
+    onClick: () -> Unit,
+) {
+    val view = inflater.inflate(R.layout.app_search_suggestion_item, parent, false)
+    val appTypeface = appSearchTypeface(parent.context)
+    val book = com.starception.submission.core.model.data.BukhariBooks.findByHadithId(hadith.id)
+    view.findViewById<ImageView>(R.id.app_search_suggestion_icon).apply {
+        setImageResource(topicIconResFor("Sahih Bukhari") ?: R.drawable.ic_app_search_home_24)
+        imageTintList = null
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_title).apply {
+        text = buildString {
+            append("Hadith #${hadith.id}")
+            book?.let { append(" · ${it.nameEnglish}") }
+        }
+        setTextColor(titleColor)
+        typeface = appTypeface
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+    }
+    view.findViewById<TextView>(R.id.app_search_suggestion_subtitle).apply {
+        val snippet = hadith.textPlain.orEmpty()
+            .replace(Regex("[\\n\\r]+"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        text = snippet
+        setTextColor(subtitleColor)
+        typeface = appTypeface
+        maxLines = 2
         ellipsize = android.text.TextUtils.TruncateAt.END
         visibility = if (snippet.isBlank()) View.GONE else View.VISIBLE
     }

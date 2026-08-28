@@ -32,7 +32,7 @@
             android:maxLines="1"
             android:text="Daily Reminder"
             android:textColor="@color/prayer_widget_on_background"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <ImageView
@@ -54,7 +54,7 @@
         android:paddingHorizontal="10dp"
         android:text="HADITH"
         android:textColor="@color/prayer_widget_on_card"
-        android:textSize="9sp"
+        android:textSize="10sp"
         android:textStyle="bold" />
 
     <TextView
@@ -68,7 +68,7 @@
         android:maxLines="4"
         android:text="The Prophet ﷺ taught us to bring mindfulness and kindness into our daily actions."
         android:textColor="@color/prayer_widget_on_background"
-        android:textSize="12sp" />
+        android:textSize="14sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -84,7 +84,7 @@
             android:includeFontPadding="false"
             android:text="Bukhari"
             android:textColor="@color/prayer_widget_muted"
-            android:textSize="9sp" />
+            android:textSize="10sp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -93,6 +93,6 @@
             android:includeFontPadding="false"
             android:text="#154 · Ablutions"
             android:textColor="@color/prayer_widget_muted"
-            android:textSize="9sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 </LinearLayout>

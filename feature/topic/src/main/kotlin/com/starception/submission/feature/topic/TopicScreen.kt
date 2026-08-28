@@ -58,6 +58,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -248,6 +249,10 @@ internal fun TopicScreen(
                             onBackClick = onBackClick,
                             onFollowClick = onFollowClick,
                             uiState = topicUiState.followableTopic,
+                            compact = topicUiState.followableTopic.topic.name.contains(
+                                "Bukhari",
+                                ignoreCase = true,
+                            ),
                         )
                     }
                     topicBody(
@@ -274,7 +279,11 @@ internal fun TopicScreen(
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
             }
         }
-        val itemsAvailable = topicItemsSize(topicUiState, newsUiState)
+        // Use the real LazyColumn item count. Bukhari renders books in 49 paired rows, so the
+        // old news-based estimate made the thumb stop early and fast scrolling ineffective.
+        val itemsAvailable by remember(state) {
+            derivedStateOf { state.layoutInfo.totalItemsCount }
+        }
         val scrollbarState = state.scrollbarState(
             itemsAvailable = itemsAvailable,
         )
@@ -290,19 +299,6 @@ internal fun TopicScreen(
                 itemsAvailable = itemsAvailable,
             ),
         )
-    }
-}
-
-private fun topicItemsSize(
-    topicUiState: TopicUiState,
-    newsUiState: NewsUiState,
-) = when (topicUiState) {
-    TopicUiState.Error -> 2 // Toolbar + error message
-    TopicUiState.Loading -> 1 // Loading bar
-    is TopicUiState.Success -> when (newsUiState) {
-        NewsUiState.Error -> 0 // Nothing
-        NewsUiState.Loading -> 1 // Loading bar
-        is NewsUiState.Success -> 2 + newsUiState.news.size // Toolbar, header
     }
 }
 
@@ -363,7 +359,7 @@ private fun LazyListScope.bukhariBookBrowser(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 14.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
             shape = RoundedCornerShape(
                 topStart = 32.dp,
                 topEnd = 32.dp,
@@ -622,6 +618,7 @@ private fun BukhariBookCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(Modifier.weight(1f))
             NiaTopicTag(
                 followed = false,
                 onClick = {},
@@ -760,6 +757,7 @@ private fun TopicToolbar(
     uiState: FollowableTopic,
     modifier: Modifier = Modifier,
     showBackButton: Boolean = true,
+    compact: Boolean = false,
     onBackClick: () -> Unit = {},
     onFollowClick: (Boolean) -> Unit = {},
 ) {
@@ -768,7 +766,7 @@ private fun TopicToolbar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 32.dp),
+            .padding(bottom = if (compact) 8.dp else 32.dp),
     ) {
         if (showBackButton) {
             IconButton(onClick = { onBackClick() }) {

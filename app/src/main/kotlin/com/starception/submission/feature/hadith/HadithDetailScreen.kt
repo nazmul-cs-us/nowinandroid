@@ -104,12 +104,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.LayoutDirection
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
@@ -149,6 +151,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleIn
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.EnglishTtsTextNormalizer
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.TtsVoiceSelectionSheet
 import com.starception.submission.settings.components.isTtsVoiceModelAvailable
@@ -1313,6 +1316,13 @@ private fun HadithContent(
     onToggleAutoAdvance: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val bukhariBook = remember(databaseFile, hadithNumber) {
+        if (databaseFile.contains("bukhari", ignoreCase = true)) {
+            BukhariBooks.findByHadithId(hadithNumber)
+        } else {
+            null
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // No status bar padding - immersive mode hides status bar
@@ -1561,6 +1571,25 @@ private fun HadithContent(
                                                         )
                                                     }
                                                 )
+
+                                                if (bukhariBook != null) {
+                                                    NiaTopicTag(
+                                                        modifier = Modifier.widthIn(
+                                                            max = if (courseCompletionInfo == null) 220.dp else 150.dp,
+                                                        ),
+                                                        followed = false,
+                                                        onClick = { },
+                                                        enabled = true,
+                                                        text = {
+                                                            Text(
+                                                                text = "Book ${bukhariBook.id} · ${bukhariBook.nameEnglish}"
+                                                                    .uppercase(Locale.getDefault()),
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                            )
+                                                        },
+                                                    )
+                                                }
 
                                                 if (courseCompletionInfo != null) {
                                                     NiaVerifiedTag(
@@ -1970,6 +1999,11 @@ private suspend fun speakWithAndroidTtsAndAwait(
         "zh" -> "来自《布哈里圣训》。"
         else -> "From Sahih Al-Bukhari."
     }
+    val speechText = if (language == "en") {
+        EnglishTtsTextNormalizer.normalize("$intro $text")
+    } else {
+        "$intro $text"
+    }
 
     fun finish(result: Boolean) {
         if (continuation.isActive) continuation.resume(result)
@@ -1983,7 +2017,7 @@ private suspend fun speakWithAndroidTtsAndAwait(
             override fun onError(utteranceId: String?) = finish(false)
         })
         tts.language = locale
-        val result = tts.speak("$intro $text", TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        val result = tts.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         if (result == TextToSpeech.ERROR) finish(false)
     }
 
@@ -2043,7 +2077,11 @@ private fun playWithTts(
         else -> "From Sahih Al-Bukhari."
     }
 
-    val fullText = "$intro $text"
+    val fullText = if (language == "en") {
+        EnglishTtsTextNormalizer.normalize("$intro $text")
+    } else {
+        "$intro $text"
+    }
 
     if (tts != null) {
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {

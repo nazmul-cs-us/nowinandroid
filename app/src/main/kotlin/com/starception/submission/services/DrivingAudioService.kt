@@ -50,6 +50,7 @@ import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.voice.EnglishTtsTextNormalizer
 import com.starception.submission.voice.SherpaOnnxTtsService
 import com.starception.submission.voice.VoiceCompletionManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -867,7 +868,7 @@ class DrivingAudioService : Service() {
 
     private fun speakWithAndroidTts(hadithNumber: Int, text: String) {
         val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
-        val fullText = "$introText $text"
+        val fullText = EnglishTtsTextNormalizer.normalize("$introText $text")
         val utteranceId = "hadith_$hadithNumber"
 
         if (textToSpeech == null) {

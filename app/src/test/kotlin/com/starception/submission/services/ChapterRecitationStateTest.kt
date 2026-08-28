@@ -10,7 +10,31 @@ class ChapterRecitationStateTest {
 
     @AfterTest
     fun tearDown() {
+        ChapterRecitationState.onGlobalStateChanged = null
+        ChapterRecitationState.onGlobalProgressChanged = null
+        ChapterRecitationState.onStateChanged = null
+        ChapterRecitationState.onProgressChanged = null
+        ChapterRecitationState.markStopped()
         ChapterRecitationState.clearServiceRequests()
+    }
+
+    @Test
+    fun publishNotifiesIndependentGlobalMediaObservers() {
+        var state: Triple<Boolean, String, String>? = null
+        var progress: Pair<Int, Int>? = null
+        ChapterRecitationState.onGlobalStateChanged = { playing, title, subtitle ->
+            state = Triple(playing, title, subtitle)
+        }
+        ChapterRecitationState.onGlobalProgressChanged = { position, duration ->
+            progress = position to duration
+        }
+
+        ChapterRecitationState.publish(true, "Hadith #8", "Sahih Bukhari")
+        ChapterRecitationState.publishProgress(400, 1_000)
+
+        assertEquals(Triple(true, "Hadith #8", "Sahih Bukhari"), state)
+        assertEquals(400 to 1_000, progress)
+        assertTrue(ChapterRecitationState.isActive)
     }
 
     @Test

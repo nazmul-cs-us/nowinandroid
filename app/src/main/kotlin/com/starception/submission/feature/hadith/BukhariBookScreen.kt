@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -268,30 +269,44 @@ private fun BukhariHadithList(
         }
 
         item(key = "hadith-search") {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                leadingIcon = {
-                    FlaticonSearchIcon(contentDescription = null)
-                },
-                placeholder = { Text("Search within this book") },
-                trailingIcon = {
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                    leadingIcon = {
+                        FlaticonSearchIcon(contentDescription = null)
+                    },
+                    placeholder = { Text("Search hadiths") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                )
+                NiaTopicTag(
+                    followed = true,
+                    onClick = {},
+                ) {
                     Text(
-                        text = "${filteredHadiths.size}/${hadiths.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = if (query.isBlank()) {
+                            "${hadiths.size} HADITHS"
+                        } else {
+                            "${filteredHadiths.size}/${hadiths.size}"
+                        },
+                        maxLines = 1,
                     )
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-            )
+                }
+            }
         }
 
         if (filteredHadiths.isEmpty()) {
