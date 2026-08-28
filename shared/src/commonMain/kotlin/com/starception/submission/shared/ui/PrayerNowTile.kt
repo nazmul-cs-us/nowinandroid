@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyResource
+import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.prayer_foreground_nabawi
+import com.starception.submission.core.images.resources.prayer_ground_nabawi
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -51,9 +54,8 @@ import org.jetbrains.compose.resources.painterResource
  * page, from :core:images, so both platforms show the same sky for the same
  * moment and forecast.
  *
- * This is a simplified take on the Android tile, which additionally layers
- * ground and foreground art with parallax drift and crossfades between skies.
- * Those layers stay on Android for now; this establishes the shared artwork path.
+ * The portable ground and foreground layers mirror the Android composition.
+ * Platform-specific parallax remains an enhancement rather than a visual gap.
  */
 @Composable
 fun PrayerNowTile(
@@ -68,13 +70,27 @@ fun PrayerNowTile(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(210.dp)
-            .clip(RoundedCornerShape(20.dp)),
+            .height(220.dp)
+            .clip(RoundedCornerShape(26.dp)),
     ) {
         Image(
             painter = painterResource(prayerSkyResource(phase, weather)),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Image(
+            painter = painterResource(Res.drawable.prayer_ground_nabawi),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Image(
+            painter = painterResource(Res.drawable.prayer_foreground_nabawi),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.BottomCenter,
             modifier = Modifier.fillMaxSize(),
         )
 

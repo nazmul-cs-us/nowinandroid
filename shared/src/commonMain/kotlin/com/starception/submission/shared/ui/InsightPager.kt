@@ -41,12 +41,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
+import com.starception.submission.core.images.resources.insight_prayer_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
+import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import com.starception.submission.shared.SharedPrayerDay
@@ -118,9 +121,9 @@ fun InsightPager(
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // Match the compact Android dashboard: two useful cards remain in
-            // view while the next page still reads as horizontally swipeable.
-            val pageWidth = (maxWidth - 12.dp) / 2
+            // Android leaves the next card visibly clipped so the horizontal
+            // gesture is apparent without a separate swipe hint.
+            val pageWidth = (maxWidth - 12.dp) * 0.53f
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
@@ -140,6 +143,9 @@ fun InsightPager(
 
                     1 -> ArtworkTile(
                         artwork = Res.drawable.insight_prayer_background,
+                        foreground = Res.drawable.insight_prayer_foreground,
+                        foregroundScale = 0.88f,
+                        foregroundOffsetYFraction = 0.08f,
                         label = "Today's salah",
                         title = salah.headline,
                         subtitle = salah.detail,
@@ -154,6 +160,9 @@ fun InsightPager(
                         val surah = dailyReading(today)
                         ArtworkTile(
                             artwork = Res.drawable.insight_quran_background,
+                            foreground = Res.drawable.insight_quran_foreground_v2,
+                            foregroundScale = 0.80f,
+                            foregroundOffsetYFraction = 0.10f,
                             label = "Reading",
                             title = surah.nameEnglish,
                             subtitle = surah.subtitle(),
@@ -170,6 +179,9 @@ fun InsightPager(
 @Composable
 private fun ArtworkTile(
     artwork: DrawableResource,
+    foreground: DrawableResource? = null,
+    foregroundScale: Float = 1f,
+    foregroundOffsetYFraction: Float = 0f,
     label: String,
     title: String,
     subtitle: String,
@@ -180,8 +192,8 @@ private fun ArtworkTile(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(210.dp)
-            .clip(RoundedCornerShape(20.dp)),
+            .height(220.dp)
+            .clip(RoundedCornerShape(26.dp)),
     ) {
         Image(
             painter = painterResource(artwork),
@@ -189,6 +201,21 @@ private fun ArtworkTile(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        foreground?.let { foregroundArtwork ->
+            Image(
+                painter = painterResource(foregroundArtwork),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.BottomCenter,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = foregroundScale
+                        scaleY = foregroundScale
+                        translationY = size.height * foregroundOffsetYFraction
+                    },
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
