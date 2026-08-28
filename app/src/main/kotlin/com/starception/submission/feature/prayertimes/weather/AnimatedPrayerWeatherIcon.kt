@@ -67,6 +67,8 @@ internal fun AnimatedPrayerWeatherIcon(
     preferFlat: Boolean = false,
     styleOverride: MeteoconStyle? = null,
     preserveOriginalColors: Boolean = false,
+    /** Replace every non-transparent pixel with [paletteColorOverride] for dark backdrops. */
+    useSolidTint: Boolean = false,
     animationSpeed: Float = 0.72f,
     paletteColorOverride: ComposeColor? = null,
     modifier: Modifier = Modifier,
@@ -84,9 +86,11 @@ internal fun AnimatedPrayerWeatherIcon(
     }
     AnimatedMeteocon(
         animationResource = visual.animationResource(level, style),
-        paletteColorFilter = remember(paletteColor, preserveOriginalColors) {
+        paletteColorFilter = remember(paletteColor, preserveOriginalColors, useSolidTint) {
             if (preserveOriginalColors) {
                 null
+            } else if (useSolidTint) {
+                solidMeteoconColorFilter(paletteColor.toArgb())
             } else {
                 themedMeteoconColorFilter(paletteColor.toArgb())
             }
