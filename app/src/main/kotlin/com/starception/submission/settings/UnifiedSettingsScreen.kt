@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,6 +76,7 @@ import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
+import com.starception.submission.settings.components.rememberDndAccess
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
@@ -305,9 +307,19 @@ fun UnifiedSettingsScreen(
                         isExpanded = expandedSections.contains("notifications"),
                         onToggleExpanded = { viewModel.toggleSection("notifications") }
                     ) {
+                        // DND access is checked here rather than inside the
+                        // section: the section is shared with iOS, which has no
+                        // such permission to grant.
+                        val hasDndAccess by rememberDndAccess()
+                        val dndContext = LocalContext.current
                         NotificationsSection(
                             preferences = notificationPreferences,
-                            onPreferencesChanged = viewModel::updateNotificationPreferences
+                            onPreferencesChanged = viewModel::updateNotificationPreferences,
+                            hasDndAccess = hasDndAccess,
+                            onOpenDndAccessSettings = {
+                                com.starception.submission.prayer.silent
+                                    .openDndAccessSettings(dndContext)
+                            },
                         )
                     }
                 }

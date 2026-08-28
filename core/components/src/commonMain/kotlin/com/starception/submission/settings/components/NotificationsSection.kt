@@ -42,15 +42,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +63,13 @@ import com.starception.submission.prayer.model.PrayerNotificationPreferences
 fun NotificationsSection(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Whether the platform has granted Do Not Disturb control. Android must ask;
+     * iOS has nothing to ask for, so it passes true.
+     */
+    hasDndAccess: Boolean = true,
+    onOpenDndAccessSettings: () -> Unit = {},
 ) {
     Column(modifier = modifier) {
         // Master toggle
@@ -186,6 +188,8 @@ fun NotificationsSection(
                 SilentDuringPrayerSection(
                     preferences = preferences,
                     onPreferencesChanged = onPreferencesChanged,
+                    hasDndAccess = hasDndAccess,
+                    onOpenDndAccessSettings = onOpenDndAccessSettings,
                 )
             }
         }
@@ -196,28 +200,13 @@ fun NotificationsSection(
 private fun SilentDuringPrayerSection(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
+    hasDndAccess: Boolean,
+    onOpenDndAccessSettings: () -> Unit,
 ) {
-    val context = LocalContext.current
-    fun dndGranted(): Boolean {
-        val nm = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE)
-            as android.app.NotificationManager
-        return nm.isNotificationPolicyAccessGranted
-    }
-    // Track DND access, re-checked whenever the screen resumes (e.g. back from settings).
-    var hasDndAccess by remember { mutableStateOf(dndGranted()) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) hasDndAccess = dndGranted()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    fun openDndAccessSettings() {
-        // Deep-links straight to this app's DND detail page on API 30+ (single toggle),
-        // falling back to the generic list on older devices.
-        com.starception.submission.prayer.silent.openDndAccessSettings(context)
-    }
+    // Do Not Disturb access is an Android permission with no iOS counterpart, so
+    // both checking it and opening its settings page come in from the caller.
+    // iOS passes hasDndAccess = true and a no-op, because there is nothing to
+    // grant — Focus is controlled by the user, not by the app.
     CollapsibleSubSection(
         title = "Silent During Prayer",
         subtitle = "Auto-enable Do Not Disturb at prayer time",
@@ -242,8 +231,8 @@ private fun SilentDuringPrayerSection(
                     // returned early, so the feature remained disabled after access
                     // was granted.
                     onPreferencesChanged(preferences.copy(silentDuringPrayerEnabled = enabled))
-                    if (enabled && !dndGranted()) {
-                        openDndAccessSettings()
+                    if (enabled && !hasDndAccess) {
+                        onOpenDndAccessSettings()
                         return@Switch
                     }
                 },
@@ -261,7 +250,7 @@ private fun SilentDuringPrayerSection(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { openDndAccessSettings() }
+                    .clickable { onOpenDndAccessSettings() }
                     .padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
