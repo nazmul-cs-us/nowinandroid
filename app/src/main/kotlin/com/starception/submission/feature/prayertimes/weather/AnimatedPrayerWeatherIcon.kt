@@ -40,24 +40,9 @@ import com.starception.submission.R
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
-internal enum class PrayerWeatherVisual {
-    Rain,
-    Heat,
-    Humidity,
-}
 
-internal enum class WeatherThresholdLevel {
-    Normal,
-    Alert,
-    Severe,
-}
-
-internal enum class MeteoconStyle {
-    Fill,
-    Flat,
-    Monochrome,
-}
-
+// Only the current-weather icon uses this, and that icon stays here: it draws
+// animated vector drawables through BlendMode, neither of which crosses.
 private enum class CurrentWeatherVisual {
     ClearDay,
     ClearNight,
@@ -74,130 +59,6 @@ private enum class CurrentWeatherVisual {
     ThunderstormsNight,
     Cloudy,
 }
-
-/** Returns every noteworthy visual in preparation-first priority order. */
-internal fun prayerWeatherVisuals(summary: String?): List<PrayerWeatherVisual> {
-    if (summary.isNullOrBlank()) return emptyList()
-    return buildList {
-        if (summary.contains("rain", ignoreCase = true)) add(PrayerWeatherVisual.Rain)
-        if (summary.contains("hot", ignoreCase = true) || '°' in summary) {
-            add(PrayerWeatherVisual.Heat)
-        }
-        if (summary.contains("humidity", ignoreCase = true)) {
-            add(PrayerWeatherVisual.Humidity)
-        }
-    }
-}
-
-/** The first actionable condition remains the fallback for compact static surfaces. */
-internal fun primaryPrayerWeatherVisual(summary: String?): PrayerWeatherVisual? =
-    prayerWeatherVisuals(summary).firstOrNull()
-
-internal fun temperatureThresholdLevel(
-    value: Double,
-    threshold: Int,
-): WeatherThresholdLevel = thresholdLevel(value, threshold, severeDelta = 5)
-
-internal fun humidityThresholdLevel(
-    value: Int,
-    threshold: Int,
-): WeatherThresholdLevel = thresholdLevel(value.toDouble(), threshold, severeDelta = 15)
-
-internal fun rainThresholdLevel(
-    value: Int,
-    threshold: Int,
-): WeatherThresholdLevel = thresholdLevel(value.toDouble(), threshold, severeDelta = 30)
-
-/** Visual feedback for the threshold value currently being edited in settings. */
-internal fun weatherThresholdPreviewLevel(
-    visual: PrayerWeatherVisual,
-    value: Int,
-): WeatherThresholdLevel = when (visual) {
-    PrayerWeatherVisual.Rain -> when {
-        value >= 60 -> WeatherThresholdLevel.Severe
-        value >= 30 -> WeatherThresholdLevel.Alert
-        else -> WeatherThresholdLevel.Normal
-    }
-    PrayerWeatherVisual.Humidity -> when {
-        value >= 75 -> WeatherThresholdLevel.Severe
-        value >= 50 -> WeatherThresholdLevel.Alert
-        else -> WeatherThresholdLevel.Normal
-    }
-    PrayerWeatherVisual.Heat -> when {
-        value >= 38 -> WeatherThresholdLevel.Severe
-        value >= 30 -> WeatherThresholdLevel.Alert
-        else -> WeatherThresholdLevel.Normal
-    }
-}
-
-internal fun prayerWeatherThresholdLevel(
-    summary: String?,
-    thresholds: PrayerWeatherThresholds,
-): WeatherThresholdLevel = primaryPrayerWeatherVisual(summary)?.let { visual ->
-    prayerWeatherThresholdLevel(summary, thresholds, visual)
-} ?: WeatherThresholdLevel.Normal
-
-/** Uses the strongest active condition to prioritize time-sensitive guidance. */
-internal fun highestPrayerWeatherThresholdLevel(
-    summary: String?,
-    thresholds: PrayerWeatherThresholds,
-): WeatherThresholdLevel = prayerWeatherVisuals(summary)
-    .maxOfOrNull { visual ->
-        prayerWeatherThresholdLevel(summary, thresholds, visual)
-    } ?: WeatherThresholdLevel.Normal
-
-/**
- * Severe weather surfaces almost immediately, ordinary threshold alerts wait
- * long enough for the home screen to settle, and provider-only advisories keep
- * the original five-second pacing.
- */
-internal fun prayerWeatherWarningDelayMillis(
-    summary: String?,
-    thresholds: PrayerWeatherThresholds,
-): Long = when (highestPrayerWeatherThresholdLevel(summary, thresholds)) {
-    WeatherThresholdLevel.Severe -> 1_250L
-    WeatherThresholdLevel.Alert -> 3_000L
-    WeatherThresholdLevel.Normal -> 5_000L
-}
-
-/** Resolves severity independently for each condition in a multi-threshold forecast. */
-internal fun prayerWeatherThresholdLevel(
-    summary: String?,
-    thresholds: PrayerWeatherThresholds,
-    visual: PrayerWeatherVisual,
-): WeatherThresholdLevel {
-    if (summary.isNullOrBlank()) return WeatherThresholdLevel.Normal
-    val conditions = summary.split('·').map(String::trim)
-    return when (visual) {
-        PrayerWeatherVisual.Rain -> conditions
-            .firstOrNull { it.contains("rain", ignoreCase = true) }
-            ?.firstNumber()
-            ?.let { rainThresholdLevel(it.toInt(), thresholds.rainProbability) }
-        PrayerWeatherVisual.Heat -> conditions
-            .firstOrNull { it.contains("hot", ignoreCase = true) || '°' in it }
-            ?.firstNumber()
-            ?.let { temperatureThresholdLevel(it, thresholds.temperatureCelsius) }
-        PrayerWeatherVisual.Humidity -> conditions
-            .firstOrNull { it.contains("humidity", ignoreCase = true) }
-            ?.firstNumber()
-            ?.let { humidityThresholdLevel(it.toInt(), thresholds.humidity) }
-    } ?: WeatherThresholdLevel.Normal
-}
-
-private fun thresholdLevel(
-    value: Double,
-    threshold: Int,
-    severeDelta: Int,
-): WeatherThresholdLevel = when {
-    value >= threshold + severeDelta -> WeatherThresholdLevel.Severe
-    value >= threshold -> WeatherThresholdLevel.Alert
-    else -> WeatherThresholdLevel.Normal
-}
-
-private fun String.firstNumber(): Double? = Regex("""\d+(?:\.\d+)?""")
-    .find(this)
-    ?.value
-    ?.toDoubleOrNull()
 
 @Composable
 internal fun AnimatedPrayerWeatherIcon(

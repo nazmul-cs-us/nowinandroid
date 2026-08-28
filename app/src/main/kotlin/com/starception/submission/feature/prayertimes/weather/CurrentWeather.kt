@@ -61,12 +61,6 @@ data class PrayerForecastTarget(
     val time: LocalTime,
 )
 
-data class PrayerWeatherThresholds(
-    val rainProbability: Int = 25,
-    val humidity: Int = 50,
-    val temperatureCelsius: Int = 38,
-)
-
 object PrayerWeatherThresholdStore {
     private const val PREFS = "prayer_weather_preferences"
     private const val RAIN = "rain_probability_threshold"
