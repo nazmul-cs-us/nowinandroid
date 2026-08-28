@@ -84,7 +84,21 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
 
     var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
 
-    val day = PrayerSchedule.forDate(
+    // Keyed, not recomputed on every recomposition. The calculator is not cheap
+    // and logs several thousand lines per run, all synchronously on the main
+    // thread — recomputing it for a "+1 minute" tap stalls the UI visibly.
+    val day = remember(
+        today,
+        place.latitude,
+        place.longitude,
+        place.timeZoneOffset,
+        place.countryCode,
+        country,
+        prayerSettings,
+        weatherCode,
+        temperature,
+    ) {
+        PrayerSchedule.forDate(
         year = today.year,
         month = today.monthNumber,
         day = today.dayOfMonth,
@@ -98,9 +112,10 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
         weatherCode = weatherCode,
         temperatureCelsius = temperature,
-        countryCode = place.countryCode,
-        isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
-    )
+            countryCode = place.countryCode,
+            isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
+        )
+    }
 
     MaterialTheme(
         colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
