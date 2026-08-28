@@ -16,6 +16,11 @@ internal object TravelDuaPolicy {
     // than the default 60-second playback delay rejects a one-off speed spike at detection.
     const val DRIVING_EVIDENCE_MAX_AGE_MILLIS = 45_000L
 
+    // Activity Transition ENTER is delivered by Google Play services and remains active
+    // until its matching EXIT. Bound the fallback as protection against a missed EXIT.
+    // This covers the configurable driving delay (up to 3 minutes) plus alarm delivery lag.
+    const val GOOGLE_DRIVING_EVIDENCE_MAX_AGE_MILLIS = 5 * 60_000L
+
     fun isWithinTripGap(
         drivingStopTimeMillis: Long,
         nowMillis: Long,
@@ -34,5 +39,18 @@ internal object TravelDuaPolicy {
             return false
         }
         return nowElapsedMillis - lastEvidenceElapsedMillis <= maxAgeMillis
+    }
+
+    fun hasActiveGoogleDrivingEvidence(
+        nowElapsedMillis: Long,
+        googleDrivingConfirmed: Boolean,
+        confirmationElapsedMillis: Long,
+        maxAgeMillis: Long = GOOGLE_DRIVING_EVIDENCE_MAX_AGE_MILLIS,
+    ): Boolean {
+        return googleDrivingConfirmed && hasRecentDrivingEvidence(
+            nowElapsedMillis = nowElapsedMillis,
+            lastEvidenceElapsedMillis = confirmationElapsedMillis,
+            maxAgeMillis = maxAgeMillis,
+        )
     }
 }

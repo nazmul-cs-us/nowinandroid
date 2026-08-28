@@ -163,6 +163,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlin.coroutines.resume
 
 private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
 private const val HADITH_SECTION_ORDER_KEY = "section_order"
@@ -345,6 +346,13 @@ fun HadithDetailScreen(
     var playbackGeneration by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // When on, hitting the end of a hadith auto-advances to the next one.
     var autoAdvance by remember(initialAutoAdvance) { mutableStateOf(initialAutoAdvance) }
+    // "Play all" is a continuous coroutine instead of a chain of recompositions.
+    // That distinction matters when the display turns off: Compose rendering pauses,
+    // but this coroutine and the foreground playback service keep advancing tracks.
+    var bookPlaylistEnabled by remember(initialAutoPlay, initialAutoAdvance) {
+        mutableStateOf(initialAutoPlay && initialAutoAdvance)
+    }
+    var isBookPlaylistPlayback by remember { mutableStateOf(false) }
 
     // On-demand audio download state
     var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -355,7 +363,9 @@ fun HadithDetailScreen(
     // dismissing during the audio swap, we suppress the "stopped" notification and
     // auto-resume playback on the new hadith.
     var prevHadithNumberRef by remember { mutableStateOf(hadithNumber) }
-    var shouldAutoPlayAfterLoad by remember(initialAutoPlay) { mutableStateOf(initialAutoPlay) }
+    var shouldAutoPlayAfterLoad by remember(initialAutoPlay, initialAutoAdvance, selectedLanguage) {
+        mutableStateOf(initialAutoPlay && !initialAutoAdvance)
+    }
     var suppressStopNotification by remember { mutableStateOf(false) }
 
     // Notify global media controller when hadith playback state OR hadith changes
@@ -389,6 +399,10 @@ fun HadithDetailScreen(
     // down the old audio silently, then auto-resume on the freshly loaded hadith.
     androidx.compose.runtime.LaunchedEffect(hadithNumber) {
         if (prevHadithNumberRef != hadithNumber) {
+            if (isBookPlaylistPlayback) {
+                prevHadithNumberRef = hadithNumber
+                return@LaunchedEffect
+            }
             playbackGeneration += 1
             // Auto-resume if the user was playing OR if continuous-play toggle is on.
             // Continuous-play covers the natural-end case where isPlaying is already
@@ -573,9 +587,19 @@ fun HadithDetailScreen(
     // popping/pushing the back stack, so the composable stays mounted and the mini-bar
     // doesn't get a dispose/remount cycle.
     val handleSkipNext: () -> Unit = {
+        if (isBookPlaylistPlayback) {
+            bookPlaylistEnabled = false
+            isBookPlaylistPlayback = false
+            sherpaOnnxTts.stopSpeaking()
+        }
         if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) hadithNumber += 1
     }
     val handleSkipPrev: () -> Unit = {
+        if (isBookPlaylistPlayback) {
+            bookPlaylistEnabled = false
+            isBookPlaylistPlayback = false
+            sherpaOnnxTts.stopSpeaking()
+        }
         val firstAllowed = playbackRangeStart ?: 1
         if (hadithNumber > firstAllowed) hadithNumber -= 1
     }
@@ -618,6 +642,117 @@ fun HadithDetailScreen(
             ) {
                 com.starception.submission.services.ChapterRecitationState.onHadithCompletion = null
             }
+        }
+    }
+
+    // Keep book playback independent from recomposition. The former implementation
+    // finished one hadith, changed Compose state, and waited for a LaunchedEffect to
+    // start the next. With the display off that handoff can be deferred indefinitely.
+    // This loop awaits each TTS item directly and therefore advances in the background.
+    androidx.compose.runtime.LaunchedEffect(
+        bookPlaylistEnabled,
+        playbackRangeStart,
+        playbackRangeEnd,
+        selectedLanguage,
+        selectedVoice,
+        selectedSpeakerId,
+    ) {
+        val rangeStart = playbackRangeStart
+        val rangeEnd = playbackRangeEnd
+        if (!bookPlaylistEnabled || rangeStart == null || rangeEnd == null) {
+            return@LaunchedEffect
+        }
+        if (selectedLanguage == "en" && !isTtsVoiceModelAvailable(context, selectedVoice)) {
+            bookPlaylistEnabled = false
+            showTtsModelDownload = true
+            return@LaunchedEffect
+        }
+
+        isBookPlaylistPlayback = true
+        shouldAutoPlayAfterLoad = false
+        bukhariTranslationRepo.loadTranslations()
+        sherpaOnnxTts.setVoice(selectedVoice)
+
+        try {
+            for (number in rangeStart..rangeEnd) {
+                if (!bookPlaylistEnabled) break
+                val nextHadith = repository.getHadith(databaseFile, number) ?: continue
+                val englishText = bukhariTranslationRepo.getEnglishText(number)
+                    ?: nextHadith.textPlain
+                    ?: continue
+                val spokenText = if (selectedLanguage == "en") {
+                    englishText
+                } else {
+                    runCatching {
+                        translationService.translateFromEnglish(englishText, selectedLanguage)
+                    }.getOrNull() ?: englishText
+                }
+
+                playbackGeneration += 1
+                prevHadithNumberRef = number
+                hadithNumber = number
+                hadithCache[number] = nextHadith
+                hadith = nextHadith
+                translatedText = spokenText
+                isLoading = false
+                isPlaying = true
+                isTtsBackedPlayback = true
+                com.starception.submission.services.ChapterRecitationService
+                    .showExternalPlayback(
+                        context = context,
+                        title = "Hadith #$number",
+                        subtitle = "Sahih Bukhari",
+                    )
+
+                val completed = if (selectedLanguage == "bn") {
+                    var audioFile = audioDownloadHelper.resolveHadithAudioFile(number)
+                    if (audioFile == null) {
+                        val cdnKey = audioDownloadHelper.getHadithCdnKey(number)
+                        isDownloadingAudio = true
+                        audioFile = when (audioDownloadHelper.downloadAudio(cdnKey)) {
+                            is AssetDownloadManager.DownloadState.Completed ->
+                                audioDownloadHelper.resolveHadithAudioFile(number)
+                            else -> null
+                        }
+                        isDownloadingAudio = false
+                    }
+                    if (audioFile != null) {
+                        playHadithRecordingAndAwait(
+                            context = context,
+                            source = audioFile.absolutePath,
+                            hadithNumber = number,
+                        )
+                    } else {
+                        speakWithAndroidTtsAndAwait(
+                            context = context,
+                            text = spokenText,
+                            language = selectedLanguage,
+                            existingTts = textToSpeech,
+                            onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                        )
+                    }
+                } else if (selectedLanguage == "en") {
+                    val fullText = "Hadith number $number from Sahih Al-Bukhari. $spokenText"
+                    sherpaOnnxTts.speakCachedOrGenerate(
+                        text = fullText,
+                        speakerId = selectedSpeakerId,
+                    )
+                } else {
+                    speakWithAndroidTtsAndAwait(
+                        context = context,
+                        text = spokenText,
+                        language = selectedLanguage,
+                        existingTts = textToSpeech,
+                        onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                    )
+                }
+                if (!completed || !bookPlaylistEnabled) break
+            }
+        } finally {
+            isBookPlaylistPlayback = false
+            isTtsBackedPlayback = false
+            isPlaying = false
+            com.starception.submission.services.ChapterRecitationService.stop(context)
         }
     }
 
@@ -745,7 +880,15 @@ fun HadithDetailScreen(
                         }
                     }
                     val handlePlayClick: () -> Unit = {
-                            if (isPlaying) {
+                            if (isBookPlaylistPlayback) {
+                                bookPlaylistEnabled = false
+                                isBookPlaylistPlayback = false
+                                playbackGeneration += 1
+                                sherpaOnnxTts.stopSpeaking()
+                                com.starception.submission.services.ChapterRecitationService.stop(context)
+                                isTtsBackedPlayback = false
+                                isPlaying = false
+                            } else if (isPlaying) {
                                 playbackGeneration += 1
                                 // Stop playback (local player, TTS, and the recitation service)
                                 mediaPlayer?.stop()
@@ -941,7 +1084,7 @@ fun HadithDetailScreen(
                     // Auto-resume playback on the freshly loaded hadith when navigation
                     // was triggered while audio was playing (mini-bar prev/next or swipe).
                     androidx.compose.runtime.LaunchedEffect(hadith) {
-                        if (shouldAutoPlayAfterLoad && !isPlaying) {
+                        if (shouldAutoPlayAfterLoad && !isPlaying && !isBookPlaylistPlayback) {
                             shouldAutoPlayAfterLoad = false
                             kotlinx.coroutines.delay(50)
                             handlePlayClick()
@@ -1763,6 +1906,105 @@ private fun getLanguageName(code: String): String {
 /**
  * Play text using TextToSpeech
  */
+private suspend fun playHadithRecordingAndAwait(
+    context: android.content.Context,
+    source: String,
+    hadithNumber: Int,
+): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    val state = com.starception.submission.services.ChapterRecitationState
+    val previousCallback = state.onHadithCompletion
+    lateinit var completionCallback: () -> Unit
+    fun restoreCallback() {
+        if (state.onHadithCompletion === completionCallback) {
+            state.onHadithCompletion = previousCallback
+        }
+    }
+    completionCallback = {
+        restoreCallback()
+        if (continuation.isActive) continuation.resume(true)
+    }
+    state.onHadithCompletion = completionCallback
+    continuation.invokeOnCancellation {
+        restoreCallback()
+        com.starception.submission.services.ChapterRecitationService.stop(context)
+    }
+    com.starception.submission.services.ChapterRecitationService.play(
+        context = context,
+        source = source,
+        title = "Hadith #$hadithNumber",
+        subtitle = "Sahih Bukhari",
+    )
+}
+
+private suspend fun speakWithAndroidTtsAndAwait(
+    context: android.content.Context,
+    text: String,
+    language: String,
+    existingTts: TextToSpeech?,
+    onTtsCreated: (TextToSpeech) -> Unit,
+): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    var activeTts = existingTts
+    val utteranceId = "bukhari_playlist_${System.nanoTime()}"
+    val locale = when (language) {
+        "ar" -> java.util.Locale.forLanguageTag("ar")
+        "bn" -> java.util.Locale.forLanguageTag("bn-BD")
+        "es" -> java.util.Locale.forLanguageTag("es-ES")
+        "fr" -> java.util.Locale.FRANCE
+        "id" -> java.util.Locale.forLanguageTag("id-ID")
+        "ru" -> java.util.Locale.forLanguageTag("ru-RU")
+        "sv" -> java.util.Locale.forLanguageTag("sv-SE")
+        "tr" -> java.util.Locale.forLanguageTag("tr-TR")
+        "ur" -> java.util.Locale.forLanguageTag("ur-PK")
+        "zh" -> java.util.Locale.SIMPLIFIED_CHINESE
+        else -> java.util.Locale.US
+    }
+    val intro = when (language) {
+        "bn" -> "সহীহ আল-বুখারী থেকে।"
+        "ar" -> "من صحيح البخاري."
+        "es" -> "De Sahih Al-Bujari."
+        "fr" -> "De Sahih Al-Boukhari."
+        "id" -> "Dari Sahih Al-Bukhari."
+        "ru" -> "Из Сахих аль-Бухари."
+        "tr" -> "Sahih-i Buhari'den."
+        "ur" -> "صحیح البخاری سے۔"
+        "zh" -> "来自《布哈里圣训》。"
+        else -> "From Sahih Al-Bukhari."
+    }
+
+    fun finish(result: Boolean) {
+        if (continuation.isActive) continuation.resume(result)
+    }
+
+    fun start(tts: TextToSpeech) {
+        activeTts = tts
+        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+            override fun onDone(utteranceId: String?) = finish(true)
+            override fun onError(utteranceId: String?) = finish(false)
+        })
+        tts.language = locale
+        val result = tts.speak("$intro $text", TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        if (result == TextToSpeech.ERROR) finish(false)
+    }
+
+    continuation.invokeOnCancellation { activeTts?.stop() }
+    if (existingTts != null) {
+        start(existingTts)
+    } else {
+        lateinit var createdTts: TextToSpeech
+        createdTts = TextToSpeech(context.applicationContext) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                onTtsCreated(createdTts)
+                start(createdTts)
+            } else {
+                createdTts.shutdown()
+                finish(false)
+            }
+        }
+        activeTts = createdTts
+    }
+}
+
 private fun playWithTts(
     context: android.content.Context,
     text: String,

@@ -17,16 +17,22 @@
 package com.starception.submission.feature.topic
 
 import androidx.annotation.VisibleForTesting
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -42,10 +48,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,6 +65,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
@@ -66,12 +78,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.designsystem.component.DynamicAsyncImage
 import com.starception.submission.core.designsystem.component.NiaBackground
 import com.starception.submission.core.designsystem.component.NiaFilterChip
 import com.starception.submission.core.designsystem.component.NiaLoadingWheel
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
@@ -310,9 +324,14 @@ private fun LazyListScope.topicBody(
     filteredBukhariBooks: List<BukhariBook> = BukhariBooks.all,
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
-    // TODO: Show icon if available
-    item {
-        TopicHeader(name, description, imageUrl)
+    val isBukhari = name.contains("Bukhari", ignoreCase = true)
+
+    // The collection browser owns its compact identity header. The generic topic hero is useful
+    // for editorial topics, but duplicated the Bukhari title and consumed most of the first screen.
+    if (!isBukhari) {
+        item {
+            TopicHeader(name, description, imageUrl)
+        }
     }
 
     // App-provided slot under the header (e.g. a download card for missing Quran/Hadith content).
@@ -320,7 +339,7 @@ private fun LazyListScope.topicBody(
         belowHeaderContent(name)
     }
 
-    if (name.contains("Bukhari", ignoreCase = true)) {
+    if (isBukhari) {
         bukhariBookBrowser(
             query = bukhariQuery,
             onQueryChange = onBukhariQueryChange,
@@ -341,38 +360,100 @@ private fun LazyListScope.bukhariBookBrowser(
     onBookPlayClick: (Int) -> Unit,
 ) {
     item(key = "bukhari-book-search") {
-        Column(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 14.dp),
+            shape = RoundedCornerShape(
+                topStart = 32.dp,
+                topEnd = 32.dp,
+                bottomEnd = 32.dp,
+                bottomStart = 10.dp,
+            ),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
-            Text(
-                text = "Explore all 97 books",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Choose a canonical book to read hadiths about a specific subject.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                leadingIcon = {
-                    FlaticonSearchIcon(contentDescription = null)
-                },
-                placeholder = { Text("Search books in English or Arabic") },
-            )
-            Text(
-                text = if (query.isBlank()) "97 books · 7,277 hadiths" else "${books.size} books found",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text(
+                            text = "SAHIH BUKHARI",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
+                        )
+                        Text(
+                            text = "Browse 97 books",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 28.sp,
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(
+                            topStart = 20.dp,
+                            topEnd = 20.dp,
+                            bottomEnd = 8.dp,
+                            bottomStart = 20.dp,
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = "97",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "BOOKS",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = "7,277 hadiths, arranged by subject",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    leadingIcon = {
+                        FlaticonSearchIcon(contentDescription = null)
+                    },
+                    placeholder = { Text("Search English or Arabic") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                )
+                if (query.isNotBlank()) {
+                    Text(
+                        text = "${books.size} ${if (books.size == 1) "book" else "books"} found",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
         }
     }
 
@@ -396,15 +477,23 @@ private fun LazyListScope.bukhariBookBrowser(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .height(IntrinsicSize.Min)
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                rowBooks.forEach { book ->
+                rowBooks.forEachIndexed { index, book ->
                     BukhariBookCard(
                         book = book,
                         onClick = { onBookClick(book.id) },
                         onPlayClick = { onBookPlayClick(book.id) },
-                        modifier = Modifier.weight(1f),
+                        position = when {
+                            rowBooks.size == 1 -> BukhariBookCardPosition.Solo
+                            index == 0 -> BukhariBookCardPosition.Left
+                            else -> BukhariBookCardPosition.Right
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                     )
                 }
                 if (rowBooks.size == 1) Spacer(Modifier.weight(1f))
@@ -418,38 +507,97 @@ private fun BukhariBookCard(
     book: BukhariBook,
     onClick: () -> Unit,
     onPlayClick: () -> Unit,
+    position: BukhariBookCardPosition,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val outerCorner by animateDpAsState(
+        targetValue = if (isPressed) 24.dp else 30.dp,
+        label = "bukhariBookOuterCorner",
+    )
+    val innerCorner by animateDpAsState(
+        targetValue = if (isPressed) 24.dp else 8.dp,
+        label = "bukhariBookInnerCorner",
+    )
+    val pressedScale by animateFloatAsState(
+        targetValue = if (isPressed) 1.025f else 1f,
+        label = "bukhariBookPressedScale",
+    )
+    val shape = when (position) {
+        BukhariBookCardPosition.Left -> RoundedCornerShape(
+            topStart = outerCorner,
+            topEnd = innerCorner,
+            bottomEnd = innerCorner,
+            bottomStart = outerCorner,
+        )
+        BukhariBookCardPosition.Right -> RoundedCornerShape(
+            topStart = innerCorner,
+            topEnd = outerCorner,
+            bottomEnd = outerCorner,
+            bottomStart = innerCorner,
+        )
+        BukhariBookCardPosition.Solo -> RoundedCornerShape(outerCorner)
+    }
+    val (containerColor, contentColor) = bukhariBookCardColors()
+
     Card(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 176.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .heightIn(min = 160.dp)
+            .zIndex(if (isPressed) 1f else 0f)
+            .graphicsLayer {
+                scaleX = pressedScale
+                scaleY = pressedScale
+            },
+        shape = shape,
+        interactionSource = interactionSource,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
                 Text(
                     text = book.id.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = contentColor.copy(alpha = 0.82f),
                 )
-                IconButton(
+                val playInteractionSource = remember { MutableInteractionSource() }
+                val isPlayPressed by playInteractionSource.collectIsPressedAsState()
+                val playCorner by animateDpAsState(
+                    targetValue = if (isPlayPressed) 26.dp else 14.dp,
+                    label = "bukhariPlayCorner",
+                )
+                FilledIconButton(
                     onClick = onPlayClick,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(44.dp),
+                    shape = RoundedCornerShape(
+                        topStart = 22.dp,
+                        topEnd = 22.dp,
+                        bottomEnd = playCorner,
+                        bottomStart = 22.dp,
+                    ),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = contentColor,
+                        contentColor = containerColor,
+                    ),
+                    interactionSource = playInteractionSource,
                 ) {
                     FlaticonPlayIcon(
                         contentDescription = "Play all ${book.hadithCount} hadiths in ${book.nameEnglish}",
-                        tint = MaterialTheme.colorScheme.primary,
-                        iconSize = 24.dp,
+                        tint = containerColor,
+                        iconSize = 20.dp,
                     )
                 }
             }
@@ -457,27 +605,46 @@ private fun BukhariBookCard(
                 text = book.nameEnglish,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 3,
+                lineHeight = 22.sp,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = book.nameArabic,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = QuranFonts.PDMSSaleem),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = QuranFonts.PDMSSaleem,
+                    lineHeight = 26.sp,
+                ),
+                color = contentColor.copy(alpha = 0.76f),
                 textAlign = TextAlign.End,
-                maxLines = 2,
+                minLines = 1,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "${book.hadithCount} hadiths",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            NiaTopicTag(
+                followed = false,
+                onClick = {},
+            ) {
+                Text(
+                    text = "${book.hadithCount} HADITHS · ${book.firstHadithId}–${book.lastHadithId}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
+
+private enum class BukhariBookCardPosition {
+    Left,
+    Right,
+    Solo,
+}
+
+@Composable
+private fun bukhariBookCardColors(): Pair<Color, Color> =
+    MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
 
 @Composable
 private fun TopicHeader(name: String, description: String, imageUrl: String) {

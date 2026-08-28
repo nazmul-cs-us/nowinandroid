@@ -53,4 +53,33 @@ class TravelDuaPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun activeGoogleDrivingConfirmation_allowsPlaybackWithoutRecentGps() {
+        assertTrue(
+            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
+                nowElapsedMillis = 200_000L,
+                googleDrivingConfirmed = true,
+                confirmationElapsedMillis = 20_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun exitedOrStaleGoogleDrivingConfirmation_blocksPlayback() {
+        assertFalse(
+            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
+                nowElapsedMillis = 200_000L,
+                googleDrivingConfirmed = false,
+                confirmationElapsedMillis = 20_000L,
+            ),
+        )
+        assertFalse(
+            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
+                nowElapsedMillis = 320_001L,
+                googleDrivingConfirmed = true,
+                confirmationElapsedMillis = 20_000L,
+            ),
+        )
+    }
 }

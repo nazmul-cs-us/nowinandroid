@@ -228,7 +228,6 @@ object ActivityTracker {
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
     private const val KEY_LAST_DUA_PLAY_TIME = "last_dua_play_time"
-    private const val KEY_GOOGLE_DRIVING_CONFIRMED = "google_driving_confirmed"
     private var googleDrivingConfirmed = false
 
     // Gap tolerance tracking - continue countdown if driving resumes within gap tolerance
@@ -1036,7 +1035,17 @@ object ActivityTracker {
     private fun persistGoogleDrivingConfirmation(isConfirmed: Boolean) {
         context?.getSharedPreferences(TravelDuaSettings.PREFS_NAME, Context.MODE_PRIVATE)
             ?.edit()
-            ?.putBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, isConfirmed)
+            ?.putBoolean(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED, isConfirmed)
+            ?.apply {
+                if (isConfirmed) {
+                    putLong(
+                        TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED,
+                        SystemClock.elapsedRealtime(),
+                    )
+                } else {
+                    remove(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED)
+                }
+            }
             ?.apply()
     }
 
@@ -2271,13 +2280,19 @@ object ActivityTracker {
             // Only restore Google authority when a Travel Dua is still pending. This
             // preserves the countdown across a sticky service/process restart without
             // allowing a missed EXIT to leave driving latched after playback completes.
-            googleDrivingConfirmed = prefs.getBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, false) &&
+            googleDrivingConfirmed = prefs.getBoolean(
+                TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED,
+                false,
+            ) &&
                 prefs.contains(TravelDuaSettings.KEY_PENDING_ALARM_TOKEN)
             if (googleDrivingConfirmed) {
                 _currentActivity.value = "Driving"
                 Log.i("ActivityTracker", "🚗 Restored Google-confirmed driving session with pending alarm")
             } else {
-                prefs.edit().putBoolean(KEY_GOOGLE_DRIVING_CONFIRMED, false).apply()
+                prefs.edit()
+                    .putBoolean(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED, false)
+                    .remove(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED)
+                    .apply()
             }
             val timeSinceLastDua = if (lastDuaPlayTime > 0) (System.currentTimeMillis() - lastDuaPlayTime) / 1000 else -1L
 
