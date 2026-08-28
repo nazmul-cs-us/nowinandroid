@@ -448,7 +448,20 @@ fun UnifiedSettingsScreen(
                         isExpanded = expandedSections.contains("about"),
                         onToggleExpanded = { viewModel.toggleSection("about") }
                     ) {
-                        AboutSection()
+                        val aboutContext = LocalContext.current
+                        AboutSection(
+                            // OssLicensesMenuActivity is an Activity, so the
+                            // section takes the action rather than the intent.
+                            onOpenLicenses = {
+                                aboutContext.startActivity(
+                                    android.content.Intent(
+                                        aboutContext,
+                                        com.google.android.gms.oss.licenses
+                                            .OssLicensesMenuActivity::class.java,
+                                    ),
+                                )
+                            },
+                        )
                     }
                 }
 
