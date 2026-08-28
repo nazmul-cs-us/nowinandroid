@@ -1942,18 +1942,21 @@ fun PrayerTimesScreen(
                 idleContainerBrush = mainPageBackgroundBrush(),
                 downloadProgress = downloadProgress,
                 downloadLabel = downloadLabel,
-                mediaState = mediaState,
-                onMediaAction = onMediaAction,
                 isTtsPreparing = isTtsPreparing,
-                onMediaTitleClick = {
-                    val source = mediaState.playback.source
-                    if (onMediaSourceClick != null) {
-                        onMediaSourceClick.invoke(source)
-                    } else {
-                        (source as? com.starception.submission.media.MediaSource.Quran)
-                            ?.let { onSurahClick(it.surahIndex + 1) }
-                    }
-                },
+                mediaBar = com.starception.submission.ui.mediaSyncBarRow(
+                    state = mediaState,
+                    onAction = onMediaAction,
+                    onTitleClick = {
+                        val source = mediaState.playback.source
+                        if (onMediaSourceClick != null) {
+                            onMediaSourceClick.invoke(source)
+                        } else {
+                            (source as? com.starception.submission.media.MediaSource.Quran)
+                                ?.let { onSurahClick(it.surahIndex + 1) }
+                        }
+                    },
+                    isTtsPreparing = isTtsPreparing,
+                ),
                 prayerAlertState = prayerAlertState,
                 weatherWarningText = syncWeatherResult,
                 onWeatherWarningDismiss = { syncWeatherResult = null },

@@ -1051,25 +1051,30 @@ private fun NiaMainContent(
             downloadProgress = downloadProgress,
             downloadLabel = downloadLabel,
             isTtsPreparing = isTtsPreparing,
-            mediaState = appLevelMediaState,
-            onMediaAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
-            onMediaTitleClick = {
-                // Route by playback source so every mini-bar title opens its
-                // detail page (surah, hadith, or fortress dua), not just Quran.
-                appState.navController.navigateToMediaSourceDetail(
-                    appLevelMediaState.playback.source,
-                )
-            },
+            mediaBar = mediaSyncBarRow(
+                state = appLevelMediaState,
+                onAction = { action -> mainViewModel?.globalMedia?.handleAction(action) },
+                onTitleClick = {
+                    // Route by playback source so every mini-bar title opens its
+                    // detail page (surah, hadith, or fortress dua), not just Quran.
+                    appState.navController.navigateToMediaSourceDetail(
+                        appLevelMediaState.playback.source,
+                    )
+                },
+                isTtsPreparing = isTtsPreparing,
+            ),
             prayerAlertState = appLevelPrayerAlert,
             silentModeState = appLevelSilentModeState,
             islamicEventState = appLevelIslamicEventState,
             onIslamicEventClick = { event ->
                 com.starception.submission.ui.search.SearchPrefillBus.requestSearch(event.searchQuery)
             },
-            mushafState = appLevelMushafState,
-            onMushafPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
-            onMushafNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
-            onMushafOpenInfo = { com.starception.submission.feature.surah.MushafMiniBarBus.onOpenInfo?.invoke() },
+            mushafBar = mushafSyncBarRow(
+                state = appLevelMushafState,
+                onPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
+                onNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
+                onOpenInfo = { com.starception.submission.feature.surah.MushafMiniBarBus.onOpenInfo?.invoke() },
+            ),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
