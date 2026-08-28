@@ -109,6 +109,7 @@ import com.starception.submission.ui.search.SearchTokenizer
 import com.starception.submission.ui.search.PopularSuggestion
 import com.starception.submission.ui.search.SearchHintAnimator
 import com.starception.submission.ui.search.SearchHints
+import com.starception.submission.ui.search.shouldSuppressAmbiguousAllahPrefixVerses
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
 
@@ -1109,13 +1110,20 @@ private fun renderSuggestions(
     // focused. Otherwise a fuzzy fragment such as "Asd" can match ordinary
     // invocation prose and place unrelated duas above the requested chapter.
     val restrictToSurahs = surahIntent && rankedSurahs.isNotEmpty()
+    val suppressAmbiguousAllahPrefixVerses = shouldSuppressAmbiguousAllahPrefixVerses(
+        query = trimmedQuery,
+        hasSurahMatches = rankedSurahs.isNotEmpty(),
+    )
     val surahCorrection = if (restrictToSurahs) {
         inferredSurahCorrection(trimmedQuery, rankedSurahs.first().item)
     } else {
         null
     }
     val sections = mutableListOf<RenderableSection>()
-    if (!restrictToSurahs && rankedVerses.isNotEmpty()) {
+    if (!restrictToSurahs &&
+        !suppressAmbiguousAllahPrefixVerses &&
+        rankedVerses.isNotEmpty()
+    ) {
         sections.add(
             RenderableSection(
                 title = ctx.getString(R.string.app_search_section_popular_verses),
