@@ -1,6 +1,5 @@
 package com.starception.submission.settings.components
 
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -13,10 +12,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 
 private const val PRIVACY_POLICY_URL = "https://policies.google.com/privacy"
 private const val BRAND_GUIDELINES_URL = "https://developer.android.com/distribute/marketing-tools/brand-guidelines"
@@ -28,10 +25,15 @@ private const val METEOCONS_URL = "https://meteocons.com/"
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AboutSection(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Opens the open-source licences screen. Android launches Google's
+     * OssLicensesMenuActivity, which is an Activity and cannot cross; iOS will
+     * present its own once there is one, and does nothing until then.
+     */
+    onOpenLicenses: () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
-    val context = LocalContext.current
 
     Column(modifier = modifier) {
         // App Version
@@ -79,7 +81,7 @@ fun AboutSection(
 
             TextButton(
                 onClick = {
-                    context.startActivity(Intent(context, OssLicensesMenuActivity::class.java))
+                    onOpenLicenses()
                 }
             ) {
                 Text(text = "Licenses")
