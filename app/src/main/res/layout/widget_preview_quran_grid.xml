@@ -18,7 +18,7 @@
             android:layout_width="19dp"
             android:layout_height="19dp"
             android:contentDescription="@null"
-            android:src="@drawable/sample_grid_icon"
+            android:src="@drawable/ic_widget_quran_flaticon"
             android:tint="@color/prayer_widget_accent" />
 
         <TextView

@@ -100,7 +100,7 @@ class LongTextAppWidget : GlanceAppWidget() {
 
     LongTextLayout(
       title = context.getString(R.string.sample_long_text_app_widget_name),
-      titleIconRes = R.drawable.sample_text_icon,
+      titleIconRes = R.drawable.ic_widget_daily_reminder_flaticon,
       titleBarActionIconRes = R.drawable.sample_refresh_icon,
       titleBarActionIconContentDescription = context.getString(
         R.string.sample_refresh_icon_button_label
