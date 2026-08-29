@@ -19,7 +19,7 @@
             android:layout_width="18dp"
             android:layout_height="18dp"
             android:contentDescription="@null"
-            android:src="@drawable/sample_text_icon"
+            android:src="@drawable/ic_widget_daily_reminder_flaticon"
             android:tint="@color/prayer_widget_accent" />
 
         <TextView

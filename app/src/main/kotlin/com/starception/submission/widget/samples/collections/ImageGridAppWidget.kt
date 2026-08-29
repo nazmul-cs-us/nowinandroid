@@ -75,7 +75,7 @@ fun WidgetContent(
 
   ImageGridLayout(
     title = context.getString(R.string.sample_image_grid_app_widget_name),
-    titleIconRes = R.drawable.sample_grid_icon,
+    titleIconRes = R.drawable.ic_widget_quran_flaticon,
     titleBarActionIconRes = R.drawable.sample_refresh_icon,
     titleBarActionIconContentDescription = context.getString(
       R.string.sample_refresh_icon_button_label
