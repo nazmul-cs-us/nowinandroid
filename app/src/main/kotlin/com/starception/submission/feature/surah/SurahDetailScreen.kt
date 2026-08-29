@@ -2883,6 +2883,7 @@ private fun AlbumPlayerContent(
                     tajweedAnnotations = tajweedAnnotations,
                     showBismillah = showBismillahRow,
                     textAlignment = textAlignment,
+                    translationCode = currentTranslation,
                     parentScrollState = scrollState,
                     initialPage = initialMushafPage,
                     surahNameArabic = displaySurah.nameArabic,
@@ -6323,6 +6324,8 @@ private fun MushafPagerView(
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     showBismillah: Boolean = false,
     textAlignment: String = "start",
+    /** Selected translation controls the numeral system used by ayah markers. */
+    translationCode: String = "ar",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
     initialPage: Int = 0,
     /** Names used by the app-level Mushaf mini-bar in PullToSyncContainer. */
@@ -6423,10 +6426,10 @@ private fun MushafPagerView(
     val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
 
-    // Quran page markers conventionally keep Arabic-Indic digits even when the
-    // selected translation is English or another Latin-script language.
-    val markerDigitsFor: (Int) -> String = remember {
-        { numberInSurah -> numberInSurah.toArabicIndic() }
+    // Keep the marker itself Mushaf-like while displaying its number in the
+    // numeral system readers expect from the selected translation.
+    val markerDigitsFor: (Int) -> String = remember(translationCode) {
+        { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
     }
     // Single-slot placeholder — the drawing pass in MushafPageWithFrame does
     // the real work of positioning the medallion by measuring live ink edges
@@ -6502,7 +6505,7 @@ private fun MushafPagerView(
     )
 
     val markerData = remember(
-        ayahs, showTajweed, tajweedAnnotations, typesetFontSize,
+        ayahs, showTajweed, tajweedAnnotations, typesetFontSize, translationCode,
         inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
@@ -7319,6 +7322,19 @@ private fun MushafPagerView(
 
 private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.font.FontFamily {
     return getArabicFontFamilyForSelection(arabicFont)
+}
+
+/** Ayah number rendered with the numeral system of the selected translation. */
+private fun Int.toAyahDigits(translationCode: String): String {
+    val zero = when (translationCode) {
+        "ar" -> '\u0660' // ٠ Arabic-Indic
+        "ur" -> '\u06F0' // ۰ Extended Arabic-Indic
+        "bn" -> '\u09E6' // ০ Bengali
+        else -> return toString() // Western digits for the remaining translations
+    }
+    return toString().map { character ->
+        if (character in '0'..'9') zero + (character - '0') else character
+    }.joinToString("")
 }
 
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
