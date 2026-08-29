@@ -123,7 +123,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -2884,7 +2883,6 @@ private fun AlbumPlayerContent(
                     tajweedAnnotations = tajweedAnnotations,
                     showBismillah = showBismillahRow,
                     textAlignment = textAlignment,
-                    translationCode = currentTranslation,
                     parentScrollState = scrollState,
                     initialPage = initialMushafPage,
                     surahNameArabic = displaySurah.nameArabic,
@@ -4818,29 +4816,33 @@ private fun ContinuousAyahsContent(
 
 // ---------------------------------------------------------------------------
 // Ayah-marker slot geometry. Everything is in em (a fraction of the Arabic
-// font size) so the ornament AND the gaps around it scale together when the
+// font size) so the ring AND the gaps around it scale together when the
 // reader changes the font size.
 // ---------------------------------------------------------------------------
-/** Slot height — must stay under the 1.45x line height or the ornament bleeds into neighbouring lines. */
-private const val MARKER_HEIGHT_EM = 1.2f
+/**
+ * Compact end-of-ayah slot used by the continuous Mushaf. Quran page typography
+ * treats the marker as punctuation, not as a separate badge; keeping it below
+ * one em lets another Quran word fit on many otherwise sparse justified lines.
+ */
+private const val MARKER_HEIGHT_EM = 0.92f
 /** Translation text is intentionally quieter than Arabic, but its terminal
  * rosette should remain the same physical size as every Arabic ayah rosette. */
 private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.65f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
-/** Ornament height as a fraction of the slot height. */
-private const val MARKER_ORNAMENT_FILL = 0.72f
+/** Ring height as a fraction of the slot height. */
+private const val MARKER_ORNAMENT_FILL = 0.74f
 
 /**
- * Pause-mark height as a fraction of the medallion it sits over.
+ * Pause-mark height as a fraction of the ayah ring it sits over.
  *
  * Print sets these signs small — they are an annotation on the verse, not part of it —
- * and a mark much larger than this reads as a second ornament stacked on the first.
+ * and a mark much larger than this reads as a second marker stacked on the first.
  */
-private const val PAUSE_MARK_SIZE_FRACTION = 0.62f
+private const val PAUSE_MARK_SIZE_FRACTION = 0.52f
 
 /**
- * Clearance between the lowest ink of the pause sign and the medallion's top edge, as a
- * fraction of the medallion's height.
+ * Clearance between the lowest ink of the pause sign and the ayah ring's top edge, as a
+ * fraction of the ring's height.
  *
  * This is what [MARKER_ORNAMENT_FILL] was reduced for: the medallion no longer fills its
  * slot, and the room that frees inside the line is where the sign goes, the way the
@@ -4879,8 +4881,8 @@ private fun pauseMarkGlyph(mark: String): String = buildString {
         )
     }
 }
-/** Aspect ratio (w/h) of R.drawable.ayah_ornament_frame. */
-private const val MARKER_ASPECT = 1332f / 1418f
+/** Quran.com-style end-of-ayah rings are circular. */
+private const val MARKER_ASPECT = 1f
 /** Gap reserved in the text flow on each side of the ornament. This sets how
  *  much ink-free room the slot contributes; the drawing pass then CENTRES the
  *  ornament in the true ink gap (see computeInkMarkerGeometries), so the space
@@ -4889,14 +4891,21 @@ private const val MARKER_ASPECT = 1332f / 1418f
  *  ornament against its neighbouring words; a justified line redistributes part
  *  of the reclaimed width across its other spaces, so the on-screen gap drops
  *  by somewhat less than the amount removed here. */
-private const val MARKER_GAP_BEFORE_EM = 0.30f
-private const val MARKER_GAP_AFTER_EM = 0.30f
+private const val MARKER_GAP_BEFORE_EM = 0.08f
+private const val MARKER_GAP_AFTER_EM = 0.08f
 /** Visual gap between the ornament and the MEASURED ink edge of the ayah's
  *  last word. Placement is ink-accurate (see computeInkMarkerGeometries): the
  *  page text is rendered once to an offscreen bitmap and the true glyph edges
  *  are scanned, so this is the gap the eye actually sees — no per-glyph
  *  overhang guessing. */
-private const val MARKER_INK_GAP_EM = 0.3f
+private const val MARKER_INK_GAP_EM = 0.08f
+
+/**
+ * A continuous Quran page is intentionally denser than the ayah-card reader.
+ * The user's selected size still controls zoom; this scale only gives Mushaf
+ * mode the page-like word count and balanced line lengths it needs.
+ */
+private const val MUSHAF_TYPESETTING_SCALE = 0.68f
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
@@ -5714,14 +5723,12 @@ private fun MushafPageWithFrame(
     inkGeometries: List<MarkerGeometry>? = null,
     /** Shared show/hide progress so removal waits for the fade-out to finish. */
     translationVisibility: Float = 1f,
-    ornamentPainter: androidx.compose.ui.graphics.painter.Painter,
-    translationOrnamentPainter: androidx.compose.ui.graphics.painter.Painter,
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
-    val markerColor = MaterialTheme.colorScheme.primary
+    val markerColor = onSurfaceColor.copy(alpha = 0.90f)
     // PageCurl snapshots its first page draw. If precise marker geometry is still
     // being prepared during that draw, use the reserved inline slots themselves
     // to render the rosettes so a cached page can never lose its ayah endings.
@@ -6018,8 +6025,7 @@ private fun MushafPageWithFrame(
             }
 
             // Markers are drawn in two passes around the Text:
-            //   1) BEFORE it (this Canvas): the ornament vector — overhanging final
-            //      swashes render on top of its flourishes, printed-mushaf style.
+            //   1) BEFORE it (this Canvas): the compact end-of-ayah ring.
             //   2) AFTER it (Canvas below the Text): the digits, always crisp. With
             //      ink-accurate placement nothing should reach the digit zone; when
             //      a tail does cross the ring it slides under the digits untouched.
@@ -6038,18 +6044,13 @@ private fun MushafPageWithFrame(
                     if (markerAlpha <= 0.01f) return@Canvas
                     for (g in geoms) {
                         translate(g.left, g.top) {
-                            val markerPainter = if (g.isTranslation) {
-                                translationOrnamentPainter
-                            } else {
-                                ornamentPainter
-                            }
-                            with(markerPainter) {
-                                draw(
-                                    androidx.compose.ui.geometry.Size(g.w, g.h),
-                                    alpha = markerAlpha,
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(markerColor),
-                                )
-                            }
+                            val radius = minOf(g.w, g.h) * 0.43f
+                            drawCircle(
+                                color = markerColor.copy(alpha = markerColor.alpha * markerAlpha),
+                                radius = radius,
+                                center = Offset(g.w / 2f, g.h / 2f),
+                                style = Stroke(width = maxOf(1.dp.toPx(), g.h * 0.045f)),
+                            )
                         }
                     }
                 }
@@ -6070,6 +6071,7 @@ private fun MushafPageWithFrame(
                     // less. MUST match the paginator's measureStyle exactly.
                     lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
                     textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
+                    letterSpacing = 0.sp,
                     lineHeight = lineHeightSp.sp,
                     // Trim extra font-metric leading/trailing on the first/last
                     // line so pages whose first line contains the Amiri Quran
@@ -6260,8 +6262,8 @@ private fun MushafPageWithFrame(
                                 // Translation ornaments use a smaller em than the
                                 // Arabic markers, so the global Arabic size clipped
                                 // their otherwise correctly scaled number.
-                                textSize = g.h * if (g.digits.length >= 3) 0.226f else 0.29f
-                                isFakeBoldText = true
+                                textSize = g.h * if (g.digits.length >= 3) 0.40f else 0.58f
+                                isFakeBoldText = false
                             }
                             val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
                             canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
@@ -6321,8 +6323,6 @@ private fun MushafPagerView(
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     showBismillah: Boolean = false,
     textAlignment: String = "start",
-    /** Selected translation code — drives the digit system of ayah markers. */
-    translationCode: String = "ar",
     parentScrollState: androidx.compose.foundation.lazy.LazyListState? = null,
     initialPage: Int = 0,
     /** Names used by the app-level Mushaf mini-bar in PullToSyncContainer. */
@@ -6374,6 +6374,7 @@ private fun MushafPagerView(
     // preview. After repagination the pager re-anchors to the ayah that was at
     // the top of the page being read.
     var committedFontSize by remember { mutableStateOf(arabicFontSize) }
+    val typesetFontSize = committedFontSize * MUSHAF_TYPESETTING_SCALE
     var pendingAnchorAyah by remember { mutableStateOf(0) }
     // Per-page measures (marker ink geometry) — small layouts, worth caching.
     val textMeasurer = rememberTextMeasurer(cacheSize = 3)
@@ -6413,7 +6414,7 @@ private fun MushafPagerView(
     val navBarHeight = with(density) {
         WindowInsets.navigationBars.getBottom(this).toDp()
     }
-    val lineSpacingMultiplier = 1.45f
+    val lineSpacingMultiplier = 1.55f
     val horizontalPadding = 12.dp
     // 16dp strip at the top hosts the morphing pull-down hint drawn by the
     // screen overlay (pill ↔ grabber); MUST match MushafPageWithFrame's
@@ -6422,11 +6423,10 @@ private fun MushafPagerView(
     val bottomPadding = navBarHeight + 8.dp
     val bismillahHeightDp = 36.dp
 
-    // End-of-ayah marker: the user's ornamental frame drawable with the ayah
-    // number centered inside, tinted in the theme color. Drawn as inline
-    // content, it looks identical for any digit system (٤ / ۴ / ৪ / 4).
-    val markerDigitsFor: (Int) -> String = remember(translationCode) {
-        { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
+    // Quran page markers conventionally keep Arabic-Indic digits even when the
+    // selected translation is English or another Latin-script language.
+    val markerDigitsFor: (Int) -> String = remember {
+        { numberInSurah -> numberInSurah.toArabicIndic() }
     }
     // Single-slot placeholder — the drawing pass in MushafPageWithFrame does
     // the real work of positioning the medallion by measuring live ink edges
@@ -6476,7 +6476,7 @@ private fun MushafPagerView(
         // Book-like typography distinguishes the translation gently without
         // making it feel like secondary UI chrome. The marker shares this span,
         // so both retain identical row metrics.
-        fontSize = (committedFontSize * MUSHAF_TRANSLATION_FONT_SCALE).sp,
+        fontSize = (typesetFontSize * MUSHAF_TRANSLATION_FONT_SCALE).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f),
         fontWeight = FontWeight.Normal,
@@ -6485,10 +6485,10 @@ private fun MushafPagerView(
     val translationParagraphStyle = ParagraphStyle(
         textDirection = androidx.compose.ui.text.style.TextDirection.Content,
         textAlign = TextAlign.Start,
-        lineHeight = (committedFontSize * MUSHAF_TRANSLATION_FONT_SCALE * 1.32f).sp,
+        lineHeight = (typesetFontSize * MUSHAF_TRANSLATION_FONT_SCALE * 1.28f).sp,
     )
     val translationSeparatorSpanStyle = SpanStyle(
-        fontSize = (committedFontSize * 0.12f).sp,
+        fontSize = (typesetFontSize * 0.12f).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     )
     val translationSeparatorParagraphStyle = ParagraphStyle(
@@ -6498,11 +6498,11 @@ private fun MushafPagerView(
         // line deliberately compact metrics instead of inheriting the Quran
         // paragraph's 1.45x leading, which left a conspicuous blank Arabic line
         // between the Arabic and its much smaller translation.
-        lineHeight = (committedFontSize * 0.12f).sp,
+        lineHeight = (typesetFontSize * 0.12f).sp,
     )
 
     val markerData = remember(
-        ayahs, showTajweed, tajweedAnnotations, committedFontSize, translationCode,
+        ayahs, showTajweed, tajweedAnnotations, typesetFontSize,
         inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
@@ -6847,9 +6847,9 @@ private fun MushafPagerView(
                 fullPageHeightPx
             }
 
-            val arabicTextStyle = getArabicFontStyle(arabicFont, committedFontSize)
+            val arabicTextStyle = getArabicFontStyle(arabicFont, typesetFontSize)
             val measureStyle = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle).copy(
-                fontSize = committedFontSize.sp,
+                fontSize = typesetFontSize.sp,
                 textAlign = TextAlign.Justify,
                 // Keep in lockstep with MushafPageWithFrame's render style — the
                 // paginator slices pages at these line breaks AND the ink-geometry
@@ -6859,7 +6859,8 @@ private fun MushafPagerView(
                 // ~half a page from what is displayed.
                 lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
                 textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
-                lineHeight = (committedFontSize * lineSpacingMultiplier).sp,
+                letterSpacing = 0.sp,
+                lineHeight = (typesetFontSize * lineSpacingMultiplier).sp,
                 lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
                     alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
                     trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
@@ -6880,11 +6881,11 @@ private fun MushafPagerView(
                  * almost one complete line of dead space above the navigation
                  * inset.
                  */
-                val lineHeightSp: Float = committedFontSize * lineSpacingMultiplier,
+                val lineHeightSp: Float = typesetFontSize * lineSpacingMultiplier,
             )
 
             val paginatedPages = remember(
-                masterString, committedFontSize, arabicFont,
+                masterString, typesetFontSize, arabicFont,
                 availableWidthPx, fullPageHeightPx, firstPageHeightPx
             ) {
                 if (masterString.text.isEmpty() || availableWidthPx <= 0f || fullPageHeightPx <= 0f) {
@@ -7007,7 +7008,7 @@ private fun MushafPagerView(
                         0f
                     }
                     val stretchedLineHeightSp =
-                        committedFontSize * lineSpacingMultiplier +
+                        typesetFontSize * lineSpacingMultiplier +
                             stretchPerGapPx / (density.density * density.fontScale)
 
                     pages.add(PaginatedPage(
@@ -7101,8 +7102,8 @@ private fun MushafPagerView(
 
             // Render-side inline map including the dynamically-sized line filler —
             // must match the widths the paginator and geometry pass used.
-            val pagerEmPxForFiller = with(density) { committedFontSize.sp.toPx() }
-            val pageInlineContent = remember(markerInlineContent, availableWidthPx, committedFontSize) {
+            val pagerEmPxForFiller = with(density) { typesetFontSize.sp.toPx() }
+            val pageInlineContent = remember(markerInlineContent, availableWidthPx, typesetFontSize) {
                 markerInlineContent + (
                     MUSHAF_LINE_FILLER_TAG to androidx.compose.foundation.text.InlineTextContent(
                         mushafLineFillerPlaceholder(availableWidthPx.toInt(), pagerEmPxForFiller),
@@ -7121,7 +7122,7 @@ private fun MushafPagerView(
             // column width, and page height can invalidate the geometry; page
             // height also controls slicing and stretched leading.
             val inkGeomCache = remember(
-                committedFontSize,
+                typesetFontSize,
                 arabicFont,
                 availableWidthPx,
                 fullPageHeightPx,
@@ -7129,7 +7130,7 @@ private fun MushafPagerView(
             ) {
                 androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
-            val pagerEmPx = with(density) { committedFontSize.sp.toPx() }
+            val pagerEmPx = with(density) { typesetFontSize.sp.toPx() }
             LaunchedEffect(state.current, paginatedPages, inkGeomCache) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
                 // A page turn can arrive much faster than a bitmap ink scan.
@@ -7201,17 +7202,6 @@ private fun MushafPagerView(
             }
 
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-            // Parse the ornament vector once, but keep independent painters for
-            // Arabic and translation sizes. Reusing one VectorPainter at both
-            // sizes retained the larger cached viewport and clipped the small
-            // translation frame to its top-left quadrant.
-            val ornamentImage = ImageVector.vectorResource(R.drawable.ayah_ornament_frame)
-            val ornamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
-                image = ornamentImage,
-            )
-            val translationOrnamentPainter = androidx.compose.ui.graphics.vector.rememberVectorPainter(
-                image = ornamentImage,
-            )
             val toggleInlineTranslation: (Int) -> Unit = { ayahNumber ->
                 // Arabic-only or incomplete databases have no gloss to reveal.
                 // In that case the gesture should be a no-op rather than leaving
@@ -7294,10 +7284,8 @@ private fun MushafPagerView(
                             inkGeomCache[page.text]
                         },
                         translationVisibility = translationVisibility.value,
-                        ornamentPainter = ornamentPainter,
-                        translationOrnamentPainter = translationOrnamentPainter,
                         arabicFont = arabicFont,
-                        arabicFontSize = committedFontSize,
+                        arabicFontSize = typesetFontSize,
                         lineHeightSp = page.lineHeightSp,
                         showBismillah = page.showBismillah,
                         onAyahLongPress = onAyahLongPress,
@@ -7333,18 +7321,6 @@ private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.fo
     return getArabicFontFamilyForSelection(arabicFont)
 }
 
-/** Ayah-number digits in the numbering system of the selected translation. */
-private fun Int.toAyahDigits(translationCode: String): String {
-    val zero: Char? = when (translationCode) {
-        "ar" -> '\u0660'   // ٠ Arabic-Indic
-        "ur" -> '\u06F0'   // ۰ Extended Arabic-Indic
-        "bn" -> '\u09E6'   // ০ Bengali
-        else -> null        // Western digits for Latin/Cyrillic/CJK readers
-    }
-    if (zero == null) return toString()
-    return toString().map { c -> if (c in '0'..'9') zero + (c - '0') else c }.joinToString("")
-}
-
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
     when (c) {
         '0' -> '٠'; '1' -> '١'; '2' -> '٢'; '3' -> '٣'; '4' -> '٤'
@@ -7354,8 +7330,8 @@ private fun Int.toArabicIndic(): String = this.toString().map { c ->
 }.joinToString("")
 
 /**
- * Draws an ayah ornament inside the inline placeholder reserved by the text
- * layout. Keeping the frame and digits in that slot prevents a later Canvas
+ * Draws a compact end-of-ayah ring inside the inline placeholder reserved by
+ * the text layout. Keeping the ring and digits in that slot prevents a later Canvas
  * pass from drifting onto Arabic glyphs on justified RTL lines.
  */
 @Composable
@@ -7363,7 +7339,7 @@ private fun MushafInlineAyahOrnament(
     digits: String,
     arabicFontSize: Float,
 ) {
-    val tint = MaterialTheme.colorScheme.primary
+    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -7371,25 +7347,20 @@ private fun MushafInlineAyahOrnament(
         Box(
             modifier = Modifier
                 .fillMaxHeight(MARKER_ORNAMENT_FILL)
-                .aspectRatio(MARKER_ASPECT),
+                .aspectRatio(MARKER_ASPECT)
+                .border(0.8.dp, tint, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ayah_ornament_frame),
-                contentDescription = null,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
-                modifier = Modifier.fillMaxSize(),
-            )
             Text(
                 text = digits,
                 color = tint,
                 fontFamily = ubuntuInspiredFontFamily,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Medium,
                 fontSize = (
-                    arabicFontSize * if (digits.length >= 3) 0.25f else 0.32f
+                    arabicFontSize * if (digits.length >= 3) 0.32f else 0.42f
                     ).sp,
                 lineHeight = (
-                    arabicFontSize * if (digits.length >= 3) 0.25f else 0.32f
+                    arabicFontSize * if (digits.length >= 3) 0.32f else 0.42f
                     ).sp,
                 maxLines = 1,
             )
@@ -7398,34 +7369,25 @@ private fun MushafInlineAyahOrnament(
 }
 
 /**
- * Ayah number rendered inside the Mushaf ayah-ending ornament
- * ([R.drawable.ayah_ornament_frame]) with the Arabic-Indic number stamped in
- * its hollow center — the same marker shown at each verse end in continuous
- * (Mushaf) reading, reused here so the ayah list matches the page view. Both
- * the frame and the digits use [tint]; the Mushaf uses colorScheme.primary.
+ * Ayah number rendered inside the same compact ring used by continuous Mushaf
+ * reading, so list and page modes share one end-of-ayah visual language.
  */
 @Composable
 private fun AyahOrnamentMarker(
     ayahNumber: Int,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.primary,
+    tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
 ) {
     val arabicDigits = ayahNumber.toArabicIndic()
     Box(
-        modifier = modifier,
+        modifier = modifier.border(1.dp, tint, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ayah_ornament_frame),
-            contentDescription = null,
-            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(tint),
-            modifier = Modifier.fillMaxSize(),
-        )
         Text(
             text = arabicDigits,
             color = tint,
-            fontWeight = FontWeight.Bold,
-            fontSize = if (arabicDigits.length >= 3) 10.sp else 13.sp,
+            fontWeight = FontWeight.Medium,
+            fontSize = if (arabicDigits.length >= 3) 9.sp else 12.sp,
             lineHeight = 13.sp,
         )
     }
