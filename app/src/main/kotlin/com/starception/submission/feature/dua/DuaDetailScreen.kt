@@ -168,6 +168,7 @@ import kotlin.math.roundToInt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.util.toLocalizedDigits
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -791,6 +792,28 @@ fun getArabicFontFamilyForDua(selectedFont: String): FontFamily {
         else -> QuranFonts.PDMSSaleem
     }
 }
+
+/**
+ * Dense RTL paragraph styling for long Arabic duas. The paragraph line breaker keeps
+ * justification even, and trimming the font metrics removes oversized top/bottom gaps.
+ */
+private fun duaArabicReadingStyle(
+    fontFamily: FontFamily,
+    fontSize: Float,
+): androidx.compose.ui.text.TextStyle = androidx.compose.ui.text.TextStyle(
+    fontFamily = fontFamily,
+    fontSize = fontSize.sp,
+    fontWeight = FontWeight.Normal,
+    lineHeight = (fontSize * 1.55f).sp,
+    letterSpacing = 0.sp,
+    textAlign = TextAlign.Justify,
+    textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
+    lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+    ),
+)
 
 /**
  * Parses the raw dua content into structured components
@@ -1594,7 +1617,10 @@ fun DuaDetailScreen(
                                                                 followed = true,
                                                                 onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
                                                                 text = {
-                                                                    Text(text = "$surahName:${dua.ayahNumber}".uppercase(Locale.getDefault()))
+                                                                    Text(
+                                                                        text = "$surahName:${dua.ayahNumber.toLocalizedDigits(selectedTranslation)}"
+                                                                            .uppercase(Locale.getDefault()),
+                                                                    )
                                                                 }
                                                             )
                                                         } else if (headerHadithRefs.isNotEmpty()) {
@@ -1711,19 +1737,19 @@ fun DuaDetailScreen(
                                                 )
                                                 Text(
                                                     text = annotatedText,
-                                                    fontFamily = arabicFontFamily,
-                                                    fontSize = 32.sp,
-                                                    lineHeight = 54.sp,
-                                                    textAlign = TextAlign.Center,
+                                                    style = duaArabicReadingStyle(
+                                                        fontFamily = arabicFontFamily,
+                                                        fontSize = 32f,
+                                                    ),
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
                                             } else {
                                                 Text(
                                                     text = dua.arabicText,
-                                                    fontFamily = arabicFontFamily,
-                                                    fontSize = 32.sp,
-                                                    lineHeight = 54.sp,
-                                                    textAlign = TextAlign.Center,
+                                                    style = duaArabicReadingStyle(
+                                                        fontFamily = arabicFontFamily,
+                                                        fontSize = 32f,
+                                                    ),
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
@@ -2254,7 +2280,7 @@ fun DuaDetailScreen(
                                         ) {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                                 Text(
-                                                    text = "${page + 1}",
+                                                    text = (page + 1).toLocalizedDigits(selectedTranslation),
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                                                     color = if (isActive) MaterialTheme.colorScheme.onPrimary
@@ -2371,7 +2397,7 @@ fun DuaDetailScreen(
                                 ) {
                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                         Text(
-                                            text = "${pageIndex + 1}",
+                                            text = (pageIndex + 1).toLocalizedDigits(selectedTranslation),
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                                             color = if (isActive) MaterialTheme.colorScheme.onPrimary
@@ -3179,19 +3205,21 @@ private fun DuaPageContent(
                         )
                         Text(
                             text = annotatedText,
-                            fontFamily = arabicFontFamily,
-                            fontSize = 34.sp,
-                            lineHeight = 56.sp,
-                            textAlign = TextAlign.Center
+                            style = duaArabicReadingStyle(
+                                fontFamily = arabicFontFamily,
+                                fontSize = 34f,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
                         Text(
                             text = dua.arabicText,
-                            fontFamily = arabicFontFamily,
-                            fontSize = 34.sp,
-                            lineHeight = 56.sp,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            style = duaArabicReadingStyle(
+                                fontFamily = arabicFontFamily,
+                                fontSize = 34f,
+                            ),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -3491,10 +3519,10 @@ private fun SingleDuaContent(
                 ) {
                     Text(
                         text = parsedContent.arabicText,
-                        fontFamily = arabicFontFamily,
-                        fontSize = 32.sp,
-                        lineHeight = 54.sp,
-                        textAlign = TextAlign.Center,
+                        style = duaArabicReadingStyle(
+                            fontFamily = arabicFontFamily,
+                            fontSize = 32f,
+                        ),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.fillMaxWidth()
                     )

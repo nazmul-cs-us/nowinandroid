@@ -173,6 +173,7 @@ import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.feature.course.CourseCompletionInfo
 import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.util.toLocalizedDigits
 import java.util.Locale
 
 private const val SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO = 3f / 2f
@@ -6429,7 +6430,7 @@ private fun MushafPagerView(
     // Keep the marker itself Mushaf-like while displaying its number in the
     // numeral system readers expect from the selected translation.
     val markerDigitsFor: (Int) -> String = remember(translationCode) {
-        { numberInSurah -> numberInSurah.toAyahDigits(translationCode) }
+        { numberInSurah -> numberInSurah.toLocalizedDigits(translationCode) }
     }
     // Single-slot placeholder — the drawing pass in MushafPageWithFrame does
     // the real work of positioning the medallion by measuring live ink edges
@@ -7322,19 +7323,6 @@ private fun MushafPagerView(
 
 private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.font.FontFamily {
     return getArabicFontFamilyForSelection(arabicFont)
-}
-
-/** Ayah number rendered with the numeral system of the selected translation. */
-private fun Int.toAyahDigits(translationCode: String): String {
-    val zero = when (translationCode) {
-        "ar" -> '\u0660' // ٠ Arabic-Indic
-        "ur" -> '\u06F0' // ۰ Extended Arabic-Indic
-        "bn" -> '\u09E6' // ০ Bengali
-        else -> return toString() // Western digits for the remaining translations
-    }
-    return toString().map { character ->
-        if (character in '0'..'9') zero + (character - '0') else character
-    }.joinToString("")
 }
 
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
