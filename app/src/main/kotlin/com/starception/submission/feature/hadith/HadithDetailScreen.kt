@@ -115,6 +115,7 @@ import com.starception.submission.core.model.data.BukhariBooks
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.util.toLocalizedDigits
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
@@ -1567,7 +1568,8 @@ private fun HadithContent(
                                                     enabled = true,
                                                     text = {
                                                         Text(
-                                                            text = "Hadith #$hadithNumber".uppercase(Locale.getDefault())
+                                                            text = "Hadith #${hadithNumber.toLocalizedDigits(selectedLanguage)}"
+                                                                .uppercase(Locale.getDefault())
                                                         )
                                                     }
                                                 )
@@ -1686,10 +1688,10 @@ private fun HadithContent(
                                         Text(
                                             text = normalizeHadithParagraphs(hadith.textArabic),
                                             modifier = Modifier.fillMaxWidth(),
-                                            fontFamily = arabicFontFamily,
-                                            fontSize = 26.sp,
-                                            lineHeight = 48.sp,
-                                            textAlign = TextAlign.End,
+                                            style = hadithArabicReadingStyle(
+                                                fontFamily = arabicFontFamily,
+                                                fontSize = 26f,
+                                            ),
                                             color = MaterialTheme.colorScheme.onSurface,
                                         )
                                     }
@@ -2557,6 +2559,28 @@ private fun hadithLayoutDirection(language: String): LayoutDirection =
 
 private fun hadithTextAlignment(language: String): TextAlign =
     if (hadithLayoutDirection(language) == LayoutDirection.Rtl) TextAlign.End else TextAlign.Start
+
+/**
+ * Book-like Arabic paragraph shaping shared with the Mushaf reader: optimized line breaks
+ * reduce stretched gaps, while RTL justification lets long lines use the card width.
+ */
+private fun hadithArabicReadingStyle(
+    fontFamily: FontFamily,
+    fontSize: Float,
+): androidx.compose.ui.text.TextStyle = androidx.compose.ui.text.TextStyle(
+    fontFamily = fontFamily,
+    fontSize = fontSize.sp,
+    fontWeight = FontWeight.Normal,
+    lineHeight = (fontSize * 1.55f).sp,
+    letterSpacing = 0.sp,
+    textAlign = TextAlign.Justify,
+    textDirection = androidx.compose.ui.text.style.TextDirection.Rtl,
+    lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+        alignment = androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+        trim = androidx.compose.ui.text.style.LineHeightStyle.Trim.Both,
+    ),
+)
 
 /**
  * Bukhari source rows are wrapped at a fixed character width and often indent continuation
