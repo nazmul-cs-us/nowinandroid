@@ -143,6 +143,32 @@ internal fun buildContextualInsightRecommendation(
     )
 }
 
+/**
+ * Returns an audio-first recommendation while driving is detected.
+ *
+ * The suggestion remains deterministic for the current date/time window and
+ * always targets a Bukhari book because that action starts playback directly;
+ * it never opens a reading surface or starts audio without a user tap.
+ */
+internal fun buildDrivingInsightRecommendation(
+    date: LocalDate,
+    time: LocalTime,
+): ContextualInsightRecommendation {
+    val window = recommendationWindow(time)
+    val candidateIndex = Math.floorMod(
+        date.toEpochDay(),
+        window.bukhariBookCandidates.size.toLong(),
+    ).toInt()
+    val book = checkNotNull(BukhariBooks.find(window.bukhariBookCandidates[candidateIndex]))
+    return ContextualInsightRecommendation(
+        title = "Listen: ${book.nameEnglish}",
+        supportingText = "Hands-free Sahih al-Bukhari playback",
+        footerText = "Driving mode · Book ${book.id} · ${book.hadithCount} hadiths",
+        actionDescription = "Play ${book.nameEnglish} from Sahih al-Bukhari",
+        target = ContextualRecommendationTarget.Bukhari(book),
+    )
+}
+
 private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (time.hour) {
     in 5..10 -> RecommendationWindow(
         name = "morning",

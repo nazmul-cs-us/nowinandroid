@@ -83,6 +83,19 @@ class ContextualInsightRecommendationTest {
         assertTrue(result.target is ContextualRecommendationTarget.Surah)
     }
 
+    @Test
+    fun drivingRecommendationAlwaysTargetsDirectBukhariPlayback() {
+        val result = buildDrivingInsightRecommendation(
+            date = LocalDate.of(2026, 8, 30),
+            time = LocalTime.of(17, 30),
+        )
+
+        val target = result.target as ContextualRecommendationTarget.Bukhari
+        assertTrue(target.book.id in listOf(66, 80, 81))
+        assertTrue(result.title.startsWith("Listen:"))
+        assertTrue(result.footerText.startsWith("Driving mode"))
+    }
+
     private fun sampleDua(
         chapterId: Int = 27,
         translation: String = "A contextual dua.",
