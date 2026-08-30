@@ -36,6 +36,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +52,8 @@ import com.starception.submission.core.images.resources.insight_prayer_backgroun
 import com.starception.submission.core.images.resources.insight_prayer_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
+import com.starception.submission.core.images.resources.insight_qibla_background
+import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import com.starception.submission.shared.SharedPrayerDay
@@ -58,19 +62,20 @@ import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.shared.salah.SalahProgress
 import kotlinx.datetime.LocalDate
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * The swipeable insight tiles at the top of the home page.
  *
- * Mirrors the structure of the Android home page's pager rather than its full
- * contents: the prayer sky tile is real, and the salah and reading tiles carry
- * the right artwork with placeholder figures until their data moves to shared
- * code. The Qibla tile is absent entirely — it needs the 3D globe, which is
- * gated on a WorldWind version bump.
- *
- * Named honestly as a partial port. It is the shape of the home page, not parity.
+ * Uses the same prayer, salah, reading and Qibla artwork as Android. The Qibla
+ * card intentionally shows the useful portable part — the great-circle bearing
+ * to Makkah — while Android's interactive WorldWind globe remains platform-only.
  */
 @Composable
 fun InsightPager(
@@ -79,10 +84,16 @@ fun InsightPager(
     salah: SalahProgress,
     onTogglePrayer: (String) -> Unit,
     today: LocalDate,
+    latitude: Double,
+    longitude: Double,
     modifier: Modifier = Modifier,
 ) {
-    val pageCount = 3
+    val pageCount = 4
     val pagerState = rememberPagerState(pageCount = { pageCount })
+    val pagerScope = rememberCoroutineScope()
+    val qiblaBearing = remember(latitude, longitude) {
+        calculateQiblaBearing(latitude, longitude).roundToInt()
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -114,7 +125,10 @@ fun InsightPager(
                                 } else {
                                     MaterialTheme.colorScheme.outlineVariant
                                 },
-                            ),
+                            )
+                            .clickable {
+                                pagerScope.launch { pagerState.animateScrollToPage(index) }
+                            },
                     )
                 }
             }
@@ -123,7 +137,7 @@ fun InsightPager(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             // Android leaves the next card visibly clipped so the horizontal
             // gesture is apparent without a separate swipe hint.
-            val pageWidth = (maxWidth - 12.dp) * 0.53f
+            val pageWidth = (maxWidth * 0.64f).coerceAtLeast(210.dp)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
@@ -156,7 +170,7 @@ fun InsightPager(
                         )
                     }
 
-                    else -> {
+                    2 -> {
                         val surah = dailyReading(today)
                         ArtworkTile(
                             artwork = Res.drawable.insight_quran_background,
@@ -169,10 +183,44 @@ fun InsightPager(
                             arabicTitle = surah.nameArabic,
                         )
                     }
+
+                    else -> ArtworkTile(
+                        artwork = Res.drawable.insight_qibla_background,
+                        foreground = Res.drawable.insight_qibla_foreground_v2,
+                        foregroundScale = 0.75f,
+                        foregroundOffsetYFraction = 0.10f,
+                        label = "Qibla",
+                        title = "$qiblaBearing° toward Makkah",
+                        subtitle = qiblaCardinalDirection(qiblaBearing),
+                    )
                 }
             }
         }
     }
+}
+
+/** Great-circle initial bearing from the user to the Kaaba, clockwise from north. */
+private fun calculateQiblaBearing(latitude: Double, longitude: Double): Double {
+    val userLatitude = degreesToRadians(latitude)
+    val kaabaLatitude = degreesToRadians(21.4225)
+    val longitudeDelta = degreesToRadians(39.8262 - longitude)
+    val y = sin(longitudeDelta) * cos(kaabaLatitude)
+    val x = cos(userLatitude) * sin(kaabaLatitude) -
+        sin(userLatitude) * cos(kaabaLatitude) * cos(longitudeDelta)
+    return ((atan2(y, x) * 180.0 / kotlin.math.PI) + 360.0) % 360.0
+}
+
+private fun degreesToRadians(value: Double): Double = value * kotlin.math.PI / 180.0
+
+private fun qiblaCardinalDirection(bearing: Int): String = when (bearing.mod(360)) {
+    in 23..67 -> "North-east"
+    in 68..112 -> "East"
+    in 113..157 -> "South-east"
+    in 158..202 -> "South"
+    in 203..247 -> "South-west"
+    in 248..292 -> "West"
+    in 293..337 -> "North-west"
+    else -> "North"
 }
 
 /** A tile that is artwork with a label chip and a caption over it. */

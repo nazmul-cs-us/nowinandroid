@@ -135,6 +135,8 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
                     onOpenSettings = onOpenSettings,
                     today = today,
                     isLocating = !resolved,
+                    latitude = place.latitude,
+                    longitude = place.longitude,
                 )
             },
             settings = { onBack ->

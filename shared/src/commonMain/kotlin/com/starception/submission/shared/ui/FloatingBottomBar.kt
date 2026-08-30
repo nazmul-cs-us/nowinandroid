@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -105,7 +106,8 @@ fun FloatingBottomBar(
     Surface(
         modifier = modifier
             .safeDrawingPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .widthIn(max = 560.dp),
         shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 3.dp,
