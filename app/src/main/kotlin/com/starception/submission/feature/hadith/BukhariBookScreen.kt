@@ -1,29 +1,36 @@
 package com.starception.submission.feature.hadith
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -37,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -215,7 +223,8 @@ private fun BukhariHadithList(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         item(key = "book-header") {
             Card(
@@ -223,40 +232,67 @@ private fun BukhariHadithList(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(
-                    topStart = 28.dp,
-                    topEnd = 28.dp,
-                    bottomEnd = 28.dp,
-                    bottomStart = 10.dp,
+                    topStart = 32.dp,
+                    topEnd = 32.dp,
+                    bottomEnd = 32.dp,
+                    bottomStart = 12.dp,
                 ),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 ),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(
-                                checkNotNull(topicIconResFor("Sahih Bukhari")),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(52.dp),
+                            shape = RoundedCornerShape(
+                                topStart = 18.dp,
+                                topEnd = 18.dp,
+                                bottomEnd = 18.dp,
+                                bottomStart = 6.dp,
                             ),
-                            contentDescription = "Bukhari book",
-                            modifier = Modifier.size(32.dp),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = "BOOK ${book.id.toString().padStart(2, '0')} / 97",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Image(
+                                    painter = painterResource(
+                                        checkNotNull(topicIconResFor("Sahih Bukhari")),
+                                    ),
+                                    contentDescription = "Bukhari book",
+                                    modifier = Modifier.size(32.dp),
+                                )
+                            }
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = "BOOK ${book.id.toString().padStart(2, '0')} OF 97",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = book.nameEnglish,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 26.sp,
+                            )
+                        }
                     }
-                    Text(
-                        text = book.nameEnglish,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
                     Text(
                         text = book.nameArabic,
                         modifier = Modifier.fillMaxWidth(),
@@ -280,7 +316,7 @@ private fun BukhariHadithList(
                                 maxLines = 1,
                             )
                         }
-                        FilledTonalButton(
+                        Button(
                             onClick = onPlayAllClick,
                             shape = RoundedCornerShape(
                                 topStart = 20.dp,
@@ -312,7 +348,9 @@ private fun BukhariHadithList(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp),
                     singleLine = true,
                     shape = RoundedCornerShape(28.dp),
                     leadingIcon = {
@@ -325,6 +363,23 @@ private fun BukhariHadithList(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
                     ),
+                )
+            }
+        }
+
+        item(key = "hadith-count") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (query.isBlank()) "Hadiths" else "Search results",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 NiaTopicTag(
                     followed = true,
@@ -375,9 +430,20 @@ private fun BukhariHadithCard(
     arabicFontFamily: FontFamily,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressedScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.985f else 1f,
+        label = "Bukhari hadith card press",
+    )
     Card(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressedScale
+                scaleY = pressedScale
+            },
         shape = RoundedCornerShape(
             topStart = 22.dp,
             topEnd = 22.dp,
@@ -385,24 +451,27 @@ private fun BukhariHadithCard(
             bottomStart = 8.dp,
         ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        interactionSource = interactionSource,
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             NiaTopicTag(
-                followed = true,
+                followed = false,
                 onClick = onClick,
                 text = { Text("HADITH ${hadith.id}") },
             )
             hadith.textPlain?.takeIf(String::isNotBlank)?.let { english ->
                 Text(
                     text = english.replace(Regex("\\s+"), " ").trim(),
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                    maxLines = 4,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -411,10 +480,11 @@ private fun BukhariHadithCard(
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = arabicFontFamily,
-                    lineHeight = 30.sp,
+                    lineHeight = 27.sp,
                 ),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f),
                 textAlign = TextAlign.End,
-                maxLines = 3,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

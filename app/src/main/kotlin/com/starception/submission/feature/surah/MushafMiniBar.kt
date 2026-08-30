@@ -1,11 +1,14 @@
 package com.starception.submission.feature.surah
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -14,14 +17,26 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,6 +53,7 @@ fun MushafMiniBar(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onOpenInfo: () -> Unit,
+    onJumpToPage: (Int) -> Unit,
     modifier: Modifier = Modifier,
     /**
      * Optional strip status (prayer alert, sync, Islamic event, …) shown in place
@@ -57,6 +73,55 @@ fun MushafMiniBar(
         state.currentPage.toFloat() / state.totalPages.toFloat()
     } else {
         0f
+    }
+    var showPageJump by rememberSaveable(state.surahNumber) { mutableStateOf(false) }
+    var pageInput by rememberSaveable(state.surahNumber) {
+        mutableStateOf(state.currentPage.toString())
+    }
+    val requestedPage = pageInput.toIntOrNull()
+    val pageInputIsValid = requestedPage != null && requestedPage in 1..state.totalPages
+
+    if (showPageJump) {
+        AlertDialog(
+            onDismissRequest = { showPageJump = false },
+            title = { Text("Go to page") },
+            text = {
+                OutlinedTextField(
+                    value = pageInput,
+                    onValueChange = { value ->
+                        pageInput = value.filter(Char::isDigit).take(4)
+                    },
+                    label = { Text("Page 1–${state.totalPages}") },
+                    supportingText = if (pageInput.isNotEmpty() && !pageInputIsValid) {
+                        { Text("Enter a page between 1 and ${state.totalPages}") }
+                    } else {
+                        null
+                    },
+                    isError = pageInput.isNotEmpty() && !pageInputIsValid,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = pageInputIsValid,
+                    onClick = {
+                        requestedPage?.let(onJumpToPage)
+                        showPageJump = false
+                    },
+                ) {
+                    Text("Go")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPageJump = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 
     MiniBarShell(
@@ -110,15 +175,37 @@ fun MushafMiniBar(
             )
         }
 
-        Text(
-            text = "${state.currentPage}/${state.totalPages}",
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 14.sp,
-            lineHeight = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = contentColor.copy(alpha = 0.82f),
-            maxLines = 1,
-        )
+        Surface(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                pageInput = state.currentPage.toString()
+                showPageJump = true
+            },
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 32.dp)
+                .semantics {
+                    contentDescription =
+                        "Page ${state.currentPage} of ${state.totalPages}. Tap to jump"
+                },
+            shape = RoundedCornerShape(16.dp),
+            color = contentColor.copy(alpha = 0.08f),
+            contentColor = contentColor,
+        ) {
+            Box(
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "${state.currentPage}/${state.totalPages}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontSize = 14.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor.copy(alpha = 0.88f),
+                    maxLines = 1,
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(2.dp))
 

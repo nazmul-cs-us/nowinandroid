@@ -361,17 +361,17 @@ private fun LazyListScope.bukhariBookBrowser(
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
             shape = RoundedCornerShape(
-                topStart = 32.dp,
-                topEnd = 32.dp,
-                bottomEnd = 32.dp,
+                topStart = 28.dp,
+                topEnd = 28.dp,
+                bottomEnd = 28.dp,
                 bottomStart = 10.dp,
             ),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -385,14 +385,20 @@ private fun LazyListScope.bukhariBookBrowser(
                         Text(
                             text = "SAHIH BUKHARI",
                             style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp,
                         )
                         Text(
                             text = "Browse 97 books",
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            lineHeight = 28.sp,
+                            lineHeight = 25.sp,
+                        )
+                        Text(
+                            text = "7,277 hadiths · arranged by subject",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Surface(
@@ -406,7 +412,7 @@ private fun LazyListScope.bukhariBookBrowser(
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
@@ -422,10 +428,6 @@ private fun LazyListScope.bukhariBookBrowser(
                         }
                     }
                 }
-                Text(
-                    text = "7,277 hadiths, arranged by subject",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQueryChange,
@@ -437,8 +439,8 @@ private fun LazyListScope.bukhariBookBrowser(
                     },
                     placeholder = { Text("Search English or Arabic") },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Color.Transparent,
                     ),
@@ -474,8 +476,8 @@ private fun LazyListScope.bukhariBookBrowser(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(IntrinsicSize.Min)
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = 16.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 rowBooks.forEachIndexed { index, book ->
                     BukhariBookCard(
@@ -509,15 +511,15 @@ private fun BukhariBookCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val outerCorner by animateDpAsState(
-        targetValue = if (isPressed) 24.dp else 30.dp,
+        targetValue = if (isPressed) 20.dp else 24.dp,
         label = "bukhariBookOuterCorner",
     )
     val innerCorner by animateDpAsState(
-        targetValue = if (isPressed) 24.dp else 8.dp,
+        targetValue = if (isPressed) 20.dp else 7.dp,
         label = "bukhariBookInnerCorner",
     )
     val pressedScale by animateFloatAsState(
-        targetValue = if (isPressed) 1.025f else 1f,
+        targetValue = if (isPressed) 0.985f else 1f,
         label = "bukhariBookPressedScale",
     )
     val shape = when (position) {
@@ -540,7 +542,7 @@ private fun BukhariBookCard(
     Card(
         onClick = onClick,
         modifier = modifier
-            .heightIn(min = 160.dp)
+            .heightIn(min = 132.dp)
             .zIndex(if (isPressed) 1f else 0f)
             .graphicsLayer {
                 scaleX = pressedScale
@@ -555,8 +557,8 @@ private fun BukhariBookCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -565,9 +567,9 @@ private fun BukhariBookCard(
             ) {
                 Text(
                     text = book.id.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Black,
-                    color = contentColor.copy(alpha = 0.82f),
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 val playInteractionSource = remember { MutableInteractionSource() }
                 val isPlayPressed by playInteractionSource.collectIsPressedAsState()
@@ -585,14 +587,14 @@ private fun BukhariBookCard(
                         bottomStart = 22.dp,
                     ),
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = contentColor,
-                        contentColor = containerColor,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                     interactionSource = playInteractionSource,
                 ) {
                     FlaticonPlayIcon(
                         contentDescription = "Play all ${book.hadithCount} hadiths in ${book.nameEnglish}",
-                        tint = containerColor,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         iconSize = 20.dp,
                     )
                 }
@@ -601,7 +603,7 @@ private fun BukhariBookCard(
                 text = book.nameEnglish,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 22.sp,
+                lineHeight = 20.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -610,9 +612,9 @@ private fun BukhariBookCard(
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = QuranFonts.PDMSSaleem,
-                    lineHeight = 26.sp,
+                    lineHeight = 23.sp,
                 ),
-                color = contentColor.copy(alpha = 0.76f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 minLines = 1,
                 maxLines = 1,
@@ -620,7 +622,7 @@ private fun BukhariBookCard(
             )
             Spacer(Modifier.weight(1f))
             NiaTopicTag(
-                followed = false,
+                followed = true,
                 onClick = {},
             ) {
                 Text(
@@ -641,7 +643,7 @@ private enum class BukhariBookCardPosition {
 
 @Composable
 private fun bukhariBookCardColors(): Pair<Color, Color> =
-    MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+    MaterialTheme.colorScheme.surfaceContainerLow to MaterialTheme.colorScheme.onSurface
 
 @Composable
 private fun TopicHeader(name: String, description: String, imageUrl: String) {
