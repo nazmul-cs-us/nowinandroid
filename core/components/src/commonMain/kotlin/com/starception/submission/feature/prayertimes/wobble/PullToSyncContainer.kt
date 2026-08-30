@@ -23,7 +23,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -159,6 +161,7 @@ fun PullToSyncContainer(
     /** Fills the bar row when media is playing; supplied by the app. */
     mediaBar: SyncBarRow? = null,
     prayerAlertState: PrayerAlertState = PrayerAlertState(),
+    forbiddenPrayerTimeState: ForbiddenPrayerTimeState = ForbiddenPrayerTimeState(),
     weatherWarningText: String? = null,
     onWeatherWarningDismiss: () -> Unit = {},
     silentModeState: SilentModeState = SilentModeState(),
@@ -188,6 +191,8 @@ fun PullToSyncContainer(
         islamicEventDismissed = false
     }
     val isPrayerAlert = prayerAlertState.isActive && !prayerAlertDismissed
+    val isForbiddenPrayerTime = forbiddenPrayerTimeState.isActive &&
+        forbiddenPrayerTimeState.displayText.isNotBlank()
     var weatherWarningDismissed by remember { mutableStateOf(false) }
     LaunchedEffect(weatherWarningText) {
         weatherWarningDismissed = false
@@ -307,7 +312,8 @@ fun PullToSyncContainer(
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
     val hasSyncResult = !syncResultText.isNullOrBlank()
-    val hasStatus = isPrayerAlert || isWeatherWarning || isIslamicEvent || isSilentMode || hasSyncResult ||
+    val hasStatus = isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning || isIslamicEvent ||
+        isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
     val targetHoldHeightDp = if (mediaBar?.isVisible == true || isMushafActive || hasStatus) {
         standardBarHeightDp
@@ -439,6 +445,15 @@ fun PullToSyncContainer(
         // duplicate here.
         if (isTtsPreparing && mediaBar?.isVisible != true) {
             add(SyncBarStatus("tts", "Preparing audio…", SyncBarIcon.Spinner))
+        }
+        if (isForbiddenPrayerTime) {
+            add(
+                SyncBarStatus(
+                    key = "forbidden-prayer:${forbiddenPrayerTimeState.periodKey}",
+                    text = forbiddenPrayerTimeState.displayText,
+                    icon = SyncBarIcon.WeatherWarning,
+                ),
+            )
         }
         if (isPrayerAlert) {
             add(
@@ -763,6 +778,7 @@ private fun DrawScope.drawIndicatorArc(color: Color, startAngle: Float) {
  * statuses still cycle, but remain visually quiet without pagination dots.
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun SyncBarStatusRow(
     status: SyncBarStatus,
     spinAngle: Float,
@@ -843,8 +859,16 @@ private fun SyncBarStatusRow(
             fontSize = 15.sp,
             color = contentColor,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
+            overflow = TextOverflow.Clip,
+            softWrap = false,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .basicMarquee(
+                    iterations = Int.MAX_VALUE,
+                    initialDelayMillis = 700,
+                    repeatDelayMillis = 1_000,
+                    velocity = 42.dp,
+                ),
         )
     }
 }

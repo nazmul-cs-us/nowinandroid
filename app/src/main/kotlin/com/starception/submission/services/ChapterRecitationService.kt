@@ -46,6 +46,7 @@ class ChapterRecitationService : Service() {
     private var currentSource: String? = null
     private var currentTitle: String = ""
     private var currentSubtitle: String = ""
+    private var isContinuousHandoff = false
     // Sherpa/Android TTS owns its audio pipeline, but still needs this service's
     // MediaSession and foreground notification. In that mode there is no MediaPlayer.
     private var isExternalPlayback = false
@@ -69,19 +70,34 @@ class ChapterRecitationService : Service() {
         const val EXTRA_SOURCE = "source"
         const val EXTRA_TITLE = "title"
         const val EXTRA_SUBTITLE = "subtitle"
+        const val EXTRA_CONTINUOUS_HANDOFF = "continuous_handoff"
 
         /** Start (or switch) playback of an already-resolved [source] with display metadata. */
-        fun play(context: Context, source: String, title: String, subtitle: String) {
+        fun play(
+            context: Context,
+            source: String,
+            title: String,
+            subtitle: String,
+            continuousHandoff: Boolean = false,
+        ) {
             // A Play-all sequence can advance while the app is backgrounded. Reuse the
             // already-running service directly because Android 12+ rejects another
             // startForegroundService() call from the background, even for a track update.
-            if (ChapterRecitationState.requestSourcePlayback(source, title, subtitle)) return
+            if (
+                ChapterRecitationState.requestSourcePlayback(
+                    source,
+                    title,
+                    subtitle,
+                    continuousHandoff,
+                )
+            ) return
 
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_PLAY_SOURCE
                 putExtra(EXTRA_SOURCE, source)
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_SUBTITLE, subtitle)
+                putExtra(EXTRA_CONTINUOUS_HANDOFF, continuousHandoff)
             }
             try {
                 androidx.core.content.ContextCompat.startForegroundService(context, intent)
@@ -130,9 +146,12 @@ class ChapterRecitationService : Service() {
         super.onCreate()
         createNotificationChannel()
         initSession()
-        ChapterRecitationState.onSourcePlaybackRequested = { source, title, subtitle ->
-            handler.post { startPlayback(source, title, subtitle) }
-        }
+        ChapterRecitationState.onSourcePlaybackRequested =
+            { source, title, subtitle, continuousHandoff ->
+                handler.post {
+                    startPlayback(source, title, subtitle, continuousHandoff)
+                }
+            }
         ChapterRecitationState.onExternalPlaybackRequested = { title, subtitle ->
             handler.post { startExternalPlayback(title, subtitle) }
         }
@@ -171,6 +190,10 @@ class ChapterRecitationService : Service() {
                         source = source,
                         title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                         subtitle = intent.getStringExtra(EXTRA_SUBTITLE).orEmpty(),
+                        continuousHandoff = intent.getBooleanExtra(
+                            EXTRA_CONTINUOUS_HANDOFF,
+                            false,
+                        ),
                     )
                 }
             }
@@ -184,7 +207,12 @@ class ChapterRecitationService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startPlayback(source: String, title: String, subtitle: String) {
+    private fun startPlayback(
+        source: String,
+        title: String,
+        subtitle: String,
+        continuousHandoff: Boolean,
+    ) {
         // Same source already loaded → treat as a play/pause toggle.
         if (source == currentSource && mediaPlayer != null) {
             togglePlayPause()
@@ -193,6 +221,7 @@ class ChapterRecitationService : Service() {
         currentSource = source
         currentTitle = title
         currentSubtitle = subtitle
+        isContinuousHandoff = continuousHandoff
         isExternalPlayback = false
         releaseExternalPlaybackWakeLock()
 
@@ -216,32 +245,55 @@ class ChapterRecitationService : Service() {
         }
         player.setOnCompletionListener {
             Log.d("DuaAutoPlay", "service setOnCompletionListener fired | title=${ChapterRecitationState.title}")
-            ChapterRecitationState.markStopped()
             stopProgressUpdates()
-            updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
             // Route natural completion to the active content type. Hadith details
             // advance their own numbered sequence; Fortress playback keeps its
             // existing chapter/dua playlist behavior.
             if (currentTitle.startsWith("Hadith #")) {
                 val completion = ChapterRecitationState.onHadithCompletion
-                if (completion != null) {
-                    // Keep foreground eligibility across the small gap before the
-                    // playlist coroutine supplies the next track. Its final cleanup
-                    // stops the service when there is no next Hadith.
+                if (completion != null && isContinuousHandoff) {
+                    // A Play-all sequence may spend a short time loading the next
+                    // database row or recording. Keep the MediaSession active during
+                    // that handoff. Reporting STOPPED here makes Samsung classify the
+                    // media FGS as idle and remove it while the display is locked.
+                    ChapterRecitationState.publish(
+                        true,
+                        currentTitle,
+                        currentSubtitle,
+                    )
+                    updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING)
+                    updateNotification()
                     completion.invoke()
                 } else {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    ChapterRecitationState.markStopped()
+                    updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
+                    completion?.invoke()
+                    stopPlaybackAndSelf()
                 }
             } else {
+                ChapterRecitationState.markStopped()
+                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 ChapterRecitationState.onCompletion?.invoke()
             }
         }
         player.setOnErrorListener { _, what, extra ->
             Log.e(TAG, "MediaPlayer error what=$what extra=$extra")
-            ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
-            if (currentTitle.startsWith("Hadith #")) {
-                ChapterRecitationState.onHadithCompletion?.invoke()
+            val completion = ChapterRecitationState.onHadithCompletion
+            if (
+                currentTitle.startsWith("Hadith #") &&
+                completion != null &&
+                isContinuousHandoff
+            ) {
+                ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
+                updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING)
+                updateNotification()
+                completion.invoke()
+            } else {
+                ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
+                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
+                completion?.invoke()
+                stopPlaybackAndSelf()
             }
             true
         }
@@ -323,6 +375,7 @@ class ChapterRecitationService : Service() {
         mediaPlayer = null
         currentSource = null
         isExternalPlayback = false
+        isContinuousHandoff = false
         releaseExternalPlaybackWakeLock()
         ChapterRecitationState.markStopped()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -404,7 +457,8 @@ class ChapterRecitationService : Service() {
         val isPlaying = if (isExternalPlayback) {
             ChapterRecitationState.isPlaying
         } else {
-            mediaPlayer?.isPlaying ?: false
+            mediaPlayer?.isPlaying == true ||
+                (isContinuousHandoff && ChapterRecitationState.isPlaying)
         }
         val contentIntent = packageManager.getLaunchIntentForPackage(packageName)
         val contentPending = PendingIntent.getActivity(
@@ -505,7 +559,7 @@ object ChapterRecitationState {
     var onExternalToggle: (() -> Unit)? = null
 
     @Volatile
-    internal var onSourcePlaybackRequested: ((String, String, String) -> Unit)? = null
+    internal var onSourcePlaybackRequested: ((String, String, String, Boolean) -> Unit)? = null
     @Volatile
     internal var onExternalPlaybackRequested: ((String, String) -> Unit)? = null
     @Volatile
@@ -558,9 +612,10 @@ object ChapterRecitationState {
         source: String,
         title: String,
         subtitle: String,
+        continuousHandoff: Boolean,
     ): Boolean {
         val callback = onSourcePlaybackRequested ?: return false
-        callback(source, title, subtitle)
+        callback(source, title, subtitle, continuousHandoff)
         return true
     }
 

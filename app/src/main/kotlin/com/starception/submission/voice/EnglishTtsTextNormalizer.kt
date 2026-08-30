@@ -23,6 +23,15 @@ package com.starception.submission.voice
  * TTS models may spell those symbols out, skip them, or treat the dots as sentence endings.
  */
 object EnglishTtsTextNormalizer {
+    private val units = arrayOf(
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+        "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+        "seventeen", "eighteen", "nineteen",
+    )
+    private val tens = arrayOf(
+        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    )
+
     private val replacements = listOf(
         Regex("\\(\\s*ﷺ\\s*\\)") to " sallallahu alayhi wa sallam ",
         Regex("[ﷺؐ]") to " sallallahu alayhi wa sallam ",
@@ -56,5 +65,34 @@ object EnglishTtsTextNormalizer {
             .replace(Regex("\\s*\\n\\s*"), " ")
             .replace(Regex(" {2,}"), " ")
             .trim()
+    }
+
+    /**
+     * Sherpa's English phonemizers can silently skip decimal digit tokens. Bukhari numbers
+     * are therefore written as words before normalization and synthesis.
+     */
+    fun bukhariIntro(hadithNumber: Int): String =
+        "Hadith number ${integerToEnglishWords(hadithNumber)} from Sahih Al-Bukhari."
+
+    internal fun integerToEnglishWords(number: Int): String {
+        require(number >= 0) { "Only non-negative numbers are supported" }
+        if (number < 20) return units[number]
+        if (number < 100) {
+            val remainder = number % 10
+            return tens[number / 10] + if (remainder == 0) "" else " ${units[remainder]}"
+        }
+        if (number < 1_000) {
+            val remainder = number % 100
+            return "${units[number / 100]} hundred" +
+                if (remainder == 0) "" else " ${integerToEnglishWords(remainder)}"
+        }
+        if (number < 1_000_000) {
+            val remainder = number % 1_000
+            return "${integerToEnglishWords(number / 1_000)} thousand" +
+                if (remainder == 0) "" else " ${integerToEnglishWords(remainder)}"
+        }
+        val remainder = number % 1_000_000
+        return "${integerToEnglishWords(number / 1_000_000)} million" +
+            if (remainder == 0) "" else " ${integerToEnglishWords(remainder)}"
     }
 }

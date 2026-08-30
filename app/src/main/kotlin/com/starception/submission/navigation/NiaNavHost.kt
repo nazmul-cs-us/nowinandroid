@@ -157,6 +157,12 @@ fun NiaNavHost(
     } else {
         com.starception.submission.feature.prayertimes.wobble.PrayerAlertState()
     }
+    val homeForbiddenPrayerTime = if (mainViewModel != null) {
+        val warning by mainViewModel.forbiddenPrayerTimeState.collectAsStateWithLifecycle()
+        warning
+    } else {
+        com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState()
+    }
     val homeIsSyncing = if (mainViewModel != null) {
         val s by mainViewModel.isSyncing.collectAsStateWithLifecycle()
         s
@@ -457,6 +463,7 @@ fun NiaNavHost(
             isTtsPreparing = homeTtsPreparing,
             onPrayerAlertChanged = { state -> mainViewModel?.updatePrayerAlert(state) },
             prayerAlertOverride = homePrayerAlertOverride,
+            forbiddenPrayerTimeState = homeForbiddenPrayerTime,
             isSyncingExternal = homeIsSyncing,
             onSetSyncing = { syncing -> mainViewModel?.setSyncing(syncing) },
         )

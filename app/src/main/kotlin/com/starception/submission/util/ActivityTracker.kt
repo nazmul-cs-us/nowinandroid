@@ -460,6 +460,23 @@ object ActivityTracker {
     private fun updateActivityFromSensor(activity: String) {
         val normalizedActivity = normalizeActivityName(activity)
         if (googleDrivingConfirmed && normalizedActivity != "Driving") {
+            val definitelyNotDriving = normalizedActivity in setOf(
+                "Still",
+                "Walking",
+                "Running",
+                "Cycling",
+                "On Foot",
+            )
+            if (definitelyNotDriving) {
+                Log.w(
+                    "ActivityTracker",
+                    "Sensor '$normalizedActivity' vetoed Google IN_VEHICLE confirmation",
+                )
+                googleDrivingConfirmed = false
+                persistGoogleDrivingConfirmation(false)
+                updateActivityInternal(normalizedActivity)
+                return
+            }
             Log.d(
                 "ActivityTracker",
                 "Ignoring sensor activity '$normalizedActivity' while Google driving is confirmed",
@@ -1126,22 +1143,17 @@ object ActivityTracker {
             val selectedLang = translationService.getSelectedLanguage()
             val useBengaliAudio = selectedLang == "bn"
 
-            // Get hadith text for TTS (if not using Bengali audio)
-            var hadithText: String? = null
-            if (!useBengaliAudio) {
-                val hadithRepository = HadithRepository.getInstance(ctx)
-                val hadith = hadithRepository.getHadith("sahih_bukhari.db", nextHadithNumber)
-                hadithText = hadith?.textPlain ?: hadith?.elaboration
-
-                // Translate if needed
-                if (selectedLang != "en" && selectedLang != "transliteration" && hadithText != null) {
-                    try {
-                        hadithText = translationService.translateFromEnglish(hadithText, selectedLang)
-                    } catch (e: Exception) {
-                        Log.w("ActivityTracker", "Translation failed, using English")
-                    }
-                }
-            }
+            // Always carry the exact English entry. Bengali normally uses its matching
+            // recording, but the driving service needs this text immediately when that
+            // individual file is absent or cannot be played.
+            val localTranslationRepository =
+                com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+                    .getInstance(ctx)
+            localTranslationRepository.loadTranslations()
+            val hadithText = localTranslationRepository.getEnglishText(nextHadithNumber)
+                ?: HadithRepository.getInstance(ctx)
+                    .getHadith("sahih_bukhari.db", nextHadithNumber)
+                    ?.let { it.textPlain ?: it.elaboration }
 
             Log.i("ActivityTracker", "📚 Next hadith: #$nextHadithNumber, useBengaliAudio=$useBengaliAudio")
             return Triple(nextHadithNumber, hadithText, useBengaliAudio)
@@ -1234,22 +1246,9 @@ object ActivityTracker {
             }
         }
 
-        // Translate hadith if user selected non-English language
-        if (selectedLang != "en" && selectedLang != "transliteration") {
-            scope.launch {
-                try {
-                    val translatedText = translationService.translateFromEnglish(text, selectedLang)
-                    Log.d("ActivityTracker", "📚 Translated hadith to $selectedLang: ${translatedText.take(100)}...")
-                    speakWithTts(ctx, hadithNumber, translatedText, ttsLocale, selectedLang)
-                } catch (e: Exception) {
-                    Log.e("ActivityTracker", "📚 Translation failed, speaking in English: ${e.message}")
-                    speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
-                }
-            }
-        } else {
-            // English or transliteration - speak in English
-            speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
-        }
+        // No matching recording: read the exact English hadith with the selected Sherpa
+        // model. Device-provided Bengali/translated TTS is intentionally never used.
+        speakWithTts(ctx, hadithNumber, text, Locale.US, "en")
     }
 
     /**
@@ -1315,7 +1314,7 @@ object ActivityTracker {
 
     /**
      * Actually speak the text using TTS
-     * Uses user-selected TTS engine: Sherpa-ONNX for English, Android TTS for other languages
+     * Uses the user-selected Sherpa-ONNX model for exact English Bukhari fallback.
      */
     private fun speakWithTts(ctx: Context, hadithNumber: Int, text: String, locale: Locale, langCode: String) {
         // Get intro text in the appropriate language
@@ -1325,23 +1324,14 @@ object ActivityTracker {
         // Store current hadith number for completion callback
         currentHadithNumber = hadithNumber
 
-        // For English, check if user selected Sherpa-ONNX TTS
-        if (langCode == "en") {
-            val ttsPrefs = ctx.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
-            val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
-            val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
-
-            // If user has selected a Sherpa-ONNX voice, use it
-            if (selectedVoiceName != null) {
-                Log.i("ActivityTracker", "📚 Using Sherpa-ONNX TTS: $selectedVoiceName, speaker $selectedSpeakerId")
-                speakWithSherpaOnnxTts(ctx, hadithNumber, fullText, selectedVoiceName, selectedSpeakerId)
-                return
-            }
-        }
-
-        // Fall back to Android TTS for non-English or if no Sherpa-ONNX voice selected
-        Log.i("ActivityTracker", "📚 Using Android TTS for language: $langCode")
-        speakWithAndroidTts(ctx, hadithNumber, fullText, locale)
+        val ttsPrefs = ctx.getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
+        val selectedVoiceName = ttsPrefs.getString(
+            "selected_voice",
+            com.starception.submission.settings.components.TtsVoice.KOKORO_EN.name,
+        ) ?: com.starception.submission.settings.components.TtsVoice.KOKORO_EN.name
+        val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
+        Log.i("ActivityTracker", "📚 Using Sherpa-ONNX TTS: $selectedVoiceName, speaker $selectedSpeakerId")
+        speakWithSherpaOnnxTts(ctx, hadithNumber, fullText, selectedVoiceName, selectedSpeakerId)
     }
 
     /**
@@ -1380,12 +1370,10 @@ object ActivityTracker {
                 )
 
                 if (!success) {
-                    Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS failed, falling back to Android TTS")
-                    speakWithAndroidTts(ctx, hadithNumber, text, Locale.US)
+                    Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS failed; system TTS fallback is disabled")
                 }
             } catch (e: Exception) {
                 Log.e("ActivityTracker", "📚 Sherpa-ONNX TTS error: ${e.message}")
-                speakWithAndroidTts(ctx, hadithNumber, text, Locale.US)
             }
         }
     }
@@ -1487,7 +1475,7 @@ object ActivityTracker {
             "tr" -> "Sahih-i Buhari'den $hadithNumber numaralı hadis."
             "ur" -> "صحیح البخاری سے حدیث نمبر $hadithNumber۔"
             "zh" -> "来自《布哈里圣训》的第 $hadithNumber 条圣训。"
-            else -> "Hadith number $hadithNumber from Sahih Al-Bukhari."
+            else -> EnglishTtsTextNormalizer.bukhariIntro(hadithNumber)
         }
     }
 
@@ -2076,7 +2064,7 @@ object ActivityTracker {
                         // Pass hadith info if enrolled
                         hadithInfo?.let { (number, text, useAudio) ->
                             putExtra(DrivingAudioService.EXTRA_HADITH_NUMBER, number)
-                            if (!useAudio && text != null) {
+                            if (text != null) {
                                 putExtra(DrivingAudioService.EXTRA_HADITH_TEXT, text)
                             }
                             putExtra(DrivingAudioService.EXTRA_COURSE_ID, "daily_bukhari")

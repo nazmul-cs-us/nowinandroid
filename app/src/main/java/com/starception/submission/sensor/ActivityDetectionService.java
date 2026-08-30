@@ -105,8 +105,13 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
     private static final float DRIVING_EVIDENCE_MAX_ACCURACY_METERS = 25f;
     private static final int DRIVING_EVIDENCE_REQUIRED_SAMPLES = 3;
     private static final long DRIVING_EVIDENCE_WRITE_INTERVAL_MILLIS = 5_000L;
+    private static final float ZERO_SPEED_EVIDENCE_MAX_MPS = 1.0f;
+    private static final int ZERO_SPEED_EVIDENCE_REQUIRED_SAMPLES = 3;
+    private static final long ZERO_SPEED_EVIDENCE_WRITE_INTERVAL_MILLIS = 5_000L;
     private int consecutiveReliableDrivingSpeedSamples = 0;
+    private int consecutiveReliableZeroSpeedSamples = 0;
     private long lastDrivingEvidencePersistedElapsed = 0L;
+    private long lastZeroSpeedEvidencePersistedElapsed = 0L;
     private static final double STATIONARY_VARIANCE_THRESHOLD = 0.15; // Slightly higher for better stability
     private static final double STATIONARY_ACCEL_THRESHOLD = 0.3; // Lower threshold for stationary
 
@@ -1676,10 +1681,11 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
         // A wake-up alarm is allowed to play the Travel Dua only when the device has
         // continued to produce reliable driving-speed samples. Requiring three samples
         // prevents one stationary GPS spike from becoming proof of an actual journey.
-        if (location.hasSpeed()
-                && accuracy <= DRIVING_EVIDENCE_MAX_ACCURACY_METERS
-                && speed > drivingSpeedThreshold) {
+        boolean hasReliableSpeed = location.hasSpeed()
+                && accuracy <= DRIVING_EVIDENCE_MAX_ACCURACY_METERS;
+        if (hasReliableSpeed && speed > drivingSpeedThreshold) {
             consecutiveReliableDrivingSpeedSamples++;
+            consecutiveReliableZeroSpeedSamples = 0;
             if (consecutiveReliableDrivingSpeedSamples >= DRIVING_EVIDENCE_REQUIRED_SAMPLES) {
                 long nowElapsed = SystemClock.elapsedRealtime();
                 if (nowElapsed - lastDrivingEvidencePersistedElapsed
@@ -1696,8 +1702,27 @@ public class ActivityDetectionService implements SensorEventListener, LocationLi
                             accuracy));
                 }
             }
+        } else if (hasReliableSpeed && speed <= ZERO_SPEED_EVIDENCE_MAX_MPS) {
+            consecutiveReliableDrivingSpeedSamples = 0;
+            consecutiveReliableZeroSpeedSamples++;
+            if (consecutiveReliableZeroSpeedSamples >= ZERO_SPEED_EVIDENCE_REQUIRED_SAMPLES) {
+                long nowElapsed = SystemClock.elapsedRealtime();
+                if (nowElapsed - lastZeroSpeedEvidencePersistedElapsed
+                        >= ZERO_SPEED_EVIDENCE_WRITE_INTERVAL_MILLIS) {
+                    context.getSharedPreferences("travel_dua_settings", Context.MODE_PRIVATE)
+                            .edit()
+                            .putLong("travel_dua_last_reliable_zero_speed_elapsed", nowElapsed)
+                            .apply();
+                    lastZeroSpeedEvidencePersistedElapsed = nowElapsed;
+                    logDebug(String.format(
+                            "Reliable zero-speed evidence persisted: %.1f km/h, accuracy=%.0fm",
+                            speed * 3.6,
+                            accuracy));
+                }
+            }
         } else {
             consecutiveReliableDrivingSpeedSamples = 0;
+            consecutiveReliableZeroSpeedSamples = 0;
         }
 
         // Log for debugging

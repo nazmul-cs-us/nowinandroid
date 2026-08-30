@@ -51,8 +51,8 @@ fun MushafMiniBar(
     val haptic = LocalHapticFeedback.current
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     val secondaryColor = contentColor.copy(alpha = 0.68f)
-    val canGoPrevious = state.currentPage > 1
-    val canGoNext = state.currentPage < state.totalPages
+    val canGoPrevious = state.currentPage > 1 || state.surahNumber > 1
+    val canGoNext = state.currentPage < state.totalPages || state.surahNumber < 114
     val progress = if (state.totalPages > 0) {
         state.currentPage.toFloat() / state.totalPages.toFloat()
     } else {
@@ -132,7 +132,11 @@ fun MushafMiniBar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Previous page",
+                contentDescription = if (state.currentPage == 1) {
+                    "Previous Surah"
+                } else {
+                    "Previous page"
+                },
                 modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = if (canGoPrevious) 0.78f else 0.22f),
             )
@@ -148,7 +152,11 @@ fun MushafMiniBar(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Next page",
+                contentDescription = if (state.currentPage == state.totalPages) {
+                    "Next Surah"
+                } else {
+                    "Next page"
+                },
                 modifier = Modifier.size(20.dp),
                 tint = contentColor.copy(alpha = if (canGoNext) 0.90f else 0.22f),
             )

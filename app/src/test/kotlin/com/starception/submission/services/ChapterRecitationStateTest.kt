@@ -39,22 +39,54 @@ class ChapterRecitationStateTest {
 
     @Test
     fun activeServiceReceivesNextSourceWithoutAnotherServiceStart() {
-        var received: Triple<String, String, String>? = null
-        ChapterRecitationState.onSourcePlaybackRequested = { source, title, subtitle ->
-            received = Triple(source, title, subtitle)
-        }
+        data class PlaybackRequest(
+            val source: String,
+            val title: String,
+            val subtitle: String,
+            val continuousHandoff: Boolean,
+        )
+
+        var received: PlaybackRequest? = null
+        ChapterRecitationState.onSourcePlaybackRequested =
+            { source, title, subtitle, continuousHandoff ->
+                received = PlaybackRequest(source, title, subtitle, continuousHandoff)
+            }
 
         assertTrue(
             ChapterRecitationState.requestSourcePlayback(
                 source = "/audio/hadith-2.mp3",
                 title = "Hadith #2",
                 subtitle = "Sahih Bukhari",
+                continuousHandoff = true,
             ),
         )
         assertEquals(
-            Triple("/audio/hadith-2.mp3", "Hadith #2", "Sahih Bukhari"),
+            PlaybackRequest(
+                source = "/audio/hadith-2.mp3",
+                title = "Hadith #2",
+                subtitle = "Sahih Bukhari",
+                continuousHandoff = true,
+            ),
             received,
         )
+    }
+
+    @Test
+    fun singlePlaybackRequestDoesNotUseContinuousHandoff() {
+        var continuousHandoff: Boolean? = null
+        ChapterRecitationState.onSourcePlaybackRequested = { _, _, _, isContinuous ->
+            continuousHandoff = isContinuous
+        }
+
+        assertTrue(
+            ChapterRecitationState.requestSourcePlayback(
+                source = "/audio/hadith-1.mp3",
+                title = "Hadith #1",
+                subtitle = "Sahih Bukhari",
+                continuousHandoff = false,
+            ),
+        )
+        assertFalse(continuousHandoff ?: true)
     }
 
     @Test

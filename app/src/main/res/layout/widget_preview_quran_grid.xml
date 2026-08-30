@@ -28,7 +28,7 @@
             android:layout_weight="1"
             android:fontFamily="@font/ubuntu_sans"
             android:includeFontPadding="false"
-            android:text="Quran Grid"
+            android:text="Holy Quran"
             android:textColor="@color/prayer_widget_on_background"
             android:textSize="12sp"
             android:textStyle="bold" />
