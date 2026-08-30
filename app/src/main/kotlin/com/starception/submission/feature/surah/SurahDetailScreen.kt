@@ -100,6 +100,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -188,6 +189,10 @@ import java.util.Locale
 
 private const val SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO = 3f / 2f
 private val SurahArtworkLandscapeHeight = 180.dp
+private val MushafEdgeControlTouchWidth = 96.dp
+private val MushafEdgeControlTouchHeight = 112.dp
+private val MushafEdgeControlVisualSize = 44.dp
+private val MushafEdgeControlCollapsedWidth = 5.dp
 
 /**
  * Container for surah navigation with drag gesture anywhere on screen.
@@ -7382,7 +7387,7 @@ private fun MushafPagerView(
             var rightEdgeControlVerticalFraction by remember {
                 mutableFloatStateOf(0.50f)
             }
-            val edgeControlSizePx = with(density) { 54.dp.toPx() }
+            val edgeControlSizePx = with(density) { MushafEdgeControlTouchHeight.toPx() }
             val edgeControlTravelPx = (
                 constraints.maxHeight.toFloat() - edgeControlSizePx
                 ).coerceAtLeast(0f)
@@ -7410,6 +7415,7 @@ private fun MushafPagerView(
                 isLeftEdge = true,
                 crossesSurah = atFirstPage,
                 enabled = paginatedPages.isNotEmpty() && (!atFirstPage || surahNumber > 1),
+                longPressEnabled = surahNumber > 1,
                 onVerticalDrag = moveLeftEdgeControlVertically,
                 onTouchActiveChanged = { edgeControlTouchActive = it },
                 onClick = {
@@ -7419,6 +7425,7 @@ private fun MushafPagerView(
                         mushafScope.launch { state.prev() }
                     }
                 },
+                onLongPress = onNavigateToPreviousSurah,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .offset { androidx.compose.ui.unit.IntOffset(0, leftEdgeControlTopPx) }
@@ -7428,6 +7435,7 @@ private fun MushafPagerView(
                 isLeftEdge = false,
                 crossesSurah = atLastPage,
                 enabled = paginatedPages.isNotEmpty() && (!atLastPage || surahNumber < 114),
+                longPressEnabled = surahNumber < 114,
                 onVerticalDrag = moveRightEdgeControlVertically,
                 onTouchActiveChanged = { edgeControlTouchActive = it },
                 onClick = {
@@ -7437,6 +7445,7 @@ private fun MushafPagerView(
                         mushafScope.launch { state.next() }
                     }
                 },
+                onLongPress = onNavigateToNextSurah,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset { androidx.compose.ui.unit.IntOffset(0, rightEdgeControlTopPx) }
@@ -7456,12 +7465,15 @@ private fun MushafEdgeTurnControl(
     isLeftEdge: Boolean,
     crossesSurah: Boolean,
     enabled: Boolean,
+    longPressEnabled: Boolean,
     onVerticalDrag: (Float) -> Unit,
     onTouchActiveChanged: (Boolean) -> Unit,
     onClick: () -> Unit,
+    onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
     var isExpanded by remember { mutableStateOf(true) }
     var isTouching by remember { mutableStateOf(false) }
     LaunchedEffect(isExpanded, isTouching) {
@@ -7479,39 +7491,43 @@ private fun MushafEdgeTurnControl(
             onClick()
         }
     }
-    val performHandleAction = {
-        if (isExpanded) {
-            performTurn()
-        } else {
+    // The collapsed sliver is only a visual state, not an extra interaction
+    // step. One tap always turns the page; expanding immediately on DOWN gives
+    // the same direct feedback as Samsung's narrow edge handles.
+    val performHandleAction = { performTurn() }
+    val performSurahTurn = {
+        if (longPressEnabled) {
             haptic.performHapticFeedback(
-                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
             )
-            isExpanded = true
+            isExpanded = false
+            onLongPress()
         }
     }
     val currentVerticalDrag by rememberUpdatedState(onVerticalDrag)
     val currentTouchActiveChanged by rememberUpdatedState(onTouchActiveChanged)
     val currentPerformHandleAction by rememberUpdatedState(performHandleAction)
-    val dragTouchSlop = with(LocalDensity.current) { 8.dp.toPx() }
+    val currentPerformSurahTurn by rememberUpdatedState(performSurahTurn)
+    val currentLongPressEnabled by rememberUpdatedState(longPressEnabled)
+    val dragTouchSlop = with(LocalDensity.current) { 2.dp.toPx() }
     val visualWidth by animateDpAsState(
-        targetValue = if (isExpanded) 54.dp else 8.dp,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        targetValue = if (isExpanded) {
+            MushafEdgeControlVisualSize
+        } else {
+            MushafEdgeControlCollapsedWidth
+        },
+        animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
         label = "Mushaf edge handle width",
     )
     val visualEdgeOffset by animateDpAsState(
         // Samsung-style edge controls are physically attached to the display:
         // the open circle tucks slightly behind the bezel and the collapsed
         // handle sits flush with it, with no floating gap.
-        targetValue = if (isExpanded) (-10).dp else 0.dp,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        targetValue = if (isExpanded) (-8).dp else 0.dp,
+        animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
         label = "Mushaf edge handle docking",
     )
     val controlDescription = when {
-        !isExpanded -> if (isLeftEdge) {
-            "Show previous-page control"
-        } else {
-            "Show next-page control"
-        }
         crossesSurah && isLeftEdge -> "Previous Surah"
         crossesSurah -> "Next Surah"
         isLeftEdge -> "Previous Mushaf page"
@@ -7523,14 +7539,19 @@ private fun MushafEdgeTurnControl(
     var pointerPreviousRawY by remember { mutableFloatStateOf(0f) }
     var pointerPendingY by remember { mutableFloatStateOf(0f) }
     var pointerIsDragging by remember { mutableStateOf(false) }
+    var longPressPerformed by remember { mutableStateOf(false) }
+    var longPressJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val disallowParentIntercept = remember { RequestDisallowInterceptTouchEvent() }
     Box(
         contentAlignment = if (isLeftEdge) Alignment.CenterStart else Alignment.CenterEnd,
         modifier = modifier
-            .size(54.dp)
+            .width(MushafEdgeControlTouchWidth)
+            .height(MushafEdgeControlTouchHeight)
             // Both controls sit inside Android's back-gesture strip. Exclude only
-            // this compact 54dp target so the edge handle remains tappable and
-            // draggable without disabling back gestures elsewhere on the page.
+            // this target. The visual remains a 44dp circle / 5dp collapsed
+            // sliver, while the invisible 96x112dp hit area extends inward and
+            // above/below it. This gives the Samsung-small visual a forgiving
+            // target without obscuring Quran text.
             .systemGestureExclusion()
             // Claim the raw Android touch stream at ACTION_DOWN. This prevents
             // the surrounding LazyColumn's "swipe down for Surah info" gesture
@@ -7543,9 +7564,19 @@ private fun MushafEdgeTurnControl(
                         disallowParentIntercept(true)
                         currentTouchActiveChanged(true)
                         isTouching = true
+                        isExpanded = true
                         pointerPreviousRawY = event.rawY
                         pointerPendingY = 0f
                         pointerIsDragging = false
+                        longPressPerformed = false
+                        longPressJob?.cancel()
+                        longPressJob = coroutineScope.launch {
+                            delay(android.view.ViewConfiguration.getLongPressTimeout().toLong())
+                            if (isTouching && !pointerIsDragging && currentLongPressEnabled) {
+                                longPressPerformed = true
+                                currentPerformSurahTurn()
+                            }
+                        }
                     }
                     android.view.MotionEvent.ACTION_MOVE -> {
                         val deltaY = event.rawY - pointerPreviousRawY
@@ -7554,6 +7585,7 @@ private fun MushafEdgeTurnControl(
                             pointerPendingY += deltaY
                             if (kotlin.math.abs(pointerPendingY) >= dragTouchSlop) {
                                 pointerIsDragging = true
+                                longPressJob?.cancel()
                                 currentVerticalDrag(pointerPendingY)
                                 pointerPendingY = 0f
                             }
@@ -7562,12 +7594,16 @@ private fun MushafEdgeTurnControl(
                         }
                     }
                     android.view.MotionEvent.ACTION_UP -> {
-                        if (!pointerIsDragging) currentPerformHandleAction()
+                        longPressJob?.cancel()
+                        if (!pointerIsDragging && !longPressPerformed) {
+                            currentPerformHandleAction()
+                        }
                         isTouching = false
                         currentTouchActiveChanged(false)
                         disallowParentIntercept(false)
                     }
                     android.view.MotionEvent.ACTION_CANCEL -> {
+                        longPressJob?.cancel()
                         isTouching = false
                         currentTouchActiveChanged(false)
                         disallowParentIntercept(false)
@@ -7578,10 +7614,18 @@ private fun MushafEdgeTurnControl(
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = controlDescription
-                if (isExpanded && !enabled) disabled()
+                if (!enabled) disabled()
                 onClick {
                     performHandleAction()
                     true
+                }
+                if (longPressEnabled) {
+                    onLongClick(
+                        label = if (isLeftEdge) "Previous Surah" else "Next Surah",
+                    ) {
+                        performSurahTurn()
+                        true
+                    }
                 }
             },
     ) {
@@ -7604,7 +7648,7 @@ private fun MushafEdgeTurnControl(
                     x = if (isLeftEdge) visualEdgeOffset else -visualEdgeOffset,
                 )
                 .width(visualWidth)
-                .height(54.dp),
+                .height(MushafEdgeControlVisualSize),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 androidx.compose.animation.AnimatedVisibility(
@@ -7619,7 +7663,7 @@ private fun MushafEdgeTurnControl(
                             Icons.AutoMirrored.Filled.ArrowForward
                         },
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }

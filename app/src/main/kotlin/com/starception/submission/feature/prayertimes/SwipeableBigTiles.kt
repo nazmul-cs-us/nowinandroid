@@ -1361,6 +1361,9 @@ fun SwipeableBigTiles(
     val view = LocalView.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val detectedActivity by com.starception.submission.util.ActivityTracker.currentActivity
+        .collectAsStateWithLifecycle()
+    val isDrivingMode = detectedActivity.equals("Driving", ignoreCase = true)
     val carouselScope = rememberCoroutineScope()
     var showGlobePopup by rememberSaveable { mutableStateOf(false) }
     var showAutoSwipeSettings by remember { mutableStateOf(false) }
@@ -1605,6 +1608,18 @@ fun SwipeableBigTiles(
             time = currentTime,
             fortressDuasByChapter = fortressDuasByChapter,
         )
+    }
+    val displayedAiRecommendation = remember(
+        isDrivingMode,
+        today,
+        currentTime.hour,
+        aiRecommendation,
+    ) {
+        if (isDrivingMode) {
+            buildDrivingInsightRecommendation(date = today, time = currentTime)
+        } else {
+            aiRecommendation
+        }
     }
     val qiblaBearing = remember(prayerTimes?.location) {
         prayerTimes?.location?.let { location ->
@@ -2010,10 +2025,22 @@ fun SwipeableBigTiles(
                         )
 
                         2 -> InsightPreviewCard(
-                            label = "Today's reading",
-                            title = dailySurah.nameEnglish,
-                            supportingText = dailySurah.nameArabic,
-                            footerText = "Surah ${dailySurah.number} · ${dailySurah.revelationType}",
+                            label = if (isDrivingMode) "Driving · Listen" else "Today's reading",
+                            title = if (isDrivingMode) {
+                                "Listen to ${dailySurah.nameEnglish}"
+                            } else {
+                                dailySurah.nameEnglish
+                            },
+                            supportingText = if (isDrivingMode) {
+                                "Hands-free Quran playback"
+                            } else {
+                                dailySurah.nameArabic
+                            },
+                            footerText = if (isDrivingMode) {
+                                "Surah ${dailySurah.number} · Keep your eyes on the road"
+                            } else {
+                                "Surah ${dailySurah.number} · ${dailySurah.revelationType}"
+                            },
                             backgroundPainterRes = ImageRes.drawable.insight_quran_background,
                             foregroundPainterRes = ImageRes.drawable.insight_quran_foreground_v2,
                             // Let more of the reading scene breathe around the Quran.
@@ -2034,6 +2061,7 @@ fun SwipeableBigTiles(
                             },
                             readingSurahIndex = dailySurah.number - 1,
                             readingPlayback = dailyReadingPlayback,
+                            preferAudioAction = isDrivingMode,
                             onReadingPlayPause = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -2043,12 +2071,20 @@ fun SwipeableBigTiles(
                                 interactionEpoch++
                                 onDailyReadingRetry()
                             },
-                            actionLabel = "Read",
-                            actionDescription = "Open ${dailySurah.nameEnglish}",
+                            actionLabel = if (isDrivingMode) "Listen" else "Read",
+                            actionDescription = if (isDrivingMode) {
+                                "Listen to ${dailySurah.nameEnglish}"
+                            } else {
+                                "Open ${dailySurah.nameEnglish}"
+                            },
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                onSurahClick(dailySurah.number)
+                                if (isDrivingMode) {
+                                    onDailyReadingPlayPause(dailySurah.number - 1)
+                                } else {
+                                    onSurahClick(dailySurah.number)
+                                }
                             },
                         )
 
@@ -2087,10 +2123,10 @@ fun SwipeableBigTiles(
                         )
 
                         else -> InsightPreviewCard(
-                            label = "AI suggested",
-                            title = aiRecommendation.title,
-                            supportingText = aiRecommendation.supportingText,
-                            footerText = aiRecommendation.footerText,
+                            label = if (isDrivingMode) "Driving · Listen" else "AI suggested",
+                            title = displayedAiRecommendation.title,
+                            supportingText = displayedAiRecommendation.supportingText,
+                            footerText = displayedAiRecommendation.footerText,
                             backgroundPainterRes = ImageRes.drawable.insight_suggestion,
                             skyTintTop = livePrayerSkyPalette.top,
                             skyTintHorizon = livePrayerSkyPalette.horizon,
@@ -2105,16 +2141,16 @@ fun SwipeableBigTiles(
                                 (pagerState.currentPage - page) +
                                     pagerState.currentPageOffsetFraction
                             },
-                            actionLabel = when (aiRecommendation.target) {
+                            actionLabel = when (displayedAiRecommendation.target) {
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
                                 is ContextualRecommendationTarget.Bukhari -> "Play book"
                             },
-                            actionDescription = aiRecommendation.actionDescription,
+                            actionDescription = displayedAiRecommendation.actionDescription,
                             onClick = {
                                 interactionEpoch++
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                when (val target = aiRecommendation.target) {
+                                when (val target = displayedAiRecommendation.target) {
                                     is ContextualRecommendationTarget.Surah -> {
                                         onSurahClick(target.number)
                                     }
@@ -2504,6 +2540,7 @@ private fun InsightPreviewCard(
     readingPlayback: DailyReadingPlaybackState = DailyReadingPlaybackState(),
     onReadingPlayPause: (() -> Unit)? = null,
     onReadingRetry: (() -> Unit)? = null,
+    preferAudioAction: Boolean = false,
     directionalHintBearing: Int? = null,
     deviceHeadingDegrees: Float? = null,
     actionLabel: String? = null,
@@ -2891,7 +2928,11 @@ private fun InsightPreviewCard(
             val isReadingHeader = readingSurahIndex != null && onReadingPlayPause != null
             val useCompactReadingHeader = isReadingHeader &&
                 (compactProgress >= 0.08f || maxWidth < 240.dp)
-            val displayLabel = if (useCompactReadingHeader) "Reading" else label
+            val displayLabel = if (useCompactReadingHeader) {
+                if (preferAudioAction) "Listen" else "Reading"
+            } else {
+                label
+            }
             val showHeaderActions = compactProgress < 0.5f &&
                 (onClick != null || onReadingPlayPause != null || directionalHintBearing != null || onPrayerUndo != null)
 
