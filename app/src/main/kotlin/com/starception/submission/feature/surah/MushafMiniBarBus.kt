@@ -23,13 +23,21 @@ object MushafMiniBarBus {
     var onNext: (() -> Unit)? = null
     var onPrevious: (() -> Unit)? = null
     var onOpenInfo: (() -> Unit)? = null
+    var onJumpToPage: ((Int) -> Unit)? = null
     private var activeOwner: Any? = null
 
-    fun bind(owner: Any, next: () -> Unit, previous: () -> Unit, openInfo: () -> Unit) {
+    fun bind(
+        owner: Any,
+        next: () -> Unit,
+        previous: () -> Unit,
+        openInfo: () -> Unit,
+        jumpToPage: (Int) -> Unit,
+    ) {
         activeOwner = owner
         onNext = next
         onPrevious = previous
         onOpenInfo = openInfo
+        onJumpToPage = jumpToPage
     }
 
     fun publish(owner: Any, newState: MushafMiniBarState) {
@@ -47,6 +55,7 @@ object MushafMiniBarBus {
         onNext = null
         onPrevious = null
         onOpenInfo = null
+        onJumpToPage = null
         state.value = null
     }
 }

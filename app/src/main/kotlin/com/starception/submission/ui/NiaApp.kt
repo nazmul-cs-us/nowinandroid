@@ -1086,6 +1086,9 @@ private fun NiaMainContent(
                 onPrevious = { com.starception.submission.feature.surah.MushafMiniBarBus.onPrevious?.invoke() },
                 onNext = { com.starception.submission.feature.surah.MushafMiniBarBus.onNext?.invoke() },
                 onOpenInfo = { com.starception.submission.feature.surah.MushafMiniBarBus.onOpenInfo?.invoke() },
+                onJumpToPage = { page ->
+                    com.starception.submission.feature.surah.MushafMiniBarBus.onJumpToPage?.invoke(page)
+                },
             ),
             modifier = Modifier
                 .fillMaxSize()

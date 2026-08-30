@@ -7115,6 +7115,11 @@ private fun MushafPagerView(
                                 )
                             }
                         },
+                        jumpToPage = { requestedPage ->
+                            val pageIndex = (requestedPage - 1)
+                                .coerceIn(0, pagerPageCount - 1)
+                            mushafScope.launch { state.snapTo(pageIndex) }
+                        },
                     )
                     MushafMiniBarBus.publish(
                         owner = miniBarOwner,
@@ -7186,12 +7191,30 @@ private fun MushafPagerView(
             val pagerEmPx = with(density) { typesetFontSize.sp.toPx() }
             LaunchedEffect(state.current, paginatedPages, inkGeomCache) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
-                // A page turn can arrive much faster than a bitmap ink scan.
-                // Debounce just long enough for rapid swipes to settle; a newer
-                // state cancels this effect before it allocates another surface.
-                kotlinx.coroutines.delay(120)
-                for (idx in listOf(state.current, state.current + 1, state.current - 1)) {
-                    val page = paginatedPages.getOrNull(idx) ?: continue
+                fun pruneGeometryCache(centerPage: Int) {
+                    val retainedTexts = (centerPage - 1..centerPage + 1)
+                        .mapNotNull { paginatedPages.getOrNull(it)?.text }
+                        .toSet()
+                    inkGeomCache.keys.toList().forEach { key ->
+                        if (key !in retainedTexts) inkGeomCache.remove(key)
+                    }
+                }
+
+                val requestedPage = state.current
+                // Prune BEFORE doing any work. Previously pruning happened only
+                // after current/next/previous scans all completed. A rapid swipe
+                // cancelled that coroutine before it reached cleanup, allowing
+                // finished geometry entries (and their styled text keys) to grow
+                // throughout a long reading session.
+                pruneGeometryCache(requestedPage)
+                try {
+                    // The reserved inline ornament is a complete visual fallback,
+                    // so do the expensive bitmap ink scan only after page movement
+                    // settles. Scanning both neighbours on every turn tripled work
+                    // and competed with the curl animation for CPU time.
+                    kotlinx.coroutines.delay(280)
+                    val page = paginatedPages.getOrNull(requestedPage)
+                        ?: return@LaunchedEffect
                     val pageText = page.text
                     if (pageText !in inkGeomCache) {
                         val geoms = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -7220,15 +7243,10 @@ private fun MushafPagerView(
                             inkGeomCache[pageText] = geoms
                         }
                     }
-                }
-                // Geometry values are tiny, but AnnotatedString keys retain all
-                // page styling. Keep only the active curl neighbourhood so long
-                // reading sessions have a hard upper memory bound.
-                val retainedTexts = (state.current - 1..state.current + 1)
-                    .mapNotNull { paginatedPages.getOrNull(it)?.text }
-                    .toSet()
-                inkGeomCache.keys.toList().forEach { key ->
-                    if (key !in retainedTexts) inkGeomCache.remove(key)
+                } finally {
+                    // Cancellation from the next swipe still executes this block.
+                    // Read the latest page so stale work cannot preserve old keys.
+                    pruneGeometryCache(state.current)
                 }
             }
 
@@ -7317,64 +7335,63 @@ private fun MushafPagerView(
             // effects attempted to snap, which could crash inside PageCurlState.
             val currentPageText = paginatedPages.getOrNull(state.current)?.text
             val currentPageGeometry = currentPageText?.let(inkGeomCache::get)
-            // Make the prepared geometry part of the curl's identity. This is
-            // important because PageCurl owns a subcomposition and otherwise can
-            // retain the page it created while the async geometry was absent.
-            androidx.compose.runtime.key(currentPageGeometry) {
-                PageCurl(
-                    count = paginatedPages.size,
-                    state = state,
-                    config = pageCurlConfig,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            // Live pinch preview: scale the committed layout toward the
-                            // in-flight size; snaps back to 1x when the commit lands.
-                            val preview = if (committedFontSize > 0f) arabicFontSize / committedFontSize else 1f
-                            scaleX = preview
-                            scaleY = preview
-                        }
-                ) { pageIndex ->
-                    val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
-                    MushafPageWithFrame(
-                        pageText = page.text,
-                        tajweed = page.tajweed,
-                        inlineContent = pageInlineContent,
-                        inkGeometries = if (pageIndex == state.current) {
-                            currentPageGeometry
-                        } else {
-                            inkGeomCache[page.text]
-                        },
-                        translationVisibility = translationVisibility.value,
-                        arabicFont = arabicFont,
-                        arabicFontSize = typesetFontSize,
-                        translationCode = translationCode,
-                        lineHeightSp = page.lineHeightSp,
-                        showBismillah = page.showBismillah,
-                        onAyahLongPress = onAyahLongPress,
-                        ayahRanges = page.ayahRanges,
-                        // A revealed ayah is also the selected one, so the verse the
-                        // gloss belongs to lights up under the words — otherwise, on a
-                        // dense page, nothing tells the reader which of the ayahs above
-                        // the translation it is explaining. Outranks the search
-                        // highlight, which is stale once the reader starts tapping.
-                        highlightedAyahNumber = inlinedAyah ?: highlightedAyahNumber,
-                        interactive = pageIndex == state.current,
-                        onAyahDoubleTap = { ayahNumber ->
-                            // No re-anchoring here on purpose. The gloss is inserted AFTER
-                            // the tapped ayah, which sits on this page, so every line before
-                            // this page's first character is untouched and repagination
-                            // reproduces the same page boundaries up to it — state.current
-                            // still points at the page being read. The anchor that used to
-                            // be set here is what dragged the reader backwards, because it
-                            // re-snapped to the first page that merely *contains* the ayah.
-                            // Double-tap the revealed ayah again to dismiss.
-                            toggleInlineTranslation(ayahNumber)
-                        },
-                        onAyahRub = toggleInlineTranslation,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+            // PageCurl's content is regular Compose content and observes geometry
+            // state directly. Keying the entire curl by a newly computed geometry
+            // list destroyed and rebuilt all three page subcompositions after each
+            // turn, leaving old draw caches for GC and making later swipes slower.
+            PageCurl(
+                count = paginatedPages.size,
+                state = state,
+                config = pageCurlConfig,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Live pinch preview: scale the committed layout toward the
+                        // in-flight size; snaps back to 1x when the commit lands.
+                        val preview = if (committedFontSize > 0f) arabicFontSize / committedFontSize else 1f
+                        scaleX = preview
+                        scaleY = preview
+                    }
+            ) { pageIndex ->
+                val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
+                MushafPageWithFrame(
+                    pageText = page.text,
+                    tajweed = page.tajweed,
+                    inlineContent = pageInlineContent,
+                    inkGeometries = if (pageIndex == state.current) {
+                        currentPageGeometry
+                    } else {
+                        inkGeomCache[page.text]
+                    },
+                    translationVisibility = translationVisibility.value,
+                    arabicFont = arabicFont,
+                    arabicFontSize = typesetFontSize,
+                    translationCode = translationCode,
+                    lineHeightSp = page.lineHeightSp,
+                    showBismillah = page.showBismillah,
+                    onAyahLongPress = onAyahLongPress,
+                    ayahRanges = page.ayahRanges,
+                    // A revealed ayah is also the selected one, so the verse the
+                    // gloss belongs to lights up under the words — otherwise, on a
+                    // dense page, nothing tells the reader which of the ayahs above
+                    // the translation it is explaining. Outranks the search
+                    // highlight, which is stale once the reader starts tapping.
+                    highlightedAyahNumber = inlinedAyah ?: highlightedAyahNumber,
+                    interactive = pageIndex == state.current,
+                    onAyahDoubleTap = { ayahNumber ->
+                        // No re-anchoring here on purpose. The gloss is inserted AFTER
+                        // the tapped ayah, which sits on this page, so every line before
+                        // this page's first character is untouched and repagination
+                        // reproduces the same page boundaries up to it — state.current
+                        // still points at the page being read. The anchor that used to
+                        // be set here is what dragged the reader backwards, because it
+                        // re-snapped to the first page that merely *contains* the ayah.
+                        // Double-tap the revealed ayah again to dismiss.
+                        toggleInlineTranslation(ayahNumber)
+                    },
+                    onAyahRub = toggleInlineTranslation,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
 
             val atFirstPage = state.current == 0

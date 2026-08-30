@@ -89,6 +89,7 @@ fun mushafSyncBarRow(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onOpenInfo: () -> Unit,
+    onJumpToPage: (Int) -> Unit,
 ): SyncBarRow? {
     if (state == null) return null
     return SyncBarRow(
@@ -104,6 +105,7 @@ fun mushafSyncBarRow(
             onPrevious = onPrevious,
             onNext = onNext,
             onOpenInfo = onOpenInfo,
+            onJumpToPage = onJumpToPage,
             statusText = statusText,
             // The strip's sweep is already the page position; drawing the same
             // fraction twice reads as clutter.
