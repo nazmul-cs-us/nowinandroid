@@ -71,14 +71,22 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED,
             0L,
         )
-        val hasActiveGoogleDriving = TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
-            nowElapsedMillis = nowElapsed,
-            googleDrivingConfirmed = googleDrivingConfirmed,
-            confirmationElapsedMillis = googleConfirmationElapsed,
+        val lastReliableZeroSpeedElapsed = prefs.getLong(
+            TravelDuaSettings.KEY_LAST_RELIABLE_ZERO_SPEED_ELAPSED,
+            0L,
         )
-        if (!hasRecentSpeed && !hasActiveGoogleDriving) {
+        val playbackAllowed = TravelDuaPolicy.shouldAllowTravelDuaPlayback(
+            nowElapsedMillis = nowElapsed,
+            lastDrivingSpeedElapsedMillis = lastReliableSpeedElapsed,
+            lastZeroSpeedElapsedMillis = lastReliableZeroSpeedElapsed,
+            googleDrivingConfirmed = googleDrivingConfirmed,
+            googleConfirmationElapsedMillis = googleConfirmationElapsed,
+        )
+        if (!playbackAllowed) {
             val evidenceAge = (nowElapsed - lastReliableSpeedElapsed)
                 .takeIf { lastReliableSpeedElapsed > 0L && it >= 0L }
+            val zeroSpeedEvidenceAge = (nowElapsed - lastReliableZeroSpeedElapsed)
+                .takeIf { lastReliableZeroSpeedElapsed > 0L && it >= 0L }
             val googleEvidenceAge = (nowElapsed - googleConfirmationElapsed)
                 .takeIf { googleConfirmationElapsed > 0L && it >= 0L }
             FileLogger.w(
@@ -86,10 +94,15 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
                 "Blocked Travel Dua: no current driving evidence " +
                     "(evidenceAgeMs=${evidenceAge ?: "none"}, " +
                     "lastSpeedKmh=${"%.1f".format(lastReliableSpeedMps * 3.6f)}, " +
+                    "zeroSpeedEvidenceAgeMs=${zeroSpeedEvidenceAge ?: "none"}, " +
                     "googleConfirmed=$googleDrivingConfirmed, " +
                     "googleEvidenceAgeMs=${googleEvidenceAge ?: "none"})",
             )
-            clearPendingAlarm(prefs)
+            // Keep the process-wide tracker and persisted wake-up state aligned.
+            // Otherwise its latched Google flag can continue suppressing the
+            // sensor's stationary updates and schedule another false alarm.
+            ActivityTracker.updateActivity("Still")
+            clearPendingAlarm(prefs, clearDrivingState = true)
             return
         }
 
@@ -117,7 +130,9 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             ContextCompat.startForegroundService(context, playbackIntent)
             FileLogger.i(
                 TAG,
-                if (hasRecentSpeed) {
+                if (hasRecentSpeed &&
+                    lastReliableSpeedElapsed > lastReliableZeroSpeedElapsed
+                ) {
                     "Travel Dua alarm accepted with recent speed " +
                         "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h"
                 } else {
@@ -153,10 +168,20 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags)
         }
 
-        private fun clearPendingAlarm(prefs: android.content.SharedPreferences) {
+        private fun clearPendingAlarm(
+            prefs: android.content.SharedPreferences,
+            clearDrivingState: Boolean = false,
+        ) {
             prefs.edit()
                 .remove(TravelDuaSettings.KEY_PENDING_ALARM_TOKEN)
                 .remove(TravelDuaSettings.KEY_PENDING_ALARM_TRIGGER_ELAPSED)
+                .apply {
+                    if (clearDrivingState) {
+                        putBoolean(TravelDuaSettings.KEY_IS_DRIVING, false)
+                        putBoolean(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED, false)
+                        remove(TravelDuaSettings.KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED)
+                    }
+                }
                 .apply()
         }
     }

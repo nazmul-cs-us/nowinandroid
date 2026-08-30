@@ -65,6 +65,8 @@ data class TravelDuaSettings(
         const val KEY_DRIVING_STOP_TIME = "travel_dua_driving_stop_time"
         const val KEY_LAST_RELIABLE_SPEED_ELAPSED = "travel_dua_last_reliable_speed_elapsed"
         const val KEY_LAST_RELIABLE_SPEED_MPS = "travel_dua_last_reliable_speed_mps"
+        const val KEY_LAST_RELIABLE_ZERO_SPEED_ELAPSED =
+            "travel_dua_last_reliable_zero_speed_elapsed"
         const val KEY_GOOGLE_DRIVING_CONFIRMED = "google_driving_confirmed"
         const val KEY_GOOGLE_DRIVING_CONFIRMED_ELAPSED =
             "google_driving_confirmed_elapsed"

@@ -32,6 +32,7 @@ import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRep
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
+import com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState
 import com.starception.submission.media.GlobalMediaViewModel
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
@@ -118,6 +119,10 @@ class MainActivityViewModel @Inject constructor(
     private val _prayerAlertState = MutableStateFlow(PrayerAlertState())
     val prayerAlertState: StateFlow<PrayerAlertState> = _prayerAlertState.asStateFlow()
 
+    private val _forbiddenPrayerTimeState = MutableStateFlow(ForbiddenPrayerTimeState())
+    val forbiddenPrayerTimeState: StateFlow<ForbiddenPrayerTimeState> =
+        _forbiddenPrayerTimeState.asStateFlow()
+
     // Timestamp (elapsedRealtime) of the last push from the Home screen. Home holds the
     // freshest, live-recalculated prayer times, so while it's active (pushing every minute)
     // we let it win. When Home leaves composition the pushes stop, and the app-wide ticker
@@ -152,7 +157,7 @@ class MainActivityViewModel @Inject constructor(
             // "Xm left" text is never more than a few seconds stale on any screen.
             while (true) {
                 try {
-                    if (!debugAlertActive) computeAndPublishPrayerAlert()
+                    computeAndPublishPrayerStatus(publishPrayerAlert = !debugAlertActive)
                 } catch (e: Exception) {
                     Log.w("MainActivityViewModel", "Prayer alert ticker failed", e)
                 }
@@ -161,7 +166,7 @@ class MainActivityViewModel @Inject constructor(
         }
     }
 
-    private fun computeAndPublishPrayerAlert() {
+    private fun computeAndPublishPrayerStatus(publishPrayerAlert: Boolean) {
         val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
             context.applicationContext,
             com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
@@ -173,13 +178,26 @@ class MainActivityViewModel @Inject constructor(
         val repo = entryPoint.prayerSettingsRepository()
         val settings = repo.calculationSettingsFlow.value
         val notifPrefs = repo.notificationPreferencesFlow.value
-        val alert = com.starception.submission.feature.prayertimes.wobble.calculatePrayerAlertState(
-            currentTime = java.time.LocalTime.now(),
-            prayerTimes = cachedPrayerTimes,
-            notificationPrefs = notifPrefs,
-            timeOffsets = settings.timeOffsets,
-        )
-        _prayerAlertState.value = alert
+        val currentTime = java.time.LocalTime.now()
+        val hasPrayedAsr = com.starception.submission.util.PrayerTracker
+            .getPrayedPrayersToday()
+            .any { it.equals("Asr", ignoreCase = true) }
+        if (publishPrayerAlert) {
+            _prayerAlertState.value =
+                com.starception.submission.feature.prayertimes.wobble.calculatePrayerAlertState(
+                    currentTime = currentTime,
+                    prayerTimes = cachedPrayerTimes,
+                    notificationPrefs = notifPrefs,
+                    timeOffsets = settings.timeOffsets,
+                )
+        }
+        _forbiddenPrayerTimeState.value =
+            com.starception.submission.feature.prayertimes.wobble.calculateForbiddenPrayerTimeState(
+                currentTime = currentTime,
+                prayerTimes = cachedPrayerTimes,
+                timeOffsets = settings.timeOffsets,
+                hasPrayedAsr = hasPrayedAsr,
+            )
     }
 
     // Pull-to-sync state shared across pages. Hoisting it here means a sync that
@@ -352,7 +370,8 @@ class MainActivityViewModel @Inject constructor(
 
                 val hadithText = bukhariTranslationRepo.getEnglishText(hadithNumber) ?: continue
 
-                val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+                val introText = com.starception.submission.voice.EnglishTtsTextNormalizer
+                    .bukhariIntro(hadithNumber)
                 val fullText = "$introText $hadithText"
 
                 if (!sherpaOnnxTts.isCached(fullText)) {

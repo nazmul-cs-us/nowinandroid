@@ -233,7 +233,7 @@ private fun TextStack(
   // 1.15x the body this came out around 22sp — the same face, but visibly smaller and
   // tighter than the app, which is what made the widget's Arabic look like a different
   // font. A widget card cannot carry 34sp, so this takes the ratio rather than the value.
-  val arabicSize = (bodySize.value * 1.45f).sp
+  val arabicSize = (bodySize.value * 1.55f).sp
 
   // Always carry the original after the English translation. The previous fit estimate
   // could suppress Arabic even when the launcher had ample room for it; the scrollable
@@ -460,8 +460,16 @@ private fun renderArabicBitmap(
   }
   val layout = StaticLayout.Builder
     .obtain(text, 0, text.length, paint, widthPx)
-    .setAlignment(Layout.Alignment.ALIGN_CENTER)
-    .setIncludePad(true)
+    // Match the in-app Mushaf treatment: paragraph-quality wrapping distributes the
+    // Arabic across the available measure, while the final line remains RTL-start
+    // aligned instead of being stranded in the centre of the card.
+    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+    .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+    .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+    .setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
+    // Compose's Arabic detail styles disable platform font padding. Do the equivalent
+    // before rasterising so the widget does not add an empty band above and below it.
+    .setIncludePad(false)
     // Indo-Pak reports an unusually tall ascent/descent box around its marks. Even the
     // nominal 1.0 baseline interval therefore leaves a conspicuous empty band between
     // lines; tighten that metrics box while retaining clearance for the diacritics.

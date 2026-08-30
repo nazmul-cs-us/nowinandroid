@@ -472,7 +472,18 @@ class DrivingAudioService : Service() {
     }
 
     private fun preparePendingHadithIfNeeded() {
-        if (pendingHadithNumber != null) return
+        pendingHadithNumber?.let { existingNumber ->
+            // Manual starts already carry the number. Older callers omitted text for
+            // Bengali because they assumed the recording would always exist; hydrate the
+            // exact English fallback before the travel dua finishes.
+            if (pendingHadithText == null) {
+                scope.launch {
+                    pendingHadithText = getHadithTextForNumber(existingNumber)
+                    preGenerateHadithTtsInBackground()
+                }
+            }
+            return
+        }
 
         val prefs = getSharedPreferences("course_progress", Context.MODE_PRIVATE)
         val enrolledCourses = prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()
@@ -501,13 +512,7 @@ class DrivingAudioService : Service() {
         pendingLessonId = "hadith_$nextHadithNumber"
 
         scope.launch {
-            val selectedLanguage =
-                com.starception.submission.core.translation.TranslationService.getInstance(
-                    this@DrivingAudioService,
-                ).getSelectedLanguage()
-            if (selectedLanguage != "bn") {
-                pendingHadithText = getHadithTextForNumber(nextHadithNumber)
-            }
+            pendingHadithText = getHadithTextForNumber(nextHadithNumber)
             preGenerateHadithTtsInBackground()
             Log.i(TAG, "📚 Prepared alarm-triggered continuation with hadith #$nextHadithNumber")
         }
@@ -539,13 +544,11 @@ class DrivingAudioService : Service() {
     private fun maintainHadithCache(currentHadithNumber: Int) {
         // Check if user has Sherpa-ONNX TTS configured
         val ttsPrefs = getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
-        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedVoiceName = ttsPrefs.getString(
+            "selected_voice",
+            TtsVoice.KOKORO_EN.name,
+        ) ?: TtsVoice.KOKORO_EN.name
         val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
-
-        if (selectedVoiceName == null) {
-            Log.d(TAG, "🔄 Using Android TTS, no pre-generation needed")
-            return
-        }
 
         scope.launch {
             try {
@@ -582,7 +585,7 @@ class DrivingAudioService : Service() {
                     // Get hadith text from repository
                     val hadithText = getHadithTextForNumber(nextHadithToCache)
                     if (hadithText != null) {
-                        val introText = "Hadith number $nextHadithToCache from Sahih Al-Bukhari."
+                        val introText = EnglishTtsTextNormalizer.bukhariIntro(nextHadithToCache)
                         val fullText = "$introText $hadithText"
 
                         // Check if already in TTS cache
@@ -649,31 +652,13 @@ class DrivingAudioService : Service() {
             val bukhariTranslationRepo = com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository.getInstance(this)
             bukhariTranslationRepo.loadTranslations()
 
-            // Get English text from JSON (same format as HadithDetailScreen uses)
+            // Always return the exact English entry. Matching language recordings are
+            // handled before this method; a missing recording must use the selected
+            // English Sherpa model, never a device-provided translated TTS voice.
             val localEnglish = bukhariTranslationRepo.getEnglishText(hadithNumber)
 
             if (localEnglish != null) {
                 Log.d(TAG, "📚 Loaded hadith #$hadithNumber from BukhariLocalTranslation (${localEnglish.length} chars)")
-
-                // Get user's selected language for translation
-                val translationService = com.starception.submission.core.translation.TranslationService.getInstance(this)
-                val selectedLang = translationService.getSelectedLanguage()
-
-                // For English, return as-is (matches HadithDetailScreen exactly)
-                if (selectedLang == "en" || selectedLang == "transliteration") {
-                    return localEnglish
-                }
-
-                // For other languages, translate from English
-                if (selectedLang != "bn") { // Bengali uses audio files, not TTS
-                    try {
-                        return translationService.translateFromEnglish(localEnglish, selectedLang)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Translation failed for hadith #$hadithNumber, using English")
-                        return localEnglish
-                    }
-                }
-
                 localEnglish
             } else {
                 // Fallback to database if JSON doesn't have this hadith
@@ -709,9 +694,8 @@ class DrivingAudioService : Service() {
                     Log.i(TAG, "📚 No Bengali audio for #$hadithNum, falling back to TTS")
                     playHadithTts(hadithNum, hadithText)
                 } else {
-                    Log.w(TAG, "📚 No audio or text for #$hadithNum, skipping")
-                    onPlaybackComplete?.invoke()
-                    updateState(PlaybackState.IDLE, "Driving Mode", "Ready")
+                    Log.i(TAG, "📚 No Bengali audio or prepared text for #$hadithNum; loading exact English fallback")
+                    playExactEnglishHadithFallback(hadithNum)
                 }
             } else if (hadithText != null) {
                 // Other languages: use TTS directly
@@ -750,7 +734,8 @@ class DrivingAudioService : Service() {
                 audioFile = legacyFiles.find { it.exists() }
                 if (audioFile == null) {
                     Log.w(TAG, "📚 Hadith audio not found for #$hadithNumber")
-                    // Background download so the next driving session can play it.
+                    // Cache the recording for next time, but do not make this playback
+                    // wait: read the exact English entry with the selected Sherpa voice.
                     val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
                     scope.launch {
                         try {
@@ -760,7 +745,7 @@ class DrivingAudioService : Service() {
                             Log.w(TAG, "📚 Background download failed for $cdnKey", e)
                         }
                     }
-                    onHadithComplete(hadithNumber)
+                    playExactEnglishHadithFallback(hadithNumber)
                     return
                 }
             }
@@ -775,7 +760,7 @@ class DrivingAudioService : Service() {
                 }
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
-                    onHadithComplete(hadithNumber)
+                    playExactEnglishHadithFallback(hadithNumber)
                     true
                 }
                 prepare()
@@ -789,7 +774,19 @@ class DrivingAudioService : Service() {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error playing hadith audio", e)
-            onHadithComplete(hadithNumber)
+            playExactEnglishHadithFallback(hadithNumber)
+        }
+    }
+
+    private fun playExactEnglishHadithFallback(hadithNumber: Int) {
+        scope.launch {
+            val englishText = getHadithTextForNumber(hadithNumber)
+            if (englishText.isNullOrBlank()) {
+                Log.e(TAG, "📚 Exact English text unavailable for hadith #$hadithNumber")
+                onHadithComplete(hadithNumber)
+            } else {
+                playHadithTts(hadithNumber, englishText)
+            }
         }
     }
 
@@ -809,16 +806,14 @@ class DrivingAudioService : Service() {
 
         // Check for Sherpa-ONNX TTS preference from Settings
         val ttsPrefs = getSharedPreferences("tts_settings", Context.MODE_PRIVATE)
-        val selectedVoiceName = ttsPrefs.getString("selected_voice", null)
+        val selectedVoiceName = ttsPrefs.getString(
+            "selected_voice",
+            TtsVoice.KOKORO_EN.name,
+        ) ?: TtsVoice.KOKORO_EN.name
         val selectedSpeakerId = ttsPrefs.getInt("selected_speaker_id", 0)
 
-        if (selectedVoiceName != null) {
-            // Use Sherpa-ONNX TTS as configured in Settings
-            speakWithSherpaOnnx(hadithNumber, text, selectedVoiceName, selectedSpeakerId)
-        } else {
-            // Use Android TTS
-            speakWithAndroidTts(hadithNumber, text)
-        }
+        // Bukhari TTS is always the exact English entry through the selected Sherpa model.
+        speakWithSherpaOnnx(hadithNumber, text, selectedVoiceName, selectedSpeakerId)
     }
 
     private fun speakWithSherpaOnnx(hadithNumber: Int, text: String, voiceName: String, speakerId: Int) {
@@ -835,7 +830,7 @@ class DrivingAudioService : Service() {
                 // to ensure cache hash matches. Don't use the text parameter as it
                 // may come from a different source.
                 val hadithText = getHadithTextForNumber(hadithNumber) ?: text
-                val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+                val introText = EnglishTtsTextNormalizer.bukhariIntro(hadithNumber)
                 val fullText = "$introText $hadithText"
 
                 // Check if audio was pre-generated during travel dua playback
@@ -856,18 +851,18 @@ class DrivingAudioService : Service() {
                 )
 
                 if (!success) {
-                    Log.w(TAG, "Sherpa-ONNX TTS failed, falling back to Android TTS")
-                    speakWithAndroidTts(hadithNumber, text)
+                    Log.e(TAG, "Sherpa-ONNX TTS failed; system TTS fallback is disabled")
+                    handler.post { onHadithComplete(hadithNumber) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Sherpa-ONNX TTS error", e)
-                speakWithAndroidTts(hadithNumber, text)
+                handler.post { onHadithComplete(hadithNumber) }
             }
         }
     }
 
     private fun speakWithAndroidTts(hadithNumber: Int, text: String) {
-        val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+        val introText = EnglishTtsTextNormalizer.bukhariIntro(hadithNumber)
         val fullText = EnglishTtsTextNormalizer.normalize("$introText $text")
         val utteranceId = "hadith_$hadithNumber"
 

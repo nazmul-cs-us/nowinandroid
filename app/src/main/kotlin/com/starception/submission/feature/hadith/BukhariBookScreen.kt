@@ -1,5 +1,6 @@
 package com.starception.submission.feature.hadith
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,11 +46,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithEntity
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
-import com.starception.submission.core.ui.FlaticonBookIcon
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.FlaticonPlayIcon
@@ -235,9 +237,12 @@ private fun BukhariHadithList(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        FlaticonBookIcon(
+                        Image(
+                            painter = painterResource(
+                                checkNotNull(topicIconResFor("Sahih Bukhari")),
+                            ),
                             contentDescription = "Bukhari book",
-                            iconSize = 28.dp,
+                            modifier = Modifier.size(32.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
@@ -429,9 +434,12 @@ private fun BukhariBookMessage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        FlaticonBookIcon(
+        Image(
+            painter = painterResource(
+                checkNotNull(topicIconResFor("Sahih Bukhari")),
+            ),
             contentDescription = null,
-            iconSize = 64.dp,
+            modifier = Modifier.size(64.dp),
         )
         Text(
             text = title,

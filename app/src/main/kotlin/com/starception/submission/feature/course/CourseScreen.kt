@@ -3545,7 +3545,8 @@ private suspend fun preGenerateHadithTts(context: Context, startHadithNumber: In
                 ?: continue
 
             // Use same format as DrivingAudioService for cache compatibility
-            val introText = "Hadith number $hadithNumber from Sahih Al-Bukhari."
+            val introText = com.starception.submission.voice.EnglishTtsTextNormalizer
+                .bukhariIntro(hadithNumber)
             val fullText = "$introText $hadithText"
 
             // Check if already cached

@@ -82,4 +82,43 @@ class TravelDuaPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun newerReliableZeroSpeed_blocksFalseGoogleDriving() {
+        assertFalse(
+            TravelDuaPolicy.shouldAllowTravelDuaPlayback(
+                nowElapsedMillis = 100_000L,
+                lastDrivingSpeedElapsedMillis = 0L,
+                lastZeroSpeedElapsedMillis = 95_000L,
+                googleDrivingConfirmed = true,
+                googleConfirmationElapsedMillis = 40_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun activeGoogleDriving_remainsFallbackWhenGpsHasNoRecentEvidence() {
+        assertTrue(
+            TravelDuaPolicy.shouldAllowTravelDuaPlayback(
+                nowElapsedMillis = 100_000L,
+                lastDrivingSpeedElapsedMillis = 0L,
+                lastZeroSpeedElapsedMillis = 0L,
+                googleDrivingConfirmed = true,
+                googleConfirmationElapsedMillis = 40_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun newerReliableDrivingSpeed_allowsPlaybackAfterStationarySample() {
+        assertTrue(
+            TravelDuaPolicy.shouldAllowTravelDuaPlayback(
+                nowElapsedMillis = 100_000L,
+                lastDrivingSpeedElapsedMillis = 99_000L,
+                lastZeroSpeedElapsedMillis = 95_000L,
+                googleDrivingConfirmed = true,
+                googleConfirmationElapsedMillis = 40_000L,
+            ),
+        )
+    }
 }

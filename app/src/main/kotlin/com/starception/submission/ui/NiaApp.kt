@@ -1006,6 +1006,17 @@ private fun NiaMainContent(
         }
         // Only pass to app-level container on non-HOME pages (HOME handles its own alert).
         val appLevelPrayerAlert = if (!isOnHome) rawPrayerAlert else PrayerAlertState()
+        val rawForbiddenPrayerTime = if (mainViewModel != null) {
+            val warning by mainViewModel.forbiddenPrayerTimeState.collectAsStateWithLifecycle()
+            warning
+        } else {
+            com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState()
+        }
+        val appLevelForbiddenPrayerTime = if (!isOnHome) {
+            rawForbiddenPrayerTime
+        } else {
+            com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState()
+        }
 
         val silentModeState by com.starception.submission.feature.prayertimes.wobble.rememberSilentModeState()
         val appLevelSilentModeState = if (!isOnHome) silentModeState else com.starception.submission.feature.prayertimes.wobble.SilentModeState()
@@ -1064,6 +1075,7 @@ private fun NiaMainContent(
                 isTtsPreparing = isTtsPreparing,
             ),
             prayerAlertState = appLevelPrayerAlert,
+            forbiddenPrayerTimeState = appLevelForbiddenPrayerTime,
             silentModeState = appLevelSilentModeState,
             islamicEventState = appLevelIslamicEventState,
             onIslamicEventClick = { event ->

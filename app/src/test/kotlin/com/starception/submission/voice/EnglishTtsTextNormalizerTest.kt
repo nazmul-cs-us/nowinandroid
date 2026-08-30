@@ -58,4 +58,20 @@ class EnglishTtsTextNormalizerTest {
             result,
         )
     }
+
+    @Test
+    fun bukhariIntroSpellsSingleDigitHadithNumber() {
+        assertEquals(
+            "Hadith number one from Sahih Al-Bukhari.",
+            EnglishTtsTextNormalizer.bukhariIntro(1),
+        )
+    }
+
+    @Test
+    fun bukhariIntroSpellsMultiDigitHadithNumber() {
+        assertEquals(
+            "Hadith number seven thousand five hundred sixty three from Sahih Al-Bukhari.",
+            EnglishTtsTextNormalizer.bukhariIntro(7_563),
+        )
+    }
 }

@@ -57,11 +57,13 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Spellcheck
 import androidx.compose.material.icons.rounded.Bookmark
@@ -91,7 +93,15 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.RequestDisallowInterceptTouchEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -858,29 +868,34 @@ fun SurahDetailScreen(
         }
     }
 
+    // One pair of navigation actions serves full-screen swipes, Mushaf edge
+    // controls, and end-of-surah page turns so every route stays in sync.
+    val navigateToPreviousSurah: () -> Unit = {
+        if (currentPlayingSurahNumber > 1) {
+            if (isPlaying) {
+                playbackService?.playPrevious()
+            } else {
+                currentPlayingSurahNumber -= 1
+            }
+        }
+    }
+    val navigateToNextSurah: () -> Unit = {
+        if (currentPlayingSurahNumber < 114) {
+            if (isPlaying) {
+                playbackService?.playNext()
+            } else {
+                currentPlayingSurahNumber += 1
+            }
+        }
+    }
+
     // In-place swipe handlers — match the mini-bar prev/next behavior. Bumping
     // currentPlayingSurahNumber drives the AnimatedContent slide; if audio is
     // playing we also advance the service so its onSurahChanged echo lines up.
     SurahSwipeContainer(
         surahNumber = currentPlayingSurahNumber,
-        onNavigateToPreviousSurah = {
-            if (currentPlayingSurahNumber > 1) {
-                if (isPlaying) {
-                    playbackService?.playPrevious()
-                } else {
-                    currentPlayingSurahNumber -= 1
-                }
-            }
-        },
-        onNavigateToNextSurah = {
-            if (currentPlayingSurahNumber < 114) {
-                if (isPlaying) {
-                    playbackService?.playNext()
-                } else {
-                    currentPlayingSurahNumber += 1
-                }
-            }
-        },
+        onNavigateToPreviousSurah = navigateToPreviousSurah,
+        onNavigateToNextSurah = navigateToNextSurah,
     ) {
         Scaffold(
             topBar = {},
@@ -1126,8 +1141,10 @@ fun SurahDetailScreen(
                     maxFontSize = maxFontSize,
                     onToggleContinuousReadingMode = { viewModel.toggleContinuousReadingMode() },
                     continuousReadingMode = continuousReadingMode,
-                    initialMushafPage = viewModel.getLastMushafPage(surahNumber),
-                    onMushafPageChange = { page -> viewModel.saveLastMushafPage(surahNumber, page) },
+                    initialMushafPage = viewModel.getLastMushafPage(num),
+                    onMushafPageChange = { page -> viewModel.saveLastMushafPage(num, page) },
+                    onNavigateToPreviousSurah = navigateToPreviousSurah,
+                    onNavigateToNextSurah = navigateToNextSurah,
                     currentRecitingAyah = currentRecitingAyah,
                     // Highlight + Mushaf snap only on the originating surah —
                     // swiping to a neighbour surah shouldn't drag the tint or
@@ -1986,27 +2003,10 @@ fun SurahDetailScreen(
                     hintExpanded = false
                 }
             }
-            // Touching the Quran text collapses the pill straight into the
-            // grabber — the reader has started interacting, the hint's job
-            // is done. Observed on the Initial pass without consuming, so
-            // page turns, long-presses and scrolls behave exactly as before.
-            if (hintExpanded) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    if (event.changes.any { it.pressed }) {
-                                        hintExpanded = false
-                                        break
-                                    }
-                                }
-                            }
-                        },
-                )
-            }
+            // Do not place a full-screen pointer layer above the reader while
+            // this hint is visible. Even an observer that does not consume the
+            // event wins sibling hit-testing and prevents the edge controls
+            // from receiving their drag. The hint still collapses on its timer.
             val isLabel = hintExpanded && !headerVisible
             val hintShape = RoundedCornerShape(percent = 50)
             val hintContainerColor by animateColorAsState(
@@ -2492,6 +2492,8 @@ private fun AlbumPlayerContent(
     continuousReadingMode: Boolean = false,
     initialMushafPage: Int = 0,
     onMushafPageChange: (Int) -> Unit = {},
+    onNavigateToPreviousSurah: () -> Unit = {},
+    onNavigateToNextSurah: () -> Unit = {},
     /** numberInSurah of the ayah currently being recited (audio sync), or null. */
     currentRecitingAyah: Int? = null,
     /** numberInSurah to softly tint after a search-driven scrollToAyah jump,
@@ -2880,6 +2882,7 @@ private fun AlbumPlayerContent(
                     ayahs = displayAyahs,
                     arabicFont = selectedArabicFont,
                     arabicFontSize = arabicFontSize,
+                    showTranslation = showTranslationInText,
                     showTajweed = showTajweed,
                     tajweedAnnotations = tajweedAnnotations,
                     showBismillah = showBismillahRow,
@@ -2898,6 +2901,8 @@ private fun AlbumPlayerContent(
                     onPageChange = { current, _ ->
                         onMushafPageChange(current)
                     },
+                    onNavigateToPreviousSurah = onNavigateToPreviousSurah,
+                    onNavigateToNextSurah = onNavigateToNextSurah,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(mushafHeight)
@@ -5704,6 +5709,7 @@ private fun MushafPageWithFrame(
     tajweed: List<TajweedSpan> = emptyList(),
     arabicFont: String,
     arabicFontSize: Float,
+    translationCode: String,
     /** Page-specific leading used to fill complete pages vertically. */
     lineHeightSp: Float = arabicFontSize * 1.45f,
     showBismillah: Boolean,
@@ -5740,6 +5746,7 @@ private fun MushafPageWithFrame(
         inlineContent,
         markersRenderedInline,
         arabicFontSize,
+        translationCode,
     ) {
         if (!markersRenderedInline) {
             inlineContent
@@ -5753,6 +5760,7 @@ private fun MushafPageWithFrame(
                             MushafInlineAyahOrnament(
                                 digits = digits,
                                 arabicFontSize = arabicFontSize,
+                                translationCode = translationCode,
                             )
                         },
                     )
@@ -5764,6 +5772,7 @@ private fun MushafPageWithFrame(
                             MushafInlineAyahOrnament(
                                 digits = digits,
                                 arabicFontSize = arabicFontSize,
+                                translationCode = translationCode,
                             )
                         },
                     )
@@ -5931,6 +5940,17 @@ private fun MushafPageWithFrame(
     val arabicTypeface: android.graphics.Typeface? = remember(fontResolver, arabicTextStyle.fontFamily) {
         runCatching {
             fontResolver.resolve(arabicTextStyle.fontFamily).value as? android.graphics.Typeface
+        }.getOrNull()
+    }
+    val markerDigitFontFamily = remember(translationCode) {
+        ayahMarkerDigitFontFamily(translationCode)
+    }
+    val markerDigitTypeface: android.graphics.Typeface? = remember(
+        fontResolver,
+        markerDigitFontFamily,
+    ) {
+        runCatching {
+            fontResolver.resolve(markerDigitFontFamily).value as? android.graphics.Typeface
         }.getOrNull()
     }
 
@@ -6266,6 +6286,7 @@ private fun MushafPageWithFrame(
                                 // their otherwise correctly scaled number.
                                 textSize = g.h * if (g.digits.length >= 3) 0.40f else 0.58f
                                 isFakeBoldText = false
+                                typeface = markerDigitTypeface
                             }
                             val baselineY = g.centerY - (paint.descent() + paint.ascent()) / 2f
                             canvas.nativeCanvas.drawText(g.digits, g.centerX, baselineY, paint)
@@ -6321,6 +6342,7 @@ private fun MushafPagerView(
     ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
     arabicFont: String,
     arabicFontSize: Float,
+    showTranslation: Boolean,
     showTajweed: Boolean,
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>>,
     showBismillah: Boolean = false,
@@ -6340,6 +6362,8 @@ private fun MushafPagerView(
     highlightedAyahNumber: Int? = null,
     onAyahLongPress: (Int) -> Unit,
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
+    onNavigateToPreviousSurah: () -> Unit = {},
+    onNavigateToNextSurah: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (ayahs.isEmpty()) return
@@ -6467,19 +6491,36 @@ private fun MushafPagerView(
     var translationTransitionJob by remember(ayahs) {
         mutableStateOf<kotlinx.coroutines.Job?>(null)
     }
+    var hiddenTranslationAyahs by remember(ayahs) {
+        mutableStateOf<Set<Int>>(emptySet())
+    }
     val translationByAyah = remember(ayahs) {
         ayahs.associate { a ->
             a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
         }
     }
-    /** Translation actually inlined this pass — blank ones must not alter the layout. */
-    val inlinedAyah: Int? = revealedAyah?.takeIf { !translationByAyah[it].isNullOrBlank() }
+    /**
+     * A direct gesture can still reveal one translation while the global preference is
+     * off. When it is on, every available translation is composed into the reading flow.
+     */
+    val inlinedAyah: Int? = if (showTranslation) {
+        null
+    } else {
+        revealedAyah?.takeIf { !translationByAyah[it].isNullOrBlank() }
+    }
     val inlinedText: String = inlinedAyah?.let { translationByAyah[it] }.orEmpty()
+    LaunchedEffect(showTranslation) {
+        if (showTranslation) {
+            translationTransitionJob?.cancel()
+            revealedAyah = null
+            hiddenTranslationAyahs = emptySet()
+            translationVisibility.snapTo(1f)
+        }
+    }
 
     val translationSpanStyle = SpanStyle(
         // Book-like typography distinguishes the translation gently without
-        // making it feel like secondary UI chrome. The marker shares this span,
-        // so both retain identical row metrics.
+        // making it feel like secondary UI chrome.
         fontSize = (typesetFontSize * MUSHAF_TRANSLATION_FONT_SCALE).sp,
         fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.80f),
@@ -6506,8 +6547,8 @@ private fun MushafPagerView(
     )
 
     val markerData = remember(
-        ayahs, showTajweed, tajweedAnnotations, typesetFontSize, translationCode,
-        inlinedAyah, inlinedText,
+        ayahs, showTranslation, hiddenTranslationAyahs, showTajweed, tajweedAnnotations,
+        typesetFontSize, translationCode, inlinedAyah, inlinedText,
     ) {
         val placeholderRanges = mutableListOf<androidx.compose.ui.text.AnnotatedString.Range<androidx.compose.ui.text.Placeholder>>()
         val tajweedSpans = mutableListOf<TajweedSpan>()
@@ -6546,13 +6587,33 @@ private fun MushafPagerView(
                 }
                 pop()
 
-                // For the selected ayah the gloss is part of the reading flow
-                // BEFORE its end marker: Arabic → translation → ornament. The
-                // Arabic annotation was already closed above, so the cloud can
-                // never include the translation. Unicode isolate controls keep
-                // Bengali/English order stable inside the surrounding RTL text.
-                if (ayah.numberInSurah == inlinedAyah && inlinedText.isNotEmpty()) {
-                    val digits = markerDigitsFor(ayah.numberInSurah)
+                val digits = markerDigitsFor(ayah.numberInSurah)
+                val slotText = if (pauseMark.isEmpty()) {
+                    digits
+                } else {
+                    digits + PAUSE_MARK_SEPARATOR + pauseMark
+                }
+                // The end marker always belongs to the Arabic ayah. Previously a
+                // revealed translation moved the marker below the translation,
+                // making the Arabic ending look unfinished and the gloss detached.
+                append('\u2060') // WORD JOINER: marker wraps with the final word
+                val markerStart = length
+                appendInlineContent("ayahOrnament", slotText)
+                placeholderRanges.add(
+                    androidx.compose.ui.text.AnnotatedString.Range(
+                        ornamentPlaceholder,
+                        markerStart,
+                        markerStart + slotText.length,
+                    ),
+                )
+
+                val translationText = when {
+                    showTranslation && ayah.numberInSurah !in hiddenTranslationAyahs ->
+                        translationByAyah[ayah.numberInSurah].orEmpty()
+                    ayah.numberInSurah == inlinedAyah -> inlinedText
+                    else -> ""
+                }
+                if (translationText.isNotEmpty()) {
                     pushStringAnnotation(
                         tag = MUSHAF_TRANSLATION_TAG,
                         annotation = ayah.numberInSurah.toString(),
@@ -6564,58 +6625,21 @@ private fun MushafPagerView(
                     }
                     withStyle(translationParagraphStyle) {
                         withStyle(translationSpanStyle) {
-                            append('\u2066') // LEFT-TO-RIGHT ISOLATE
-                            append(inlinedText)
-                            // This dedicated Center-aligned slot uses the
-                            // translation row metrics. Its separate painter
-                            // avoids reusing the Arabic marker's cached size.
-                            // WORD JOINER attaches it to the final translated
-                            // word; the placeholder already reserves its own
-                            // horizontal breathing room.
-                            append('\u2060')
-                            val markerStart = length
-                            appendInlineContent(MUSHAF_TRANSLATION_ORNAMENT_TAG, digits)
-                            placeholderRanges.add(
-                                androidx.compose.ui.text.AnnotatedString.Range(
-                                    translationOrnamentPlaceholder,
-                                    markerStart,
-                                    markerStart + digits.length,
-                                ),
-                            )
-                            // Close the LTR isolate after the ornament so the
-                            // final translated word and marker wrap as one unit.
+                            // FIRST-STRONG ISOLATE lets Bengali, English, Arabic,
+                            // Urdu and other selected translations choose their
+                            // own direction inside the surrounding RTL Mushaf.
+                            append('\u2068')
+                            append(translationText)
                             append('\u2069') // POP DIRECTIONAL ISOLATE
                         }
                     }
-                    // End the selected ayah cleanly after its marker; the next
-                    // Arabic ayah resumes on a fresh RTL line.
+                    // The next Arabic ayah begins immediately after this gloss,
+                    // preserving a consistent ayah-by-ayah reading sequence.
                     withStyle(translationSeparatorParagraphStyle) {
                         withStyle(translationSeparatorSpanStyle) { append('\u2028') }
                     }
                     pop()
-                    append(' ')
                 } else {
-                    val digits = markerDigitsFor(ayah.numberInSurah)
-                    // The slot's own characters are never drawn — the medallion covers
-                    // them — so the pause mark rides along inside it. That keeps the mark
-                    // tied to its ayah through pagination, where a page slice would lose
-                    // any side table keyed by position.
-                    val slotText = if (pauseMark.isEmpty()) {
-                        digits
-                    } else {
-                        digits + PAUSE_MARK_SEPARATOR + pauseMark
-                    }
-                    // Normally the marker stays attached to the Arabic ending.
-                    append('⁠')
-                    val markerStart = length
-                    appendInlineContent("ayahOrnament", slotText)
-                    placeholderRanges.add(
-                        androidx.compose.ui.text.AnnotatedString.Range(
-                            ornamentPlaceholder,
-                            markerStart,
-                            markerStart + slotText.length,
-                        ),
-                    )
                     // A regular space becomes a justification expansion point.
                     // That is especially visible in short Surahs, whose sparse
                     // lines can pour most of their unused width immediately after
@@ -6739,6 +6763,12 @@ private fun MushafPagerView(
     // slicing, tap hit-testing and highlighting cannot disagree with the text they index.
     val ayahCharRanges = markerData.ayahRanges
 
+    // The page container also observes vertical drags so it can reveal the Surah
+    // header. Let it know when an edge control owns the current touch stream;
+    // otherwise that parent observer consumes the movement before the control can
+    // reposition itself.
+    var edgeControlTouchActive by remember { mutableStateOf(false) }
+    val isEdgeControlTouchActive by rememberUpdatedState(edgeControlTouchActive)
 
     Column(
         modifier = modifier.background(surfaceColor)
@@ -6769,7 +6799,12 @@ private fun MushafPagerView(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             val pointers = event.changes.filter { it.pressed }
 
-                            if (pointers.size >= 2) {
+                            if (isEdgeControlTouchActive) {
+                                // The down event reaches this parent before the child.
+                                // By the first move, the edge control has claimed it.
+                                // Do not consume here; the control's interop handler
+                                // needs the unchanged stream to follow the finger.
+                            } else if (pointers.size >= 2) {
                                 pointers.forEach { it.consume() }
                             } else if (pointers.size == 1) {
                                 val change = pointers[0]
@@ -7044,18 +7079,27 @@ private fun MushafPagerView(
 
             // Publish current Mushaf page to PullToSyncContainer's mini-bar.
             // Cleared on dispose so leaving Mushaf mode hides the strip.
-            DisposableEffect(surahNameArabic, surahNameEnglish, state.current, paginatedPages.size) {
+            DisposableEffect(
+                surahNameArabic,
+                surahNameEnglish,
+                state.current,
+                paginatedPages.size,
+            ) {
                 if (paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.bind(
                         owner = miniBarOwner,
                         next = {
-                            mushafScope.launch {
-                                if (state.current < pagerPageCount - 1) state.next()
+                            if (state.current < pagerPageCount - 1) {
+                                mushafScope.launch { state.next() }
+                            } else if (ayahs.first().surahNumber < 114) {
+                                onNavigateToNextSurah()
                             }
                         },
                         previous = {
-                            mushafScope.launch {
-                                if (state.current > 0) state.prev()
+                            if (state.current > 0) {
+                                mushafScope.launch { state.prev() }
+                            } else if (ayahs.first().surahNumber > 1) {
+                                onNavigateToPreviousSurah()
                             }
                         },
                         openInfo = {
@@ -7210,7 +7254,16 @@ private fun MushafPagerView(
                 // Arabic-only or incomplete databases have no gloss to reveal.
                 // In that case the gesture should be a no-op rather than leaving
                 // a misleading highlight with no text beneath it.
-                if (!translationByAyah[ayahNumber].isNullOrBlank()) {
+                if (showTranslation && !translationByAyah[ayahNumber].isNullOrBlank()) {
+                    hiddenTranslationAyahs = if (ayahNumber in hiddenTranslationAyahs) {
+                        hiddenTranslationAyahs - ayahNumber
+                    } else {
+                        hiddenTranslationAyahs + ayahNumber
+                    }
+                    haptic.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                    )
+                } else if (!showTranslation && !translationByAyah[ayahNumber].isNullOrBlank()) {
                     val currentAyah = revealedAyah
                     val isHidingCurrent = currentAyah == ayahNumber
                     translationTransitionJob?.cancel()
@@ -7290,6 +7343,7 @@ private fun MushafPagerView(
                         translationVisibility = translationVisibility.value,
                         arabicFont = arabicFont,
                         arabicFontSize = typesetFontSize,
+                        translationCode = translationCode,
                         lineHeightSp = page.lineHeightSp,
                         showBismillah = page.showBismillah,
                         onAyahLongPress = onAyahLongPress,
@@ -7299,7 +7353,7 @@ private fun MushafPagerView(
                         // dense page, nothing tells the reader which of the ayahs above
                         // the translation it is explaining. Outranks the search
                         // highlight, which is stale once the reader starts tapping.
-                        highlightedAyahNumber = revealedAyah ?: highlightedAyahNumber,
+                        highlightedAyahNumber = inlinedAyah ?: highlightedAyahNumber,
                         interactive = pageIndex == state.current,
                         onAyahDoubleTap = { ayahNumber ->
                             // No re-anchoring here on purpose. The gloss is inserted AFTER
@@ -7314,6 +7368,258 @@ private fun MushafPagerView(
                         },
                         onAyahRub = toggleInlineTranslation,
                         modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            val atFirstPage = state.current == 0
+            val atLastPage = paginatedPages.isNotEmpty() &&
+                state.current == paginatedPages.lastIndex
+            val surahNumber = ayahs.first().surahNumber
+            var leftEdgeControlVerticalFraction by remember {
+                mutableFloatStateOf(0.50f)
+            }
+            var rightEdgeControlVerticalFraction by remember {
+                mutableFloatStateOf(0.50f)
+            }
+            val edgeControlSizePx = with(density) { 54.dp.toPx() }
+            val edgeControlTravelPx = (
+                constraints.maxHeight.toFloat() - edgeControlSizePx
+                ).coerceAtLeast(0f)
+            val leftEdgeControlTopPx = (
+                edgeControlTravelPx * leftEdgeControlVerticalFraction
+                ).toInt()
+            val rightEdgeControlTopPx = (
+                edgeControlTravelPx * rightEdgeControlVerticalFraction
+                ).toInt()
+            val moveLeftEdgeControlVertically: (Float) -> Unit = { dragDeltaPx ->
+                if (edgeControlTravelPx > 0f) {
+                    leftEdgeControlVerticalFraction = (
+                        leftEdgeControlVerticalFraction + dragDeltaPx / edgeControlTravelPx
+                        ).coerceIn(0f, 1f)
+                }
+            }
+            val moveRightEdgeControlVertically: (Float) -> Unit = { dragDeltaPx ->
+                if (edgeControlTravelPx > 0f) {
+                    rightEdgeControlVerticalFraction = (
+                        rightEdgeControlVerticalFraction + dragDeltaPx / edgeControlTravelPx
+                        ).coerceIn(0f, 1f)
+                }
+            }
+            MushafEdgeTurnControl(
+                isLeftEdge = true,
+                crossesSurah = atFirstPage,
+                enabled = paginatedPages.isNotEmpty() && (!atFirstPage || surahNumber > 1),
+                onVerticalDrag = moveLeftEdgeControlVertically,
+                onTouchActiveChanged = { edgeControlTouchActive = it },
+                onClick = {
+                    if (atFirstPage) {
+                        onNavigateToPreviousSurah()
+                    } else {
+                        mushafScope.launch { state.prev() }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, leftEdgeControlTopPx) }
+                    .zIndex(4f),
+            )
+            MushafEdgeTurnControl(
+                isLeftEdge = false,
+                crossesSurah = atLastPage,
+                enabled = paginatedPages.isNotEmpty() && (!atLastPage || surahNumber < 114),
+                onVerticalDrag = moveRightEdgeControlVertically,
+                onTouchActiveChanged = { edgeControlTouchActive = it },
+                onClick = {
+                    if (atLastPage) {
+                        onNavigateToNextSurah()
+                    } else {
+                        mushafScope.launch { state.next() }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, rightEdgeControlTopPx) }
+                    .zIndex(4f),
+            )
+        }
+    }
+}
+
+/**
+ * Persistent, low-emphasis page-turn hint. The translucent circle keeps the
+ * Quran text legible underneath it; at a boundary the same arrow continues
+ * directly into the adjacent surah without changing visual language.
+ */
+@Composable
+private fun MushafEdgeTurnControl(
+    isLeftEdge: Boolean,
+    crossesSurah: Boolean,
+    enabled: Boolean,
+    onVerticalDrag: (Float) -> Unit,
+    onTouchActiveChanged: (Boolean) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var isExpanded by remember { mutableStateOf(true) }
+    var isTouching by remember { mutableStateOf(false) }
+    LaunchedEffect(isExpanded, isTouching) {
+        if (isExpanded && !isTouching) {
+            delay(2_500L)
+            isExpanded = false
+        }
+    }
+    val performTurn = {
+        if (enabled) {
+            haptic.performHapticFeedback(
+                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+            )
+            isExpanded = false
+            onClick()
+        }
+    }
+    val performHandleAction = {
+        if (isExpanded) {
+            performTurn()
+        } else {
+            haptic.performHapticFeedback(
+                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+            )
+            isExpanded = true
+        }
+    }
+    val currentVerticalDrag by rememberUpdatedState(onVerticalDrag)
+    val currentTouchActiveChanged by rememberUpdatedState(onTouchActiveChanged)
+    val currentPerformHandleAction by rememberUpdatedState(performHandleAction)
+    val dragTouchSlop = with(LocalDensity.current) { 8.dp.toPx() }
+    val visualWidth by animateDpAsState(
+        targetValue = if (isExpanded) 54.dp else 8.dp,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "Mushaf edge handle width",
+    )
+    val visualEdgeOffset by animateDpAsState(
+        // Samsung-style edge controls are physically attached to the display:
+        // the open circle tucks slightly behind the bezel and the collapsed
+        // handle sits flush with it, with no floating gap.
+        targetValue = if (isExpanded) (-10).dp else 0.dp,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "Mushaf edge handle docking",
+    )
+    val controlDescription = when {
+        !isExpanded -> if (isLeftEdge) {
+            "Show previous-page control"
+        } else {
+            "Show next-page control"
+        }
+        crossesSurah && isLeftEdge -> "Previous Surah"
+        crossesSurah -> "Next Surah"
+        isLeftEdge -> "Previous Mushaf page"
+        else -> "Next Mushaf page"
+    }
+    // Use the pointer's screen coordinate rather than its coordinate inside this
+    // control. The control is repositioned while it is dragged; a local `event.y`
+    // therefore shifts with the control and makes the next delta collapse to zero.
+    var pointerPreviousRawY by remember { mutableFloatStateOf(0f) }
+    var pointerPendingY by remember { mutableFloatStateOf(0f) }
+    var pointerIsDragging by remember { mutableStateOf(false) }
+    val disallowParentIntercept = remember { RequestDisallowInterceptTouchEvent() }
+    Box(
+        contentAlignment = if (isLeftEdge) Alignment.CenterStart else Alignment.CenterEnd,
+        modifier = modifier
+            .size(54.dp)
+            // Both controls sit inside Android's back-gesture strip. Exclude only
+            // this compact 54dp target so the edge handle remains tappable and
+            // draggable without disabling back gestures elsewhere on the page.
+            .systemGestureExclusion()
+            // Claim the raw Android touch stream at ACTION_DOWN. This prevents
+            // the surrounding LazyColumn's "swipe down for Surah info" gesture
+            // from winning before Compose's normal drag detector reaches slop.
+            .pointerInteropFilter(
+                requestDisallowInterceptTouchEvent = disallowParentIntercept,
+            ) { event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        disallowParentIntercept(true)
+                        currentTouchActiveChanged(true)
+                        isTouching = true
+                        pointerPreviousRawY = event.rawY
+                        pointerPendingY = 0f
+                        pointerIsDragging = false
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        val deltaY = event.rawY - pointerPreviousRawY
+                        pointerPreviousRawY = event.rawY
+                        if (!pointerIsDragging) {
+                            pointerPendingY += deltaY
+                            if (kotlin.math.abs(pointerPendingY) >= dragTouchSlop) {
+                                pointerIsDragging = true
+                                currentVerticalDrag(pointerPendingY)
+                                pointerPendingY = 0f
+                            }
+                        } else {
+                            currentVerticalDrag(deltaY)
+                        }
+                    }
+                    android.view.MotionEvent.ACTION_UP -> {
+                        if (!pointerIsDragging) currentPerformHandleAction()
+                        isTouching = false
+                        currentTouchActiveChanged(false)
+                        disallowParentIntercept(false)
+                    }
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        isTouching = false
+                        currentTouchActiveChanged(false)
+                        disallowParentIntercept(false)
+                    }
+                }
+                true
+            }
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = controlDescription
+                if (isExpanded && !enabled) disabled()
+                onClick {
+                    performHandleAction()
+                    true
+                }
+            },
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(
+                alpha = if (isExpanded) 0.34f else 0.48f,
+            ),
+            contentColor = MaterialTheme.colorScheme.onSurface.copy(
+                alpha = if (enabled) 0.82f else 0.30f,
+            ),
+            border = BorderStroke(
+                width = 0.75.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+            ),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
+            modifier = Modifier
+                .offset(
+                    x = if (isLeftEdge) visualEdgeOffset else -visualEdgeOffset,
+                )
+                .width(visualWidth)
+                .height(54.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = fadeIn(animationSpec = tween(140)),
+                    exit = fadeOut(animationSpec = tween(90)),
+                ) {
+                    Icon(
+                        imageVector = if (isLeftEdge) {
+                            Icons.AutoMirrored.Filled.ArrowBack
+                        } else {
+                            Icons.AutoMirrored.Filled.ArrowForward
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
                     )
                 }
             }
@@ -7342,6 +7648,7 @@ private fun Int.toArabicIndic(): String = this.toString().map { c ->
 private fun MushafInlineAyahOrnament(
     digits: String,
     arabicFontSize: Float,
+    translationCode: String,
 ) {
     val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f)
     Box(
@@ -7358,8 +7665,8 @@ private fun MushafInlineAyahOrnament(
             Text(
                 text = digits,
                 color = tint,
-                fontFamily = ubuntuInspiredFontFamily,
-                fontWeight = FontWeight.Medium,
+                fontFamily = ayahMarkerDigitFontFamily(translationCode),
+                fontWeight = FontWeight.Normal,
                 fontSize = (
                     arabicFontSize * if (digits.length >= 3) 0.32f else 0.42f
                     ).sp,
@@ -7369,6 +7676,18 @@ private fun MushafInlineAyahOrnament(
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * Gives localized ayah numbers a bookish, calligraphic face without forcing a
+ * foreign script through an Arabic-only Quran font. Android's serif family
+ * supplies script-aware fallbacks for Bengali and other translated numerals.
+ */
+private fun ayahMarkerDigitFontFamily(languageCode: String): androidx.compose.ui.text.font.FontFamily {
+    return when (languageCode.lowercase().substringBefore('-').substringBefore('_')) {
+        "ar", "fa", "ur" -> QuranFonts.Amiri
+        else -> androidx.compose.ui.text.font.FontFamily.Serif
     }
 }
 

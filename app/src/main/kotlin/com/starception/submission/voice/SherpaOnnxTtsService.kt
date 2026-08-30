@@ -63,6 +63,9 @@ class SherpaOnnxTtsService @Inject constructor(
         private const val TAG = "SherpaOnnxTtsService"
         private const val DEFAULT_SPEAKER_ID = 0
         private const val DEFAULT_SPEED = 1.0f
+        private val INFERENCE_THREADS = Runtime.getRuntime()
+            .availableProcessors()
+            .coerceIn(2, 4)
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -270,7 +273,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         )
                         OfflineTtsModelConfig(
                             kokoro = kokoroConfig,
-                            numThreads = 2,
+                            numThreads = INFERENCE_THREADS,
                             debug = false,
                             provider = "cpu"
                         )
@@ -288,7 +291,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         )
                         OfflineTtsModelConfig(
                             vits = vitsConfig,
-                            numThreads = 2,
+                            numThreads = INFERENCE_THREADS,
                             debug = false,
                             provider = "cpu"
                         )
@@ -375,131 +378,54 @@ class SherpaOnnxTtsService @Inject constructor(
     ): Boolean {
         return suspendCancellableCoroutine { continuation ->
             scope.launch {
-                // Use mutex to prevent concurrent TTS access (native library is not thread-safe)
-                ttsMutex.withLock {
                 try {
-                    var playbackStartNotified = false
-                    fun notifyPlaybackStart() {
-                        if (!playbackStartNotified) {
-                            playbackStartNotified = true
-                            onPlaybackStart?.invoke()
-                        }
-                    }
-
-                    // Double-check TTS is still valid after acquiring lock
-                    if (tts == null || !isInitialized) {
-                        Log.w(TAG, "TTS became unavailable, reinitializing...")
-                        val reinit = initialize()
-                        if (!reinit) {
-                            onComplete?.invoke()
-                            if (continuation.isActive) continuation.resume(false)
-                            return@withLock
-                        }
-                    }
-
-                    // Split text into sentences for generation
                     val sentences = splitIntoSentences(text)
                         .filter { it.isNotBlank() }
-                    Log.d(TAG, "Generating ${sentences.size} sentences...")
-
                     if (sentences.isEmpty()) {
                         onComplete?.invoke()
                         if (continuation.isActive) continuation.resume(true)
-                        return@withLock
+                        return@launch
                     }
 
-                    // Hybrid approach:
-                    // - Very short text (<=3 sentences): generate everything first,
-                    //   one gap-free clip.
-                    // - Everything else: PIPELINED — a small first batch starts
-                    //   playback fast, then the producer keeps generating the next
-                    //   batches WHILE audio plays, so the old strict
-                    //   generate→play→generate alternation (with its mid-playback
-                    //   silences) overlaps away. Gaps now only appear when
-                    //   generation is genuinely slower than playback.
-                    val sampleRate = tts?.sampleRate() ?: 22050
-                    var playedAnySamples = false
+                    Log.d(TAG, "Preparing complete clip from ${sentences.size} sentences")
+                    val preparedAudio = ttsMutex.withLock {
+                        // The native engine is not thread-safe. Keep synthesis serialized,
+                        // but release this lock before AudioTrack starts so the next hadith
+                        // can be prepared while the current one is playing.
+                        if (tts == null || !isInitialized) {
+                            Log.w(TAG, "TTS became unavailable, reinitializing...")
+                            if (!initialize()) return@withLock null
+                        }
 
-                    if (sentences.size <= 3) {
-                        // Very short text: generate all first for gap-free playback
-                        Log.d(TAG, "Short text (${sentences.size} sentences) - generating all first")
-                        val allSamples = mutableListOf<Float>()
-
+                        val generatedParts = ArrayList<FloatArray>(sentences.size)
+                        var sampleRate = tts?.sampleRate() ?: 22050
                         for ((index, sentence) in sentences.withIndex()) {
+                            if (stopRequested) break
                             val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
                             if (audio != null && audio.samples.isNotEmpty()) {
-                                allSamples.addAll(audio.samples.toList())
+                                generatedParts += audio.samples
+                                sampleRate = audio.sampleRate
                             }
                         }
-
-                        if (allSamples.isNotEmpty()) {
-                            Log.d(TAG, "Playing ${allSamples.size} samples continuously")
-                            notifyPlaybackStart()
-                            playAudioSamples(allSamples.toFloatArray(), sampleRate)
-                            playedAnySamples = true
+                        if (generatedParts.size != sentences.size || stopRequested) null else {
+                            CachedAudio(concatenateSamples(generatedParts), sampleRate)
                         }
-                    } else {
-                        val FIRST_BATCH_SIZE = 2
-                        val BATCH_SIZE = 5
-                        val batches = listOf(sentences.take(FIRST_BATCH_SIZE)) +
-                            sentences.drop(FIRST_BATCH_SIZE).chunked(BATCH_SIZE)
-                        Log.d(TAG, "Pipelined TTS: ${sentences.size} sentences in ${batches.size} batches")
-
-                        // Producer: generates batches ahead (up to 2 buffered) while
-                        // the consumer below plays. Generation is the only engine
-                        // user inside this mutex-held section, so overlap is safe.
-                        val channel = kotlinx.coroutines.channels.Channel<FloatArray>(capacity = 2)
-                        var globalIndex = 0
-                        val producer = scope.launch {
-                            try {
-                                producerLoop@ for (batch in batches) {
-                                    val batchSamples = mutableListOf<Float>()
-                                    for (sentence in batch) {
-                                        if (stopRequested) break@producerLoop
-                                        globalIndex += 1
-                                        val audio = generateSentence(sentence, speakerId, speed, globalIndex, sentences.size)
-                                        if (audio != null && audio.samples.isNotEmpty()) {
-                                            batchSamples.addAll(audio.samples.toList())
-                                        }
-                                    }
-                                    if (batchSamples.isNotEmpty()) {
-                                        channel.send(batchSamples.toFloatArray())
-                                    }
-                                }
-                            } finally {
-                                channel.close()
-                            }
-                        }
-
-                        // Consumer: play batches as they become ready.
-                        var batchNumber = 0
-                        while (!stopRequested) {
-                            // Non-blocking check first: if nothing is buffered we're
-                            // about to go silent while the producer works — surface
-                            // the "Preparing audio" state for the wait.
-                            var result = channel.tryReceive()
-                            if (result.isFailure && !result.isClosed) {
-                                _isPreparingAudio.value = true
-                                result = channel.receiveCatching()
-                            }
-                            val samples = result.getOrNull() ?: break
-                            batchNumber++
-                            Log.d(TAG, "Playing batch $batchNumber/${batches.size}")
-                            notifyPlaybackStart()
-                            playAudioSamples(samples, sampleRate)
-                            playedAnySamples = true
-                        }
-                        producer.cancel()
                     }
 
-                    if (!playedAnySamples) {
+                    if (preparedAudio == null) {
                         Log.w(TAG, "No audio samples generated")
                         onComplete?.invoke()
                         if (continuation.isActive) continuation.resume(false)
-                        return@withLock
+                        return@launch
                     }
 
-                    Log.d(TAG, "Finished playing all ${sentences.size} sentences")
+                    Log.i(
+                        TAG,
+                        "Complete clip ready: ${preparedAudio.samples.size} samples; starting gap-free playback",
+                    )
+                    onPlaybackStart?.invoke()
+                    playAudioSamples(preparedAudio.samples, preparedAudio.sampleRate)
+                    Log.d(TAG, "Finished playing complete ${sentences.size}-sentence clip")
 
                     onComplete?.invoke()
                     if (continuation.isActive) continuation.resume(true)
@@ -510,12 +436,21 @@ class SherpaOnnxTtsService @Inject constructor(
                     if (continuation.isActive) continuation.resume(false)
                 }
             }
-            }
 
             continuation.invokeOnCancellation {
                 stopSpeaking()
             }
         }
+    }
+
+    private fun concatenateSamples(parts: List<FloatArray>): FloatArray {
+        val result = FloatArray(parts.sumOf(FloatArray::size))
+        var destinationOffset = 0
+        for (part in parts) {
+            part.copyInto(result, destinationOffset)
+            destinationOffset += part.size
+        }
+        return result
     }
 
     /**
@@ -759,8 +694,9 @@ class SherpaOnnxTtsService @Inject constructor(
                 // This prevents voice prompts from waiting 20+ seconds for entire pre-generation
                 try {
                     val sentences = splitIntoSentences(speechText).filter { it.isNotBlank() }
-                    val allSamples = mutableListOf<Float>()
+                    val generatedParts = ArrayList<FloatArray>(sentences.size)
                     var sampleRate = tts?.sampleRate() ?: 22050
+                    var completedAllSentences = true
 
                     Log.d(TAG, "🔄 Pre-generating ${sentences.size} sentences for hash=$textHash...")
 
@@ -769,6 +705,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         if (cancelBackgroundGeneration) {
                             Log.i(TAG, "🛑 Background generation cancelled for hash=$textHash at sentence ${index + 1}/${sentences.size}")
                             cancelBackgroundGeneration = false
+                            completedAllSentences = false
                             break
                         }
 
@@ -783,16 +720,16 @@ class SherpaOnnxTtsService @Inject constructor(
 
                             val audio = generateSentence(sentence, speakerId, speed, index + 1, sentences.size)
                             if (audio != null && audio.samples.isNotEmpty()) {
-                                allSamples.addAll(audio.samples.toList())
+                                generatedParts += audio.samples
                                 sampleRate = audio.sampleRate
                             }
                         }
                     }
 
-                    if (allSamples.isNotEmpty()) {
-                        val cachedAudio = CachedAudio(allSamples.toFloatArray(), sampleRate)
+                    if (completedAllSentences && generatedParts.size == sentences.size) {
+                        val cachedAudio = CachedAudio(concatenateSamples(generatedParts), sampleRate)
                         audioCache[textHash] = cachedAudio
-                        Log.i(TAG, "✅ Pre-generation complete: ${allSamples.size} samples cached (hash=$textHash)")
+                        Log.i(TAG, "✅ Pre-generation complete: ${cachedAudio.samples.size} samples cached (hash=$textHash)")
                         Log.d(TAG, "📦 Cache now has ${audioCache.size} entries: ${audioCache.keys}")
 
                         // Persist to disk for survival across app restarts
@@ -847,19 +784,19 @@ class SherpaOnnxTtsService @Inject constructor(
         withContext(Dispatchers.IO) {
             for ((index, text) in pending.withIndex()) {
                 val sentences = splitIntoSentences(text).filter { it.isNotBlank() }
-                val samples = mutableListOf<Float>()
+                val generatedParts = ArrayList<FloatArray>(sentences.size)
                 var sampleRate = tts?.sampleRate() ?: 22050
                 for ((i, sentence) in sentences.withIndex()) {
                     ttsMutex.withLock {
                         val audio = generateSentence(sentence, DEFAULT_SPEAKER_ID, DEFAULT_SPEED, i + 1, sentences.size)
                         if (audio != null && audio.samples.isNotEmpty()) {
-                            samples.addAll(audio.samples.toList())
+                            generatedParts += audio.samples
                             sampleRate = audio.sampleRate
                         }
                     }
                 }
-                if (samples.isNotEmpty()) {
-                    audioCache[text.hashCode()] = CachedAudio(samples.toFloatArray(), sampleRate)
+                if (generatedParts.size == sentences.size) {
+                    audioCache[text.hashCode()] = CachedAudio(concatenateSamples(generatedParts), sampleRate)
                 } else {
                     Log.w(TAG, "Prepared line produced no audio, will retry on demand: \"${text.take(40)}\"")
                 }
@@ -1013,6 +950,29 @@ class SherpaOnnxTtsService @Inject constructor(
                     null
                 }
             }
+        }
+
+        // Play All may have started preparing this exact hadith while the previous
+        // clip was playing. Wait for that work instead of jumping into a duplicate
+        // synthesis pass when the next item begins before the cache write completes.
+        if (cached == null && synchronized(generatingHashes) { textHash in generatingHashes }) {
+            Log.i(TAG, "⏳ Waiting for in-flight complete clip (hash=$textHash)")
+            while (
+                !stopRequested &&
+                synchronized(generatingHashes) { textHash in generatingHashes }
+            ) {
+                kotlinx.coroutines.delay(50)
+            }
+            cached = audioCache[textHash]
+            if (cached != null) {
+                Log.i(TAG, "✅ In-flight complete clip is ready (hash=$textHash)")
+            }
+        }
+
+        if (stopRequested) {
+            _isPreparingAudio.value = false
+            onComplete?.invoke()
+            return false
         }
 
         if (cached != null) {
