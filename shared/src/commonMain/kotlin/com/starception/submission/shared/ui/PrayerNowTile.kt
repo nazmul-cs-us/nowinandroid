@@ -31,7 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,18 +143,30 @@ fun PrayerNowTile(
                 ),
         )
 
-        Box(
-            modifier = Modifier
-                .padding(10.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.38f))
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Prayer now",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-            )
+            TileLabel("Prayer now")
+            Surface(
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.38f),
+                contentColor = Color.White,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Compass", style = MaterialTheme.typography.labelLarge)
+                    Icon(
+                        imageVector = Icons.Filled.Explore,
+                        contentDescription = null,
+                        modifier = Modifier.height(16.dp),
+                    )
+                }
+            }
         }
 
         Column(
@@ -205,5 +221,21 @@ fun PrayerNowTile(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TileLabel(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.38f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+        )
     }
 }

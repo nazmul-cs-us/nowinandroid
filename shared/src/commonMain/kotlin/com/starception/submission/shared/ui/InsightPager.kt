@@ -43,6 +43,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -78,6 +81,9 @@ import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
 import com.starception.submission.shared.qibla.cardinalDirection
 import com.starception.submission.shared.qibla.qiblaBearing
+import com.starception.submission.shared.qibla.relativeQiblaTurn
+import com.starception.submission.shared.qibla.HeadingProvider
+import com.starception.submission.shared.qibla.HeadingReading
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -128,6 +134,9 @@ fun InsightPager(
     val quranPlayer = remember { QuranAudioPlayer() }
     var isReadingAudio by remember { mutableStateOf(false) }
     var prayerSceneIndex by remember(today) { mutableStateOf(today.day % 3) }
+    val autoAdvanceProgress = remember { Animatable(0f) }
+    val headingProvider = remember { HeadingProvider() }
+    var heading by remember { mutableStateOf(HeadingReading()) }
     DisposableEffect(quranPlayer) {
         onDispose { quranPlayer.stop() }
     }
@@ -145,9 +154,21 @@ fun InsightPager(
             }
         }
     }
-    LaunchedEffect(pagerState.settledPage) {
-        delay(30_000)
-        pagerState.animateScrollToPage(pagerState.settledPage + 1)
+    val qiblaPageVisible = pagerState.settledPage % pageCount == 3
+    DisposableEffect(headingProvider, qiblaPageVisible) {
+        if (qiblaPageVisible) headingProvider.start { heading = it }
+        onDispose { headingProvider.stop() }
+    }
+    LaunchedEffect(pagerState.settledPage, pagerState.isScrollInProgress) {
+        autoAdvanceProgress.snapTo(0f)
+        if (pagerState.isScrollInProgress) return@LaunchedEffect
+        autoAdvanceProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 30_000, easing = LinearEasing),
+        )
+        if (!pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(pagerState.settledPage + 1)
+        }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -170,13 +191,13 @@ fun InsightPager(
                     Box(
                         modifier = Modifier
                             .size(
-                                width = if (selected) 18.dp else 6.dp,
+                                width = if (selected) 26.dp else 6.dp,
                                 height = 6.dp,
                             )
                             .clip(CircleShape)
                             .background(
                                 if (selected) {
-                                    MaterialTheme.colorScheme.primary
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
                                 } else {
                                     MaterialTheme.colorScheme.outlineVariant
                                 },
@@ -189,7 +210,17 @@ fun InsightPager(
                                     )
                                 }
                             },
-                    )
+                    ) {
+                        if (selected) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(autoAdvanceProgress.value)
+                                    .height(6.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -229,10 +260,8 @@ fun InsightPager(
                     0 -> PrayerNowTile(
                         phase = day.skyPhase,
                         weather = day.skyWeather,
-                        headline = day.nextPrayer?.let { "Your next prayer is $it" }
-                            ?: day.currentPrayer?.let { "Time for $it" }
-                            ?: "Prayer Times",
-                        subtitle = placeName,
+                        headline = day.heroHeadline(),
+                        subtitle = day.heroSubtitle(placeName),
                         nextPrayer = nextPrayerText,
                         countdown = day.countdown,
                         sceneIndex = prayerSceneIndex,
@@ -322,7 +351,10 @@ fun InsightPager(
                         foregroundOffsetYFraction = 0.10f,
                         label = "Qibla",
                         title = "$qiblaBearing° toward Makkah",
-                        subtitle = cardinalDirection(qiblaBearing.toDouble()),
+                        subtitle = qiblaGuidance(
+                            qiblaBearing = qiblaBearing,
+                            headingDegrees = heading.headingDegrees,
+                        ),
                         tileHeight = tileHeight,
                         onClick = onOpenQibla,
                     )
@@ -345,6 +377,16 @@ fun InsightPager(
     }
 }
 
+private fun qiblaGuidance(qiblaBearing: Int, headingDegrees: Double?): String {
+    if (headingDegrees == null) return cardinalDirection(qiblaBearing.toDouble())
+    val turn = relativeQiblaTurn(qiblaBearing.toDouble(), headingDegrees)
+    return when {
+        abs(turn) <= 5.0 -> "Aligned with Qibla"
+        turn > 0 -> "Turn right ${turn.roundToInt()}°"
+        else -> "Turn left ${abs(turn).roundToInt()}°"
+    }
+}
+
 private fun formatPrayerTime(hour: Int, minute: Int): String {
     val hour12 = when {
         hour == 0 -> 12
@@ -352,6 +394,53 @@ private fun formatPrayerTime(hour: Int, minute: Int): String {
         else -> hour
     }
     return "$hour12:${minute.toString().padStart(2, '0')} ${if (hour < 12) "AM" else "PM"}"
+}
+
+/**
+ * Mirrors Android's SmartContentUtils phase logic: the headline shifts as the
+ * prayer window ages, so it always gives the user actionable context.
+ *
+ * When countdown == "Now" the next prayer has just started; even if [currentPrayer]
+ * hasn't been updated yet, treat it as starting so the headline is actionable.
+ */
+private fun SharedPrayerDay.heroHeadline(): String {
+    // Treat countdown=="Now" as the prayer just starting, matching Android's behaviour.
+    val effectiveCurrent = currentPrayer
+        ?: if (countdown == "Now") nextPrayer else null
+    if (effectiveCurrent != null) {
+        val slot = slots.firstOrNull { it.isCurrent }
+            ?: slots.firstOrNull { it.name == effectiveCurrent }
+        val elapsed = if (slot != null) {
+            val startMin = slot.hour * 60 + slot.minute
+            (nowMinute - startMin + 1440) % 1440
+        } else 0
+        return when {
+            elapsed <= 20 -> "Go to Mosque for $effectiveCurrent"
+            elapsed <= 60 -> "Best Time to Pray $effectiveCurrent"
+            else -> "Make Time for $effectiveCurrent"
+        }
+    }
+    return nextPrayer?.let { "Your next prayer is $it" } ?: "Prayer Times"
+}
+
+/**
+ * When a prayer is in progress, shows how long ago it started ("7h 42m since
+ * Fajr"), matching the Android hero subtitle. Falls back to the place name when
+ * no prayer is currently active — so it always reads naturally.
+ */
+private fun SharedPrayerDay.heroSubtitle(placeName: String): String {
+    val effectiveCurrent = currentPrayer
+        ?: if (countdown == "Now") nextPrayer else null
+        ?: return placeName
+    val slot = slots.firstOrNull { it.isCurrent }
+        ?: slots.firstOrNull { it.name == effectiveCurrent }
+        ?: return placeName
+    val startMin = slot.hour * 60 + slot.minute
+    val elapsed = (nowMinute - startMin + 1440) % 1440
+    if (elapsed <= 0) return placeName
+    val h = elapsed / 60
+    val m = elapsed % 60
+    return if (h > 0) "${h}h ${m}m since $effectiveCurrent" else "${m}m since $effectiveCurrent"
 }
 
 private fun SharedPrayerDay.prayerWindowProgress(): Float? {

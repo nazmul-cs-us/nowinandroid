@@ -55,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -84,6 +85,7 @@ import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.rounded.LocationOn
 import com.starception.submission.core.designsystem.icon.NiaIcons
@@ -143,6 +145,7 @@ fun PrayerTimesScreen(
     onTogglePrayerNotification: (String) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
+    onVoiceTap: (() -> Unit)? = null,
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
@@ -200,10 +203,14 @@ fun PrayerTimesScreen(
                     )
                     .padding(top = 8.dp),
             ) {
+                PrayerStatusStrip(day)
+                Spacer(Modifier.height(8.dp))
                 PrayerHomeHeader(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
                     onOpenSearch = onOpenSearch,
+                    searchTerm = day.nextPrayer ?: day.currentPrayer,
+                    onVoiceTap = onVoiceTap,
                 )
                 Spacer(Modifier.height(10.dp))
 
@@ -239,6 +246,8 @@ fun PrayerTimesScreen(
                                     temperatureCelsius = day.temperatureCelsius,
                                     conditionLabel = day.conditionLabel,
                                     isLocating = isLocating,
+                                    compact = false,
+                                    onRefresh = onRefresh,
                                 )
                             }
                         }
@@ -259,7 +268,6 @@ fun PrayerTimesScreen(
                                     onTogglePrayerNotification = onTogglePrayerNotification,
                                     showExpandControl = false,
                                     compact = true,
-                                    onRefresh = onRefresh,
                                 )
                             }
                         }
@@ -296,21 +304,20 @@ fun PrayerTimesScreen(
                                 isTuning = isTuningSchedule,
                                 onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                 notifications = notifications,
-                                onTogglePrayerNotification = onTogglePrayerNotification,
-                                showExpandControl = true,
-                                compact = false,
+                                    onTogglePrayerNotification = onTogglePrayerNotification,
+                                    showExpandControl = true,
+                                    compact = false,
+                                )
+                        }
+                        item {
+                            LocationWeatherRow(
+                                placeName = placeName,
+                                temperatureCelsius = day.temperatureCelsius,
+                                conditionLabel = day.conditionLabel,
+                                isLocating = isLocating,
+                                compact = showAllPrayers,
                                 onRefresh = onRefresh,
                             )
-                        }
-                        if (!showAllPrayers) {
-                            item {
-                                LocationWeatherRow(
-                                    placeName = placeName,
-                                    temperatureCelsius = day.temperatureCelsius,
-                                    conditionLabel = day.conditionLabel,
-                                    isLocating = isLocating,
-                                )
-                            }
                         }
                     }
                 }
@@ -341,6 +348,8 @@ private fun PrayerHomeHeader(
     onOpenSettings: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSearch: () -> Unit,
+    searchTerm: String?,
+    onVoiceTap: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -361,7 +370,7 @@ private fun PrayerHomeHeader(
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -371,11 +380,27 @@ private fun PrayerHomeHeader(
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    text = "Search Quran, Hadith and more",
+                    text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                if (onVoiceTap != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onVoiceTap),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = "Voice search",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
             }
         }
         IconTapTarget(
@@ -384,6 +409,37 @@ private fun PrayerHomeHeader(
             tint = MaterialTheme.colorScheme.onBackground,
             onClick = onOpenSettings,
         )
+    }
+}
+
+@Composable
+private fun PrayerStatusStrip(day: SharedPrayerDay) {
+    val prayer = day.nextPrayer ?: day.currentPrayer ?: return
+    val status = if (day.countdown == "Now") "$prayer now" else "$prayer in ${day.countdown}"
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.height(34.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
+                )
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 
@@ -400,7 +456,6 @@ private fun PrayerScheduleSection(
     onTogglePrayerNotification: (String) -> Unit,
     showExpandControl: Boolean,
     compact: Boolean,
-    onRefresh: () -> Unit,
 ) {
     var revealedCard by remember { mutableStateOf<RevealedPrayerCard?>(null) }
 
@@ -509,20 +564,6 @@ private fun PrayerScheduleSection(
                 modifier = Modifier.fillMaxWidth().height(40.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (showAllPrayers) {
-                    Surface(
-                        onClick = onRefresh,
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.LocationOn,
-                            contentDescription = "Refresh location",
-                            modifier = Modifier.padding(10.dp),
-                        )
-                    }
-                }
                 TextButton(
                     onClick = onToggleExpanded,
                     modifier = Modifier.weight(1f).height(40.dp),
@@ -936,8 +977,30 @@ private fun LocationWeatherRow(
     temperatureCelsius: Double?,
     conditionLabel: String,
     isLocating: Boolean,
+    compact: Boolean,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (compact) {
+        Box(
+            modifier = modifier.fillMaxWidth().height(40.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            Surface(
+                onClick = onRefresh,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.LocationOn,
+                    contentDescription = "Refresh location",
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+        }
+        return
+    }
     Card(
         modifier = modifier.fillMaxWidth().height(52.dp),
         shape = RoundedCornerShape(24.dp),
