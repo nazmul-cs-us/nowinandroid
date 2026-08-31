@@ -55,7 +55,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -83,6 +82,8 @@ import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.dashboardSlots
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.feature.prayertimes.wobble.AlertPhase
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
@@ -175,11 +176,13 @@ fun PrayerTimesScreen(
             ),
         )
     }
+    val nextPrayerState = remember(day) { day.nextPrayerSyncState() }
 
     PullToSyncContainer(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         syncResultText = syncResultText,
+        prayerAlertState = nextPrayerState,
         modifier = modifier.fillMaxSize(),
     ) {
         Surface(
@@ -203,8 +206,6 @@ fun PrayerTimesScreen(
                     )
                     .padding(top = 8.dp),
             ) {
-                PrayerStatusStrip(day)
-                Spacer(Modifier.height(8.dp))
                 PrayerHomeHeader(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
@@ -412,36 +413,40 @@ private fun PrayerHomeHeader(
     }
 }
 
-@Composable
-private fun PrayerStatusStrip(day: SharedPrayerDay) {
-    val prayer = day.nextPrayer ?: day.currentPrayer ?: return
-    val status = if (day.countdown == "Now") "$prayer now" else "$prayer in ${day.countdown}"
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.height(34.dp),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.dp,
-                )
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+private fun SharedPrayerDay.nextPrayerSyncState(): PrayerAlertState {
+    val prayerName = nextPrayer ?: return PrayerAlertState()
+    val prayers = slots.filterNot { it.name == "Sunrise" }
+    val nextIndex = prayers.indexOfFirst { it.name == prayerName }
+    if (nextIndex < 0) return PrayerAlertState()
+
+    val next = prayers[nextIndex]
+    val previous = prayers[(nextIndex - 1).mod(prayers.size)]
+    val nextMinute = next.hour * 60 + next.minute
+    val previousMinute = previous.hour * 60 + previous.minute
+    val countdownMinutes = (nextMinute - nowMinute).mod(MINUTES_PER_DAY).let {
+        if (it == 0) MINUTES_PER_DAY else it
     }
+    val totalMinutes = (nextMinute - previousMinute).mod(MINUTES_PER_DAY).let {
+        if (it == 0) MINUTES_PER_DAY else it
+    }
+    val displayName = next.localName.ifBlank { prayerName }
+    val displayText = if (countdown == "Now") {
+        "$displayName now"
+    } else {
+        "$displayName in $countdown"
+    }
+
+    return PrayerAlertState(
+        isActive = true,
+        prayerName = prayerName,
+        phase = AlertPhase.BEFORE_PRAYER,
+        countdownMinutes = countdownMinutes,
+        totalMinutes = totalMinutes,
+        displayText = displayText,
+    )
 }
+
+private const val MINUTES_PER_DAY = 24 * 60
 
 @Composable
 private fun PrayerScheduleSection(
