@@ -84,6 +84,7 @@ import com.starception.submission.shared.qibla.qiblaBearing
 import com.starception.submission.shared.qibla.relativeQiblaTurn
 import com.starception.submission.shared.qibla.HeadingProvider
 import com.starception.submission.shared.qibla.HeadingReading
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -111,6 +112,7 @@ fun InsightPager(
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
+    notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     isLandscape: Boolean = false,
     modifier: Modifier = Modifier,
@@ -125,15 +127,10 @@ fun InsightPager(
     val qiblaBearing = remember(latitude, longitude) {
         qiblaBearing(latitude, longitude).roundToInt()
     }
-    val nextPrayerSlot = day.nextPrayer?.let { prayerName ->
-        day.slots.firstOrNull { it.name == prayerName }
-    }
-    val nextPrayerText = nextPrayerSlot?.let { slot ->
-        "${slot.name} · ${formatPrayerTime(slot.hour, slot.minute)}"
-    } ?: day.nextPrayer.orEmpty()
+    val nextPrayerText = day.nextPrayer?.let { "$it in ${day.countdown}" }.orEmpty()
     val quranPlayer = remember { QuranAudioPlayer() }
     var isReadingAudio by remember { mutableStateOf(false) }
-    var prayerSceneIndex by remember(today) { mutableStateOf(today.day % 3) }
+    var prayerSceneIndex by remember(today) { mutableStateOf(today.toEpochDays().mod(3)) }
     val autoAdvanceProgress = remember { Animatable(0f) }
     val headingProvider = remember { HeadingProvider() }
     var heading by remember { mutableStateOf(HeadingReading()) }
@@ -260,10 +257,10 @@ fun InsightPager(
                     0 -> PrayerNowTile(
                         phase = day.skyPhase,
                         weather = day.skyWeather,
-                        headline = day.heroHeadline(),
+                        headline = day.heroHeadline(notifications),
                         subtitle = day.heroSubtitle(placeName),
                         nextPrayer = nextPrayerText,
-                        countdown = day.countdown,
+                        forecast = day.temperatureCelsius?.let { "${it.roundToInt()}°C" },
                         sceneIndex = prayerSceneIndex,
                         timelineProgress = day.prayerWindowProgress(),
                         tileHeight = tileHeight,
@@ -387,15 +384,6 @@ private fun qiblaGuidance(qiblaBearing: Int, headingDegrees: Double?): String {
     }
 }
 
-private fun formatPrayerTime(hour: Int, minute: Int): String {
-    val hour12 = when {
-        hour == 0 -> 12
-        hour > 12 -> hour - 12
-        else -> hour
-    }
-    return "$hour12:${minute.toString().padStart(2, '0')} ${if (hour < 12) "AM" else "PM"}"
-}
-
 /**
  * Mirrors Android's SmartContentUtils phase logic: the headline shifts as the
  * prayer window ages, so it always gives the user actionable context.
@@ -403,7 +391,9 @@ private fun formatPrayerTime(hour: Int, minute: Int): String {
  * When countdown == "Now" the next prayer has just started; even if [currentPrayer]
  * hasn't been updated yet, treat it as starting so the headline is actionable.
  */
-private fun SharedPrayerDay.heroHeadline(): String {
+private fun SharedPrayerDay.heroHeadline(
+    notifications: PrayerNotificationPreferences,
+): String {
     // Treat countdown=="Now" as the prayer just starting, matching Android's behaviour.
     val effectiveCurrent = currentPrayer
         ?: if (countdown == "Now") nextPrayer else null
@@ -415,7 +405,8 @@ private fun SharedPrayerDay.heroHeadline(): String {
             (nowMinute - startMin + 1440) % 1440
         } else 0
         return when {
-            elapsed <= 20 -> "Go to Mosque for $effectiveCurrent"
+            elapsed <= notifications.getGoToMosqueDurationForPrayer(effectiveCurrent) ->
+                "Go to Mosque for $effectiveCurrent"
             elapsed <= 60 -> "Best Time to Pray $effectiveCurrent"
             else -> "Make Time for $effectiveCurrent"
         }

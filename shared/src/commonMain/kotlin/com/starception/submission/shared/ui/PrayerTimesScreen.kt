@@ -176,7 +176,9 @@ fun PrayerTimesScreen(
             ),
         )
     }
-    val nextPrayerState = remember(day) { day.nextPrayerSyncState() }
+    val nextPrayerState = remember(day, notifications) {
+        day.prayerAlertState(notifications)
+    }
 
     PullToSyncContainer(
         isRefreshing = isRefreshing,
@@ -192,7 +194,9 @@ fun PrayerTimesScreen(
             BoxWithConstraints(Modifier.fillMaxSize().background(homeCanvas)) {
             val useTwoPaneLayout = maxWidth > maxHeight
             val useSideNavigation = useTwoPaneLayout
-            val portraitInsightHeight = (maxHeight - 576.dp).coerceIn(208.dp, 288.dp)
+            // iOS has taller status/navigation safe areas than Android. Reserving
+            // their measured space keeps the location card above the floating bar.
+            val portraitInsightHeight = (maxHeight - 636.dp).coerceIn(196.dp, 288.dp)
             val landscapeInsightHeight = (maxHeight - 182.dp).coerceIn(220.dp, 560.dp)
             Column(
                 modifier = Modifier
@@ -237,6 +241,7 @@ fun PrayerTimesScreen(
                                     onOpenQuran = onOpenQuran,
                                     onOpenQibla = onOpenQibla,
                                     onOpenRecommendation = onOpenRecommendation,
+                                    notifications = notifications,
                                     tileHeight = landscapeInsightHeight,
                                     isLandscape = true,
                                 )
@@ -292,6 +297,7 @@ fun PrayerTimesScreen(
                                 onOpenQuran = onOpenQuran,
                                 onOpenQibla = onOpenQibla,
                                 onOpenRecommendation = onOpenRecommendation,
+                                notifications = notifications,
                                 tileHeight = portraitInsightHeight,
                             )
                         }
@@ -413,36 +419,45 @@ private fun PrayerHomeHeader(
     }
 }
 
-private fun SharedPrayerDay.nextPrayerSyncState(): PrayerAlertState {
-    val prayerName = nextPrayer ?: return PrayerAlertState()
+private fun SharedPrayerDay.prayerAlertState(
+    notifications: PrayerNotificationPreferences,
+): PrayerAlertState {
     val prayers = slots.filterNot { it.name == "Sunrise" }
-    val nextIndex = prayers.indexOfFirst { it.name == prayerName }
-    if (nextIndex < 0) return PrayerAlertState()
+    currentPrayer
+        ?.let { name -> prayers.firstOrNull { it.name == name } }
+        ?.let { current ->
+            val duration = notifications.getGoToMosqueDurationForPrayer(current.name)
+            val elapsed = (nowMinute - (current.hour * 60 + current.minute))
+                .mod(MINUTES_PER_DAY)
+            val minutesLeft = duration - elapsed
+            if (minutesLeft > 0) {
+                return PrayerAlertState(
+                    isActive = true,
+                    prayerName = current.name,
+                    phase = AlertPhase.GO_TO_MOSQUE,
+                    countdownMinutes = minutesLeft,
+                    totalMinutes = duration,
+                    displayText = "${current.name} · Go now to mosque, ${minutesLeft}m left",
+                )
+            }
+        }
 
-    val next = prayers[nextIndex]
-    val previous = prayers[(nextIndex - 1).mod(prayers.size)]
-    val nextMinute = next.hour * 60 + next.minute
-    val previousMinute = previous.hour * 60 + previous.minute
-    val countdownMinutes = (nextMinute - nowMinute).mod(MINUTES_PER_DAY).let {
-        if (it == 0) MINUTES_PER_DAY else it
-    }
-    val totalMinutes = (nextMinute - previousMinute).mod(MINUTES_PER_DAY).let {
-        if (it == 0) MINUTES_PER_DAY else it
-    }
-    val displayName = next.localName.ifBlank { prayerName }
-    val displayText = if (countdown == "Now") {
-        "$displayName now"
-    } else {
-        "$displayName in $countdown"
+    val next = nextPrayer
+        ?.let { name -> prayers.firstOrNull { it.name == name } }
+        ?: return PrayerAlertState()
+    val minutesUntil = ((next.hour * 60 + next.minute) - nowMinute).mod(MINUTES_PER_DAY)
+    val priorMinutes = notifications.getPriorMinutesForPrayer(next.name)
+    if (minutesUntil !in 1..priorMinutes) {
+        return PrayerAlertState()
     }
 
     return PrayerAlertState(
         isActive = true,
-        prayerName = prayerName,
+        prayerName = next.name,
         phase = AlertPhase.BEFORE_PRAYER,
-        countdownMinutes = countdownMinutes,
-        totalMinutes = totalMinutes,
-        displayText = displayText,
+        countdownMinutes = minutesUntil,
+        totalMinutes = priorMinutes,
+        displayText = "${next.name} in ${minutesUntil}m",
     )
 }
 
@@ -699,7 +714,7 @@ private fun PrayerCard(
     Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(if (compact) 78.dp else 106.dp)
+                .height(if (compact) 78.dp else 96.dp)
             .clip(cardShape),
     ) {
         Box(
@@ -917,20 +932,18 @@ private fun PrayerCard(
                             modifier = Modifier.padding(bottom = 2.dp),
                         )
                     }
-                    if (isTuning || offsetMinutes != 0) {
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(accentColor.copy(alpha = 0.08f))
-                                .padding(horizontal = 7.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = offsetLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = accentColor.copy(alpha = 0.78f),
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(accentColor.copy(alpha = 0.08f))
+                            .padding(horizontal = 7.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = offsetLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accentColor.copy(alpha = 0.78f),
+                        )
                     }
                 }
             }

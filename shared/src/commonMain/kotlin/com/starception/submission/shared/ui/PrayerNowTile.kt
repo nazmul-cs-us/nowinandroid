@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyResource
@@ -76,7 +77,7 @@ fun PrayerNowTile(
     headline: String,
     subtitle: String,
     nextPrayer: String,
-    countdown: String,
+    forecast: String?,
     sceneIndex: Int = 0,
     timelineProgress: Float? = null,
     tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
@@ -159,7 +160,11 @@ fun PrayerNowTile(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Compass", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = "Compass",
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                    )
                     Icon(
                         imageVector = Icons.Filled.Explore,
                         contentDescription = null,
@@ -177,13 +182,15 @@ fun PrayerNowTile(
         ) {
             Text(
                 text = headline,
-                style = MaterialTheme.typography.titleLarge,
+                fontSize = 17.sp,
+                lineHeight = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
                 color = Color.White.copy(alpha = 0.85f),
             )
             timelineProgress?.let { progress ->
@@ -209,16 +216,29 @@ fun PrayerNowTile(
                     )
                     Text(
                         text = nextPrayer,
-                        style = MaterialTheme.typography.titleSmall,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                     )
                 }
-                Text(
-                    text = countdown,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
-                )
+                forecast?.let {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Forecast",
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            color = Color.White.copy(alpha = 0.75f),
+                        )
+                        Text(
+                            text = it,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+                }
             }
         }
     }
@@ -234,7 +254,8 @@ private fun TileLabel(text: String) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
             color = Color.White,
         )
     }
