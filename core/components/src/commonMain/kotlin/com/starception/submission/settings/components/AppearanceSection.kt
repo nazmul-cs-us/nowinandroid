@@ -68,6 +68,7 @@ fun AppearanceSection(
      * passes false and the option is not offered.
      */
     supportDynamicColor: Boolean = false,
+    showCustomTheme: Boolean = true,
     /**
      * The custom-accent picker. Android's draws its wheel with Bitmap, Canvas and
      * Paint, which do not cross, so the dialog comes from the caller. When null
@@ -140,15 +141,17 @@ fun AppearanceSection(
                         onChangeThemeBrand(ThemeBrand.ROYAL)
                     },
                 )
-                ThemePill(
-                    label = "Custom",
-                    selected = themeSettings.brand == ThemeBrand.CUSTOM,
-                    color = customColorOrFallback,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        showColorPickerState.value = true
-                    },
-                )
+                if (showCustomTheme) {
+                    ThemePill(
+                        label = "Custom",
+                        selected = themeSettings.brand == ThemeBrand.CUSTOM,
+                        color = customColorOrFallback,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showColorPickerState.value = true
+                        },
+                    )
+                }
             }
         }
 

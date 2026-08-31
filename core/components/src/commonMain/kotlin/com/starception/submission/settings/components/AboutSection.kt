@@ -26,10 +26,13 @@ private const val METEOCONS_URL = "https://meteocons.com/"
 @Composable
 fun AboutSection(
     modifier: Modifier = Modifier,
+    versionName: String = "1.0.0",
+    showLicenses: Boolean = true,
+    showProjectLinks: Boolean = true,
     /**
      * Opens the open-source licences screen. Android launches Google's
-     * OssLicensesMenuActivity, which is an Activity and cannot cross; iOS will
-     * present its own once there is one, and does nothing until then.
+     * OssLicensesMenuActivity, which is an Activity and cannot cross. Platforms
+     * without an implementation hide the action with [showLicenses].
      */
     onOpenLicenses: () -> Unit = {},
 ) {
@@ -44,7 +47,7 @@ fun AboutSection(
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "1.0.0",
+            text = versionName,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -73,30 +76,36 @@ fun AboutSection(
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            TextButton(
-                onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) }
-            ) {
-                Text(text = "Privacy Policy")
-            }
-
-            TextButton(
-                onClick = {
-                    onOpenLicenses()
+            if (showProjectLinks) {
+                TextButton(
+                    onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) }
+                ) {
+                    Text(text = "Privacy Policy")
                 }
-            ) {
-                Text(text = "Licenses")
             }
 
-            TextButton(
-                onClick = { uriHandler.openUri(BRAND_GUIDELINES_URL) }
-            ) {
-                Text(text = "Brand Guidelines")
+            if (showLicenses) {
+                TextButton(
+                    onClick = {
+                        onOpenLicenses()
+                    }
+                ) {
+                    Text(text = "Licenses")
+                }
             }
 
-            TextButton(
-                onClick = { uriHandler.openUri(FEEDBACK_URL) }
-            ) {
-                Text(text = "Feedback")
+            if (showProjectLinks) {
+                TextButton(
+                    onClick = { uriHandler.openUri(BRAND_GUIDELINES_URL) }
+                ) {
+                    Text(text = "Brand Guidelines")
+                }
+
+                TextButton(
+                    onClick = { uriHandler.openUri(FEEDBACK_URL) }
+                ) {
+                    Text(text = "Feedback")
+                }
             }
 
             TextButton(

@@ -17,6 +17,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,21 +25,36 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ComposeUIViewController
+import com.starception.submission.core.designsystem.theme.DarkAndroidColorScheme
 import com.starception.submission.core.designsystem.theme.DarkCoastalColorScheme
+import com.starception.submission.core.designsystem.theme.DarkDefaultColorScheme
+import com.starception.submission.core.designsystem.theme.DarkRoyalColorScheme
+import com.starception.submission.core.designsystem.theme.LightAndroidColorScheme
 import com.starception.submission.core.designsystem.theme.LightCoastalColorScheme
+import com.starception.submission.core.designsystem.theme.LightDefaultColorScheme
+import com.starception.submission.core.designsystem.theme.LightRoyalColorScheme
 import com.starception.submission.core.designsystem.theme.sharedTypography
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.prayerDefaultsFor
 import com.starception.submission.shared.PrayerSchedule
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
+import com.starception.submission.shared.notifications.IosPrayerSchedulePublisher
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.salah.SalahTracker
+import com.starception.submission.shared.settings.LastLocationStore
+import com.starception.submission.shared.settings.UserAppearanceSettings
 import com.starception.submission.shared.settings.UserPrayerSettings
 import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import platform.Foundation.NSBundle
 import platform.UIKit.UIViewController
 
 /**
@@ -49,38 +65,66 @@ import platform.UIKit.UIViewController
  */
 @Suppress("FunctionName")
 fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
-    var location by remember { mutableStateOf<DeviceLocation?>(null) }
+    val tracker = remember { SalahTracker() }
+    val settingsStore = remember { UserPrayerSettings() }
+    val appearanceStore = remember { UserAppearanceSettings() }
+    val locationStore = remember { LastLocationStore() }
+
+    var location by remember { mutableStateOf(locationStore.location()) }
     var resolved by remember { mutableStateOf(false) }
     var weatherCode by remember { mutableStateOf<Int?>(null) }
     var temperature by remember { mutableStateOf<Double?>(null) }
+    var refreshRequest by remember { mutableStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var syncResultText by remember { mutableStateOf<String?>(null) }
+    var now by remember { mutableStateOf(Clock.System.now()) }
+    var themeSettings by remember { mutableStateOf(appearanceStore.settings()) }
 
-    // One tracker for the life of the screen; it reads and writes through
-    // NSUserDefaults, so the marks survive relaunch.
-    val tracker = remember { SalahTracker() }
-    val settingsStore = remember { UserPrayerSettings() }
-
-    LaunchedEffect(Unit) {
-        location = LocationProvider().current()
-        // Tracked separately from `location` being null, which is also what a
-        // denied permission looks like — without this the UI cannot tell
-        // "still asking" from "asked and refused".
+    LaunchedEffect(refreshRequest) {
+        isRefreshing = refreshRequest > 0
+        val savedLocation = location
+        val refreshedLocation = LocationProvider().current()
+        if (refreshedLocation != null) {
+            location = refreshedLocation
+            locationStore.save(refreshedLocation)
+        }
         resolved = true
-    }
 
-    // Keyed on the resolved position so the forecast follows the user rather
-    // than being fetched once for wherever they happened to start.
-    LaunchedEffect(location?.latitude, location?.longitude) {
-        val place = location ?: return@LaunchedEffect
-        val conditions = CurrentConditionsClient.fetch(place.latitude, place.longitude)
+        val target = refreshedLocation ?: savedLocation ?: FALLBACK_LOCATION
+        val conditions = CurrentConditionsClient.fetch(target.latitude, target.longitude)
         weatherCode = conditions?.weatherCode
         temperature = conditions?.temperatureCelsius
+        if (refreshRequest > 0) {
+            isRefreshing = false
+            syncResultText = if (refreshedLocation != null) {
+                "Location and prayer times updated"
+            } else if (savedLocation != null) {
+                "Location unavailable; using last saved location"
+            } else {
+                "Location unavailable; using Dubai fallback"
+            }
+            delay(3_000)
+            syncResultText = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000)
+            now = Clock.System.now()
+        }
     }
 
     val place = location ?: FALLBACK_LOCATION
     val country = prayerDefaultsFor(place.countryCode)
-    var prayerSettings by remember(country) { mutableStateOf(settingsStore.settings(country)) }
+    var prayerSettings by remember(place.countryCode, country) {
+        mutableStateOf(settingsStore.settings(place.countryCode, country))
+    }
     var notificationPrefs by remember { mutableStateOf(settingsStore.notifications()) }
-    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    // Prayer times belong to the resolved location, not necessarily the device's
+    // current timezone (for example, when viewing a cached location while travelling).
+    val localNow = now.toLocalDateTime(timeZoneForOffset(place.timeZoneOffset))
+    val today = localNow.date
 
     var completed by remember(today) { mutableStateOf(tracker.completed(today)) }
 
@@ -97,32 +141,70 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
         prayerSettings,
         weatherCode,
         temperature,
+        localNow.hour,
+        localNow.minute,
     ) {
         PrayerSchedule.forDate(
-        year = today.year,
-        month = today.monthNumber,
-        day = today.dayOfMonth,
-        latitude = place.latitude,
-        longitude = place.longitude,
-        timeZoneOffset = place.timeZoneOffset,
-        // The country's own method, so Fajr and Isha use the angles its
-        // authority publishes rather than one country's convention everywhere.
-        defaults = country,
-        settings = prayerSettings,
-        // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
-        weatherCode = weatherCode,
-        temperatureCelsius = temperature,
+            year = today.year,
+            month = today.monthNumber,
+            day = today.dayOfMonth,
+            latitude = place.latitude,
+            longitude = place.longitude,
+            timeZoneOffset = place.timeZoneOffset,
+            // The country's own method keeps its authority's published offsets.
+            defaults = country,
+            settings = prayerSettings,
+            // Null until the forecast arrives, which prayerSkyWeather treats as Clear.
+            weatherCode = weatherCode,
+            temperatureCelsius = temperature,
             countryCode = place.countryCode,
             isFriday = today.dayOfWeek == DayOfWeek.FRIDAY,
+            nowHour = localNow.hour,
+            nowMinute = localNow.minute,
         )
     }
 
+    LaunchedEffect(
+        today,
+        place,
+        country,
+        prayerSettings,
+        notificationPrefs,
+        localNow.hour,
+        localNow.minute,
+    ) {
+        IosPrayerSchedulePublisher.publish(
+            locationName = place.placeName,
+            startDate = today,
+            latitude = place.latitude,
+            longitude = place.longitude,
+            timeZoneOffset = place.timeZoneOffset,
+            countryCode = place.countryCode,
+            defaults = country,
+            settings = prayerSettings,
+            preferences = notificationPrefs,
+        )
+    }
+
+    val useDarkTheme = when (themeSettings.darkThemeConfig) {
+        DarkThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+        DarkThemeConfig.LIGHT -> false
+        DarkThemeConfig.DARK -> true
+    }
+    val appVersion = remember {
+        NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String
+            ?: "Unknown"
+    }
+
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkCoastalColorScheme else LightCoastalColorScheme,
+        colorScheme = iosColorScheme(themeSettings.brand, useDarkTheme),
         typography = sharedTypography(),
     ) {
         SharedNavHost(
-            home = { onOpenSettings ->
+            latitude = place.latitude,
+            longitude = place.longitude,
+            today = today,
+            home = { actions ->
                 PrayerTimesScreen(
                     placeName = place.placeName.ifEmpty { "Locating…" },
                     day = day,
@@ -130,26 +212,46 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
                     onTogglePrayer = { completed = tracker.toggle(today, it) },
                     offsets = prayerSettings.timeOffsets,
                     onAdjustPrayer = { prayer, delta ->
-                        prayerSettings = settingsStore.adjust(country, prayer, delta)
+                        prayerSettings = settingsStore.adjust(
+                            place.countryCode,
+                            country,
+                            prayer,
+                            delta,
+                        )
                     },
-                    onOpenSettings = onOpenSettings,
+                    onOpenSettings = actions.onOpenSettings,
                     today = today,
                     isLocating = !resolved,
+                    isRefreshing = isRefreshing,
+                    syncResultText = syncResultText,
+                    onRefresh = { refreshRequest += 1 },
                     latitude = place.latitude,
                     longitude = place.longitude,
+                    notifications = notificationPrefs,
+                    onTogglePrayerNotification = { prayer ->
+                        notificationPrefs = notificationPrefs.togglePrayer(prayer)
+                        settingsStore.saveNotifications(notificationPrefs)
+                    },
+                    onOpenProfile = actions.onOpenProfile,
+                    onOpenSearch = actions.onOpenSearch,
+                    onOpenQuran = actions.onOpenQuran,
+                    onOpenQibla = actions.onOpenQibla,
+                    onOpenRecommendation = actions.onOpenRecommendation,
+                    onSelectBottom = actions.onSelectBottom,
                 )
             },
             settings = { onBack ->
                 PrayerSettingsScreen(
                     settings = prayerSettings,
                     countryName = country?.countryName,
+                    showRestoreOption = settingsStore.isChanged(place.countryCode, country),
                     onSettingsChange = { updated ->
                         prayerSettings = updated
-                        settingsStore.save(updated)
+                        settingsStore.save(place.countryCode, updated)
                     },
                     onRestore = {
-                        settingsStore.restoreDefaults()
-                        prayerSettings = settingsStore.settings(country)
+                        settingsStore.restoreDefaults(place.countryCode)
+                        prayerSettings = settingsStore.settings(place.countryCode, country)
                     },
                     onBack = onBack,
                     notifications = notificationPrefs,
@@ -157,18 +259,36 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
                         notificationPrefs = updated
                         settingsStore.saveNotifications(updated)
                     },
+                    themeSettings = themeSettings,
+                    onThemeBrandChange = { brand ->
+                        appearanceStore.saveBrand(brand)
+                        themeSettings = themeSettings.copy(brand = brand)
+                    },
+                    onDarkThemeConfigChange = { config ->
+                        appearanceStore.saveDarkTheme(config)
+                        themeSettings = themeSettings.copy(darkThemeConfig = config)
+                    },
+                    appVersion = appVersion,
                 )
             },
         )
     }
 }
 
+private fun iosColorScheme(brand: ThemeBrand, dark: Boolean): ColorScheme = when (brand) {
+    ThemeBrand.DEFAULT -> if (dark) DarkDefaultColorScheme else LightDefaultColorScheme
+    ThemeBrand.ANDROID -> if (dark) DarkAndroidColorScheme else LightAndroidColorScheme
+    ThemeBrand.COASTAL -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
+    ThemeBrand.ROYAL -> if (dark) DarkRoyalColorScheme else LightRoyalColorScheme
+    ThemeBrand.CUSTOM -> if (dark) DarkCoastalColorScheme else LightCoastalColorScheme
+}
+
 /**
- * Used until Core Location answers, and if it never does.
+ * Used only when neither Core Location nor a previously saved fix is available.
  *
  * Prayer times are wrong for the wrong place, so this is a stopgap, not a
- * default worth keeping: the settings slice brings the user's chosen location
- * across and this goes away.
+ * default worth keeping. A successful fix is persisted and takes precedence on
+ * future launches.
  */
 private val FALLBACK_LOCATION = DeviceLocation(
     latitude = 25.1030198,
@@ -177,3 +297,23 @@ private val FALLBACK_LOCATION = DeviceLocation(
     placeName = "Nad Al Hamar, Dubai",
     countryCode = "AE",
 )
+
+private fun timeZoneForOffset(offsetHours: Double): TimeZone {
+    val offsetMinutes = (offsetHours * 60).roundToInt().coerceIn(-18 * 60, 18 * 60)
+    val absoluteMinutes = abs(offsetMinutes)
+    val hours = (absoluteMinutes / 60).toString().padStart(2, '0')
+    val minutes = (absoluteMinutes % 60).toString().padStart(2, '0')
+    val sign = if (offsetMinutes < 0) "-" else "+"
+    return TimeZone.of("UTC$sign$hours:$minutes")
+}
+
+private fun com.starception.submission.prayer.model.PrayerNotificationPreferences.togglePrayer(
+    prayer: String,
+) = when (prayer.lowercase()) {
+    "fajr" -> copy(fajrNotificationEnabled = !fajrNotificationEnabled)
+    "dhuhr" -> copy(dhuhrNotificationEnabled = !dhuhrNotificationEnabled)
+    "asr" -> copy(asrNotificationEnabled = !asrNotificationEnabled)
+    "maghrib" -> copy(maghribNotificationEnabled = !maghribNotificationEnabled)
+    "isha" -> copy(ishaNotificationEnabled = !ishaNotificationEnabled)
+    else -> this
+}

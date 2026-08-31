@@ -1,0 +1,38 @@
+package com.starception.submission.shared.content
+
+import com.starception.submission.shared.storage.InMemoryKeyValueStore
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class SharedContentStoreTest {
+    @Test
+    fun stateRoundTripsAcrossStoreInstances() {
+        val keyValues = InMemoryKeyValueStore()
+        val content = SharedContentStore(keyValues)
+
+        content.saveProfile(LocalProfile("Amina", 20))
+        content.toggleSurah(18)
+        content.toggleBukhariBook(80)
+        content.toggleInterest("Quran")
+        content.toggleLesson(1)
+
+        val restored = SharedContentStore(keyValues)
+        assertEquals(LocalProfile("Amina", 20), restored.profile())
+        assertEquals(setOf(18), restored.bookmarkedSurahs())
+        assertEquals(setOf(80), restored.savedBukhariBooks())
+        assertEquals(setOf("Quran"), restored.interests())
+        assertEquals(setOf(1), restored.completedLessons())
+    }
+
+    @Test
+    fun togglesRemoveExistingValuesAndRejectInvalidCatalogIds() {
+        val content = SharedContentStore(InMemoryKeyValueStore())
+
+        assertTrue(18 in content.toggleSurah(18))
+        assertFalse(18 in content.toggleSurah(18))
+        assertTrue(content.toggleSurah(999).isEmpty())
+        assertTrue(content.toggleBukhariBook(0).isEmpty())
+    }
+}

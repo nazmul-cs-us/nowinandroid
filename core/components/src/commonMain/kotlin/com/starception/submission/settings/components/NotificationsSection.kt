@@ -70,6 +70,7 @@ fun NotificationsSection(
      */
     hasDndAccess: Boolean = true,
     onOpenDndAccessSettings: () -> Unit = {},
+    showSilentDuringPrayer: Boolean = true,
 ) {
     Column(modifier = modifier) {
         // Master toggle
@@ -185,12 +186,14 @@ fun NotificationsSection(
                     }
                 }
 
-                SilentDuringPrayerSection(
-                    preferences = preferences,
-                    onPreferencesChanged = onPreferencesChanged,
-                    hasDndAccess = hasDndAccess,
-                    onOpenDndAccessSettings = onOpenDndAccessSettings,
-                )
+                if (showSilentDuringPrayer) {
+                    SilentDuringPrayerSection(
+                        preferences = preferences,
+                        onPreferencesChanged = onPreferencesChanged,
+                        hasDndAccess = hasDndAccess,
+                        onOpenDndAccessSettings = onOpenDndAccessSettings,
+                    )
+                }
             }
         }
     }

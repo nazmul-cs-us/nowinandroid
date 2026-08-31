@@ -149,6 +149,6 @@ enum class HighLatitudeAdjustment(
     
     NEAREST_LATITUDE(
         displayName = "Nearest Latitude",
-        description = "Use times from nearest day when sun reaches required angle"
+        description = "Use twilight times calculated at the nearest standard latitude"
     )
 }

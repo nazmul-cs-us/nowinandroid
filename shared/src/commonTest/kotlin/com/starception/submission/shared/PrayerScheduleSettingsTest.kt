@@ -2,6 +2,7 @@ package com.starception.submission.shared
 
 import com.starception.submission.prayer.model.AsrMadhhab
 import com.starception.submission.prayer.model.CalculationMethod
+import com.starception.submission.prayer.model.HighLatitudeAdjustment
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.prayerDefaultsFor
@@ -126,6 +127,77 @@ class PrayerScheduleSettingsTest {
         assertEquals(
             withoutCountry.getValue("Sunrise").toMinutes() - 3,
             withCountry.getValue("Sunrise").toMinutes(),
+        )
+    }
+
+    @Test
+    fun highLatitudeSettingsRestoreMissingTwilightTimes() {
+        fun stockholm(adjustment: HighLatitudeAdjustment) = PrayerSchedule.forDate(
+            year = 2026,
+            month = 6,
+            day = 21,
+            latitude = 59.3293,
+            longitude = 18.0686,
+            timeZoneOffset = 2.0,
+            settings = PrayerSettings(
+                calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+                highLatitudeAdjustment = adjustment,
+            ),
+            nowHour = 12,
+            nowMinute = 0,
+        ).slots.associateBy { it.name }
+
+        val unadjusted = stockholm(HighLatitudeAdjustment.NONE)
+        assertTrue("Sunrise" in unadjusted && "Maghrib" in unadjusted)
+        assertTrue("Fajr" !in unadjusted && "Isha" !in unadjusted)
+
+        HighLatitudeAdjustment.entries.filterNot { it == HighLatitudeAdjustment.NONE }.forEach {
+            val adjusted = stockholm(it)
+            assertTrue("Fajr" in adjusted, "$it did not restore Fajr")
+            assertTrue("Isha" in adjusted, "$it did not restore Isha")
+        }
+    }
+
+    @Test
+    fun dashboardStartsWithTheLatestPrayerEventAndWraps() {
+        val day = PrayerSchedule.forDate(
+            year = 2026,
+            month = 8,
+            day = 27,
+            latitude = dubaiLat,
+            longitude = dubaiLon,
+            timeZoneOffset = gulfOffset,
+            defaults = prayerDefaultsFor("AE"),
+            settings = uaeDefaults,
+            nowHour = 19,
+            nowMinute = 0,
+        )
+
+        assertEquals(
+            listOf("Maghrib", "Isha", "Fajr", "Sunrise", "Dhuhr", "Asr"),
+            day.dashboardSlots().map { it.name },
+        )
+        assertEquals(19 * 60, day.nowMinute)
+    }
+
+    @Test
+    fun dashboardKeepsChronologicalOrderBeforeFajr() {
+        val day = PrayerSchedule.forDate(
+            year = 2026,
+            month = 8,
+            day = 27,
+            latitude = dubaiLat,
+            longitude = dubaiLon,
+            timeZoneOffset = gulfOffset,
+            defaults = prayerDefaultsFor("AE"),
+            settings = uaeDefaults,
+            nowHour = 1,
+            nowMinute = 0,
+        )
+
+        assertEquals(
+            listOf("Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"),
+            day.dashboardSlots().map { it.name },
         )
     }
 

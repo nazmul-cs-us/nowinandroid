@@ -18,6 +18,7 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,7 +46,11 @@ import com.starception.submission.core.images.PrayerSkyPhase
 import com.starception.submission.core.images.PrayerSkyWeather
 import com.starception.submission.core.images.prayerSkyResource
 import com.starception.submission.core.images.resources.Res
+import com.starception.submission.core.images.resources.insight_salah_foreground
+import com.starception.submission.core.images.resources.prayer_foreground_kaaba
 import com.starception.submission.core.images.resources.prayer_foreground_nabawi
+import com.starception.submission.core.images.resources.prayer_ground_kaaba
+import com.starception.submission.core.images.resources.prayer_ground_local
 import com.starception.submission.core.images.resources.prayer_ground_nabawi
 import org.jetbrains.compose.resources.painterResource
 
@@ -55,7 +62,8 @@ import org.jetbrains.compose.resources.painterResource
  * moment and forecast.
  *
  * The portable ground and foreground layers mirror the Android composition.
- * Platform-specific parallax remains an enhancement rather than a visual gap.
+ * The scene rotates on long press, matching Android's local, Kaaba and Nabawi
+ * variants without making the iOS host own any UI state.
  */
 @Composable
 fun PrayerNowTile(
@@ -65,13 +73,30 @@ fun PrayerNowTile(
     subtitle: String,
     nextPrayer: String,
     countdown: String,
+    sceneIndex: Int = 0,
+    timelineProgress: Float? = null,
+    tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {},
 ) {
+    val scene = sceneIndex.mod(3)
+    val foreground = when (scene) {
+        0 -> Res.drawable.insight_salah_foreground
+        1 -> Res.drawable.prayer_foreground_kaaba
+        else -> Res.drawable.prayer_foreground_nabawi
+    }
+    val ground = when (scene) {
+        0 -> Res.drawable.prayer_ground_local
+        1 -> Res.drawable.prayer_ground_kaaba
+        else -> Res.drawable.prayer_ground_nabawi
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(26.dp)),
+            .height(tileHeight)
+            .clip(RoundedCornerShape(26.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Image(
             painter = painterResource(prayerSkyResource(phase, weather)),
@@ -80,14 +105,19 @@ fun PrayerNowTile(
             modifier = Modifier.fillMaxSize(),
         )
         Image(
-            painter = painterResource(Res.drawable.prayer_ground_nabawi),
+            painter = painterResource(ground),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.BottomCenter,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = if (scene == 1) 0.94f else if (scene == 2) 0.92f else 1f
+                    scaleY = scaleX
+                },
         )
         Image(
-            painter = painterResource(Res.drawable.prayer_foreground_nabawi),
+            painter = painterResource(foreground),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.BottomCenter,
@@ -140,6 +170,14 @@ fun PrayerNowTile(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
             )
+            timelineProgress?.let { progress ->
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f),
+                    trackColor = Color.White.copy(alpha = 0.22f),
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

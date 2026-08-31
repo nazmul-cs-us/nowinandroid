@@ -1,0 +1,6 @@
+// Safe defaults. Override these as external xcodebuild settings or from an
+// uncommitted Config/Local.xcconfig file.
+APNS_ENVIRONMENT = development
+PRAYER_PUSH_BACKEND_URL =
+
+#include? "Local.xcconfig"

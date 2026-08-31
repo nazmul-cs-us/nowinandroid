@@ -18,6 +18,7 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,10 +35,19 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,21 +64,27 @@ import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
+import com.starception.submission.core.images.resources.insight_suggestion
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.runtime.LaunchedEffect
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.shared.content.dailyRecommendation
+import com.starception.submission.shared.audio.QuranAudioPlayer
+import com.starception.submission.shared.audio.quranAudioUrl
+import com.starception.submission.shared.qibla.cardinalDirection
+import com.starception.submission.shared.qibla.qiblaBearing
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.roundToInt
-import kotlin.math.sin
+import kotlin.math.abs
 
 /**
  * The swipeable insight tiles at the top of the home page.
@@ -86,13 +102,52 @@ fun InsightPager(
     today: LocalDate,
     latitude: Double,
     longitude: Double,
+    onOpenQuran: (Int) -> Unit = {},
+    onOpenQibla: () -> Unit = {},
+    onOpenRecommendation: () -> Unit = {},
+    tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
+    isLandscape: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val pageCount = 4
-    val pagerState = rememberPagerState(pageCount = { pageCount })
+    val pageCount = 5
+    val middleLoopStart = pageCount
+    val pagerState = rememberPagerState(
+        initialPage = middleLoopStart,
+        pageCount = { pageCount * 3 },
+    )
     val pagerScope = rememberCoroutineScope()
     val qiblaBearing = remember(latitude, longitude) {
-        calculateQiblaBearing(latitude, longitude).roundToInt()
+        qiblaBearing(latitude, longitude).roundToInt()
+    }
+    val nextPrayerSlot = day.nextPrayer?.let { prayerName ->
+        day.slots.firstOrNull { it.name == prayerName }
+    }
+    val nextPrayerText = nextPrayerSlot?.let { slot ->
+        "${slot.name} · ${formatPrayerTime(slot.hour, slot.minute)}"
+    } ?: day.nextPrayer.orEmpty()
+    val quranPlayer = remember { QuranAudioPlayer() }
+    var isReadingAudio by remember { mutableStateOf(false) }
+    var prayerSceneIndex by remember(today) { mutableStateOf(today.day % 3) }
+    DisposableEffect(quranPlayer) {
+        onDispose { quranPlayer.stop() }
+    }
+    LaunchedEffect(today) {
+        quranPlayer.stop()
+        isReadingAudio = false
+    }
+    LaunchedEffect(pagerState.settledPage) {
+        when {
+            pagerState.settledPage < middleLoopStart -> {
+                pagerState.scrollToPage(pagerState.settledPage + pageCount)
+            }
+            pagerState.settledPage >= middleLoopStart + pageCount -> {
+                pagerState.scrollToPage(pagerState.settledPage - pageCount)
+            }
+        }
+    }
+    LaunchedEffect(pagerState.settledPage) {
+        delay(30_000)
+        pagerState.animateScrollToPage(pagerState.settledPage + 1)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -111,7 +166,7 @@ fun InsightPager(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 repeat(pageCount) { index ->
-                    val selected = pagerState.currentPage == index
+                    val selected = pagerState.currentPage % pageCount == index
                     Box(
                         modifier = Modifier
                             .size(
@@ -127,7 +182,12 @@ fun InsightPager(
                                 },
                             )
                             .clickable {
-                                pagerScope.launch { pagerState.animateScrollToPage(index) }
+                                pagerScope.launch {
+                                    val currentLogicalPage = pagerState.currentPage % pageCount
+                                    pagerState.animateScrollToPage(
+                                        pagerState.currentPage + (index - currentLogicalPage),
+                                    )
+                                }
                             },
                     )
                 }
@@ -135,24 +195,51 @@ fun InsightPager(
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // Android leaves the next card visibly clipped so the horizontal
-            // gesture is apparent without a separate swipe hint.
-            val pageWidth = (maxWidth * 0.64f).coerceAtLeast(210.dp)
+            // Keep Android's card aspect ratio. Portrait intentionally leaves a
+            // neighboring card visible; landscape dedicates its left pane to it.
+            val pageWidth = if (isLandscape) {
+                maxWidth
+            } else {
+                (tileHeight * (250f / 288f))
+                    .coerceAtMost(maxWidth * 0.64f)
+                    .coerceAtLeast(140.dp)
+            }
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(pageWidth),
                 pageSpacing = 12.dp,
-                modifier = Modifier.fillMaxWidth(),
+                beyondViewportPageCount = 1,
+                modifier = Modifier.fillMaxWidth().height(tileHeight),
             ) { page ->
-                when (page) {
+                val logicalPage = page % pageCount
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val pageOffset = abs(
+                                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction,
+                            ).coerceIn(0f, 1f)
+                            val focus = 1f - pageOffset
+                            scaleX = 0.97f + (0.03f * focus)
+                            scaleY = 0.97f + (0.03f * focus)
+                            alpha = 0.9f + (0.1f * focus)
+                        },
+                ) {
+                when (logicalPage) {
                     0 -> PrayerNowTile(
                         phase = day.skyPhase,
                         weather = day.skyWeather,
-                        headline = day.currentPrayer?.let { "Time for $it" }
+                        headline = day.nextPrayer?.let { "Your next prayer is $it" }
+                            ?: day.currentPrayer?.let { "Time for $it" }
                             ?: "Prayer Times",
                         subtitle = placeName,
-                        nextPrayer = day.nextPrayer.orEmpty(),
+                        nextPrayer = nextPrayerText,
                         countdown = day.countdown,
+                        sceneIndex = prayerSceneIndex,
+                        timelineProgress = day.prayerWindowProgress(),
+                        tileHeight = tileHeight,
+                        onClick = onOpenQibla,
+                        onLongClick = { prayerSceneIndex = (prayerSceneIndex + 1).mod(3) },
                     )
 
                     1 -> ArtworkTile(
@@ -163,9 +250,13 @@ fun InsightPager(
                         label = "Today's salah",
                         title = salah.headline,
                         subtitle = salah.detail,
+                        tileHeight = tileHeight,
                     ) {
                         SalahMarkers(
                             completed = salah.completed,
+                            available = day.slots
+                                .filter { it.hasStarted && it.name in FARD_PRAYERS }
+                                .mapTo(mutableSetOf()) { it.name },
                             onToggle = onTogglePrayer,
                         )
                     }
@@ -177,50 +268,104 @@ fun InsightPager(
                             foreground = Res.drawable.insight_quran_foreground_v2,
                             foregroundScale = 0.80f,
                             foregroundOffsetYFraction = 0.10f,
-                            label = "Reading",
+                            label = "Today's reading",
                             title = surah.nameEnglish,
                             subtitle = surah.subtitle(),
                             arabicTitle = surah.nameArabic,
+                            tileHeight = tileHeight,
+                            onClick = {
+                                quranPlayer.stop()
+                                isReadingAudio = false
+                                onOpenQuran(surah.number)
+                            },
+                            content = {
+                                Surface(
+                                    onClick = {
+                                        if (isReadingAudio) {
+                                            quranPlayer.pause()
+                                            isReadingAudio = false
+                                        } else {
+                                            isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
+                                        }
+                                    },
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.38f),
+                                    contentColor = Color.White,
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isReadingAudio) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            contentDescription = if (isReadingAudio) "Pause recitation" else "Play recitation",
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                        Text(
+                                            text = if (isReadingAudio) "Pause" else "Listen",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
 
-                    else -> ArtworkTile(
+                    3 -> ArtworkTile(
                         artwork = Res.drawable.insight_qibla_background,
                         foreground = Res.drawable.insight_qibla_foreground_v2,
                         foregroundScale = 0.75f,
                         foregroundOffsetYFraction = 0.10f,
                         label = "Qibla",
                         title = "$qiblaBearing° toward Makkah",
-                        subtitle = qiblaCardinalDirection(qiblaBearing),
+                        subtitle = cardinalDirection(qiblaBearing.toDouble()),
+                        tileHeight = tileHeight,
+                        onClick = onOpenQibla,
                     )
+
+                    else -> {
+                        val recommendation = dailyRecommendation(today)
+                        ArtworkTile(
+                            artwork = Res.drawable.insight_suggestion,
+                            label = "AI suggested · ${recommendation.category}",
+                            title = recommendation.title,
+                            subtitle = recommendation.summary,
+                            tileHeight = tileHeight,
+                            onClick = onOpenRecommendation,
+                        )
+                    }
+                }
                 }
             }
         }
     }
 }
 
-/** Great-circle initial bearing from the user to the Kaaba, clockwise from north. */
-private fun calculateQiblaBearing(latitude: Double, longitude: Double): Double {
-    val userLatitude = degreesToRadians(latitude)
-    val kaabaLatitude = degreesToRadians(21.4225)
-    val longitudeDelta = degreesToRadians(39.8262 - longitude)
-    val y = sin(longitudeDelta) * cos(kaabaLatitude)
-    val x = cos(userLatitude) * sin(kaabaLatitude) -
-        sin(userLatitude) * cos(kaabaLatitude) * cos(longitudeDelta)
-    return ((atan2(y, x) * 180.0 / kotlin.math.PI) + 360.0) % 360.0
+private fun formatPrayerTime(hour: Int, minute: Int): String {
+    val hour12 = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return "$hour12:${minute.toString().padStart(2, '0')} ${if (hour < 12) "AM" else "PM"}"
 }
 
-private fun degreesToRadians(value: Double): Double = value * kotlin.math.PI / 180.0
-
-private fun qiblaCardinalDirection(bearing: Int): String = when (bearing.mod(360)) {
-    in 23..67 -> "North-east"
-    in 68..112 -> "East"
-    in 113..157 -> "South-east"
-    in 158..202 -> "South"
-    in 203..247 -> "South-west"
-    in 248..292 -> "West"
-    in 293..337 -> "North-west"
-    else -> "North"
+private fun SharedPrayerDay.prayerWindowProgress(): Float? {
+    val current = currentPrayer?.let { name -> slots.firstOrNull { it.name == name } }
+        ?: return null
+    val next = nextPrayer?.let { name -> slots.firstOrNull { it.name == name } }
+        ?: return null
+    val startMinute = current.hour * 60 + current.minute
+    var endMinute = next.hour * 60 + next.minute
+    if (endMinute <= startMinute) endMinute += 24 * 60
+    var currentMinute = nowMinute
+    if (currentMinute < startMinute) currentMinute += 24 * 60
+    return ((currentMinute - startMinute).toFloat() / (endMinute - startMinute))
+        .coerceIn(0f, 1f)
 }
 
 /** A tile that is artwork with a label chip and a caption over it. */
@@ -233,15 +378,18 @@ private fun ArtworkTile(
     label: String,
     title: String,
     subtitle: String,
+    tileHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     arabicTitle: String? = null,
+    onClick: (() -> Unit)? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(26.dp)),
+            .height(tileHeight)
+            .clip(RoundedCornerShape(26.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         Image(
             painter = painterResource(artwork),
@@ -329,6 +477,7 @@ private fun ArtworkTile(
 @Composable
 private fun SalahMarkers(
     completed: Set<String>,
+    available: Set<String>,
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -338,20 +487,31 @@ private fun SalahMarkers(
     ) {
         FARD_PRAYERS.forEach { prayer ->
             val isDone = prayer in completed
+            val isAvailable = prayer in available
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isDone) Color.White else Color.White.copy(alpha = 0.15f),
+                            when {
+                                isDone -> Color.White
+                                isAvailable -> Color.White.copy(alpha = 0.15f)
+                                else -> Color.White.copy(alpha = 0.07f)
+                            },
                         )
                         .border(
                             width = 1.5.dp,
-                            color = Color.White.copy(alpha = if (isDone) 1f else 0.6f),
+                            color = Color.White.copy(
+                                alpha = when {
+                                    isDone -> 1f
+                                    isAvailable -> 0.6f
+                                    else -> 0.28f
+                                },
+                            ),
                             shape = CircleShape,
                         )
-                        .clickable { onToggle(prayer) },
+                        .clickable(enabled = isAvailable) { onToggle(prayer) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -360,7 +520,11 @@ private fun SalahMarkers(
                         fontWeight = FontWeight.Bold,
                         // Dark on the filled state, light on the empty one, so
                         // the letter stays legible either way.
-                        color = if (isDone) Color(0xFF1B3A2A) else Color.White,
+                        color = if (isDone) {
+                            Color(0xFF1B3A2A)
+                        } else {
+                            Color.White.copy(alpha = if (isAvailable) 1f else 0.42f)
+                        },
                     )
                 }
             }

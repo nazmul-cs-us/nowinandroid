@@ -23,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -61,17 +63,15 @@ data class BottomBarItem(
 /**
  * The destinations the shared app shows.
  *
- * Mirrors the Android bar's order. The four beyond Home are marked disabled
- * rather than omitted: their feature modules are not ported, and showing them
- * greyed says "not yet" honestly, where hiding them would misrepresent the app
- * and enabling them would lead to blank screens.
+ * Mirrors the Android bar's order. Each destination has a lean shared
+ * implementation backed by the platform key-value store.
  */
 val SharedBottomBarItems = listOf(
     BottomBarItem("Home", NiaIcons.Home, NiaIcons.HomeBorder),
-    BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder, enabled = false),
-    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder, enabled = false),
-    BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder, enabled = false),
-    BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3, enabled = false),
+    BottomBarItem("For you", NiaIcons.Upcoming, NiaIcons.UpcomingBorder),
+    BottomBarItem("Saved", NiaIcons.Bookmarks, NiaIcons.BookmarksBorder),
+    BottomBarItem("Course", NiaIcons.Course, NiaIcons.CourseBorder),
+    BottomBarItem("Interests", NiaIcons.Grid3x3, NiaIcons.Grid3x3),
 )
 
 /**
@@ -92,10 +92,16 @@ fun FloatingBottomBar(
 ) {
     var barWidth by remember { mutableStateOf(0) }
     val density = LocalDensity.current
-    val itemWidth = with(density) { (barWidth / items.size.coerceAtLeast(1)).toDp() }
+    val horizontalInset = 12.dp
+    val itemWidth = with(density) {
+        ((barWidth / density.density).dp - horizontalInset * 2) /
+            items.size.coerceAtLeast(1)
+    }
+    val isDarkTheme = MaterialTheme.colorScheme.background
+        .let { it.red * 0.299f + it.green * 0.587f + it.blue * 0.114f < 0.5f }
 
     val indicatorOffset by animateDpAsState(
-        targetValue = itemWidth * selectedIndex,
+        targetValue = 4.dp + itemWidth * selectedIndex,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -109,29 +115,34 @@ fun FloatingBottomBar(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .widthIn(max = 560.dp),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = if (isDarkTheme) {
+            MaterialTheme.colorScheme.surfaceContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .height(56.dp)
                 .onSizeChanged { barWidth = it.width },
         ) {
             if (barWidth > 0) {
                 Box(
                     modifier = Modifier
                         .offset(x = indicatorOffset)
-                        .padding(6.dp)
-                        .size(width = itemWidth - 12.dp, height = 40.dp)
+                        .size(width = itemWidth + 16.dp, height = 48.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                        .background(
+                            if (isDarkTheme) MaterialTheme.colorScheme.surfaceBright else Color.White,
+                        ),
                 )
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = horizontalInset),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -140,9 +151,7 @@ fun FloatingBottomBar(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
-                            // Disabled items stay visible but take no taps, so a
-                            // press does not silently do nothing.
+                            .height(56.dp)
                             .clickable(enabled = item.enabled) { onSelect(index) },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -158,6 +167,61 @@ fun FloatingBottomBar(
                             modifier = Modifier.size(24.dp),
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Floating navigation rail used by the Android and iOS landscape dashboards. */
+@Composable
+fun FloatingSideBar(
+    items: List<BottomBarItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .safeDrawingPadding()
+            .padding(horizontal = 8.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            items.forEachIndexed { index, item ->
+                val selected = index == selectedIndex
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            } else {
+                                androidx.compose.ui.graphics.Color.Transparent
+                            },
+                        )
+                        .clickable(enabled = item.enabled) { onSelect(index) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.label,
+                        tint = when {
+                            !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                                .copy(alpha = 0.35f)
+                            selected -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(23.dp),
+                    )
                 }
             }
         }

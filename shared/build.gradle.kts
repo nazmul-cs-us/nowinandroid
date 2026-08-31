@@ -28,6 +28,9 @@ kotlin {
     // The framework iosApp/ links against. Everything the iOS host needs should
     // be reachable through here, which is why dependencies below are `api`.
     targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+        compilations.getByName("main").cinterops.create("sqlite3") {
+            definitionFile.set(project.file("src/nativeInterop/cinterop/sqlite3.def"))
+        }
         binaries.framework {
             baseName = "Shared"
             isStatic = true

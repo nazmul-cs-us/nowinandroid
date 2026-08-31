@@ -40,9 +40,6 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         encodeDefaults = true
     }
 
-    /** True once the user has saved anything, so defaults can stop being applied. */
-    fun hasSaved(): Boolean = !store.getString(KEY_SETTINGS).isNullOrBlank()
-
     /**
      * The stored settings, or the country's defaults where nothing is stored.
      *
@@ -50,8 +47,8 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
      * someone who has never opened settings still get their local method, and
      * keeps working when they travel.
      */
-    fun settings(country: CountryPrayerDefaults?): PrayerSettings {
-        val stored = store.getString(KEY_SETTINGS)
+    fun settings(countryCode: String, country: CountryPrayerDefaults?): PrayerSettings {
+        val stored = storedSettings(countryCode)
         if (stored.isNullOrBlank()) return defaultsFrom(country)
 
         // A value that will not parse means a format change or hand-editing.
@@ -61,8 +58,8 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
             .getOrElse { defaultsFrom(country) }
     }
 
-    fun save(settings: PrayerSettings) {
-        store.putString(KEY_SETTINGS, json.encodeToString(settings))
+    fun save(countryCode: String, settings: PrayerSettings) {
+        store.putString(settingsKey(countryCode), json.encodeToString(settings))
     }
 
     /**
@@ -83,14 +80,23 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         store.putString(KEY_NOTIFICATIONS, json.encodeToString(preferences))
     }
 
-    /** Clears the user's choices so the country's defaults apply again. */
-    fun restoreDefaults() {
-        store.putString(KEY_SETTINGS, "")
+    /** Clears only this country's choices so its defaults apply again. */
+    fun restoreDefaults(countryCode: String) {
+        store.putString(settingsKey(countryCode), "")
     }
 
+    fun isChanged(countryCode: String, country: CountryPrayerDefaults?): Boolean =
+        settings(countryCode, country).toCalculationSettings() !=
+            defaultsFrom(country).toCalculationSettings()
+
     /** Adjusts one prayer by [delta] minutes, clamped to the dial's range. */
-    fun adjust(country: CountryPrayerDefaults?, prayer: String, delta: Int): PrayerSettings {
-        val current = settings(country)
+    fun adjust(
+        countryCode: String,
+        country: CountryPrayerDefaults?,
+        prayer: String,
+        delta: Int,
+    ): PrayerSettings {
+        val current = settings(countryCode, country)
         val updated = current.copy(
             timeOffsets = current.timeOffsets.withOffset(
                 prayer = prayer,
@@ -98,9 +104,24 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
                     .coerceIn(-MAX_OFFSET, MAX_OFFSET),
             ),
         )
-        save(updated)
+        save(countryCode, updated)
         return updated
     }
+
+    /** Moves the former global value into the first country opened after upgrade. */
+    private fun storedSettings(countryCode: String): String? {
+        val key = settingsKey(countryCode)
+        store.getString(key)?.takeIf { it.isNotBlank() }?.let { return it }
+
+        val legacy = store.getString(KEY_LEGACY_SETTINGS)?.takeIf { it.isNotBlank() }
+            ?: return null
+        store.putString(key, legacy)
+        store.putString(KEY_LEGACY_SETTINGS, "")
+        return legacy
+    }
+
+    private fun settingsKey(countryCode: String): String =
+        "$KEY_SETTINGS_PREFIX${countryCode.trim().uppercase().ifEmpty { UNKNOWN_COUNTRY }}"
 
     private fun defaultsFrom(country: CountryPrayerDefaults?) = PrayerSettings(
         calculationMethod = country?.method ?: PrayerSettings().calculationMethod,
@@ -112,7 +133,9 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
     )
 
     private companion object {
-        const val KEY_SETTINGS = "cached_prayer_settings"
+        const val KEY_LEGACY_SETTINGS = "cached_prayer_settings"
+        const val KEY_SETTINGS_PREFIX = "cached_prayer_settings_country_"
+        const val UNKNOWN_COUNTRY = "UNKNOWN"
         const val KEY_NOTIFICATIONS = "prayer_notification_preferences"
 
         /**

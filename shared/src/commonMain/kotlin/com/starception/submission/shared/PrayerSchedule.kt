@@ -23,6 +23,7 @@ import com.starception.submission.core.images.prayerSkyWeather
 import com.starception.submission.core.images.weatherConditionLabel
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
 import com.starception.submission.prayer.model.CountryPrayerDefaults
+import com.starception.submission.prayer.model.HighLatitudeAdjustment
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
 import com.starception.submission.prayer.model.PrayerSettings
@@ -47,6 +48,8 @@ data class SharedPrayerSlot(
     val localName: String = "",
     val hour: Int,
     val minute: Int,
+    /** Whether this event has started today, used to order the dashboard by relevance. */
+    val hasStarted: Boolean = false,
     val isCurrent: Boolean = false,
     val isNext: Boolean = false,
 ) {
@@ -72,7 +75,22 @@ data class SharedPrayerDay(
     val temperatureCelsius: Double? = null,
     /** A short description of the sky, e.g. "Clear sky". */
     val conditionLabel: String = "",
+    /** Current local minute of the day, used to render the active-prayer timeline. */
+    val nowMinute: Int = 0,
 )
+
+/**
+ * Displays the latest event first, then wraps through the rest of the day.
+ *
+ * This mirrors the Android home page: after sunset, for example, Maghrib is the
+ * first card rather than being hidden behind a permanently Fajr-first list.
+ */
+fun SharedPrayerDay.dashboardSlots(): List<SharedPrayerSlot> {
+    if (slots.isEmpty()) return emptyList()
+    val firstIndex = slots.indexOfLast { it.hasStarted }
+    if (firstIndex < 0) return slots
+    return List(slots.size) { offset -> slots[(firstIndex + offset) % slots.size] }
+}
 
 /**
  * Facade over the shared prayer engine for UI hosts.
@@ -87,6 +105,8 @@ data class SharedPrayerDay(
  * `PrayerSettings`, which still lives in `app` on java.time. It grows into the
  * real shared entry point as the prayer slice moves over.
  */
+private const val NEAREST_LATITUDE = 48.5
+
 object PrayerSchedule {
 
     /**
@@ -98,8 +118,8 @@ object PrayerSchedule {
      * for plenty of places — passing the real country is what makes the times
      * correct rather than merely plausible.
      *
-     * Any prayer the calculator cannot resolve — which happens at high latitudes
-     * where the sun never reaches the required angle — is omitted rather than
+     * A configured high-latitude rule supplies Fajr or Isha only when its normal
+     * calculation fails. Any prayer still unresolved is omitted rather than
      * reported as a wrong time. Sunrise is excluded from the current/next
      * reckoning: it is an astronomical event shown for reference, not a prayer.
      */
@@ -134,26 +154,64 @@ object PrayerSchedule {
         val fajrAngle = settings.customFajrAngle ?: method.fajrAngle
         val shadowFactor = settings.asrMadhhab.shadowFactor
 
+        val sunrise = calculator.calculateSunrise(location, julianDay)
+        val sunset = calculator.calculateSunset(location, julianDay)
+        val ishaAngle = settings.getEffectiveIshaAngle()
+        val rawFajr = calculator.calculateFajr(location, julianDay, fajrAngle)
+        val rawIsha = calculator.calculateIsha(
+            location,
+            julianDay,
+            ishaAngle,
+            settings.customIshaDelay ?: method.ishaDelay,
+            settings.customMaghribOffset ?: method.maghribOffset,
+        )
+
+        fun adjustedTwilight(isFajr: Boolean, angle: Double): Double {
+            if (settings.highLatitudeAdjustment == HighLatitudeAdjustment.NONE) return Double.NaN
+
+            if (settings.highLatitudeAdjustment == HighLatitudeAdjustment.NEAREST_LATITUDE) {
+                val nearest = location.copy(
+                    latitude = location.latitude.coerceIn(-NEAREST_LATITUDE, NEAREST_LATITUDE),
+                )
+                return if (isFajr) {
+                    calculator.calculateFajr(nearest, julianDay, angle)
+                } else {
+                    calculator.calculateIsha(
+                        nearest,
+                        julianDay,
+                        ishaAngle,
+                        settings.customIshaDelay ?: method.ishaDelay,
+                        settings.customMaghribOffset ?: method.maghribOffset,
+                    )
+                }
+            }
+
+            // Divide the night from today's sunset to tomorrow's sunrise. These
+            // methods cannot produce a time when either boundary is unavailable.
+            if (sunrise.isNaN() || sunset.isNaN()) return Double.NaN
+            val nightHours = ((sunrise - sunset) % 24.0 + 24.0) % 24.0
+            val portion = when (settings.highLatitudeAdjustment) {
+                HighLatitudeAdjustment.MIDDLE_OF_NIGHT -> 0.5
+                HighLatitudeAdjustment.ONE_SEVENTH_OF_NIGHT -> 1.0 / 7.0
+                HighLatitudeAdjustment.ANGLE_BASED -> (angle / 60.0).coerceIn(0.0, 1.0)
+                else -> return Double.NaN
+            }
+            val adjustment = nightHours * portion
+            return if (isFajr) sunrise - adjustment else sunset + adjustment
+        }
+
+        val fajr = rawFajr.takeUnless { it.isNaN() }
+            ?: adjustedTwilight(isFajr = true, angle = fajrAngle)
+        val isha = rawIsha.takeUnless { it.isNaN() }
+            ?: adjustedTwilight(isFajr = false, angle = ishaAngle ?: 0.0)
+
         val computed = listOf(
-            "Fajr" to calculator.calculateFajr(location, julianDay, fajrAngle),
-            "Sunrise" to calculator.calculateSunrise(location, julianDay),
+            "Fajr" to fajr,
+            "Sunrise" to sunrise,
             "Dhuhr" to calculator.calculateSolarNoon(location, julianDay),
             "Asr" to calculator.calculateAsr(location, julianDay, shadowFactor),
-            "Maghrib" to calculator.calculateSunset(location, julianDay),
-            // Isha is an angle for most methods and a delay after Maghrib for
-            // others, notably Umm al-Qura's 90 minutes. Passing an angle of 0.0
-            // for those would put Isha at sunset.
-            // getEffectiveIshaAngle treats 0.0 as "no angle", which is how the
-            // model marks methods that define Isha as a delay after Maghrib —
-            // Umm al-Qura's 90 minutes. Passing 0.0 through would put Isha at
-            // sunset.
-            "Isha" to calculator.calculateIsha(
-                location,
-                julianDay,
-                settings.getEffectiveIshaAngle(),
-                settings.customIshaDelay ?: method.ishaDelay,
-                settings.customMaghribOffset ?: method.maghribOffset,
-            ),
+            "Maghrib" to sunset,
+            "Isha" to isha,
         ).mapNotNull { (name, decimalHour) ->
             calculator.decimalHourToLocalTime(decimalHour)?.let { instant ->
                 // The country's published adjustment and the user's own both
@@ -191,6 +249,7 @@ object PrayerSchedule {
                 ),
                 hour = instant.time.hour,
                 minute = instant.time.minute,
+                hasStarted = instant.time <= now,
                 isCurrent = status?.isCurrent == true,
                 isNext = status?.isNext == true,
             )
@@ -218,6 +277,7 @@ object PrayerSchedule {
             skyWeather = prayerSkyWeather(weatherCode),
             temperatureCelsius = temperatureCelsius,
             conditionLabel = weatherConditionLabel(weatherCode),
+            nowMinute = now.hour * 60 + now.minute,
         )
     }
 }

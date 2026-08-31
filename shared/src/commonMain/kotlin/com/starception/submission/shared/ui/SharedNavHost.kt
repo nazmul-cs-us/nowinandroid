@@ -17,11 +17,15 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import com.starception.submission.shared.content.SharedContentStore
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 /**
@@ -31,16 +35,36 @@ import kotlinx.serialization.Serializable
  * declares its own — so a screen moving between them does not have its
  * navigation rewritten on the way.
  *
- * Only what iOS can actually show today. The Android app has five top-level
- * destinations, but four of them (For You, Bookmarks, Course, Interests) are
- * feature modules that have not been ported: a tab bar with four empty tabs
- * would be worse than no tab bar.
+ * The iOS host uses lean shared implementations where Android-only Room data is
+ * unavailable. Every visible top-level destination is therefore functional.
  */
 @Serializable
 object PrayerTimesRoute
 
 @Serializable
 object PrayerSettingsRoute
+
+@Serializable object ForYouRoute
+@Serializable object SavedRoute
+@Serializable object CourseRoute
+@Serializable object InterestsRoute
+@Serializable object SearchRoute
+@Serializable object ProfileRoute
+@Serializable object QuranLibraryRoute
+@Serializable data class QuranDetailRoute(val number: Int)
+@Serializable data class BukhariBookRoute(val id: Int)
+@Serializable object QiblaRoute
+@Serializable object RecommendationRoute
+
+data class SharedHomeActions(
+    val onOpenSettings: () -> Unit,
+    val onOpenProfile: () -> Unit,
+    val onOpenSearch: () -> Unit,
+    val onOpenQuran: (Int) -> Unit,
+    val onOpenQibla: () -> Unit,
+    val onOpenRecommendation: () -> Unit,
+    val onSelectBottom: (Int) -> Unit,
+)
 
 /**
  * Hosts the shared screens.
@@ -54,22 +78,131 @@ object PrayerSettingsRoute
 fun SharedNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    home: @Composable (onOpenSettings: () -> Unit) -> Unit,
+    latitude: Double,
+    longitude: Double,
+    today: LocalDate,
+    home: @Composable (SharedHomeActions) -> Unit,
     settings: @Composable (onBack: () -> Unit) -> Unit,
 ) {
+    val contentStore = remember { SharedContentStore() }
+    val selectBottom: (Int) -> Unit = { index ->
+        when (index) {
+            0 -> navController.navigate(PrayerTimesRoute) {
+                popUpTo(PrayerTimesRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            1 -> navController.navigate(ForYouRoute) {
+                popUpTo(PrayerTimesRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            2 -> navController.navigate(SavedRoute) {
+                popUpTo(PrayerTimesRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            3 -> navController.navigate(CourseRoute) {
+                popUpTo(PrayerTimesRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+            4 -> navController.navigate(InterestsRoute) {
+                popUpTo(PrayerTimesRoute) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
     NavHost(
         navController = navController,
         startDestination = PrayerTimesRoute,
         modifier = modifier,
     ) {
         composable<PrayerTimesRoute> {
-            home { navController.navigate(PrayerSettingsRoute) }
+            home(
+                SharedHomeActions(
+                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                    onOpenSearch = { navController.navigate(SearchRoute) },
+                    onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenQibla = { navController.navigate(QiblaRoute) },
+                    onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                    onSelectBottom = selectBottom,
+                ),
+            )
         }
         composable<PrayerSettingsRoute> {
             // popBackStack rather than navigate(home): navigating would push a
             // second copy of the home screen and leave settings on the stack,
             // so the system back gesture would return to it.
             settings { navController.popBackStack() }
+        }
+        composable<ForYouRoute> {
+            ForYouScreen(
+                date = today,
+                store = contentStore,
+                onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onSelectBottom = selectBottom,
+            )
+        }
+        composable<SavedRoute> {
+            SavedScreen(
+                store = contentStore,
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                onSelectBottom = selectBottom,
+            )
+        }
+        composable<CourseRoute> {
+            CourseScreen(contentStore, selectBottom)
+        }
+        composable<InterestsRoute> {
+            InterestsScreen(contentStore, selectBottom)
+        }
+        composable<SearchRoute> {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenQuranLibrary = { navController.navigate(QuranLibraryRoute) },
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+            )
+        }
+        composable<ProfileRoute> {
+            ProfileScreen(contentStore) { navController.popBackStack() }
+        }
+        composable<QuranLibraryRoute> {
+            QuranLibraryScreen(
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+            )
+        }
+        composable<QuranDetailRoute> { entry ->
+            QuranDetailScreen(
+                number = entry.toRoute<QuranDetailRoute>().number,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<BukhariBookRoute> { entry ->
+            BukhariBookDetailScreen(
+                id = entry.toRoute<BukhariBookRoute>().id,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<QiblaRoute> {
+            QiblaScreen(latitude, longitude) { navController.popBackStack() }
+        }
+        composable<RecommendationRoute> {
+            RecommendationScreen(
+                date = today,
+                onBack = { navController.popBackStack() },
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+            )
         }
     }
 }

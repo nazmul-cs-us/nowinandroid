@@ -43,13 +43,11 @@ import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.settings.ThemeSettingsState
-import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
-import com.starception.submission.settings.components.TravelDuaSection
 
 /**
  * The prayer settings screen.
@@ -66,16 +64,16 @@ import com.starception.submission.settings.components.TravelDuaSection
 fun PrayerSettingsScreen(
     settings: PrayerSettings,
     countryName: String?,
+    showRestoreOption: Boolean,
     onSettingsChange: (PrayerSettings) -> Unit,
     onRestore: () -> Unit,
     onBack: () -> Unit,
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
-    travelDua: TravelDuaSettings = TravelDuaSettings(),
-    onTravelDuaChange: (TravelDuaSettings) -> Unit = {},
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
+    appVersion: String = "Unknown",
 ) {
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
@@ -98,7 +96,7 @@ fun PrayerSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Prayer times",
+                    text = "Settings",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -123,10 +121,7 @@ fun PrayerSettingsScreen(
             ) {
                 PrayerTimesSection(
                     prayerSettings = settings,
-                    // Offered whenever a country is known, so a user who has
-                    // changed something can always get back to their local
-                    // defaults.
-                    showRestoreOption = countryName != null,
+                    showRestoreOption = showRestoreOption,
                     autoDetectedCountryName = countryName,
                     onSettingsChange = onSettingsChange,
                     onRestoreClick = onRestore,
@@ -148,6 +143,7 @@ fun PrayerSettingsScreen(
                     // iOS has no Do Not Disturb permission to grant: Focus is the
                     // user's to set, so there is nothing to prompt for.
                     hasDndAccess = true,
+                    showSilentDuringPrayer = false,
                 )
             }
 
@@ -168,41 +164,25 @@ fun PrayerSettingsScreen(
                     // Material You does not exist here, and the colour wheel is
                     // drawn with Android graphics, so neither is offered.
                     supportDynamicColor = false,
+                    showCustomTheme = false,
                     colorPickerDialog = null,
                 )
             }
 
             SettingsSection(
-                title = "Travel Dua",
-                subtitle = "Auto-play dua when driving",
-                icon = NiaIcons.Course,
-                isExpanded = expanded == SECTION_TRAVEL,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_TRAVEL) null else SECTION_TRAVEL
-                },
-            ) {
-                TravelDuaSection(
-                    settings = travelDua,
-                    onSettingsChanged = onTravelDuaChange,
-                    // Nothing plays on iOS yet — the audio chain is an Android
-                    // foreground service — so the controls show the settings
-                    // without pretending they will start something.
-                    isPlaying = false,
-                )
-            }
-
-            SettingsSection(
                 title = "About",
-                subtitle = "Version & licences",
+                subtitle = "Version & attributions",
                 icon = NiaIcons.Person,
                 isExpanded = expanded == SECTION_ABOUT,
                 onToggleExpanded = {
                     expanded = if (expanded == SECTION_ABOUT) null else SECTION_ABOUT
                 },
             ) {
-                // No licences screen on iOS yet, so the row is present but inert
-                // rather than absent — the information it carries is still true.
-                AboutSection()
+                AboutSection(
+                    versionName = "$appVersion (iOS)",
+                    showLicenses = false,
+                    showProjectLinks = false,
+                )
             }
         }
     }
@@ -212,4 +192,3 @@ private const val SECTION_PRAYER = "prayer"
 private const val SECTION_NOTIFICATIONS = "notifications"
 private const val SECTION_APPEARANCE = "appearance"
 private const val SECTION_ABOUT = "about"
-private const val SECTION_TRAVEL = "travel"
