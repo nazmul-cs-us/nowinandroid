@@ -93,6 +93,11 @@ class SherpaOnnxTtsService @Inject constructor(
     @Volatile
     private var stopRequested = false
 
+    // MediaSession pause must suspend the current clip without completing the
+    // caller's playlist coroutine. `stopRequested` remains reserved for a real stop/skip.
+    @Volatile
+    private var playbackPaused = false
+
     // True while a speak request is in flight (generating or playing) — lets
     // callers (e.g. HadithDetailScreen's dispose) know audio will keep going.
     @Volatile
@@ -346,6 +351,7 @@ class SherpaOnnxTtsService @Inject constructor(
         val speechText = EnglishTtsTextNormalizer.normalize(text)
         _isPreparingAudio.value = true
         stopRequested = false
+        playbackPaused = false
         if (!isInitialized) {
             val initialized = initialize()
             if (!initialized) {
@@ -572,12 +578,21 @@ class SherpaOnnxTtsService @Inject constructor(
             audioTrack?.write(pcmData, 0, pcmData.size)
             audioTrack?.play()
 
-            // Wait in short intervals so notification/UI stop requests interrupt a
-            // long cached hadith promptly instead of sleeping for the entire clip.
-            val durationMs = (samples.size * 1000L) / sampleRate
-            val deadline = android.os.SystemClock.elapsedRealtime() + durationMs + 100
-            while (!stopRequested && android.os.SystemClock.elapsedRealtime() < deadline) {
+            if (playbackPaused) {
+                audioTrack?.pause()
+            }
+
+            // Wait in short intervals so stop/skip interrupts promptly. Paused time does
+            // not consume the clip duration; resuming continues the same AudioTrack.
+            var remainingMs = (samples.size * 1000L) / sampleRate + 100L
+            var lastTick = android.os.SystemClock.elapsedRealtime()
+            while (!stopRequested && remainingMs > 0L) {
                 Thread.sleep(100)
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (!playbackPaused) {
+                    remainingMs -= now - lastTick
+                }
+                lastTick = now
             }
 
             stopAudioTrack()
@@ -598,9 +613,36 @@ class SherpaOnnxTtsService @Inject constructor(
     fun stopSpeaking() {
         _isPreparingAudio.value = false
         stopRequested = true
+        playbackPaused = false
         isSpeakingNow = false
         stopAudioTrack()
     }
+
+    /** Pause the active clip without completing/cancelling its playlist request. */
+    fun pauseSpeaking() {
+        if (!isSpeakingNow || playbackPaused) return
+        playbackPaused = true
+        try {
+            audioTrack?.pause()
+            Log.d(TAG, "TTS playback paused")
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to pause TTS playback", e)
+        }
+    }
+
+    /** Resume a clip previously suspended by [pauseSpeaking]. */
+    fun resumeSpeaking() {
+        if (!isSpeakingNow || !playbackPaused || stopRequested) return
+        playbackPaused = false
+        try {
+            audioTrack?.play()
+            Log.d(TAG, "TTS playback resumed")
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to resume TTS playback", e)
+        }
+    }
+
+    fun isPaused(): Boolean = playbackPaused
 
     /**
      * Request cancellation of any ongoing background pre-generation.
@@ -926,6 +968,7 @@ class SherpaOnnxTtsService @Inject constructor(
         retainCache: Boolean = false,
     ): Boolean {
         stopRequested = false
+        playbackPaused = false
         val speechText = EnglishTtsTextNormalizer.normalize(text)
         val textHash = speechText.hashCode()
         // Show "Preparing audio" while the cache is checked/loaded; cleared when

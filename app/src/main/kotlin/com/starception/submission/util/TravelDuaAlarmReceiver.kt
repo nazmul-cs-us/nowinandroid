@@ -79,8 +79,6 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             nowElapsedMillis = nowElapsed,
             lastDrivingSpeedElapsedMillis = lastReliableSpeedElapsed,
             lastZeroSpeedElapsedMillis = lastReliableZeroSpeedElapsed,
-            googleDrivingConfirmed = googleDrivingConfirmed,
-            googleConfirmationElapsedMillis = googleConfirmationElapsed,
         )
         if (!playbackAllowed) {
             val evidenceAge = (nowElapsed - lastReliableSpeedElapsed)
@@ -130,14 +128,8 @@ class TravelDuaAlarmReceiver : BroadcastReceiver() {
             ContextCompat.startForegroundService(context, playbackIntent)
             FileLogger.i(
                 TAG,
-                if (hasRecentSpeed &&
-                    lastReliableSpeedElapsed > lastReliableZeroSpeedElapsed
-                ) {
-                    "Travel Dua alarm accepted with recent speed " +
-                        "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h"
-                } else {
-                    "Travel Dua alarm accepted with active Google IN_VEHICLE confirmation"
-                },
+                "Travel Dua alarm accepted with recent speed " +
+                    "${"%.1f".format(lastReliableSpeedMps * 3.6f)} km/h",
             )
         } catch (e: Exception) {
             // Do not write a cooldown here: a failed start must remain eligible for retry.

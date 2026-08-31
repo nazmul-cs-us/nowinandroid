@@ -31,6 +31,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fontFamily="@font/ubuntu_sans_bold"
+    android:textStyle="bold"
     android:includeFontPadding="false"
     android:fallbackLineSpacing="false"
     android:ellipsize="end" />

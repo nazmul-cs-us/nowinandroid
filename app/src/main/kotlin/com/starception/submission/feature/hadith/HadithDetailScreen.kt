@@ -357,6 +357,8 @@ fun HadithDetailScreen(
         mutableStateOf(initialAutoPlay && initialAutoAdvance)
     }
     var isBookPlaylistPlayback by remember { mutableStateOf(false) }
+    var isBookPlaylistPaused by remember { mutableStateOf(false) }
+    var bookPlaylistJumpTarget by remember { mutableStateOf<Int?>(null) }
 
     // On-demand audio download state
     var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -592,20 +594,28 @@ fun HadithDetailScreen(
     // doesn't get a dispose/remount cycle.
     val handleSkipNext: () -> Unit = {
         if (isBookPlaylistPlayback) {
-            bookPlaylistEnabled = false
-            isBookPlaylistPlayback = false
-            sherpaOnnxTts.stopSpeaking()
+            val rangeEnd = playbackRangeEnd
+            if (rangeEnd != null && hadithNumber < rangeEnd) {
+                bookPlaylistJumpTarget = hadithNumber + 1
+                isBookPlaylistPaused = false
+                sherpaOnnxTts.stopSpeaking()
+            }
+        } else if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) {
+            hadithNumber += 1
         }
-        if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) hadithNumber += 1
     }
     val handleSkipPrev: () -> Unit = {
         if (isBookPlaylistPlayback) {
-            bookPlaylistEnabled = false
-            isBookPlaylistPlayback = false
-            sherpaOnnxTts.stopSpeaking()
+            val firstAllowed = playbackRangeStart ?: 1
+            if (hadithNumber > firstAllowed) {
+                bookPlaylistJumpTarget = hadithNumber - 1
+                isBookPlaylistPaused = false
+                sherpaOnnxTts.stopSpeaking()
+            }
+        } else {
+            val firstAllowed = playbackRangeStart ?: 1
+            if (hadithNumber > firstAllowed) hadithNumber -= 1
         }
-        val firstAllowed = playbackRangeStart ?: 1
-        if (hadithNumber > firstAllowed) hadithNumber -= 1
     }
     val currentAutoAdvance by androidx.compose.runtime.rememberUpdatedState(autoAdvance)
     val handlePlaybackCompleted: () -> Unit = {
@@ -661,11 +671,9 @@ fun HadithDetailScreen(
         selectedVoice,
         selectedSpeakerId,
     ) {
-        val rangeStart = playbackRangeStart
-        val rangeEnd = playbackRangeEnd
-        if (!bookPlaylistEnabled || rangeStart == null || rangeEnd == null) {
-            return@LaunchedEffect
-        }
+        if (!bookPlaylistEnabled) return@LaunchedEffect
+        val rangeStart = playbackRangeStart ?: return@LaunchedEffect
+        val rangeEnd = playbackRangeEnd ?: return@LaunchedEffect
         // Every Bukhari item now begins with its numbered English Sherpa intro, including
         // Bengali recordings, so the selected voice model is required for Play All.
         if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
@@ -675,17 +683,28 @@ fun HadithDetailScreen(
         }
 
         isBookPlaylistPlayback = true
+        isBookPlaylistPaused = false
+        bookPlaylistJumpTarget = null
         shouldAutoPlayAfterLoad = false
         bukhariTranslationRepo.loadTranslations()
         sherpaOnnxTts.setVoice(selectedVoice)
 
         try {
-            for (number in rangeStart..rangeEnd) {
+            var playlistNumber = rangeStart
+            while (playlistNumber <= rangeEnd) {
                 if (!bookPlaylistEnabled) break
-                val nextHadith = repository.getHadith(databaseFile, number) ?: continue
+                val number = playlistNumber
+                val nextHadith = repository.getHadith(databaseFile, number)
+                if (nextHadith == null) {
+                    playlistNumber += 1
+                    continue
+                }
                 val englishText = bukhariTranslationRepo.getEnglishText(number)
                     ?: nextHadith.textPlain
-                    ?: continue
+                if (englishText == null) {
+                    playlistNumber += 1
+                    continue
+                }
                 val spokenText = if (selectedLanguage == "en") {
                     englishText
                 } else {
@@ -793,10 +812,19 @@ fun HadithDetailScreen(
                 } else {
                     playExactEnglishWithSherpa()
                 }
+                val requestedHadith = bookPlaylistJumpTarget
+                if (requestedHadith != null) {
+                    bookPlaylistJumpTarget = null
+                    playlistNumber = requestedHadith
+                    continue
+                }
                 if (!completed || !bookPlaylistEnabled) break
+                playlistNumber += 1
             }
         } finally {
             isBookPlaylistPlayback = false
+            isBookPlaylistPaused = false
+            bookPlaylistJumpTarget = null
             isTtsBackedPlayback = false
             isPlaying = false
             com.starception.submission.services.ChapterRecitationService.stop(context)
@@ -963,13 +991,10 @@ fun HadithDetailScreen(
                         }
                     val handlePlayClick: () -> Unit = {
                             if (isBookPlaylistPlayback) {
-                                bookPlaylistEnabled = false
-                                isBookPlaylistPlayback = false
-                                playbackGeneration += 1
-                                sherpaOnnxTts.stopSpeaking()
-                                com.starception.submission.services.ChapterRecitationService.stop(context)
-                                isTtsBackedPlayback = false
-                                isPlaying = false
+                                // MediaSession owns pause/resume so the same behavior is used
+                                // by the in-app button, lock screen, Bluetooth and Android Auto.
+                                com.starception.submission.services.ChapterRecitationService
+                                    .toggle(context)
                             } else if (isPlaying) {
                                 playbackGeneration += 1
                                 // Stop playback (local player, TTS, and the recitation service)
@@ -1197,11 +1222,45 @@ fun HadithDetailScreen(
                             android.util.Log.d("HadithMiniBar", "🎯 SKIP_PREV invoked | hadith=$hadithNumber → ${hadithNumber - 1}")
                             currentSkipPrev()
                         }
+                        val pauseCb: () -> Unit = {
+                            if (isBookPlaylistPlayback && !isBookPlaylistPaused) {
+                                isBookPlaylistPaused = true
+                                sherpaOnnxTts.pauseSpeaking()
+                                isPlaying = false
+                            } else if (!isBookPlaylistPlayback && isPlaying) {
+                                currentHandlePlayClick()
+                            }
+                        }
+                        val resumeCb: () -> Unit = {
+                            if (isBookPlaylistPlayback && isBookPlaylistPaused) {
+                                isBookPlaylistPaused = false
+                                sherpaOnnxTts.resumeSpeaking()
+                                isPlaying = true
+                            } else if (!isBookPlaylistPlayback && !isPlaying) {
+                                currentHandlePlayClick()
+                            }
+                        }
+                        val carNextCb: () -> Boolean = {
+                            val canSkip = isBookPlaylistPlayback &&
+                                playbackRangeEnd?.let { hadithNumber < it } == true
+                            if (canSkip) currentSkipNext()
+                            canSkip
+                        }
+                        val carPrevCb: () -> Boolean = {
+                            val canSkip = isBookPlaylistPlayback &&
+                                hadithNumber > (playbackRangeStart ?: 1)
+                            if (canSkip) currentSkipPrev()
+                            canSkip
+                        }
                         android.util.Log.d("HadithMiniBar", "📌 REGISTER | hadith=$hadithNumber | callbacks installed")
                         GlobalMediaViewModel.onHadithPlayPauseRequested = playCb
                         GlobalMediaViewModel.onHadithSkipNextRequested = nextCb
                         GlobalMediaViewModel.onHadithSkipPreviousRequested = prevCb
                         com.starception.submission.services.ChapterRecitationState.onExternalToggle = playCb
+                        com.starception.submission.services.ChapterRecitationState.onExternalPause = pauseCb
+                        com.starception.submission.services.ChapterRecitationState.onExternalPlay = resumeCb
+                        com.starception.submission.services.ChapterRecitationState.onSkipNext = carNextCb
+                        com.starception.submission.services.ChapterRecitationState.onSkipPrevious = carPrevCb
                         onDispose {
                             android.util.Log.d("HadithMiniBar", "🧹 UNREGISTER | hadith=$hadithNumber | clearing only own callbacks")
                             if (GlobalMediaViewModel.onHadithPlayPauseRequested === playCb) {
@@ -1219,6 +1278,34 @@ fun HadithDetailScreen(
                             ) {
                                 com.starception.submission.services.ChapterRecitationState
                                     .onExternalToggle = null
+                            }
+                            if (
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalPause === pauseCb
+                            ) {
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalPause = null
+                            }
+                            if (
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalPlay === resumeCb
+                            ) {
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onExternalPlay = null
+                            }
+                            if (
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onSkipNext === carNextCb
+                            ) {
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onSkipNext = null
+                            }
+                            if (
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onSkipPrevious === carPrevCb
+                            ) {
+                                com.starception.submission.services.ChapterRecitationState
+                                    .onSkipPrevious = null
                             }
                         }
                     }

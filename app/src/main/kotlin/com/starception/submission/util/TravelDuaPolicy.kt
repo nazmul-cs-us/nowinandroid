@@ -21,11 +21,6 @@ internal object TravelDuaPolicy {
     // evidence that a cached Activity Recognition result is wrong.
     const val ZERO_SPEED_EVIDENCE_MAX_AGE_MILLIS = 30_000L
 
-    // Activity Transition ENTER is delivered by Google Play services and remains active
-    // until its matching EXIT. Bound the fallback as protection against a missed EXIT.
-    // This covers the configurable driving delay (up to 3 minutes) plus alarm delivery lag.
-    const val GOOGLE_DRIVING_EVIDENCE_MAX_AGE_MILLIS = 5 * 60_000L
-
     fun isWithinTripGap(
         drivingStopTimeMillis: Long,
         nowMillis: Long,
@@ -46,25 +41,10 @@ internal object TravelDuaPolicy {
         return nowElapsedMillis - lastEvidenceElapsedMillis <= maxAgeMillis
     }
 
-    fun hasActiveGoogleDrivingEvidence(
-        nowElapsedMillis: Long,
-        googleDrivingConfirmed: Boolean,
-        confirmationElapsedMillis: Long,
-        maxAgeMillis: Long = GOOGLE_DRIVING_EVIDENCE_MAX_AGE_MILLIS,
-    ): Boolean {
-        return googleDrivingConfirmed && hasRecentDrivingEvidence(
-            nowElapsedMillis = nowElapsedMillis,
-            lastEvidenceElapsedMillis = confirmationElapsedMillis,
-            maxAgeMillis = maxAgeMillis,
-        )
-    }
-
     fun shouldAllowTravelDuaPlayback(
         nowElapsedMillis: Long,
         lastDrivingSpeedElapsedMillis: Long,
         lastZeroSpeedElapsedMillis: Long,
-        googleDrivingConfirmed: Boolean,
-        googleConfirmationElapsedMillis: Long,
     ): Boolean {
         val hasRecentDrivingSpeed = hasRecentDrivingEvidence(
             nowElapsedMillis = nowElapsedMillis,
@@ -79,16 +59,12 @@ internal object TravelDuaPolicy {
         // When GPS has supplied both kinds of evidence, the newest reliable
         // sample wins. This lets a journey resume after a stop while preventing
         // an old speed sample from overriding the phone currently sitting still.
-        if (hasRecentDrivingSpeed || hasRecentZeroSpeed) {
-            return hasRecentDrivingSpeed &&
-                (!hasRecentZeroSpeed ||
-                    lastDrivingSpeedElapsedMillis > lastZeroSpeedElapsedMillis)
-        }
-
-        return hasActiveGoogleDrivingEvidence(
-            nowElapsedMillis = nowElapsedMillis,
-            googleDrivingConfirmed = googleDrivingConfirmed,
-            confirmationElapsedMillis = googleConfirmationElapsedMillis,
-        )
+        // Google Activity Recognition can produce an IN_VEHICLE false positive while the
+        // phone is stationary (and can replay ENTER after our detector process restarts).
+        // It may start the confirmation window, but never let it start audible playback on
+        // its own. A fresh, reliable speed sample must be the final authorization.
+        return hasRecentDrivingSpeed &&
+            (!hasRecentZeroSpeed ||
+                lastDrivingSpeedElapsedMillis > lastZeroSpeedElapsedMillis)
     }
 }

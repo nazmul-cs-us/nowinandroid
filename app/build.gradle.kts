@@ -119,8 +119,6 @@ dependencies {
     // Sherpa-ONNX for offline TTS and speech recognition
     implementation(files("libs/sherpa-onnx-1.12.26.aar"))
 
-    // PageCurl — real book page curl animation (oleksandrbalan/pagecurl, MIT license)
-    implementation("io.github.oleksandrbalan:pagecurl:1.5.1")
 
     implementation(projects.core.common)
     implementation(projects.core.ui)

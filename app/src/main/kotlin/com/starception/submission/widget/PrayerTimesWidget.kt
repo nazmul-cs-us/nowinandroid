@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
@@ -73,11 +74,29 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import androidx.glance.color.ColorProvider as DayNightColorProvider
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 
 /** Matches the ported layouts' own widgetPadding so the two sit consistently. */
 private val WIDGET_PADDING = 16.dp
+
+/** A quiet inset surface that keeps the schedule distinct without introducing a new hue. */
+private val PrayerScheduleSurface = DayNightColorProvider(
+    Color(0xFFF8F9FF),
+    Color(0xFF323A4B),
+)
+
+private val PrayerScheduleDivider = DayNightColorProvider(
+    Color(0xFFD2D7E3),
+    Color(0xFF596274),
+)
+
+/** Prayer-specific accents mirror the reference artwork while remaining legible at night. */
+private val FajrAccent = DayNightColorProvider(Color(0xFFE9AD22), Color(0xFFFFD166))
+private val DhuhrAccent = DayNightColorProvider(Color(0xFFF1B72F), Color(0xFFFFD166))
+private val MaghribAccent = DayNightColorProvider(Color(0xFFD86F2F), Color(0xFFFFA66F))
+private val IshaAccent = DayNightColorProvider(Color(0xFF6042B8), Color(0xFFC6B8FF))
 
 // The title bar's height is set by the tallest thing in it — the 48dp refresh target —
 // plus 4dp of padding above and below. The hero below sizes its type against the height
@@ -1154,29 +1173,158 @@ private fun FullPrayerContent(
     state: PrayerWidgetState.Available,
     contentSize: DpSize,
 ) {
-    val scheduleRowHeight = ((contentSize.height.value - 153f) /
+    val scheduleRowHeight = ((contentSize.height.value - 215f) /
         state.prayers.size.coerceAtLeast(1))
-        .coerceAtLeast(25f)
+        // Samsung exposes taller row spans than Pixel for the same nominal widget size.
+        // Let the five rows share all remaining space instead of leaving a band below
+        // Isha; 30dp is the minimum at the smallest size that enters this layout.
+        .coerceAtLeast(30f)
         .dp
 
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         PrayerContextRow(state)
-        Spacer(modifier = GlanceModifier.height(14.dp))
-        Column(modifier = GlanceModifier.fillMaxWidth()) {
-            CompactHeroSummary(state = state, width = contentSize.width, textScale = 1.2f)
+        Spacer(modifier = GlanceModifier.height(10.dp))
+        FullPrayerHero(state = state, width = contentSize.width)
+        Spacer(modifier = GlanceModifier.height(10.dp))
+        PrayerSchedulePanel(
+            state = state,
+            rowHeight = scheduleRowHeight,
+        )
+        // Match the reference's outer rhythm: the inset panel ends one full content
+        // margin above the widget edge, rather than visually touching the rounded shell.
+        Spacer(modifier = GlanceModifier.height(10.dp))
+    }
+}
+
+/**
+ * The reference widget uses one strong illustration to anchor the live prayer window.
+ * Keep it theme-tinted and use the user-selected Flaticon mosque-and-crescent artwork.
+ */
+@Composable
+private fun FullPrayerHero(
+    state: PrayerWidgetState.Available,
+    width: Dp,
+) {
+    val context = LocalContext.current
+    val title = state.insight?.title ?: "Prayer now"
+    val elapsed = state.insight?.elapsed ?: state.nextPrayer.time
+    val titleSize = WidgetTypography
+        .fittingSize(context, title, (width.value - 76f).coerceAtLeast(1f), bold = true)
+        .coerceAtMost(19f)
+
+    Row(
+        modifier = GlanceModifier.fillMaxWidth().height(70.dp),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+    ) {
+        Box(
+            modifier = GlanceModifier
+                .size(64.dp)
+                .background(GlanceTheme.colors.primaryContainer)
+                .cornerRadius(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.flaticon_mosque_widget_4358830),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+                modifier = GlanceModifier.size(38.dp),
+            )
         }
-        Spacer(modifier = GlanceModifier.height(16.dp))
+        Spacer(modifier = GlanceModifier.width(12.dp))
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            WidgetText(
+                text = title,
+                size = titleSize.sp,
+                color = GlanceTheme.colors.onSurface,
+                weight = WidgetFontWeight.Medium,
+            )
+            WidgetText(
+                text = elapsed,
+                size = 17.sp,
+                color = GlanceTheme.colors.primary,
+                weight = WidgetFontWeight.Bold,
+            )
+            state.windowProgress?.let { progress ->
+                Spacer(modifier = GlanceModifier.height(5.dp))
+                ExpressiveProgressBar(
+                    progress = progress,
+                    width = width - 76.dp,
+                )
+            }
+        }
+    }
+}
+
+/** Inset schedule card with a clear next-prayer handoff and scannable weather rows. */
+@Composable
+private fun PrayerSchedulePanel(
+    state: PrayerWidgetState.Available,
+    rowHeight: Dp,
+) {
+    val countdown = state.countdown.removePrefix("in ").trim()
+    val nextLabel = if (countdown == "now") {
+        "${state.nextPrayer.name} now"
+    } else {
+        "${state.nextPrayer.name} in $countdown"
+    }
+
+    Column(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(PrayerScheduleSurface)
+            .cornerRadius(20.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .background(GlanceTheme.colors.primaryContainer)
+                .cornerRadius(12.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.Vertical.CenterVertically,
+        ) {
+            WidgetText(
+                text = "Next Prayer",
+                size = 16.sp,
+                color = GlanceTheme.colors.onPrimaryContainer,
+                weight = WidgetFontWeight.Bold,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+            Spacer(modifier = GlanceModifier.defaultWeight())
+            WidgetText(
+                text = nextLabel,
+                size = 16.sp,
+                color = GlanceTheme.colors.primary,
+                weight = WidgetFontWeight.Bold,
+                align = WidgetTextAlign.End,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
+            WidgetText(
+                text = "›",
+                size = 25.sp,
+                color = GlanceTheme.colors.onPrimaryContainer,
+                weight = WidgetFontWeight.Medium,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+        }
+        Spacer(modifier = GlanceModifier.height(14.dp))
         WidgetText(
             text = "Today's Prayers",
-            size = 12.sp,
-            color = GlanceTheme.colors.onSurfaceVariant,
-            weight = WidgetFontWeight.Bold,
+            size = 14.sp,
+            color = GlanceTheme.colors.onSurface,
+            weight = WidgetFontWeight.Medium,
         )
-        Spacer(modifier = GlanceModifier.height(4.dp))
+        Spacer(modifier = GlanceModifier.height(6.dp))
         PrayerScheduleList(
             prayers = state.prayers,
             textSize = 16f,
-            rowHeight = scheduleRowHeight,
+            rowHeight = rowHeight,
+            showWeatherIcons = true,
+            usePrayerIconAccents = true,
+            highlightNext = true,
+            showDividers = true,
         )
     }
 }
@@ -1276,6 +1424,9 @@ private fun PrayerScheduleList(
     rowHeight: Dp,
     showTemperature: Boolean = true,
     showDividers: Boolean = true,
+    showWeatherIcons: Boolean = false,
+    usePrayerIconAccents: Boolean = false,
+    highlightNext: Boolean = false,
 ) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         prayers.forEachIndexed { index, prayer ->
@@ -1284,9 +1435,29 @@ private fun PrayerScheduleList(
             // and five rows with four dividers already sits at nine.
             Column(modifier = GlanceModifier.fillMaxWidth()) {
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth().height(rowHeight),
+                    modifier = if (highlightNext && prayer.isNext) {
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .height(rowHeight)
+                            .background(GlanceTheme.colors.primaryContainer)
+                            .cornerRadius(9.dp)
+                            .padding(horizontal = 8.dp)
+                    } else {
+                        GlanceModifier
+                            .fillMaxWidth()
+                            .height(rowHeight)
+                            .padding(horizontal = 8.dp)
+                    },
                     verticalAlignment = Alignment.Vertical.CenterVertically,
                 ) {
+                    if (showWeatherIcons) {
+                        AnimatedMeteocon(
+                            prayer = prayer,
+                            size = 24.dp,
+                            tint = if (usePrayerIconAccents) prayerAccent(prayer) else null,
+                        )
+                        Spacer(modifier = GlanceModifier.width(10.dp))
+                    }
                     WidgetText(
                         text = prayer.name,
                         size = textSize.sp,
@@ -1302,13 +1473,14 @@ private fun PrayerScheduleList(
                         },
                         modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
                     )
-                    prayer.temperature?.takeIf { showTemperature }?.let { temperature ->
+                    if (showTemperature) {
                         WidgetText(
-                            text = temperature,
+                            text = prayer.temperature.orEmpty(),
                             size = (textSize * 0.78f).sp,
                             color = GlanceTheme.colors.onSurfaceVariant,
                             weight = WidgetFontWeight.Regular,
-                            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                            align = WidgetTextAlign.End,
+                            modifier = GlanceModifier.width(42.dp).wrapContentHeight(),
                         )
                         Spacer(modifier = GlanceModifier.width(12.dp))
                     }
@@ -1326,7 +1498,7 @@ private fun PrayerScheduleList(
                             WidgetFontWeight.Medium
                         },
                         align = WidgetTextAlign.End,
-                        modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                        modifier = GlanceModifier.width(84.dp).wrapContentHeight(),
                     )
                 }
             }
@@ -1335,7 +1507,7 @@ private fun PrayerScheduleList(
                     modifier = GlanceModifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(GlanceTheme.colors.surfaceVariant),
+                        .background(PrayerScheduleDivider),
                 ) {}
             }
         }
@@ -1578,21 +1750,25 @@ private fun ExpressiveProgressBar(progress: Float, width: androidx.compose.ui.un
  * the motion rather than the icon.
  */
 @Composable
-private fun AnimatedMeteocon(prayer: WidgetPrayer, size: androidx.compose.ui.unit.Dp) {
+private fun AnimatedMeteocon(
+    prayer: WidgetPrayer,
+    size: androidx.compose.ui.unit.Dp,
+    tint: ColorProvider? = null,
+) {
     val frames = prayer.weatherFrames
     val context = LocalContext.current
 
     // The artwork is now the Mono set — one black silhouette — so it has to be tinted to
     // be anything but a black smudge on a light card. Tinted to the same accent the
     // countdown beside it uses, so the row reads as one thing.
-    val tint = GlanceTheme.colors.primary
+    val resolvedTint = tint ?: GlanceTheme.colors.primary
 
     if (frames.size < 2) {
         prayer.weatherIcon?.let {
             Image(
                 provider = ImageProvider(it),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(tint),
+                colorFilter = ColorFilter.tint(resolvedTint),
                 modifier = GlanceModifier.size(size),
             )
         }
@@ -1604,7 +1780,7 @@ private fun AnimatedMeteocon(prayer: WidgetPrayer, size: androidx.compose.ui.uni
     // render time would bake one theme's colour into the cache. ImageView.setColorFilter
     // is remotable and applies SRC_ATOP, which recolours the glyph and leaves its alpha —
     // exactly what a solid silhouette needs.
-    val tintArgb = tint.getColor(context).toArgb()
+    val tintArgb = resolvedTint.getColor(context).toArgb()
     val remoteViews = RemoteViews(
         context.packageName,
         R.layout.widget_meteocon_flipper,
@@ -1622,6 +1798,15 @@ private fun AnimatedMeteocon(prayer: WidgetPrayer, size: androidx.compose.ui.uni
         remoteViews = remoteViews,
         modifier = GlanceModifier.size(size),
     )
+}
+
+@Composable
+private fun prayerAccent(prayer: WidgetPrayer): ColorProvider = when (prayer.name.lowercase()) {
+    "fajr" -> FajrAccent
+    "dhuhr" -> DhuhrAccent
+    "maghrib" -> MaghribAccent
+    "isha" -> IshaAccent
+    else -> GlanceTheme.colors.primary
 }
 
 private val FRAME_VIEW_IDS = intArrayOf(

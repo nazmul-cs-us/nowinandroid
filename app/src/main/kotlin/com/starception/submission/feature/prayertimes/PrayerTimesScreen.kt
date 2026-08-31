@@ -2099,7 +2099,15 @@ fun PrayerTimesScreen(
             // floating navigation, then give the Insights carousel what remains.
             // This keeps Location visible at rest instead of relying on a height
             // tuned for one handset. Larger accessibility text gets extra room too.
-            val portraitInsightMaxHeight = if (configuration.screenHeightDp < 1_000) 280.dp else 288.dp
+            val portraitInsightMaxHeight = when {
+                configuration.screenHeightDp < 820 -> 280.dp
+                configuration.screenHeightDp < 900 -> 304.dp
+                // The Pixel 9 Pro class has enough vertical room for the carousel
+                // to absorb the final dashboard slack. At 328dp the location tile
+                // still stopped about 30dp above the floating navigation; 348dp
+                // leaves the intended compact 10–12dp visual gap.
+                else -> 348.dp
+            }
             // Measured against the real chrome rather than guessed: the prayer rows
             // gave back 32dp (112 -> 96), the Show All control 8dp, the Prayer times
             // header 8dp and the location card 6dp, on top of the slack that was
@@ -2132,8 +2140,16 @@ fun PrayerTimesScreen(
             val syncContentCompression =
                 (syncState.heldContentInsetTop - syncTopInsetReclaim)
                     .coerceAtLeast(0.dp)
+            // A persistent sync/prayer strip used to collapse Insights all the way to
+            // 170dp on every phone. On tall portrait displays (Pixel 9 Pro included)
+            // that made the dashboard finish roughly 40dp too early, leaving a large
+            // empty band between Location and the floating navigation. Preserve the
+            // normal 208dp compact strip on tall screens; genuinely short phones still
+            // have the smaller escape hatch needed to keep Location reachable.
+            val portraitInsightMinHeight =
+                if (configuration.screenHeightDp >= 900) 208.dp else 170.dp
             val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
-                .coerceAtLeast(170.dp)
+                .coerceAtLeast(portraitInsightMinHeight)
 
             if (isLandscape) {
                 // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right

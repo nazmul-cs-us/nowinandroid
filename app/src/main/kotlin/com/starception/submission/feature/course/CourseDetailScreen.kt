@@ -64,31 +64,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.AccessTime
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.EmojiEvents
-import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.Quiz
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.School
-import androidx.compose.material.icons.outlined.SignalCellularAlt
-import androidx.compose.material.icons.outlined.Verified
-import androidx.compose.material.icons.outlined.WorkspacePremium
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.material3.Card
@@ -97,7 +72,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -132,7 +106,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -872,13 +845,9 @@ private fun CourseDetailTopBar(
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = collapseProgress)
-
-    val surfaceColor = MaterialTheme.colorScheme.onSurface
-    val contentColor = Color(
-        red = 1f + (surfaceColor.red - 1f) * collapseProgress,
-        green = 1f + (surfaceColor.green - 1f) * collapseProgress,
-        blue = 1f + (surfaceColor.blue - 1f) * collapseProgress,
-        alpha = 1f,
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val actionContainerColor = MaterialTheme.colorScheme.surface.copy(
+        alpha = 0.76f + (collapseProgress * 0.24f),
     )
 
     Surface(
@@ -898,7 +867,11 @@ private fun CourseDetailTopBar(
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = contentColor.copy(alpha = 0.15f),
+                color = actionContainerColor,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                ),
             ) {
                 IconButton(onClick = onBackClick) {
                     FlaticonIcon(
@@ -912,22 +885,44 @@ private fun CourseDetailTopBar(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            IconButton(onClick = onShareClick) {
-                FlaticonIcon(
-                    glyph = FlaticonIcons.SHARE,
-                    contentDescription = "Share",
-                    tint = contentColor,
-                    fontSize = 20.sp,
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = actionContainerColor,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                ),
+            ) {
+                IconButton(onClick = onShareClick) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.SHARE,
+                        contentDescription = "Share",
+                        tint = contentColor,
+                        fontSize = 19.sp,
+                    )
+                }
             }
 
-            IconButton(onClick = onBookmarkClick) {
-                FlaticonIcon(
-                    glyph = FlaticonIcons.BOOKMARK,
-                    contentDescription = "Bookmark",
-                    tint = contentColor,
-                    fontSize = 20.sp,
-                )
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = actionContainerColor,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                ),
+            ) {
+                IconButton(onClick = onBookmarkClick) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.BOOKMARK,
+                        contentDescription = "Bookmark",
+                        tint = contentColor,
+                        fontSize = 19.sp,
+                    )
+                }
             }
         }
     }
@@ -1050,28 +1045,48 @@ private fun CourseHeroSection(
                         text = course.description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                         lineHeight = 20.sp,
                     )
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Right side: Dynamic highlight number
-                Box(
+                // Compact course identity panel: a non-figurative Flaticon glyph
+                // plus the most useful course-sized metric.
+                Surface(
                     modifier = Modifier
-                        .size(95.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                    contentAlignment = Alignment.Center,
+                        .width(104.dp)
+                        .height(124.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.94f),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    ),
                 ) {
                     Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
+                        Surface(
+                            modifier = Modifier.size(32.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = accentColor.copy(alpha = 0.12f),
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                FlaticonIcon(
+                                    glyph = course.iconGlyph,
+                                    contentDescription = null,
+                                    tint = accentColor,
+                                    fontSize = 17.sp,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = highlightText,
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = accentColor,
                         )
@@ -1387,7 +1402,7 @@ private fun QuickStatsPills(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         StatPill(
-            iconGlyph = FlaticonIcons.OPEN_BOOK,
+            iconGlyph = FlaticonIcons.BOOK,
             value = "$totalLessons",
             label = "Lessons",
             accentColor = MaterialTheme.colorScheme.primary,
@@ -1619,69 +1634,59 @@ private fun ContinueLearningCard(
     }
 
     if (nextLesson != null) {
-        // Material 3 Expressive ContinueLearning Card with gradient
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clickable { onLessonClick(nextLesson, nextLessonIndex) },
             shape = RoundedCornerShape(16.dp),
-            color = Color.Transparent,
-            shadowElevation = 4.dp,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            ),
+            tonalElevation = 1.dp,
         ) {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            ),
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    modifier = Modifier.size(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
-                    // Play button with expressive styling
-                    Surface(
-                        modifier = Modifier.size(56.dp),
-                        shape = CircleShape,
-                        color = Color.White,
-                        shadowElevation = 4.dp,
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            FlaticonIcon(
-                                glyph = FlaticonIcons.OPEN_BOOK,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(30.dp),
-                                fontSize = 28.sp,
-                            )
-                        }
+                        FlaticonIcon(
+                            glyph = course.iconGlyph,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(26.dp),
+                            fontSize = 24.sp,
+                        )
                     }
+                }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Continue Learning",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = nextLesson.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1693,27 +1698,40 @@ private fun ContinueLearningCard(
                         Text(
                             text = moduleName,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = "•",
-                            color = Color.White.copy(alpha = 0.5f),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
                         )
                         Text(
                             text = nextLesson.duration,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
 
-                FlaticonIcon(
-                    glyph = FlaticonIcons.ANGLE_RIGHT,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp),
-                    fontSize = 22.sp,
-                )
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.ANGLE_RIGHT,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp),
+                            fontSize = 16.sp,
+                        )
+                    }
                 }
             }
         }
@@ -1756,7 +1774,7 @@ private fun WhatYouWillLearnSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         FlaticonIcon(
-                            glyph = FlaticonIcons.SCHOOL,
+                            glyph = FlaticonIcons.BOOK,
                             contentDescription = null,
                             tint = accentColor,
                             modifier = Modifier.size(20.dp),
@@ -1837,7 +1855,7 @@ private fun InstructorSection(
                         contentAlignment = Alignment.Center,
                     ) {
                         FlaticonIcon(
-                            glyph = FlaticonIcons.KNOWLEDGE,
+                            glyph = FlaticonIcons.BOOK,
                             contentDescription = null,
                             tint = accentColor,
                             modifier = Modifier.size(20.dp),
@@ -2842,17 +2860,34 @@ private fun generateModulesForCourse(course: Course): List<CourseModule> {
     }
 }
 
-private fun generateMemorize3AyahsModules(): List<CourseModule> {
-    val surahNames = listOf(
-        "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah",
-        "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
-        "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr",
-        "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
-        "Al-Anbiya", "Al-Hajj", "Al-Mu'minun", "An-Nur", "Al-Furqan",
-        "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-Ankabut", "Ar-Rum"
-    )
+private val courseSurahNames = listOf(
+    "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah",
+    "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
+    "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr",
+    "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
+    "Al-Anbiya", "Al-Hajj", "Al-Mu'minun", "An-Nur", "Al-Furqan",
+    "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-Ankabut", "Ar-Rum",
+    "Luqman", "As-Sajdah", "Al-Ahzab", "Saba", "Fatir",
+    "Ya-Sin", "As-Saffat", "Sad", "Az-Zumar", "Ghafir",
+    "Fussilat", "Ash-Shura", "Az-Zukhruf", "Ad-Dukhan", "Al-Jathiyah",
+    "Al-Ahqaf", "Muhammad", "Al-Fath", "Al-Hujurat", "Qaf",
+    "Adh-Dhariyat", "At-Tur", "An-Najm", "Al-Qamar", "Ar-Rahman",
+    "Al-Waqi'ah", "Al-Hadid", "Al-Mujadila", "Al-Hashr", "Al-Mumtahanah",
+    "As-Saff", "Al-Jumu'ah", "Al-Munafiqun", "At-Taghabun", "At-Talaq",
+    "At-Tahrim", "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij",
+    "Nuh", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyamah",
+    "Al-Insan", "Al-Mursalat", "An-Naba", "An-Nazi'at", "Abasa",
+    "At-Takwir", "Al-Infitar", "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj",
+    "At-Tariq", "Al-A'la", "Al-Ghashiyah", "Al-Fajr", "Al-Balad",
+    "Ash-Shams", "Al-Layl", "Ad-Duha", "Ash-Sharh", "At-Tin",
+    "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat",
+    "Al-Qari'ah", "At-Takathur", "Al-Asr", "Al-Humazah", "Al-Fil",
+    "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr",
+    "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas",
+)
 
-    return surahNames.chunked(10).mapIndexed { moduleIndex, surahs ->
+private fun generateMemorize3AyahsModules(): List<CourseModule> {
+    return courseSurahNames.chunked(10).mapIndexed { moduleIndex, surahs ->
         CourseModule(
             id = "module_$moduleIndex",
             title = "Surahs ${moduleIndex * 10 + 1} - ${moduleIndex * 10 + surahs.size}",
@@ -2965,12 +3000,18 @@ private fun generateJuzAmmaModules(): List<CourseModule> {
 }
 
 private fun generateQuranReadingModules(): List<CourseModule> {
-    return (0 until 30).map { juzIndex ->
+    val juzStartPages = listOf(
+        1, 22, 42, 62, 82, 102, 121, 142, 162, 182,
+        201, 222, 242, 262, 282, 302, 322, 342, 362, 382,
+        402, 422, 442, 462, 482, 502, 522, 542, 562, 582,
+    )
+
+    return juzStartPages.mapIndexed { juzIndex, startPage ->
+        val endPage = juzStartPages.getOrNull(juzIndex + 1)?.minus(1) ?: 604
         CourseModule(
             id = "juz_$juzIndex",
             title = "Juz ${juzIndex + 1}",
-            lessons = (0 until 20).map { pageIndex ->
-                val pageNumber = juzIndex * 20 + pageIndex + 1
+            lessons = (startPage..endPage).map { pageNumber ->
                 Lesson(
                     id = "page_$pageNumber",
                     title = "Page $pageNumber",
@@ -2985,31 +3026,7 @@ private fun generateQuranReadingModules(): List<CourseModule> {
 
 private fun generateQuranListeningModules(): List<CourseModule> {
     // All 114 surahs organized by Juz for listening
-    val surahNames = listOf(
-        "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah",
-        "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
-        "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr",
-        "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
-        "Al-Anbiya", "Al-Hajj", "Al-Mu'minun", "An-Nur", "Al-Furqan",
-        "Ash-Shu'ara", "An-Naml", "Al-Qasas", "Al-Ankabut", "Ar-Rum",
-        "Luqman", "As-Sajdah", "Al-Ahzab", "Saba", "Fatir",
-        "Ya-Sin", "As-Saffat", "Sad", "Az-Zumar", "Ghafir",
-        "Fussilat", "Ash-Shura", "Az-Zukhruf", "Ad-Dukhan", "Al-Jathiyah",
-        "Al-Ahqaf", "Muhammad", "Al-Fath", "Al-Hujurat", "Qaf",
-        "Adh-Dhariyat", "At-Tur", "An-Najm", "Al-Qamar", "Ar-Rahman",
-        "Al-Waqi'ah", "Al-Hadid", "Al-Mujadila", "Al-Hashr", "Al-Mumtahanah",
-        "As-Saff", "Al-Jumu'ah", "Al-Munafiqun", "At-Taghabun", "At-Talaq",
-        "At-Tahrim", "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij",
-        "Nuh", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyamah",
-        "Al-Insan", "Al-Mursalat", "An-Naba", "An-Nazi'at", "Abasa",
-        "At-Takwir", "Al-Infitar", "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj",
-        "At-Tariq", "Al-A'la", "Al-Ghashiyah", "Al-Fajr", "Al-Balad",
-        "Ash-Shams", "Al-Layl", "Ad-Duha", "Ash-Sharh", "At-Tin",
-        "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat",
-        "Al-Qari'ah", "At-Takathur", "Al-Asr", "Al-Humazah", "Al-Fil",
-        "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr",
-        "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas"
-    )
+    val surahNames = courseSurahNames
 
     // Approximate duration in minutes for each surah (based on average recitation)
     val surahDurations = listOf(

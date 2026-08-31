@@ -168,11 +168,21 @@ class ChapterRecitationService : Service() {
             )
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
-                    if (isExternalPlayback || mediaPlayer?.isPlaying == false) togglePlayPause()
+                    if (isExternalPlayback) {
+                        resumeExternalPlayback()
+                    } else if (mediaPlayer?.isPlaying == false) {
+                        togglePlayPause()
+                    }
                 }
                 override fun onPause() {
-                    if (isExternalPlayback || mediaPlayer?.isPlaying == true) togglePlayPause()
+                    if (isExternalPlayback) {
+                        pauseExternalPlayback()
+                    } else if (mediaPlayer?.isPlaying == true) {
+                        togglePlayPause()
+                    }
                 }
+                override fun onSkipToNext() { skipHadith(next = true) }
+                override fun onSkipToPrevious() { skipHadith(next = false) }
                 override fun onSeekTo(pos: Long) { seekTo(pos.toInt()) }
                 override fun onStop() { stopPlaybackAndSelf() }
             })
@@ -331,18 +341,8 @@ class ChapterRecitationService : Service() {
 
     fun togglePlayPause() {
         if (isExternalPlayback) {
-            // The Hadith screen owns the TTS renderer. Its callback applies the
-            // same stop/restart behavior as the in-app media controller.
-            val callback = ChapterRecitationState.onExternalToggle
-            if (callback != null) {
-                callback.invoke()
-            } else {
-                // The screen may have been closed while app-scoped Sherpa audio
-                // continued. Preserve a working notification control in that case.
-                com.starception.submission.media.GlobalMediaViewModel
-                    .onHadithFallbackStop?.invoke()
-                stopPlaybackAndSelf()
-            }
+            if (ChapterRecitationState.isPlaying) pauseExternalPlayback()
+            else resumeExternalPlayback()
             return
         }
         val player = mediaPlayer ?: return
@@ -358,6 +358,57 @@ class ChapterRecitationService : Service() {
             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
             startForegroundNotification()
             startProgressUpdates()
+        }
+    }
+
+    private fun pauseExternalPlayback() {
+        if (!isExternalPlayback || !ChapterRecitationState.isPlaying) return
+        val callback = ChapterRecitationState.onExternalPause
+            ?: ChapterRecitationState.onExternalToggle
+        if (callback == null) {
+            com.starception.submission.media.GlobalMediaViewModel.onHadithFallbackStop?.invoke()
+            stopPlaybackAndSelf()
+            return
+        }
+        callback.invoke()
+        ChapterRecitationState.publish(false, currentTitle, currentSubtitle)
+        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+        updateNotification()
+    }
+
+    private fun resumeExternalPlayback() {
+        if (!isExternalPlayback || ChapterRecitationState.isPlaying) return
+        val callback = ChapterRecitationState.onExternalPlay
+            ?: ChapterRecitationState.onExternalToggle
+        if (callback == null) {
+            stopPlaybackAndSelf()
+            return
+        }
+        callback.invoke()
+        ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
+        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+        updateNotification()
+    }
+
+    /** Route car/Bluetooth previous/next controls into an active Bukhari book playlist. */
+    private fun skipHadith(next: Boolean) {
+        if (!currentTitle.startsWith("Hadith #")) return
+        val accepted = if (next) {
+            ChapterRecitationState.onSkipNext?.invoke()
+        } else {
+            ChapterRecitationState.onSkipPrevious?.invoke()
+        } == true
+        if (!accepted) return
+
+        ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
+        updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING)
+        updateNotification()
+
+        if (!isExternalPlayback && isContinuousHandoff) {
+            stopProgressUpdates()
+            mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+            mediaPlayer = null
+            ChapterRecitationState.onHadithCompletion?.invoke()
         }
     }
 
@@ -392,6 +443,8 @@ class ChapterRecitationService : Service() {
                     PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
                         PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
                         PlaybackStateCompat.ACTION_SEEK_TO or
                         PlaybackStateCompat.ACTION_STOP,
                 )
@@ -557,6 +610,12 @@ object ChapterRecitationState {
     var onHadithCompletion: (() -> Unit)? = null
     /** MediaSession play/pause request for audio rendered by an external TTS engine. */
     var onExternalToggle: (() -> Unit)? = null
+    /** Distinct commands preserve a suspended Bukhari playlist instead of toggling it off. */
+    var onExternalPause: (() -> Unit)? = null
+    var onExternalPlay: (() -> Unit)? = null
+    /** Car/Bluetooth transport controls. Return true when the playlist accepted the jump. */
+    var onSkipNext: (() -> Boolean)? = null
+    var onSkipPrevious: (() -> Boolean)? = null
 
     @Volatile
     internal var onSourcePlaybackRequested: ((String, String, String, Boolean) -> Unit)? = null
