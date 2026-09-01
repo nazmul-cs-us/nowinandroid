@@ -16,30 +16,34 @@
 
 package com.starception.submission.shared.ui
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.starception.submission.core.designsystem.icon.NiaIcons
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.settings.ThemeSettingsState
@@ -48,6 +52,7 @@ import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
+import com.starception.submission.settings.components.TravelDuaSection
 
 /**
  * The prayer settings screen.
@@ -74,10 +79,12 @@ fun PrayerSettingsScreen(
     onThemeBrandChange: (ThemeBrand) -> Unit = {},
     onDarkThemeConfigChange: (DarkThemeConfig) -> Unit = {},
     appVersion: String = "Unknown",
+    audioState: AudioSettingsState = AudioSettingsState(),
+    audioActions: AudioSettingsActions = AudioSettingsActions(),
 ) {
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
-    var expanded by remember { mutableStateOf<String?>(SECTION_PRAYER) }
+    var expanded by remember { mutableStateOf<String?>(SECTION_APPEARANCE) }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -87,33 +94,63 @@ fun PrayerSettingsScreen(
                 .fillMaxSize()
                 .safeDrawingPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 40.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                // The gesture works too, but a visible control is needed: this
-                // is reached from a tap, not a sheet the user swiped up.
                 IconTapTarget(
                     icon = NiaIcons.ArrowBack,
                     contentDescription = "Back",
                     tint = MaterialTheme.colorScheme.onBackground,
+                    visualSize = 40.dp,
                     onClick = onBack,
+                )
+                Column(
+                    modifier = Modifier.padding(start = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Prayer, audio, notifications and app preferences.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            SettingsGroupLabel("Prayer & personalization")
+
+            SettingsSection(
+                title = "Appearance",
+                subtitle = "Theme, colors & display mode",
+                iconGlyph = FlaticonIcons.APPEARANCE,
+                isExpanded = expanded == SECTION_APPEARANCE,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_APPEARANCE) null else SECTION_APPEARANCE
+                },
+            ) {
+                AppearanceSection(
+                    themeSettings = themeSettings,
+                    onChangeThemeBrand = onThemeBrandChange,
+                    onChangeDynamicColorPreference = {},
+                    onChangeDarkThemeConfig = onDarkThemeConfigChange,
+                    supportDynamicColor = false,
+                    showCustomTheme = false,
+                    colorPickerDialog = null,
                 )
             }
 
             SettingsSection(
                 title = "Prayer Times",
                 subtitle = "Calculation method & location",
-                icon = NiaIcons.Home,
+                iconGlyph = FlaticonIcons.SCHEDULE,
                 isExpanded = expanded == SECTION_PRAYER,
                 onToggleExpanded = {
                     expanded = if (expanded == SECTION_PRAYER) null else SECTION_PRAYER
@@ -131,7 +168,7 @@ fun PrayerSettingsScreen(
             SettingsSection(
                 title = "Notifications",
                 subtitle = "Prayer alerts & reminders",
-                icon = NiaIcons.Upcoming,
+                iconGlyph = FlaticonIcons.NOTIFICATIONS,
                 isExpanded = expanded == SECTION_NOTIFICATIONS,
                 onToggleExpanded = {
                     expanded = if (expanded == SECTION_NOTIFICATIONS) null else SECTION_NOTIFICATIONS
@@ -140,39 +177,80 @@ fun PrayerSettingsScreen(
                 NotificationsSection(
                     preferences = notifications,
                     onPreferencesChanged = onNotificationsChange,
-                    // iOS has no Do Not Disturb permission to grant: Focus is the
-                    // user's to set, so there is nothing to prompt for.
                     hasDndAccess = true,
                     showSilentDuringPrayer = false,
                 )
             }
 
             SettingsSection(
-                title = "Appearance",
-                subtitle = "Theme, colors & display mode",
-                icon = NiaIcons.ViewDay,
-                isExpanded = expanded == SECTION_APPEARANCE,
+                title = "Travel Dua",
+                subtitle = "Auto-play dua when driving",
+                iconGlyph = FlaticonIcons.TRAVEL,
+                isExpanded = expanded == SECTION_TRAVEL,
                 onToggleExpanded = {
-                    expanded = if (expanded == SECTION_APPEARANCE) null else SECTION_APPEARANCE
+                    expanded = if (expanded == SECTION_TRAVEL) null else SECTION_TRAVEL
                 },
             ) {
-                AppearanceSection(
-                    themeSettings = themeSettings,
-                    onChangeThemeBrand = onThemeBrandChange,
-                    onChangeDynamicColorPreference = {},
-                    onChangeDarkThemeConfig = onDarkThemeConfigChange,
-                    // Material You does not exist here, and the colour wheel is
-                    // drawn with Android graphics, so neither is offered.
-                    supportDynamicColor = false,
-                    showCustomTheme = false,
-                    colorPickerDialog = null,
+                TravelDuaSection(
+                    settings = audioState.travelDua,
+                    onSettingsChanged = audioActions.onTravelDuaChange,
+                    onTriggerAudioChain = audioActions.onTestTravelDua,
+                    onStopAudioChain = audioActions.onStopTravelDua,
+                    isPlaying = audioState.isTravelDuaPlaying,
+                    testButtonLabel = "Test Travel Dua",
+                    playbackDescription = "Best effort while iOS location updates are available.",
+                )
+            }
+
+            SettingsGroupLabel("Voice & Salah intelligence")
+
+            SettingsSection(
+                title = "Voice Recognition",
+                subtitle = "Speech detection engine",
+                iconGlyph = FlaticonIcons.MICROPHONE,
+                isExpanded = expanded == SECTION_VOICE,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_VOICE) null else SECTION_VOICE
+                },
+            ) {
+                VoiceRecognitionSettingsSection(
+                    selectedMode = audioState.recognitionMode,
+                    testState = audioState.recognitionTestState,
+                    testText = audioState.recognitionTestText,
+                    onModeSelected = audioActions.onRecognitionModeSelected,
+                    onStartTest = audioActions.onStartRecognitionTest,
+                    onStopTest = audioActions.onStopRecognitionTest,
                 )
             }
 
             SettingsSection(
+                title = "Text-to-Speech",
+                subtitle = "Voice output settings",
+                iconGlyph = FlaticonIcons.VOLUME,
+                isExpanded = expanded == SECTION_NARRATION,
+                onToggleExpanded = {
+                    expanded = if (expanded == SECTION_NARRATION) null else SECTION_NARRATION
+                },
+            ) {
+                NarrationSettingsSection(
+                    voices = audioState.narrationVoices,
+                    selectedIdentifier = audioState.selectedNarrationVoiceIdentifier,
+                    selectedSpeakerId = audioState.selectedNarrationSpeakerId,
+                    isSpeaking = audioState.isNarrationSpeaking,
+                    error = audioState.narrationError,
+                    onVoiceSelected = audioActions.onNarrationVoiceSelected,
+                    onSpeakerSelected = audioActions.onNarrationSpeakerSelected,
+                    onPreview = audioActions.onPreviewNarration,
+                    onStop = audioActions.onStopNarration,
+                )
+            }
+
+            SettingsGroupLabel("App & support")
+
+            SettingsSection(
                 title = "About",
                 subtitle = "Version & attributions",
-                icon = NiaIcons.Person,
+                iconGlyph = FlaticonIcons.INFO,
                 isExpanded = expanded == SECTION_ABOUT,
                 onToggleExpanded = {
                     expanded = if (expanded == SECTION_ABOUT) null else SECTION_ABOUT
@@ -184,11 +262,28 @@ fun PrayerSettingsScreen(
                     showProjectLinks = false,
                 )
             }
+
+            Spacer(Modifier.fillMaxWidth().height(32.dp))
         }
     }
+}
+
+@Composable
+private fun SettingsGroupLabel(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 0.8.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+    )
 }
 
 private const val SECTION_PRAYER = "prayer"
 private const val SECTION_NOTIFICATIONS = "notifications"
 private const val SECTION_APPEARANCE = "appearance"
 private const val SECTION_ABOUT = "about"
+private const val SECTION_TRAVEL = "travel"
+private const val SECTION_VOICE = "voice"
+private const val SECTION_NARRATION = "narration"

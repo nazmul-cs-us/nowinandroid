@@ -123,6 +123,7 @@ dependencies {
     implementation("io.github.oleksandrbalan:pagecurl:1.5.1")
 
     implementation(projects.core.common)
+    implementation(projects.core.assetCache)
     implementation(projects.core.ui)
     implementation(projects.core.designsystem)
     implementation(projects.core.data)

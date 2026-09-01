@@ -2,6 +2,7 @@ package com.starception.submission.shared.content
 
 import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
+import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
@@ -45,7 +46,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
         }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun readTopics(): List<SharedTopic> = query("topics", "db", """
+    private suspend fun readTopics(): List<SharedTopic> = query("topics", "db", """
         SELECT id, name, short_description, long_description
         FROM topics
         ORDER BY id ASC
@@ -59,7 +60,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun readQuranicDuas(): List<SharedTopicArticle> = query("quranic_duas", "db", """
+    private suspend fun readQuranicDuas(): List<SharedTopicArticle> = query("quranic_duas", "db", """
         SELECT id, dua_number, title, arabic, translation, transliteration,
                surah_reference, explanation
         FROM quranic_duas
@@ -83,7 +84,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun readFortressArticles(topicId: Int): List<SharedTopicArticle> {
+    private suspend fun readFortressArticles(topicId: Int): List<SharedTopicArticle> {
         val chapters = fortressChaptersByTopic[topicId].orEmpty()
         if (chapters.isEmpty()) return emptyList()
         val chapterIds = chapters.joinToString(",")
@@ -121,14 +122,24 @@ private class IosSharedTopicRepository : SharedTopicRepository {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private inline fun <T> query(
+private suspend inline fun <T> query(
     resource: String,
     type: String,
     sql: String,
     row: (CPointer<sqlite3_stmt>) -> T,
-): List<T> = memScoped {
-    val databasePath = NSBundle.mainBundle.pathForResource(resource, ofType = type)
-        ?: error("Bundled $resource.$type was not found")
+): List<T> {
+    val remotePath = when (resource) {
+        "topics" -> "topics.db"
+        "quranic_duas" -> "databases/quranic_duas.db"
+        "fortress_of_the_muslim_v2" -> "databases/fortress_of_the_muslim_v2.db"
+        else -> error("No Cloudflare asset mapping for $resource.$type")
+    }
+    val databasePath = resolveDatabaseAsset(
+        bundledPath = NSBundle.mainBundle.pathForResource(resource, ofType = type),
+        remotePath = remotePath,
+        cacheName = "$resource.$type",
+    )
+    return memScoped {
     val database = alloc<CPointerVar<sqlite3>>()
     val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
     if (openResult != SQLITE_OK) {
@@ -158,6 +169,7 @@ private inline fun <T> query(
         }
     } finally {
         database.value?.let(::sqlite3_close)
+    }
     }
 }
 

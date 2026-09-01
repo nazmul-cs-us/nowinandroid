@@ -18,6 +18,7 @@ private struct PrayerPushTokenSnapshot: Codable, Equatable {
 private struct PrayerSchedulePayload: Decodable {
     let version: Int
     let locationName: String
+    let timeZoneOffset: Double?
     let notificationsEnabled: Bool
     let soundEnabled: Bool
     let days: [PrayerDay]
@@ -113,14 +114,16 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
     }
 
     private func datedPrayers(from payload: PrayerSchedulePayload) -> [DatedPrayer] {
-        let calendar = Calendar.autoupdatingCurrent
+        let timeZone = scheduleTimeZone(for: payload)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
         return payload.days.flatMap { day -> [DatedPrayer] in
             let dateParts = day.date.split(separator: "-").compactMap { Int($0) }
             guard dateParts.count == 3 else { return [] }
             return day.prayers.compactMap { prayer in
                 var components = DateComponents()
                 components.calendar = calendar
-                components.timeZone = .autoupdatingCurrent
+                components.timeZone = timeZone
                 components.year = dateParts[0]
                 components.month = dateParts[1]
                 components.day = dateParts[2]
@@ -179,10 +182,13 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             content.interruptionLevel = .timeSensitive
             if payload.soundEnabled { content.sound = .default }
 
-            let components = Calendar.autoupdatingCurrent.dateComponents(
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = scheduleTimeZone(for: payload)
+            var components = calendar.dateComponents(
                 [.year, .month, .day, .hour, .minute],
                 from: event.1
             )
+            components.timeZone = calendar.timeZone
             let trigger = UNCalendarNotificationTrigger(
                 dateMatching: components,
                 repeats: false
@@ -195,6 +201,11 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                 )
             )
         }
+    }
+
+    private func scheduleTimeZone(for payload: PrayerSchedulePayload) -> TimeZone {
+        guard let offset = payload.timeZoneOffset else { return .autoupdatingCurrent }
+        return TimeZone(secondsFromGMT: Int((offset * 3_600).rounded())) ?? .autoupdatingCurrent
     }
 
     private func removePrayerNotifications() {

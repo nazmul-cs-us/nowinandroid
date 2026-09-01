@@ -13,7 +13,9 @@ import UIKit
 /// in Kotlin. Anything decided here would be a decision Android could not share.
 struct ComposePrayerTimesView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        IosComposeRootKt.PrayerTimesViewController()
+        IosComposeRootKt.PrayerTimesViewController(
+            sherpaService: SherpaSpeechService.shared
+        )
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {

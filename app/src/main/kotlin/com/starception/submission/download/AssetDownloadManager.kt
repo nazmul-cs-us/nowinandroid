@@ -8,7 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
-import com.starception.submission.core.data.util.NetworkMonitor
+import com.starception.submission.core.assetcache.CloudAssetRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -32,8 +31,8 @@ import javax.inject.Singleton
 class AssetDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient,
-    private val networkMonitor: NetworkMonitor,
 ) {
+    private val sharedAssets = CloudAssetRepository(AndroidAssetPlatform(context, okHttpClient))
     sealed class DownloadState {
         data object NotStarted : DownloadState()
         data class Downloading(
@@ -460,66 +459,10 @@ class AssetDownloadManager @Inject constructor(
 
     suspend fun loadManifest(): AssetManifest? = withContext(Dispatchers.IO) {
         cachedManifest?.let { return@withContext it }
-
-        val cachedFile = File(cdnAssetsDir, "manifest.json")
-        val isOnline = runCatching { networkMonitor.isOnline.first() }.getOrDefault(false)
-
-        // 1. Try fetching latest manifest from CDN so hashes are always in sync with served files.
-        //    Skipped entirely when the device is offline so the bundled fallback is reached instantly.
-        if (isOnline) {
-            try {
-                val bundledBaseUrl = context.assets.open(MANIFEST_ASSET_PATH).bufferedReader().use {
-                    val json = it.readText()
-                    AssetManifest.fromJson(json).baseUrl
-                }
-                val cdnManifestUrl = "${bundledBaseUrl.trimEnd('/')}/$MANIFEST_ASSET_PATH"
-                val request = okhttp3.Request.Builder().url(cdnManifestUrl).build()
-                val response = okHttpClient.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val json = response.body?.string()
-                    if (!json.isNullOrBlank()) {
-                        val manifest = AssetManifest.fromJson(json)
-                        cachedFile.parentFile?.mkdirs()
-                        cachedFile.writeText(json)
-                        cachedManifest = manifest
-                        Log.i(TAG, "Loaded manifest from CDN (version=${manifest.version})")
-                        return@withContext manifest
-                    }
-                }
-                response.close()
-                Log.w(TAG, "CDN manifest fetch failed: HTTP ${response.code}")
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not fetch manifest from CDN, falling back: ${e.message}")
-            }
-        } else {
-            Log.i(TAG, "Offline — skipping CDN manifest fetch")
-        }
-
-        // 2. Fall back to disk-cached manifest (from a previous successful CDN fetch)
-        if (cachedFile.exists()) {
-            try {
-                val json = cachedFile.readText()
-                val manifest = AssetManifest.fromJson(json)
-                cachedManifest = manifest
-                Log.i(TAG, "Loaded manifest from disk cache (version=${manifest.version})")
-                return@withContext manifest
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to parse cached manifest", e)
-            }
-        }
-
-        // 3. Last resort: bundled manifest in APK (may be stale, but better than nothing)
-        try {
-            val json = context.assets.open(MANIFEST_ASSET_PATH).bufferedReader().readText()
-            val manifest = AssetManifest.fromJson(json)
+        sharedAssets.loadManifest()?.also { manifest ->
             cachedManifest = manifest
-            Log.w(TAG, "Loaded bundled manifest (version=${manifest.version}) — hashes may be stale")
-            return@withContext manifest
-        } catch (e: Exception) {
-            Log.e(TAG, "No manifest available", e)
+            Log.i(TAG, "Loaded shared Cloudflare manifest (version=${manifest.version})")
         }
-
-        return@withContext null
     }
 
     fun deleteAsset(cdnKey: String): Boolean {

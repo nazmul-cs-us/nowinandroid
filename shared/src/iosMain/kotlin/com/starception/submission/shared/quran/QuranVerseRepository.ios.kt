@@ -45,7 +45,7 @@ private class IosQuranVerseRepository : QuranVerseRepository {
             remotePath = "databases/quran/quran.db",
             cacheName = "quran.db",
         )
-        val translations = readTranslations(surahNumber)
+        val translations = runCatching { readTranslations(surahNumber) }.getOrDefault(emptyMap())
         return memScoped {
         val database = alloc<CPointerVar<sqlite3>>()
         val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)

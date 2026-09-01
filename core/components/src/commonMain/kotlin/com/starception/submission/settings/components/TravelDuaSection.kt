@@ -78,6 +78,8 @@ fun TravelDuaSection(
     onStopAudioChain: () -> Unit = {},
     isPlaying: Boolean = false,
     modifier: Modifier = Modifier,
+    testButtonLabel: String = "Test Audio Chain",
+    playbackDescription: String = "Travel Dua → Hadith → Quran • Say YES/NO to complete",
     /**
      * Asks for whatever the platform needs before the audio chain may play, and
      * invokes the callback once it may. Android requests RECORD_AUDIO and audio
@@ -223,7 +225,7 @@ fun TravelDuaSection(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (playing) "Stop" else "Test Audio Chain",
+                                text = if (playing) "Stop" else testButtonLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -233,7 +235,7 @@ fun TravelDuaSection(
 
                 // Compact info text
                 Text(
-                    text = "Travel Dua → Hadith → Quran • Say YES/NO to complete",
+                    text = playbackDescription,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)

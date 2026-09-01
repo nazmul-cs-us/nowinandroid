@@ -6,6 +6,7 @@ import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.prayerDefaultsFor
+import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.storage.InMemoryKeyValueStore
 import kotlin.test.Test
@@ -91,6 +92,40 @@ class UserSettingsPersistenceTest {
 
         store.putString("ios_theme_brand", ThemeBrand.CUSTOM.name)
         assertEquals(ThemeBrand.COASTAL, UserAppearanceSettings(store).settings().brand)
+    }
+
+    @Test
+    fun audioSettingsPersistAndClampSupportedChoices() {
+        val store = InMemoryKeyValueStore()
+        val settings = UserAudioSettings(store)
+
+        settings.saveTravelDua(
+            TravelDuaSettings(
+                enabled = false,
+                cooldownMinutes = 100,
+                playbackDelaySeconds = 1,
+                gapToleranceMinutes = 100,
+                drivingSpeedThresholdKmh = 1,
+            ),
+        )
+        settings.saveRecognitionMode(VoiceRecognitionMode.TRANSCRIPTION)
+        settings.saveNarrationVoiceIdentifier("com.apple.voice.compact.en-GB.Daniel")
+
+        assertEquals(
+            TravelDuaSettings(
+                enabled = false,
+                cooldownMinutes = 30,
+                playbackDelaySeconds = 10,
+                gapToleranceMinutes = 15,
+                drivingSpeedThresholdKmh = 10,
+            ),
+            UserAudioSettings(store).travelDua(),
+        )
+        assertEquals(VoiceRecognitionMode.TRANSCRIPTION, settings.recognitionMode())
+        assertEquals(
+            "com.apple.voice.compact.en-GB.Daniel",
+            settings.narrationVoiceIdentifier(),
+        )
     }
 
     @Test

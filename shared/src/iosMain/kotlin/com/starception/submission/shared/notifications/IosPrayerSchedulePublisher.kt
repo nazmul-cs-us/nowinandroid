@@ -67,6 +67,7 @@ internal object IosPrayerSchedulePublisher {
         val payload = IosPrayerPayload(
             generatedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
             locationName = locationName,
+            timeZoneOffset = timeZoneOffset,
             notificationsEnabled = preferences.notificationsEnabled,
             soundEnabled = preferences.notificationSound != "silent",
             days = days,
@@ -83,6 +84,7 @@ private data class IosPrayerPayload(
     val version: Int = 1,
     val generatedAtEpochMilliseconds: Long,
     val locationName: String,
+    val timeZoneOffset: Double,
     val notificationsEnabled: Boolean,
     val soundEnabled: Boolean,
     val days: List<IosPrayerDay>,

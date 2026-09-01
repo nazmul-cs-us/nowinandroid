@@ -1,7 +1,6 @@
 package com.starception.submission.download
 
 import android.content.Context
-import com.starception.submission.core.data.util.NetworkMonitor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,8 +30,7 @@ object AssetDownloadModule {
     fun provideAssetDownloadManager(
         @ApplicationContext context: Context,
         okHttpClient: OkHttpClient,
-        networkMonitor: NetworkMonitor,
-    ): AssetDownloadManager = AssetDownloadManager(context, okHttpClient, networkMonitor)
+    ): AssetDownloadManager = AssetDownloadManager(context, okHttpClient)
 
     @Provides
     @Singleton

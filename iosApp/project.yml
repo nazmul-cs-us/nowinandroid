@@ -15,6 +15,11 @@ options:
     # ActivityKit for the prayer Live Update requires iOS 16.1.
     iOS: "16.1"
 
+packages:
+  SherpaOnnx:
+    url: https://github.com/k2-fsa/sherpa-onnx
+    exactVersion: 1.13.7
+
 targets:
   iosApp:
     type: application
@@ -22,6 +27,9 @@ targets:
     sources:
       - path: Sources
       - path: Shared
+      - path: ../app/src/main/assets/manifest.json
+        buildPhase: resources
+        type: file
       # Reference the Android asset in place so the 6.8 MB database has one
       # source of truth while Xcode still copies it into the iOS app bundle.
       - path: ../app/src/main/assets/databases/quran.db
@@ -128,8 +136,14 @@ targets:
         # Core Location refuses to prompt without this string, and the refusal is
         # silent — no fix ever arrives and the app just shows the fallback city.
         NSLocationWhenInUseUsageDescription: >-
-          Prayer times depend on where you are. Your location is used on device to
-          calculate them and is never sent anywhere.
+          Location is used on device to calculate prayer times and, when enabled,
+          detect driving for the Travel Dua. It is never sent anywhere.
+        NSMicrophoneUsageDescription: >-
+          The microphone is used only when you test voice recognition or answer a
+          hands-free prompt.
+        NSSpeechRecognitionUsageDescription: >-
+          Speech recognition turns your test response into text so you can verify
+          hands-free voice controls.
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -164,6 +178,8 @@ targets:
           - -framework
           - Shared
     dependencies:
+      - package: SherpaOnnx
+        product: sherpa-onnx
       - target: PrayerLiveActivityExtension
         embed: true
     preBuildScripts:
