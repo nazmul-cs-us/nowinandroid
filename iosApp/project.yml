@@ -27,6 +27,89 @@ targets:
       - path: ../app/src/main/assets/databases/quran.db
         buildPhase: resources
         type: file
+      # The Interests destination reads the same topic catalog and source
+      # databases used by Android's NewsDbGenerator.
+      - path: ../core/contentdatabase/src/main/assets/databases/topics.db
+        buildPhase: resources
+        type: file
+      - path: ../app/src/main/assets/databases/quranic_duas.db
+        buildPhase: resources
+        type: file
+      - path: ../app/src/main/assets/databases/fortress_of_the_muslim_v2.db
+        buildPhase: resources
+        type: file
+      # Reuse Android's exact Interests/news artwork in place. Keeping these as
+      # individual resources makes UIImage.imageNamed resolve the same basename
+      # on iOS without maintaining a second copy of any asset.
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_holy_quran.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sahih_bukhari.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_quranic_duas.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_morning_evening.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_prayer.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_home_daily.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_food_drink.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_travel.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_protection.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_distress_anxiety.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_health_sickness.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_social_etiquette.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_death_funeral.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_weather_nature.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_hajj_umrah.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_forgiveness_repentance.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_guidance_faith.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_remembrance_dhikr.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_family_marriage.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable-nodpi/topic_sacrifice_worship.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable/masjid_al_nawabi.png
+        buildPhase: resources
+        type: file
+      - path: ../core/designsystem/src/main/res/drawable/masjid_al_haram.png
+        buildPhase: resources
+        type: file
+      - path: ../app/src/main/res/drawable-nodpi/ic_flaticon_location_marker.png
+        buildPhase: resources
+        type: file
     info:
       path: Sources/Info.plist
       properties:

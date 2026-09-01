@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -77,7 +78,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.dashboardSlots
 import com.starception.submission.prayer.model.PrayerTimeOffsets
@@ -86,16 +89,22 @@ import com.starception.submission.feature.prayertimes.wobble.AlertPhase
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Thermostat
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
 import com.starception.submission.shared.SharedPrayerSlot
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.ExpandMore
 import kotlin.math.roundToInt
 
 // Shared copies of the Android dashboard's reference palette. Keeping these
@@ -196,7 +205,7 @@ fun PrayerTimesScreen(
             val useSideNavigation = useTwoPaneLayout
             // iOS has taller status/navigation safe areas than Android. Reserving
             // their measured space keeps the location card above the floating bar.
-            val portraitInsightHeight = (maxHeight - 636.dp).coerceIn(196.dp, 288.dp)
+            val portraitInsightHeight = (maxHeight - 652.dp).coerceIn(192.dp, 280.dp)
             val landscapeInsightHeight = (maxHeight - 182.dp).coerceIn(220.dp, 560.dp)
             Column(
                 modifier = Modifier
@@ -283,7 +292,7 @@ fun PrayerTimesScreen(
                     // artwork never leaves only a couple of prayer rows visible.
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 84.dp),
+                        contentPadding = PaddingValues(bottom = 112.dp),
                     ) {
                         item {
                             InsightPager(
@@ -342,6 +351,7 @@ fun PrayerTimesScreen(
                     items = SharedBottomBarItems,
                     selectedIndex = selectedBottomIndex,
                     onSelect = onSelectBottom,
+                    onVoiceTap = onVoiceTap,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -364,9 +374,13 @@ private fun PrayerHomeHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconTapTarget(
-            icon = NiaIcons.Person,
+            // Android's logged-out state uses its filled circular profile asset.
+            icon = Icons.Filled.AccountCircle,
             contentDescription = "Open local profile",
             tint = MaterialTheme.colorScheme.onBackground,
+            visualSize = 34.dp,
+            iconSize = 34.dp,
+            showBackground = false,
             onClick = onOpenProfile,
         )
         Surface(
@@ -411,9 +425,12 @@ private fun PrayerHomeHeader(
             }
         }
         IconTapTarget(
-            icon = NiaIcons.Settings,
+            icon = Icons.Outlined.Settings,
             contentDescription = "Prayer settings",
             tint = MaterialTheme.colorScheme.onBackground,
+            visualSize = 36.dp,
+            iconSize = 26.dp,
+            showBackground = false,
             onClick = onOpenSettings,
         )
     }
@@ -483,7 +500,7 @@ private fun PrayerScheduleSection(
         if (!isTuning) revealedCard = null
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -492,12 +509,8 @@ private fun PrayerScheduleSection(
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     text = "Prayer times",
-                    style = if (compact) {
-                        MaterialTheme.typography.titleMedium
-                    } else {
-                        MaterialTheme.typography.titleLarge
-                    },
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
@@ -522,18 +535,35 @@ private fun PrayerScheduleSection(
                 } else {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 },
-                modifier = Modifier.height(if (compact) 36.dp else 42.dp),
+                modifier = Modifier
+                    .widthIn(min = if (compact) 126.dp else 148.dp)
+                    .height(if (compact) 36.dp else 44.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = if (isTuning) NiaIcons.Check else NiaIcons.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(if (compact) 16.dp else 18.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(if (compact) 26.dp else 32.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isTuning) {
+                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isTuning) NiaIcons.Check else Icons.Outlined.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(if (compact) 16.dp else 18.dp),
+                        )
+                    }
                     Text(
                         text = if (isTuning) "Done" else "Tune schedule",
                         style = MaterialTheme.typography.labelMedium,
@@ -581,15 +611,23 @@ private fun PrayerScheduleSection(
         }
         if (showExpandControl) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+                modifier = Modifier.fillMaxWidth().height(32.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(
                     onClick = onToggleExpanded,
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(32.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                 ) {
-                    Text(if (showAllPrayers) "Show less" else "Show all prayers")
+                    Icon(
+                        imageVector = Icons.Rounded.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { rotationZ = if (showAllPrayers) 180f else 0f },
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(if (showAllPrayers) "Show Less" else "Show All Prayers")
                 }
             }
         }
@@ -881,8 +919,12 @@ private fun PrayerCard(
                                     .clickable(enabled = isTuning, onClick = onToggleNotification),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Notifications,
+                                FlaticonIcon(
+                                    glyph = if (notificationEnabled) {
+                                        FlaticonIcons.NOTIFICATIONS_ACTIVE
+                                    } else {
+                                        FlaticonIcons.NOTIFICATIONS
+                                    },
                                     contentDescription = if (notificationEnabled) {
                                         "Disable ${slot.name} notification"
                                     } else {
@@ -891,7 +933,7 @@ private fun PrayerCard(
                                     tint = accentColor.copy(
                                         alpha = if (notificationEnabled) 0.9f else 0.25f,
                                     ),
-                                    modifier = Modifier.size(if (compact) 18.dp else 20.dp),
+                                    fontSize = if (compact) 13.sp else 16.sp,
                                 )
                             }
                         }
@@ -964,22 +1006,31 @@ internal fun IconTapTarget(
     contentDescription: String,
     tint: Color,
     modifier: Modifier = Modifier,
+    visualSize: Dp = 48.dp,
+    iconSize: Dp = if (visualSize < 48.dp) 24.dp else 26.dp,
+    showBackground: Boolean = true,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = modifier
             .size(48.dp)
-            .clip(CircleShape)
-            .background(tint.copy(alpha = 0.08f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        androidx.compose.material3.Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(26.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(visualSize)
+                .clip(CircleShape)
+                .background(if (showBackground) tint.copy(alpha = 0.08f) else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 
@@ -1010,24 +1061,27 @@ private fun LocationWeatherRow(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.size(40.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.LocationOn,
-                    contentDescription = "Refresh location",
-                    modifier = Modifier.padding(10.dp),
+                LocationMarkerArtwork(
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(9.dp),
                 )
             }
         }
         return
     }
-    Card(
-        modifier = modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+    val placeParts = remember(placeName) { placeName.split(',', limit = 2).map(String::trim) }
+    val placeTitle = placeParts.firstOrNull().orEmpty().ifEmpty { placeName }
+    val placeDetail = placeParts.getOrNull(1).orEmpty()
+    Surface(
+        onClick = onRefresh,
+        modifier = modifier.fillMaxWidth().height(58.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
+        shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1035,36 +1089,60 @@ private fun LocationWeatherRow(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                LocationMarkerArtwork(
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
-                Text(
-                    text = if (isLocating) "$placeName · Locating" else placeName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 8.dp).weight(1f),
-                )
+                Column(modifier = Modifier.padding(start = 8.dp).weight(1f)) {
+                    Text(
+                        text = if (isLocating) "$placeTitle · Locating" else placeTitle,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 14.sp,
+                            lineHeight = 17.sp,
+                        ),
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (placeDetail.isNotEmpty()) {
+                        Text(
+                            text = placeDetail,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 13.sp,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
             // Only shown once the forecast has arrived; an empty slot reads
             // better than a placeholder temperature that might be wrong.
             if (temperatureCelsius != null) {
-                Column(horizontalAlignment = Alignment.End) {
+                Spacer(Modifier.size(12.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Thermostat,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Column(
+                    modifier = Modifier.padding(start = 6.dp),
+                    horizontalAlignment = Alignment.Start,
+                ) {
                     Text(
                         text = "${temperatureCelsius.toInt()}\u00B0C",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (conditionLabel.isNotEmpty()) {
                         Text(
                             text = conditionLabel,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         )
                     }

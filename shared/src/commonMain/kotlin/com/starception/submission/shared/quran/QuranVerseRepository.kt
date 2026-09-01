@@ -14,6 +14,7 @@ data class QuranVerse(
     val arabicText: String,
     val page: Int,
     val juz: Int,
+    val translation: String = "",
 )
 
 interface QuranVerseRepository {
@@ -34,7 +35,8 @@ internal fun filterQuranVerses(
     if (term.isBlank()) return verses
     return verses.filter { verse ->
         verse.numberInSurah.toString() == term ||
-            normalizeArabicSearch(verse.arabicText).contains(term)
+            normalizeArabicSearch(verse.arabicText).contains(term) ||
+            verse.translation.lowercase().contains(query.trim().lowercase())
     }
 }
 

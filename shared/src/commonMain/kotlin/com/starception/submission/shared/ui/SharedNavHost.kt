@@ -53,6 +53,9 @@ object PrayerSettingsRoute
 @Serializable object QuranLibraryRoute
 @Serializable data class QuranDetailRoute(val number: Int)
 @Serializable data class BukhariBookRoute(val id: Int)
+@Serializable data class BukhariHadithRoute(val id: Int)
+@Serializable data class TopicRoute(val id: Int)
+@Serializable data class TopicArticleRoute(val topicId: Int, val articleId: Int)
 @Serializable object QiblaRoute
 @Serializable object RecommendationRoute
 
@@ -159,7 +162,11 @@ fun SharedNavHost(
             CourseScreen(contentStore, selectBottom)
         }
         composable<InterestsRoute> {
-            InterestsScreen(contentStore, selectBottom)
+            InterestsScreen(
+                store = contentStore,
+                onSelectBottom = selectBottom,
+                onOpenTopic = { navController.navigate(TopicRoute(it)) },
+            )
         }
         composable<SearchRoute> {
             SearchScreen(
@@ -189,6 +196,34 @@ fun SharedNavHost(
         composable<BukhariBookRoute> { entry ->
             BukhariBookDetailScreen(
                 id = entry.toRoute<BukhariBookRoute>().id,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+                onOpenHadith = { navController.navigate(BukhariHadithRoute(it)) },
+            )
+        }
+        composable<BukhariHadithRoute> { entry ->
+            BukhariHadithDetailScreen(
+                hadithId = entry.toRoute<BukhariHadithRoute>().id,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<TopicRoute> { entry ->
+            TopicNewsScreen(
+                topicId = entry.toRoute<TopicRoute>().id,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+                onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                onOpenArticle = { topicId, articleId ->
+                    navController.navigate(TopicArticleRoute(topicId, articleId))
+                },
+            )
+        }
+        composable<TopicArticleRoute> { entry ->
+            val route = entry.toRoute<TopicArticleRoute>()
+            TopicArticleDetailScreen(
+                topicId = route.topicId,
+                articleId = route.articleId,
                 store = contentStore,
                 onBack = { navController.popBackStack() },
             )

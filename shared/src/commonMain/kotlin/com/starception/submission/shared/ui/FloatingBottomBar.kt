@@ -88,6 +88,7 @@ fun FloatingBottomBar(
     items: List<BottomBarItem>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    onVoiceTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var barWidth by remember { mutableStateOf(0) }
@@ -109,62 +110,99 @@ fun FloatingBottomBar(
         label = "navIndicator",
     )
 
-    Surface(
+    Row(
         modifier = modifier
             .safeDrawingPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .fillMaxWidth()
             .widthIn(max = 560.dp),
-        shape = RoundedCornerShape(26.dp),
-        color = if (isDarkTheme) {
-            MaterialTheme.colorScheme.surfaceContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHighest
-        },
-        tonalElevation = 3.dp,
-        shadowElevation = 6.dp,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .onSizeChanged { barWidth = it.width },
+        Surface(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDarkTheme) {
+                MaterialTheme.colorScheme.surfaceContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHighest
+            },
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
         ) {
-            if (barWidth > 0) {
-                Box(
-                    modifier = Modifier
-                        .offset(x = indicatorOffset)
-                        .size(width = itemWidth + 16.dp, height = 48.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isDarkTheme) MaterialTheme.colorScheme.surfaceBright else Color.White,
-                        ),
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = horizontalInset),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .onSizeChanged { barWidth = it.width },
             ) {
-                items.forEachIndexed { index, item ->
-                    val selected = index == selectedIndex
+                if (barWidth > 0) {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clickable(enabled = item.enabled) { onSelect(index) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.label,
-                            tint = when {
-                                !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    .copy(alpha = 0.35f)
-                                selected -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(24.dp),
+                            .offset(x = indicatorOffset)
+                            .size(width = itemWidth + 16.dp, height = 48.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isDarkTheme) MaterialTheme.colorScheme.surfaceBright else Color.White,
+                            ),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = horizontalInset),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items.forEachIndexed { index, item ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .clickable(enabled = item.enabled) { onSelect(index) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                // Android keeps the destination glyph outlined in every
+                                // state; the travelling surface is the selection cue.
+                                imageVector = item.unselectedIcon,
+                                contentDescription = item.label,
+                                tint = when {
+                                    !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        .copy(alpha = 0.35f)
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (onVoiceTap != null) {
+            Surface(
+                onClick = onVoiceTap,
+                modifier = Modifier.size(52.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.onSurface,
+                contentColor = MaterialTheme.colorScheme.surface,
+                shadowElevation = 3.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 13.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    listOf(12.dp, 20.dp, 27.dp, 20.dp, 12.dp).forEach { barHeight ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(barHeight)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface),
                         )
                     }
                 }
@@ -212,13 +250,12 @@ fun FloatingSideBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                        imageVector = item.unselectedIcon,
                         contentDescription = item.label,
                         tint = when {
                             !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
                                 .copy(alpha = 0.35f)
-                            selected -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurface
                         },
                         modifier = Modifier.size(23.dp),
                     )

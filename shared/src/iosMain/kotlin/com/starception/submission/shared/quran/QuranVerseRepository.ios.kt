@@ -2,6 +2,7 @@ package com.starception.submission.shared.quran
 
 import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
+import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
@@ -38,9 +39,14 @@ private class IosQuranVerseRepository : QuranVerseRepository {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private fun readVerses(surahNumber: Int): List<QuranVerse> = memScoped {
-        val databasePath = NSBundle.mainBundle.pathForResource("quran", ofType = "db")
-            ?: error("Bundled Quran database was not found")
+    private suspend fun readVerses(surahNumber: Int): List<QuranVerse> {
+        val databasePath = resolveDatabaseAsset(
+            bundledPath = NSBundle.mainBundle.pathForResource("quran", ofType = "db"),
+            remotePath = "databases/quran/quran.db",
+            cacheName = "quran.db",
+        )
+        val translations = readTranslations(surahNumber)
+        return memScoped {
         val database = alloc<CPointerVar<sqlite3>>()
         val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
         if (openResult != SQLITE_OK) {
@@ -82,6 +88,7 @@ private class IosQuranVerseRepository : QuranVerseRepository {
                                     ),
                                     page = sqlite3_column_int(statement.value, 4),
                                     juz = sqlite3_column_int(statement.value, 5),
+                                    translation = translations[sqlite3_column_int(statement.value, 2)].orEmpty(),
                                 ),
                             )
                             SQLITE_DONE -> break
@@ -94,6 +101,63 @@ private class IosQuranVerseRepository : QuranVerseRepository {
             }
         } finally {
             database.value?.let(::sqlite3_close)
+        }
+        }
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readTranslations(surahNumber: Int): Map<Int, String> {
+        val databasePath = resolveDatabaseAsset(
+            bundledPath = NSBundle.mainBundle.pathForResource("quran_en", ofType = "db"),
+            remotePath = "databases/quran/quran_en.db",
+            cacheName = "quran_en.db",
+        )
+        return memScoped {
+        val database = alloc<CPointerVar<sqlite3>>()
+        val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+        if (openResult != SQLITE_OK) {
+            val message = database.value.errorMessage()
+            database.value?.let(::sqlite3_close)
+            error("Unable to open Quran translation database: $message")
+        }
+        try {
+            val statement = alloc<CPointerVar<sqlite3_stmt>>()
+            val sql = """
+                SELECT number_in_surah, text
+                FROM ayahs
+                WHERE surah_number = ?
+                ORDER BY number_in_surah ASC
+            """.trimIndent()
+            check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                "Unable to prepare Quran translation query: ${database.value.errorMessage()}"
+            }
+            try {
+                check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK)
+                buildMap {
+                    while (true) {
+                        when (sqlite3_step(statement.value)) {
+                            SQLITE_ROW -> put(
+                                sqlite3_column_int(statement.value, 0),
+                                cleanQuranText(
+                                    sqlite3_column_text(statement.value, 1)
+                                        ?.reinterpret<ByteVar>()
+                                        ?.toKString()
+                                        .orEmpty(),
+                                ),
+                            )
+                            SQLITE_DONE -> break
+                            else -> error(
+                                "Unable to read Quran translations: ${database.value.errorMessage()}",
+                            )
+                        }
+                    }
+                }
+            } finally {
+                statement.value?.let(::sqlite3_finalize)
+            }
+        } finally {
+            database.value?.let(::sqlite3_close)
+        }
         }
     }
 }

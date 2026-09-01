@@ -55,11 +55,13 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         // Falling back to the country's defaults keeps prayer times on screen;
         // failing here would leave the user with no times at all.
         return runCatching { json.decodeFromString<PrayerSettings>(stored) }
+            .map { migrateToAndroidOffsets(countryCode, country, it) }
             .getOrElse { defaultsFrom(country) }
     }
 
     fun save(countryCode: String, settings: PrayerSettings) {
         store.putString(settingsKey(countryCode), json.encodeToString(settings))
+        store.putString(offsetModeKey(countryCode), ANDROID_OFFSET_MODE)
     }
 
     /**
@@ -123,6 +125,30 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
     private fun settingsKey(countryCode: String): String =
         "$KEY_SETTINGS_PREFIX${countryCode.trim().uppercase().ifEmpty { UNKNOWN_COUNTRY }}"
 
+    private fun offsetModeKey(countryCode: String): String =
+        "$KEY_OFFSET_MODE_PREFIX${countryCode.trim().uppercase().ifEmpty { UNKNOWN_COUNTRY }}"
+
+    /**
+     * Earlier iOS builds stored only the user's delta and added the country's
+     * authority offset inside PrayerSchedule. Android stores their sum in
+     * PrayerSettings.timeOffsets. Fold the authority value in once, then mark the
+     * record so subsequent reads cannot add it again.
+     */
+    private fun migrateToAndroidOffsets(
+        countryCode: String,
+        country: CountryPrayerDefaults?,
+        settings: PrayerSettings,
+    ): PrayerSettings {
+        if (store.getString(offsetModeKey(countryCode)) == ANDROID_OFFSET_MODE) return settings
+
+        val authority = country.toPrayerTimeOffsets()
+        val migrated = settings.copy(
+            timeOffsets = settings.timeOffsets.plus(authority),
+        )
+        save(countryCode, migrated)
+        return migrated
+    }
+
     private fun defaultsFrom(country: CountryPrayerDefaults?) = PrayerSettings(
         calculationMethod = country?.method ?: PrayerSettings().calculationMethod,
         asrMadhhab = if (country?.asrShadowFactor == AsrMadhhab.HANAFI.shadowFactor) {
@@ -130,11 +156,14 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         } else {
             AsrMadhhab.STANDARD
         },
+        timeOffsets = country.toPrayerTimeOffsets(),
     )
 
     private companion object {
         const val KEY_LEGACY_SETTINGS = "cached_prayer_settings"
         const val KEY_SETTINGS_PREFIX = "cached_prayer_settings_country_"
+        const val KEY_OFFSET_MODE_PREFIX = "cached_prayer_offset_mode_country_"
+        const val ANDROID_OFFSET_MODE = "android_combined_v1"
         const val UNKNOWN_COUNTRY = "UNKNOWN"
         const val KEY_NOTIFICATIONS = "prayer_notification_preferences"
 
@@ -146,6 +175,24 @@ class UserPrayerSettings(private val store: KeyValueStore = platformKeyValueStor
         const val MAX_OFFSET = 180
     }
 }
+
+private fun CountryPrayerDefaults?.toPrayerTimeOffsets() = PrayerTimeOffsets(
+    fajr = this?.timeOffsets?.get("fajr") ?: 0,
+    sunrise = this?.timeOffsets?.get("sunrise") ?: 0,
+    dhuhr = this?.timeOffsets?.get("dhuhr") ?: 0,
+    asr = this?.timeOffsets?.get("asr") ?: 0,
+    maghrib = this?.timeOffsets?.get("maghrib") ?: 0,
+    isha = this?.timeOffsets?.get("isha") ?: 0,
+)
+
+private fun PrayerTimeOffsets.plus(other: PrayerTimeOffsets) = PrayerTimeOffsets(
+    fajr = fajr + other.fajr,
+    sunrise = sunrise + other.sunrise,
+    dhuhr = dhuhr + other.dhuhr,
+    asr = asr + other.asr,
+    maghrib = maghrib + other.maghrib,
+    isha = isha + other.isha,
+)
 
 /** Returns a copy with [prayer]'s offset replaced. */
 fun PrayerTimeOffsets.withOffset(prayer: String, minutes: Int): PrayerTimeOffsets =

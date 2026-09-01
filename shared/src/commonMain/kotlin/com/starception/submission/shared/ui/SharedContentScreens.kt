@@ -12,6 +12,9 @@ package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,11 +24,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,8 +43,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,12 +68,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
@@ -75,26 +89,22 @@ import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
 import com.starception.submission.shared.content.LocalProfile
 import com.starception.submission.shared.content.SharedContentStore
+import com.starception.submission.shared.content.SharedTopic
+import com.starception.submission.shared.content.SharedTopicArticle
+import com.starception.submission.shared.content.SharedTopics
+import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
 import com.starception.submission.shared.content.searchCatalog
+import com.starception.submission.shared.content.sharedTopic
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
+import com.starception.submission.shared.hadith.SharedHadith
+import com.starception.submission.shared.hadith.createSharedHadithRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
-
-internal val SharedInterests = listOf(
-    "Quran",
-    "Prayer",
-    "Hadith",
-    "Dua and remembrance",
-    "Character",
-    "Family",
-    "Travel",
-    "Learning",
-)
 
 internal data class CourseLesson(val number: Int, val title: String, val summary: String)
 
@@ -110,6 +120,18 @@ private sealed interface QuranAyahState {
     data object Loading : QuranAyahState
     data class Loaded(val verses: List<QuranVerse>) : QuranAyahState
     data class Error(val message: String) : QuranAyahState
+}
+
+private sealed interface TopicArticlesState {
+    data object Loading : TopicArticlesState
+    data class Loaded(val articles: List<SharedTopicArticle>) : TopicArticlesState
+    data class Error(val message: String) : TopicArticlesState
+}
+
+private sealed interface HadithsState {
+    data object Loading : HadithsState
+    data class Loaded(val hadiths: List<SharedHadith>) : HadithsState
+    data class Error(val message: String) : HadithsState
 }
 
 @Composable
@@ -288,33 +310,42 @@ internal fun QuranDetailScreen(
             QuranAyahState.Error(error.message ?: "The Quran database could not be read.")
         }
     }
+    var showTranslation by remember(number) { mutableStateOf(true) }
     SharedDetailScaffold(title = surah.nameEnglish, onBack = onBack) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            shape = RoundedCornerShape(24.dp),
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(20.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(surah.nameArabic, style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.height(8.dp))
-                Text(surah.subtitle(), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Surah ${surah.number} · ${surah.nameEnglish}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        surah.subtitle(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    surah.nameArabic,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Whole-surah recitation",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            "Streamed from QuranicAudio using Mishari Alafasy's murattal recitation. Network access is required.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = {
                     if (playing) {
@@ -326,26 +357,20 @@ internal fun QuranDetailScreen(
                 },
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(
-                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(if (playing) "Pause" else "Play recitation")
+                Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null)
+                Spacer(Modifier.size(6.dp))
+                Text(if (playing) "Pause" else "Play")
             }
             OutlinedButton(
                 onClick = { saved = number in store.toggleSurah(number) },
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(
-                    if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.size(8.dp))
+                Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, null)
+                Spacer(Modifier.size(6.dp))
                 Text(if (saved) "Saved" else "Save")
             }
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(10.dp))
         when (val state = ayahState) {
             QuranAyahState.Loading -> Box(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -371,21 +396,27 @@ internal fun QuranDetailScreen(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search Arabic ayahs or number") },
+                    label = { Text("Search ayah, Arabic, or translation") },
                     leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (query.isBlank()) {
-                        "${state.verses.size} ayahs"
-                    } else {
-                        "${filteredVerses.size} matching ayahs"
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (query.isBlank()) "${state.verses.size} ayahs" else "${filteredVerses.size} matches",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        if (showTranslation) "Double-tap to hide translation" else "Double-tap to show translation",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 if (filteredVerses.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxWidth().weight(1f),
@@ -396,10 +427,182 @@ internal fun QuranDetailScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                         contentPadding = PaddingValues(bottom = 24.dp),
                     ) {
-                        items(filteredVerses, key = { it.id }) { verse -> QuranAyahCard(verse) }
+                        items(filteredVerses, key = { it.id }) { verse ->
+                            QuranAyahReadingBlock(
+                                verse = verse,
+                                showTranslation = showTranslation,
+                                onToggleTranslation = { showTranslation = !showTranslation },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun QuranAyahReadingBlock(
+    verse: QuranVerse,
+    showTranslation: Boolean,
+    onToggleTranslation: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onDoubleClick = onToggleTranslation)
+            .semantics {
+            contentDescription = verse.metadataLabel()
+        }
+            .padding(horizontal = 4.dp, vertical = 14.dp),
+    ) {
+        Text(
+            verse.metadataLabel(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = "${verse.arabicText} \u06DD${verse.numberInSurah.toArabicIndicDigits()}",
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 30.sp,
+            lineHeight = 48.sp,
+            textAlign = TextAlign.Justify,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (showTranslation && verse.translation.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "${verse.translation} \u06DD${verse.numberInSurah}",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+    }
+}
+
+private fun Int.toArabicIndicDigits(): String = toString().map { digit ->
+    if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
+}.joinToString("")
+
+@Composable
+internal fun BukhariBookDetailScreen(
+    id: Int,
+    store: SharedContentStore,
+    onBack: () -> Unit,
+    onOpenHadith: (Int) -> Unit,
+) {
+    val book = BukhariBooks.find(id)
+    if (book == null) {
+        SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) { Text("Book not found") }
+        return
+    }
+    var saved by remember(id) { mutableStateOf(id in store.savedBukhariBooks()) }
+    var query by remember(id) { mutableStateOf("") }
+    var loadAttempt by remember(id) { mutableStateOf(0) }
+    var state by remember(id) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    val repository = remember { createSharedHadithRepository() }
+    LaunchedEffect(id, loadAttempt) {
+        state = try {
+            val hadiths = repository.getHadiths(book.firstHadithId, book.lastHadithId)
+            if (hadiths.isEmpty()) HadithsState.Error("No narrations were found for this book.")
+            else HadithsState.Loaded(hadiths)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "The Sahih al-Bukhari database could not be read.")
+        }
+    }
+    SharedDetailScaffold(title = book.nameEnglish, onBack = onBack) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TopicArtwork("Sahih Bukhari", Modifier.size(56.dp))
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(book.nameEnglish, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        book.nameArabic,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "${book.hadithCount} hadiths · ${book.firstHadithId}–${book.lastHadithId}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                FilledIconToggleButton(
+                    checked = saved,
+                    onCheckedChange = { saved = id in store.toggleBukhariBook(id) },
+                ) {
+                    Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, "Save book")
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        when (val current = state) {
+            HadithsState.Loading -> Box(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is HadithsState.Error -> Column(
+                Modifier.fillMaxWidth().weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                SupportingCard("Unable to load this book", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is HadithsState.Loaded -> {
+                val filtered = remember(current.hadiths, query) {
+                    val term = query.trim().lowercase()
+                    if (term.isEmpty()) current.hadiths else current.hadiths.filter {
+                        it.id.toString() == term || it.english.lowercase().contains(term) || it.arabic.contains(query.trim())
+                    }
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search this book") },
+                    leadingIcon = { Icon(NiaIcons.Search, null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    if (query.isBlank()) "${current.hadiths.size} hadiths" else "${filtered.size} matches",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(7.dp))
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    items(filtered, key = { it.id }) { hadith ->
+                        BukhariHadithTile(hadith, onClick = { onOpenHadith(hadith.id) })
                     }
                 }
             }
@@ -408,64 +611,113 @@ internal fun QuranDetailScreen(
 }
 
 @Composable
-private fun QuranAyahCard(verse: QuranVerse) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth().semantics {
-            contentDescription = verse.metadataLabel()
-        },
+private fun BukhariHadithTile(hadith: SharedHadith, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(
-                verse.metadataLabel(),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                verse.arabicText,
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.End,
-            )
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            ReaderTag("HADITH ${hadith.id}")
+            if (hadith.arabic.isNotBlank()) {
+                Text(
+                    hadith.arabic,
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                    fontSize = 22.sp,
+                    lineHeight = 34.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (hadith.english.isNotBlank()) {
+                Text(
+                    hadith.english,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
 @Composable
-internal fun BukhariBookDetailScreen(
-    id: Int,
-    store: SharedContentStore,
+internal fun BukhariHadithDetailScreen(
+    hadithId: Int,
     onBack: () -> Unit,
 ) {
-    val book = BukhariBooks.find(id)
-    if (book == null) {
-        SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) { Text("Book not found") }
-        return
-    }
-    var saved by remember(id) { mutableStateOf(id in store.savedBukhariBooks()) }
-    SharedDetailScaffold(title = book.nameEnglish, onBack = onBack) {
-        Text(book.nameArabic, style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(12.dp))
-        SupportingCard(
-            title = "Book ${book.id} · ${book.hadithCount} narrations",
-            body = "Canonical collection range ${book.firstHadithId}-${book.lastHadithId}.",
-        )
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = { saved = id in store.toggleBukhariBook(id) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, contentDescription = null)
-            Spacer(Modifier.size(8.dp))
-            Text(if (saved) "Saved collection" else "Save collection")
+    val book = BukhariBooks.findByHadithId(hadithId)
+    val repository = remember { createSharedHadithRepository() }
+    var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    LaunchedEffect(hadithId) {
+        state = try {
+            repository.getHadith(hadithId)?.let { HadithsState.Loaded(listOf(it)) }
+                ?: HadithsState.Error("Hadith $hadithId was not found.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "The shared iOS catalog includes authoritative book boundaries and metadata. Full narration text remains in the Android downloadable database and is not presented here as if it were bundled.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+    SharedDetailScaffold(title = "Hadith $hadithId", onBack = onBack) {
+        when (val current = state) {
+            HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            is HadithsState.Error -> SupportingCard("Unable to load hadith", current.message)
+            is HadithsState.Loaded -> {
+                val hadith = current.hadiths.first()
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    item {
+                        NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(20.dp)))
+                    }
+                    item {
+                        Column {
+                            Text("Sahih al-Bukhari", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ReaderTag("HADITH $hadithId")
+                                if (book != null) {
+                                    ReaderTag("BOOK ${book.id} · ${book.nameEnglish.uppercase()}", selected = false)
+                                }
+                            }
+                        }
+                    }
+                    if (hadith.arabic.isNotBlank()) item {
+                        ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                            Text(
+                                hadith.arabic,
+                                modifier = Modifier.fillMaxWidth(),
+                                fontSize = 29.sp,
+                                lineHeight = 46.sp,
+                                textAlign = TextAlign.End,
+                            )
+                        }
+                    }
+                    if (hadith.english.isNotBlank()) item {
+                        ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
+                            Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                        }
+                    }
+                    if (hadith.explanation.isNotBlank()) item {
+                        ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
+                            Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -543,7 +795,10 @@ internal fun ForYouScreen(
         item {
             SupportingCard(
                 title = "Your interests",
-                body = interests.takeIf { it.isNotEmpty() }?.sorted()?.joinToString()
+                body = interests.takeIf { it.isNotEmpty() }
+                    ?.mapNotNull { id -> sharedTopic(id.toIntOrNull() ?: -1)?.name }
+                    ?.sorted()
+                    ?.joinToString()
                     ?: "Choose topics in Interests to shape this local feed.",
             )
         }
@@ -599,31 +854,609 @@ internal fun CourseScreen(store: SharedContentStore, onSelectBottom: (Int) -> Un
 }
 
 @Composable
-internal fun InterestsScreen(store: SharedContentStore, onSelectBottom: (Int) -> Unit) {
+internal fun InterestsScreen(
+    store: SharedContentStore,
+    onSelectBottom: (Int) -> Unit,
+    onOpenTopic: (Int) -> Unit,
+) {
+    val repository = remember { createSharedTopicRepository() }
+    var topics by remember { mutableStateOf(SharedTopics) }
     var selected by remember { mutableStateOf(store.interests()) }
-    TopLevelScaffold(title = "Interests", selectedIndex = 4, onSelectBottom = onSelectBottom) {
-        item {
-            Text(
-                "Select topics for the local For You feed.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    LaunchedEffect(repository) {
+        topics = runCatching { repository.topics() }
+            .getOrDefault(SharedTopics)
+            .ifEmpty { SharedTopics }
+    }
+    TopLevelScaffold(
+        title = "Interests",
+        selectedIndex = 4,
+        onSelectBottom = onSelectBottom,
+        itemSpacing = 0.dp,
+    ) {
+        items(topics, key = { it.id }) { topic ->
+            TopicInterestRow(
+                topic = topic,
+                following = topic.id.toString() in selected,
+                onOpen = { onOpenTopic(topic.id) },
+                onToggle = { selected = store.toggleInterest(topic.id.toString()) },
             )
         }
-        items(SharedInterests.chunked(2)) { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { interest ->
-                    FilterChip(
-                        selected = interest in selected,
-                        onClick = { selected = store.toggleInterest(interest) },
-                        label = { Text(interest) },
-                        leadingIcon = if (interest in selected) {
-                            { Icon(NiaIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                        } else null,
-                        modifier = Modifier.weight(1f),
-                    )
+    }
+}
+
+@Composable
+private fun TopicInterestRow(
+    topic: SharedTopic,
+    following: Boolean,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    ListItem(
+        leadingContent = {
+            TopicArtwork(topic.name, Modifier.size(48.dp).padding(2.dp))
+        },
+        headlineContent = {
+            Text(topic.name, style = MaterialTheme.typography.bodyLarge)
+        },
+        supportingContent = {
+            Text(topic.shortDescription, style = MaterialTheme.typography.bodyMedium)
+        },
+        trailingContent = {
+            FilledIconToggleButton(
+                checked = following,
+                onCheckedChange = { onToggle() },
+                colors = IconButtonDefaults.iconToggleButtonColors(
+                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            ) {
+                Icon(
+                    imageVector = if (following) NiaIcons.Check else NiaIcons.Add,
+                    contentDescription = if (following) {
+                        "Unfollow ${topic.name}"
+                    } else {
+                        "Follow ${topic.name}"
+                    },
+                )
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            // TopLevelScaffold already supplies 16 dp; Android's list supplies 24 dp.
+            .padding(horizontal = 8.dp)
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "${topic.name} topic${if (following) ", followed" else ""}"
+            }
+            .clickable(onClick = onOpen),
+    )
+}
+
+@Composable
+internal fun TopicNewsScreen(
+    topicId: Int,
+    store: SharedContentStore,
+    onBack: () -> Unit,
+    onOpenSurah: (Int) -> Unit,
+    onOpenBukhariBook: (Int) -> Unit,
+    onOpenArticle: (Int, Int) -> Unit,
+) {
+    val repository = remember { createSharedTopicRepository() }
+    var topic by remember(topicId) { mutableStateOf(sharedTopic(topicId)) }
+    var state by remember(topicId) { mutableStateOf<TopicArticlesState>(TopicArticlesState.Loading) }
+    var followedTopics by remember { mutableStateOf(store.interests()) }
+    var savedArticles by remember { mutableStateOf(store.bookmarkedTopicArticles()) }
+
+    LaunchedEffect(topicId, repository) {
+        topic = runCatching { repository.topics().firstOrNull { it.id == topicId } }
+            .getOrNull() ?: sharedTopic(topicId)
+        if (topicId != 7 && topicId != 8) {
+            state = runCatching { repository.articles(topicId) }
+                .fold(
+                    onSuccess = { TopicArticlesState.Loaded(it) },
+                    onFailure = { TopicArticlesState.Error(it.message ?: "Unable to read topic content") },
+                )
+        }
+    }
+
+    val currentTopic = topic
+    if (currentTopic == null) {
+        SharedDetailScaffold(title = "Topic", onBack = onBack) {
+            SupportingCard("Topic unavailable", "This topic is not part of the current catalog.")
+        }
+        return
+    }
+
+    TopicPageScaffold(
+        followed = currentTopic.id.toString() in followedTopics,
+        onBack = onBack,
+        onFollowChanged = {
+            followedTopics = store.toggleInterest(currentTopic.id.toString())
+        },
+    ) {
+        if (topicId != 8) {
+            item { TopicPageHeader(currentTopic) }
+        }
+        when (topicId) {
+            7 -> items(QuranData.surahs, key = { it.number }) { surah ->
+                QuranNewsCard(surah = surah, onClick = { onOpenSurah(surah.number) })
+            }
+            8 -> items(BukhariBooks.all, key = { it.id }) { book ->
+                BukhariBookRow(
+                    book = book,
+                    saved = book.id in store.savedBukhariBooks(),
+                    onClick = { onOpenBukhariBook(book.id) },
+                )
+            }
+            else -> when (val current = state) {
+                TopicArticlesState.Loading -> item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                is TopicArticlesState.Error -> item {
+                    Box(Modifier.padding(horizontal = 24.dp)) {
+                        SupportingCard("Unable to load news", current.message)
+                    }
+                }
+                is TopicArticlesState.Loaded -> {
+                    if (current.articles.isEmpty()) {
+                        item {
+                            Box(Modifier.padding(horizontal = 24.dp)) {
+                                SupportingCard("No content yet", "There are no items in this topic.")
+                            }
+                        }
+                    } else {
+                        items(current.articles, key = { it.id }) { article ->
+                            val articleKey = "$topicId:${article.id}"
+                            TopicArticleRow(
+                                article = article,
+                                topic = currentTopic,
+                                bookmarked = articleKey in savedArticles,
+                                onToggleBookmark = {
+                                    savedArticles = store.toggleTopicArticle(topicId, article.id)
+                                },
+                                onClick = { onOpenArticle(topicId, article.id) },
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun TopicPageScaffold(
+    followed: Boolean,
+    onBack: () -> Unit,
+    onFollowChanged: () -> Unit,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val wide = maxWidth >= 700.dp
+            Column(
+                modifier = Modifier
+                    .widthIn(max = if (wide) 900.dp else 680.dp)
+                    .fillMaxSize()
+                    .align(Alignment.TopCenter)
+                    .safeDrawingPadding(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    IconTapTarget(
+                        icon = NiaIcons.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        onClick = onBack,
+                    )
+                    FilterChip(
+                        selected = followed,
+                        onClick = onFollowChanged,
+                        label = { Text(if (followed) "FOLLOWING" else "NOT FOLLOWING") },
+                        leadingIcon = if (followed) {
+                            { Icon(NiaIcons.Check, contentDescription = null, Modifier.size(18.dp)) }
+                        } else {
+                            { Icon(NiaIcons.Add, contentDescription = null, Modifier.size(18.dp)) }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        modifier = Modifier.padding(end = 24.dp),
+                    )
+                }
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                    content = content,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopicPageHeader(topic: SharedTopic) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+        TopicArtwork(
+            topicName = topic.name,
+            modifier = Modifier.align(Alignment.CenterHorizontally).size(132.dp).padding(bottom = 12.dp),
+        )
+        Text(topic.name, style = MaterialTheme.typography.displayMedium)
+        if (topic.longDescription.isNotBlank()) {
+            Text(
+                topic.longDescription,
+                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TopicArticleRow(
+    article: SharedTopicArticle,
+    topic: SharedTopic,
+    bookmarked: Boolean,
+    onToggleBookmark: () -> Unit,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column {
+            NewsHeaderArtwork(
+                resourceName = "masjid_al_nawabi",
+                modifier = Modifier.fillMaxWidth().height(240.dp),
+            )
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        article.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilledIconToggleButton(
+                        checked = bookmarked,
+                        onCheckedChange = { onToggleBookmark() },
+                        colors = IconButtonDefaults.iconToggleButtonColors(
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
+                            contentDescription = if (bookmarked) "Remove bookmark" else "Bookmark",
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("Dua 🤲", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(14.dp))
+                if (article.arabic.isNotBlank()) {
+                    Text(
+                        article.arabic,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.headlineLarge,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                Text(
+                    article.translation.ifBlank { article.context },
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Text(
+                        topic.name.uppercase(),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuranNewsCard(surah: Surah, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(24.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column {
+            NewsHeaderArtwork(
+                resourceName = if (surah.revelationType == "Medinan") {
+                    "masjid_al_nawabi"
+                } else {
+                    "masjid_al_haram"
+                },
+                modifier = Modifier.fillMaxWidth().height(240.dp),
+            )
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(
+                    "Surah ${surah.number}: ${surah.nameEnglish}",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Spacer(Modifier.height(14.dp))
+                Text("Surah 📖", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    surah.nameArabic,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.headlineLarge,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Read and listen to ${surah.nameEnglish}, the ${surah.number.ordinal()} chapter of the Holy Quran.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Text(
+                        "HOLY QURAN",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun Int.ordinal(): String {
+    val suffix = when {
+        this % 100 in 11..13 -> "th"
+        this % 10 == 1 -> "st"
+        this % 10 == 2 -> "nd"
+        this % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$this$suffix"
+}
+
+@Composable
+internal fun TopicArticleDetailScreen(
+    topicId: Int,
+    articleId: Int,
+    store: SharedContentStore,
+    onBack: () -> Unit,
+) {
+    val topic = sharedTopic(topicId)
+    val repository = remember { createSharedTopicRepository() }
+    var state by remember(topicId, articleId) {
+        mutableStateOf<TopicArticlesState>(TopicArticlesState.Loading)
+    }
+    LaunchedEffect(topicId, articleId, repository) {
+        state = runCatching { repository.articles(topicId) }
+            .fold(
+                onSuccess = { TopicArticlesState.Loaded(it) },
+                onFailure = { TopicArticlesState.Error(it.message ?: "Unable to read this item") },
+            )
+    }
+
+    SharedDetailScaffold(title = topic?.name ?: "Reading", onBack = onBack) {
+        when (val current = state) {
+            TopicArticlesState.Loading -> Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is TopicArticlesState.Error -> SupportingCard("Unable to load item", current.message)
+            is TopicArticlesState.Loaded -> {
+                val article = current.articles.firstOrNull { it.id == articleId }
+                if (article == null) {
+                    SupportingCard("Item unavailable", "This item is no longer in the topic database.")
+                } else {
+                    var saved by remember(topicId, articleId) {
+                        mutableStateOf("$topicId:$articleId" in store.bookmarkedTopicArticles())
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 28.dp),
+                    ) {
+                        item {
+                            NewsHeaderArtwork(
+                                resourceName = "masjid_al_nawabi",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(190.dp)
+                                    .clip(RoundedCornerShape(20.dp)),
+                            )
+                        }
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        article.title,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    Spacer(Modifier.height(7.dp))
+                                    ReaderTag((topic?.name ?: "DUA").uppercase())
+                                }
+                                FilledIconToggleButton(
+                                    checked = saved,
+                                    onCheckedChange = {
+                                        saved = "$topicId:$articleId" in store.toggleTopicArticle(topicId, articleId)
+                                    },
+                                ) {
+                                    Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, "Save dua")
+                                }
+                            }
+                        }
+                        if (article.context.isNotBlank()) item {
+                            ReaderSection("Context", MaterialTheme.colorScheme.secondary) {
+                                Text(article.context, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                            }
+                        }
+                        if (article.arabic.isNotBlank()) {
+                            item {
+                                Surface(
+                                    shape = RoundedCornerShape(22.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                ) {
+                                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp)) {
+                                        Text(
+                                            "ARABIC",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        Text(
+                                            article.arabic,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            fontSize = 31.sp,
+                                            lineHeight = 49.sp,
+                                            textAlign = TextAlign.End,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (article.transliteration.isNotBlank()) {
+                            item {
+                                ReaderSection("Transliteration", MaterialTheme.colorScheme.secondary) {
+                                    Text(
+                                        article.transliteration,
+                                        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        if (article.translation.isNotBlank()) {
+                            item {
+                                ReaderSection("Translation", MaterialTheme.colorScheme.primary) {
+                                    Text(article.translation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                                }
+                            }
+                        }
+                        if (article.instruction.isNotBlank()) {
+                            item {
+                                ReaderSection("Guidance", MaterialTheme.colorScheme.tertiary) {
+                                    Text(article.instruction, style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp))
+                                }
+                            }
+                        }
+                        if (article.additionalContext.isNotBlank()) {
+                            item {
+                                ReaderSection("Additional context", MaterialTheme.colorScheme.tertiary) {
+                                    Text(article.additionalContext, style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp))
+                                }
+                            }
+                        }
+                        if (article.reference.isNotBlank()) {
+                            item {
+                                ReaderSection("Reference", MaterialTheme.colorScheme.primary) {
+                                    Text(
+                                        article.reference,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderSection(
+    title: String,
+    accent: Color,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
+            Column(
+                modifier = Modifier.weight(1f).padding(horizontal = 15.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accent,
+                )
+                Spacer(Modifier.height(8.dp))
+                content()
+            }
+        }
+    }
+}
+
+/** Same compact filled/unfilled tag treatment used by NiA topic chips. */
+@Composable
+private fun ReaderTag(text: String, selected: Boolean = true) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)
+        },
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -657,6 +1490,7 @@ private fun TopLevelScaffold(
     title: String,
     selectedIndex: Int,
     onSelectBottom: (Int) -> Unit,
+    itemSpacing: Dp = 10.dp,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
@@ -671,7 +1505,7 @@ private fun TopLevelScaffold(
             ) {
                 ScreenHeader(title)
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(itemSpacing),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
                     content = content,
                 )

@@ -40,9 +40,19 @@ class PrayerScheduleSettingsTest {
         nowMinute = 0,
     ).slots.associate { it.name to it.display }
 
+    private val uaeCountry = requireNotNull(prayerDefaultsFor("AE"))
+    private val uaeOffsets = PrayerTimeOffsets(
+        fajr = uaeCountry.timeOffsets["fajr"] ?: 0,
+        sunrise = uaeCountry.timeOffsets["sunrise"] ?: 0,
+        dhuhr = uaeCountry.timeOffsets["dhuhr"] ?: 0,
+        asr = uaeCountry.timeOffsets["asr"] ?: 0,
+        maghrib = uaeCountry.timeOffsets["maghrib"] ?: 0,
+        isha = uaeCountry.timeOffsets["isha"] ?: 0,
+    )
     private val uaeDefaults = PrayerSettings(
         calculationMethod = CalculationMethod.UAE_IACAD,
         asrMadhhab = AsrMadhhab.STANDARD,
+        timeOffsets = uaeOffsets,
     )
 
     @Test
@@ -76,7 +86,10 @@ class PrayerScheduleSettingsTest {
 
     @Test
     fun ummAlQuraPutsIshaNinetyMinutesAfterMaghrib() {
-        val settings = uaeDefaults.copy(calculationMethod = CalculationMethod.UMM_AL_QURA)
+        val settings = uaeDefaults.copy(
+            calculationMethod = CalculationMethod.UMM_AL_QURA,
+            timeOffsets = PrayerTimeOffsets(),
+        )
         // A country with no published offsets, so the method is measured alone.
         val times = schedule(settings, countryCode = "ZZ")
 
@@ -106,7 +119,9 @@ class PrayerScheduleSettingsTest {
     @Test
     fun userOffsetsAddToTheCountrysOwn() {
         val plain = schedule(uaeDefaults)
-        val adjusted = schedule(uaeDefaults.copy(timeOffsets = PrayerTimeOffsets(asr = 7)))
+        val adjusted = schedule(
+            uaeDefaults.copy(timeOffsets = uaeOffsets.copy(asr = uaeOffsets.asr + 7)),
+        )
 
         assertEquals(
             plain.getValue("Asr").toMinutes() + 7,
@@ -118,7 +133,10 @@ class PrayerScheduleSettingsTest {
     fun theUaesPublishedOffsetsApplyEvenWithoutUserChanges() {
         // Country AE shifts Asr +3 and Sunrise -3; a country with none must not.
         val withCountry = schedule(uaeDefaults, countryCode = "AE")
-        val withoutCountry = schedule(uaeDefaults, countryCode = "ZZ")
+        val withoutCountry = schedule(
+            uaeDefaults.copy(timeOffsets = PrayerTimeOffsets()),
+            countryCode = "ZZ",
+        )
 
         assertEquals(
             withoutCountry.getValue("Asr").toMinutes() + 3,

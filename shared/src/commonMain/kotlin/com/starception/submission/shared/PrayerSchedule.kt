@@ -112,11 +112,11 @@ object PrayerSchedule {
     /**
      * Computes a day's schedule and resolves its status against [now].
      *
-     * [defaults] carries the country's calculation method, Asr shadow factor and
-     * any per-prayer offsets its authority publishes. Without it the Muslim World
-     * League convention is used, which is a reasonable global default but wrong
-     * for plenty of places — passing the real country is what makes the times
-     * correct rather than merely plausible.
+     * [settings] follows Android's model: [PrayerSettings.timeOffsets] already
+     * contains the auto-detected authority adjustment plus any later user edit.
+     * The schedule therefore applies that value exactly once. [defaults] remains
+     * in the signature while older shared callers migrate, but is not a second
+     * offset source.
      *
      * A configured high-latitude rule supplies Fajr or Isha only when its normal
      * calculation fails. Any prayer still unresolved is omitted rather than
@@ -130,7 +130,7 @@ object PrayerSchedule {
         latitude: Double,
         longitude: Double,
         timeZoneOffset: Double,
-        defaults: CountryPrayerDefaults? = null,
+        @Suppress("UNUSED_PARAMETER") defaults: CountryPrayerDefaults? = null,
         settings: PrayerSettings = PrayerSettings(),
         countryCode: String? = null,
         isFriday: Boolean = false,
@@ -214,14 +214,11 @@ object PrayerSchedule {
             "Isha" to isha,
         ).mapNotNull { (name, decimalHour) ->
             calculator.decimalHourToLocalTime(decimalHour)?.let { instant ->
-                // The country's published adjustment and the user's own both
-                // apply: the first is what the local authority announces, the
-                // second is the user reconciling it with their mosque.
+                // Match Android: its auto-detection writes the authority offset
+                // into PrayerSettings.timeOffsets and the UI edits that same value.
                 PrayerInstant(
                     name,
-                    instant.plusMinutes(
-                        defaults.offsetFor(name) + settings.timeOffsets.getOffset(name),
-                    ),
+                    instant.plusMinutes(settings.timeOffsets.getOffset(name)),
                 )
             }
         }
@@ -281,15 +278,6 @@ object PrayerSchedule {
         )
     }
 }
-
-/**
- * The country's published adjustment for a prayer, in minutes.
- *
- * Keys in the source data are lowercase prayer names; the schedule uses
- * capitalised ones.
- */
-private fun CountryPrayerDefaults?.offsetFor(prayerName: String): Int =
-    this?.timeOffsets?.get(prayerName.lowercase()) ?: 0
 
 /** Adds minutes, wrapping past midnight. */
 private fun LocalTime.plusMinutes(minutes: Int): LocalTime =

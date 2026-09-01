@@ -1,0 +1,14 @@
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ */
+
+package com.starception.submission.shared.hadith
+
+/** Android uses its Room-backed HadithRepository; this shared host is currently used by iOS. */
+actual fun createSharedHadithRepository(): SharedHadithRepository = object : SharedHadithRepository {
+    override suspend fun getHadith(id: Int): SharedHadith? = null
+    override suspend fun getHadiths(firstId: Int, lastId: Int): List<SharedHadith> = emptyList()
+}

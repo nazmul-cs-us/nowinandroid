@@ -234,6 +234,7 @@ fun PrayerTimesViewController(): UIViewController = ComposeUIViewController {
                     },
                     onOpenProfile = actions.onOpenProfile,
                     onOpenSearch = actions.onOpenSearch,
+                    onVoiceTap = actions.onOpenSearch,
                     onOpenQuran = actions.onOpenQuran,
                     onOpenQibla = actions.onOpenQibla,
                     onOpenRecommendation = actions.onOpenRecommendation,

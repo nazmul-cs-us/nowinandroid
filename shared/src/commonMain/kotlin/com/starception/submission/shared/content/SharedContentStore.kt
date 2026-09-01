@@ -39,13 +39,30 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
 
     fun toggleBukhariBook(id: Int): Set<Int> = toggle(SAVED_BUKHARI, id, 1..97)
 
-    fun interests(): Set<String> = stringSet(INTERESTS)
+    fun bookmarkedTopicArticles(): Set<String> = stringSet(SAVED_TOPIC_ARTICLES)
+
+    fun toggleTopicArticle(topicId: Int, articleId: Int): Set<String> {
+        val itemKey = "$topicId:$articleId"
+        val updated = bookmarkedTopicArticles().toMutableSet().apply {
+            if (!add(itemKey)) remove(itemKey)
+        }
+        store.putString(SAVED_TOPIC_ARTICLES, updated.sorted().joinToString(SEPARATOR))
+        return updated
+    }
+
+    fun interests(): Set<String> {
+        val stored = stringSet(INTERESTS)
+        val canonical = stored.mapTo(mutableSetOf(), ::canonicalInterestKey)
+        if (canonical != stored) persistInterests(canonical)
+        return canonical
+    }
 
     fun toggleInterest(interest: String): Set<String> {
+        val key = canonicalInterestKey(interest)
         val updated = interests().toMutableSet().apply {
-            if (!add(interest)) remove(interest)
+            if (!add(key)) remove(key)
         }
-        store.putString(INTERESTS, updated.sorted().joinToString(SEPARATOR))
+        persistInterests(updated)
         return updated
     }
 
@@ -73,6 +90,10 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
             .map(String::trim)
             .filterTo(mutableSetOf(), String::isNotEmpty)
 
+    private fun persistInterests(interests: Set<String>) {
+        store.putString(INTERESTS, interests.sorted().joinToString(SEPARATOR))
+    }
+
     companion object {
         const val COURSE_LESSON_COUNT = 5
         private const val SEPARATOR = "|"
@@ -80,6 +101,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val READING_GOAL = "shared_reading_goal"
         private const val SAVED_SURAHS = "shared_saved_surahs"
         private const val SAVED_BUKHARI = "shared_saved_bukhari"
+        private const val SAVED_TOPIC_ARTICLES = "shared_saved_topic_articles"
         private const val INTERESTS = "shared_interests"
         private const val COMPLETED_LESSONS = "shared_completed_lessons"
     }

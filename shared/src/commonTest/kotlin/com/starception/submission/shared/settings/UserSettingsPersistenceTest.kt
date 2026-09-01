@@ -4,6 +4,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.PrayerSettings
+import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.model.prayerDefaultsFor
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.storage.InMemoryKeyValueStore
@@ -36,6 +37,10 @@ class UserSettingsPersistenceTest {
         assertTrue(settings.isChanged("AE", uae))
         settings.restoreDefaults("AE")
         assertFalse(settings.isChanged("AE", uae))
+        assertEquals(
+            PrayerTimeOffsets(sunrise = -3, dhuhr = 3, asr = 3, maghrib = 3),
+            settings.settings("AE", uae).timeOffsets,
+        )
         assertEquals(canadaChange, settings.settings("CA", canada))
     }
 
@@ -54,16 +59,23 @@ class UserSettingsPersistenceTest {
         }
         val settings = UserPrayerSettings(store)
 
-        assertEquals(legacy, settings.settings("AE", prayerDefaultsFor("AE")))
+        val migrated = settings.settings("AE", prayerDefaultsFor("AE"))
+        assertEquals(
+            PrayerTimeOffsets(sunrise = -3, dhuhr = 3, asr = 3, maghrib = 3),
+            migrated.timeOffsets,
+        )
         assertEquals(
             CalculationMethod.ISNA,
-            settings.settings("AE", prayerDefaultsFor("AE")).calculationMethod,
+            migrated.calculationMethod,
         )
         assertEquals(
             prayerDefaultsFor("CA")?.method,
             settings.settings("CA", prayerDefaultsFor("CA")).calculationMethod,
         )
         assertTrue(store.getString("cached_prayer_settings").isNullOrEmpty())
+
+        // Reading again must not add the UAE values a second time.
+        assertEquals(migrated, settings.settings("AE", prayerDefaultsFor("AE")))
     }
 
     @Test

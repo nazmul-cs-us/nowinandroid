@@ -35,7 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -166,7 +166,7 @@ fun PrayerNowTile(
                         lineHeight = 15.sp,
                     )
                     Icon(
-                        imageVector = Icons.Filled.Explore,
+                        imageVector = Icons.Filled.ChevronRight,
                         contentDescription = null,
                         modifier = Modifier.height(16.dp),
                     )
