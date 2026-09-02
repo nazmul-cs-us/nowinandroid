@@ -71,6 +71,7 @@ data class AudioSettingsState(
     val selectedNarrationVoiceIdentifier: String? = null,
     val selectedNarrationSpeakerId: Int = 0,
     val isNarrationSpeaking: Boolean = false,
+    val narrationStatus: String? = null,
     val narrationError: String? = null,
 )
 
@@ -224,6 +225,7 @@ fun NarrationSettingsSection(
     selectedIdentifier: String?,
     selectedSpeakerId: Int,
     isSpeaking: Boolean,
+    status: String?,
     error: String?,
     onVoiceSelected: (NarrationVoice) -> Unit,
     onSpeakerSelected: (Int) -> Unit,
@@ -315,6 +317,7 @@ fun NarrationSettingsSection(
             Spacer(Modifier.width(8.dp))
             Text(if (isSpeaking) "Stop voice sample" else "Play voice sample")
         }
+        if (status != null) StatusCard("Preparing voice", status, error = false)
         if (error != null) StatusCard("Narration unavailable", error, error = true)
     }
 }

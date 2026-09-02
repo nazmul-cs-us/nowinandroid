@@ -218,3 +218,19 @@ targets:
         CODE_SIGN_STYLE: Automatic
         "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
         "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"
+
+  iosAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: iosApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.starception.submission.UITests
+        TEST_TARGET_NAME: iosApp
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        "CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]": "NO"
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": "NO"

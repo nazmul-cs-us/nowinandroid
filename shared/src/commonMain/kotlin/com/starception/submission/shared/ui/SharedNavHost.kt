@@ -81,6 +81,7 @@ data class SharedHomeActions(
 fun SharedNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
+    startInSettings: Boolean = false,
     latitude: Double,
     longitude: Double,
     today: LocalDate,
@@ -119,7 +120,7 @@ fun SharedNavHost(
     }
     NavHost(
         navController = navController,
-        startDestination = PrayerTimesRoute,
+        startDestination = if (startInSettings) PrayerSettingsRoute else PrayerTimesRoute,
         modifier = modifier,
     ) {
         composable<PrayerTimesRoute> {

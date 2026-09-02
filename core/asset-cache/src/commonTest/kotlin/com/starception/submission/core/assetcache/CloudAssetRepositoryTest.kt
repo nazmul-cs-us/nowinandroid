@@ -1,9 +1,11 @@
 package com.starception.submission.core.assetcache
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -134,6 +136,24 @@ class CloudAssetRepositoryTest {
     }
 
     @Test
+    fun categoryDownloadDoesNotDuplicateBundledAssets() = runTest {
+        val platform = FakeAssetPlatform().apply {
+            addBundled("audio/one file!.mp3", size = 4, sha256 = "hash-one")
+            downloads["audio/two.mp3"] = FakeFile(6, "hash-two")
+        }
+
+        val result = CloudAssetRepository(platform).downloadCategory(
+            category = "audio",
+            manifest = AssetManifest.fromJson(manifestJson()),
+        )
+
+        assertTrue(result.isComplete)
+        assertEquals(listOf("audio/two.mp3"), platform.downloadedKeys)
+        assertEquals(AssetSource.BUNDLE, result.resolvedAssets.first().source)
+        assertEquals(AssetSource.DOWNLOAD, result.resolvedAssets.last().source)
+    }
+
+    @Test
     fun lookupAndDeletionOperateOnlyOnCache() = runTest {
         val platform = FakeAssetPlatform().apply {
             addCached("audio/one file!.mp3", size = 4, sha256 = "hash-one")
@@ -149,6 +169,42 @@ class CloudAssetRepositoryTest {
         assertNull(repository.lookupAsset("audio/one file!.mp3", manifest))
         assertNotNull(repository.lookupAsset("audio/two.mp3", manifest))
     }
+
+    @Test
+    fun categoryStatusSeparatesDownloadedCacheFromBundledAvailability() = runTest {
+        val platform = FakeAssetPlatform().apply {
+            addCached("audio/one file!.mp3", size = 4, sha256 = "hash-one")
+            addBundled("audio/two.mp3", size = 6, sha256 = "hash-two")
+        }
+
+        val status = CloudAssetRepository(platform).getCategoryStatus(
+            category = "audio",
+            manifest = AssetManifest.fromJson(manifestJson()),
+        )
+
+        assertEquals(4L, status.downloadedBytes)
+        assertEquals(10L, status.availableBytes)
+        assertEquals(1, status.downloadedFiles)
+        assertEquals(2, status.availableFiles)
+        assertFalse(status.isDownloaded)
+        assertTrue(status.isAvailable)
+        assertEquals(0, platform.sha256Requests)
+    }
+
+    @Test
+    fun cancellationStopsResolutionWithoutUsingBundleFallback() = runTest {
+        val platform = FakeAssetPlatform().apply {
+            downloadError = CancellationException("cancelled")
+            addBundled("audio/one file!.mp3", size = 4, sha256 = "bundle-hash")
+        }
+
+        assertFailsWith<CancellationException> {
+            CloudAssetRepository(platform).resolveAsset(
+                cdnKey = "audio/one file!.mp3",
+                manifest = AssetManifest.fromJson(manifestJson()),
+            )
+        }
+    }
 }
 
 private data class FakeFile(val size: Long, val sha256: String)
@@ -162,6 +218,8 @@ private class FakeAssetPlatform : AssetPlatform {
     val downloadedKeys = mutableListOf<String>()
     val deletedCachedKeys = mutableListOf<String>()
     val deletedFiles = mutableListOf<String>()
+    var downloadError: Exception? = null
+    var sha256Requests = 0
 
     private val files = mutableMapOf<String, FakeFile>()
     private val cachedPaths = mutableMapOf<String, String>()
@@ -202,6 +260,7 @@ private class FakeAssetPlatform : AssetPlatform {
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
     ): String? {
         downloadedKeys += cdnKey
+        downloadError?.let { throw it }
         val file = downloads[cdnKey] ?: return null
         onProgress(file.size / 2, file.size)
         onProgress(file.size, file.size)
@@ -212,7 +271,10 @@ private class FakeAssetPlatform : AssetPlatform {
 
     override suspend fun fileSize(absolutePath: String): Long? = files[absolutePath]?.size
 
-    override suspend fun sha256(absolutePath: String): String? = files[absolutePath]?.sha256
+    override suspend fun sha256(absolutePath: String): String? {
+        sha256Requests++
+        return files[absolutePath]?.sha256
+    }
 
     override suspend fun commitDownloadedAsset(temporaryPath: String, cdnKey: String): String {
         val path = "/cache/$cdnKey"

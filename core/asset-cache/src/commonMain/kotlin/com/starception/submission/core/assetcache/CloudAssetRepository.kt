@@ -1,5 +1,6 @@
 package com.starception.submission.core.assetcache
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -46,6 +47,19 @@ data class CategoryDownloadResult(
     val isComplete: Boolean get() = missingAssets.isEmpty()
 }
 
+data class CategoryAssetStatus(
+    val category: String,
+    val downloadedBytes: Long,
+    val availableBytes: Long,
+    val totalBytes: Long,
+    val downloadedFiles: Int,
+    val availableFiles: Int,
+    val totalFiles: Int,
+) {
+    val isDownloaded: Boolean get() = totalFiles > 0 && downloadedFiles == totalFiles
+    val isAvailable: Boolean get() = totalFiles > 0 && availableFiles == totalFiles
+}
+
 /**
  * Platform-neutral manifest and cloud asset policy.
  *
@@ -71,7 +85,8 @@ class CloudAssetRepository(
             // and cached manifests fail.
             val bundledJson = try {
                 platform.readBundledText(manifestPath)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                error.rethrowIfCancellation()
                 null
             }
             val bundledManifest = bundledJson?.let(::parseManifest)
@@ -82,14 +97,16 @@ class CloudAssetRepository(
             if (manifestUrl != null) {
                 val remoteJson = try {
                     platform.fetchText(manifestUrl)
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    error.rethrowIfCancellation()
                     null
                 }
                 val remoteManifest = remoteJson?.let(::parseManifest)
                 if (remoteManifest != null) {
                     try {
                         platform.writeCachedText(manifestPath, remoteJson)
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        error.rethrowIfCancellation()
                         // A cache write failure must not discard a valid remote manifest.
                     }
                     cachedManifest = remoteManifest
@@ -99,7 +116,8 @@ class CloudAssetRepository(
 
             val diskJson = try {
                 platform.readCachedText(manifestPath)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                error.rethrowIfCancellation()
                 null
             }
             val diskManifest = diskJson?.let(::parseManifest)
@@ -165,7 +183,11 @@ class CloudAssetRepository(
         )
 
         assets.forEach { entry ->
-            val result = resolveAsset(entry.cdnKey, effectiveManifest) { assetProgress ->
+            // A category action means "make available", not "copy every bundled file to cache".
+            val result = lookupAsset(entry.cdnKey, effectiveManifest) ?: resolveAsset(
+                cdnKey = entry.cdnKey,
+                manifest = effectiveManifest,
+            ) { assetProgress ->
                 emitCategoryProgress(
                     onProgress,
                     CategoryDownloadProgress(
@@ -214,6 +236,43 @@ class CloudAssetRepository(
             if (deleteAsset(it.cdnKey)) deleted++
         }
         return deleted
+    }
+
+    suspend fun getCategoryStatus(
+        category: String,
+        manifest: AssetManifest? = null,
+    ): CategoryAssetStatus {
+        val effectiveManifest = manifest ?: loadManifest()
+        val assets = effectiveManifest?.getAssetsByCategory(category).orEmpty()
+        var downloadedBytes = 0L
+        var availableBytes = 0L
+        var downloadedFiles = 0
+        var availableFiles = 0
+
+        assets.forEach { entry ->
+            // Settings refreshes should not hash every cached byte. Full SHA validation remains
+            // mandatory in lookupAsset/resolveAsset before a feature consumes the file.
+            val cached = lightweightCachedAsset(entry)
+            if (cached != null) {
+                availableBytes += entry.size
+                availableFiles++
+                downloadedBytes += entry.size
+                downloadedFiles++
+            } else if (bundledAsset(entry.cdnKey) != null) {
+                availableBytes += entry.size
+                availableFiles++
+            }
+        }
+
+        return CategoryAssetStatus(
+            category = category,
+            downloadedBytes = downloadedBytes,
+            availableBytes = availableBytes,
+            totalBytes = assets.sumOf { it.size },
+            downloadedFiles = downloadedFiles,
+            availableFiles = availableFiles,
+            totalFiles = assets.size,
+        )
     }
 
     suspend fun getCategoryDownloadedSize(
@@ -268,14 +327,16 @@ class CloudAssetRepository(
                 )
                 return ResolvedAsset(entry.cdnKey, committedPath, AssetSource.DOWNLOAD)
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            error.rethrowIfCancellation()
             // Resolution continues with the bundled fallback.
         }
 
         temporaryPath?.let {
             try {
                 platform.deleteFile(it)
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                error.rethrowIfCancellation()
                 // Best-effort temporary-file cleanup.
             }
         }
@@ -285,7 +346,8 @@ class CloudAssetRepository(
     private suspend fun validCachedAsset(entry: AssetEntry): ResolvedAsset? {
         val path = try {
             platform.cachedAssetPath(entry.cdnKey)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            error.rethrowIfCancellation()
             null
         } ?: return null
 
@@ -295,16 +357,37 @@ class CloudAssetRepository(
 
         try {
             platform.deleteCachedAsset(entry.cdnKey)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            error.rethrowIfCancellation()
             // An invalid cache entry is never returned, even if cleanup fails.
         }
         return null
     }
 
+    private suspend fun lightweightCachedAsset(entry: AssetEntry): ResolvedAsset? {
+        val path = try {
+            platform.cachedAssetPath(entry.cdnKey)
+        } catch (error: Exception) {
+            error.rethrowIfCancellation()
+            null
+        } ?: return null
+
+        val hasExpectedSize = try {
+            platform.fileSize(path) == entry.size
+        } catch (error: Exception) {
+            error.rethrowIfCancellation()
+            false
+        }
+        return path.takeIf { hasExpectedSize }?.let {
+            ResolvedAsset(entry.cdnKey, it, AssetSource.CACHE)
+        }
+    }
+
     private suspend fun isValid(absolutePath: String, entry: AssetEntry): Boolean = try {
         platform.fileSize(absolutePath) == entry.size &&
             platform.sha256(absolutePath)?.equals(entry.sha256, ignoreCase = true) == true
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        error.rethrowIfCancellation()
         false
     }
 
@@ -312,7 +395,8 @@ class CloudAssetRepository(
         platform.bundledAssetPath(cdnKey)?.let {
             ResolvedAsset(cdnKey, it, AssetSource.BUNDLE)
         }
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        error.rethrowIfCancellation()
         null
     }
 
@@ -351,4 +435,8 @@ class CloudAssetRepository(
     private companion object {
         const val DEFAULT_MANIFEST_PATH = "manifest.json"
     }
+}
+
+private fun Exception.rethrowIfCancellation() {
+    if (this is CancellationException) throw this
 }

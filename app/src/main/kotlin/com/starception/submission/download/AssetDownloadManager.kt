@@ -2,13 +2,17 @@ package com.starception.submission.download
 
 import android.content.Context
 import android.util.Log
+import com.starception.submission.core.assetcache.AssetSource
+import com.starception.submission.core.assetcache.CloudAssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
-import com.starception.submission.core.assetcache.CloudAssetRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,16 +20,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.File
-import java.io.FileOutputStream
-import java.security.MessageDigest
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
 class AssetDownloadManager @Inject constructor(
@@ -47,7 +44,6 @@ class AssetDownloadManager @Inject constructor(
     private val cdnAssetsDir = File(context.filesDir, CDN_ASSETS_DIR)
     private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadStates = mutableMapOf<String, MutableStateFlow<DownloadState>>()
-    private val downloadMutexes = mutableMapOf<String, Mutex>()
     private var cachedManifest: AssetManifest? = null
 
     /**
@@ -57,16 +53,9 @@ class AssetDownloadManager @Inject constructor(
     private val verifiedChecksums: MutableSet<String> =
         java.util.concurrent.ConcurrentHashMap.newKeySet()
 
-    private fun getOrCreateMutex(cdnKey: String): Mutex =
-        synchronized(downloadMutexes) { downloadMutexes.getOrPut(cdnKey) { Mutex() } }
-
     // Global download progress tracking (persists across ViewModel lifecycles)
     private val _globalDownloadProgress = MutableStateFlow(0f)
     val globalDownloadProgress: StateFlow<Float> = _globalDownloadProgress.asStateFlow()
-
-    // Last emitted progress value — used to throttle StateFlow updates to ≥1% change
-    // so the main thread isn't flooded with recompositions on every 8KB buffer read.
-    private var lastEmittedProgress = 0f
 
     private val _isGloballyDownloading = MutableStateFlow(false)
     val isGloballyDownloading: StateFlow<Boolean> = _isGloballyDownloading.asStateFlow()
@@ -96,7 +85,6 @@ class AssetDownloadManager @Inject constructor(
                 _isGloballyDownloading.value = false
                 _globalDownloadProgress.value = 0f
                 _globalDownloadLabel.value = ""
-                lastEmittedProgress = 0f
             }
         }
     }
@@ -240,27 +228,18 @@ class AssetDownloadManager @Inject constructor(
     ): DownloadState = withContext(Dispatchers.IO) {
         val stateFlow = getOrCreateStateFlow(cdnKey)
 
-        if (isAssetAvailable(cdnKey)) {
+        if (sharedAssets.lookupAsset(cdnKey, manifest) != null) {
             stateFlow.value = DownloadState.Completed
             return@withContext DownloadState.Completed
         }
 
-        // Prevent concurrent downloads of the same file
-        val mutex = getOrCreateMutex(cdnKey)
-        mutex.withLock {
-            // Re-check after acquiring lock (another caller may have completed it)
-            if (isAssetAvailable(cdnKey)) {
-                stateFlow.value = DownloadState.Completed
-                return@withContext DownloadState.Completed
-            }
-            val category = manifest.assets[cdnKey]?.category ?: ""
-            _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
-            beginGlobalDownload()
-            try {
-                downloadAssetInternal(cdnKey, manifest, stateFlow)
-            } finally {
-                endGlobalDownload()
-            }
+        val category = manifest.assets[cdnKey]?.category ?: ""
+        _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
+        beginGlobalDownload()
+        try {
+            downloadAssetInternal(cdnKey, manifest, stateFlow)
+        } finally {
+            endGlobalDownload()
         }
     }
 
@@ -268,134 +247,37 @@ class AssetDownloadManager @Inject constructor(
         cdnKey: String,
         manifest: AssetManifest,
         stateFlow: MutableStateFlow<DownloadState>,
-        // When called from downloadCategory, batchOffset + perFileProgress*batchScale
-        // gives smooth cumulative progress instead of per-file 0→1 resets.
-        batchOffset: Float = 0f,
-        batchScale: Float = 1f,
     ): DownloadState {
-
         val entry = manifest.assets[cdnKey]
             ?: return DownloadState.Failed("Asset not in manifest: $cdnKey").also {
                 stateFlow.value = it
             }
 
-        val url = manifest.getAssetUrl(cdnKey)
-        val targetFile = File(cdnAssetsDir, cdnKey)
-        val tmpFile = File(cdnAssetsDir, "$cdnKey.tmp")
-
-        targetFile.parentFile?.mkdirs()
-
-        var lastError: String? = null
-        for (attempt in 1..MAX_RETRIES) {
-            try {
-                stateFlow.value = DownloadState.Downloading(0f, 0, entry.size)
-
-                val request = Request.Builder().url(url).build()
-                val response = okHttpClient.newCall(request).execute()
-
-                if (!response.isSuccessful) {
-                    lastError = "HTTP ${response.code}: ${response.message}"
-                    Log.w(TAG, "Download attempt $attempt failed for $cdnKey: $lastError")
-                    response.close()
-                    if (attempt < MAX_RETRIES) {
-                        kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
-                    }
-                    continue
-                }
-
-                val body = response.body ?: run {
-                    lastError = "Empty response body"
-                    response.close()
-                    continue
-                }
-
-                val totalBytes = body.contentLength().let {
-                    if (it > 0) it else entry.size
-                }
-
-                var bytesDownloaded = 0L
-                FileOutputStream(tmpFile).use { output ->
-                    body.byteStream().use { input ->
-                        val buffer = ByteArray(BUFFER_SIZE)
-                        var bytesRead: Int
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            bytesDownloaded += bytesRead
-                            val progress = if (totalBytes > 0) {
-                                bytesDownloaded.toFloat() / totalBytes
-                            } else 0f
-                            val clampedProgress = progress.coerceIn(0f, 1f)
-                            val globalProgress = (batchOffset + clampedProgress * batchScale).coerceIn(0f, 1f)
-                            // Only emit when global progress advances by ≥1% to avoid
-                            // flooding the main thread with recompositions on every 8KB chunk.
-                            if (globalProgress - lastEmittedProgress >= 0.01f || globalProgress >= 1f) {
-                                stateFlow.value = DownloadState.Downloading(
-                                    clampedProgress,
-                                    bytesDownloaded,
-                                    totalBytes,
-                                )
-                                _globalDownloadProgress.value = globalProgress
-                                lastEmittedProgress = globalProgress
-                            }
-                        }
-                    }
-                }
-
-                response.close()
-
-                // Verify download size before checksum
-                val actualSize = tmpFile.length()
-                if (actualSize != entry.size) {
-                    tmpFile.delete()
-                    lastError = "Size mismatch: expected ${entry.size} bytes, got $actualSize bytes"
-                    Log.w(TAG, "Incomplete download for $cdnKey: $lastError")
-                    if (attempt < MAX_RETRIES) {
-                        kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
-                    }
-                    continue
-                }
-
-                // Verify SHA-256
-                val actualHash = sha256(tmpFile)
-                if (actualHash != entry.sha256) {
-                    tmpFile.delete()
-                    lastError = "SHA-256 mismatch: expected ${entry.sha256}, got $actualHash"
-                    Log.w(TAG, "Checksum failed for $cdnKey: $lastError")
-                    if (attempt < MAX_RETRIES) {
-                        kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
-                    }
-                    continue
-                }
-
-                // Atomic rename
-                if (tmpFile.renameTo(targetFile)) {
-                    Log.i(TAG, "Downloaded $cdnKey (${bytesDownloaded / 1024}KB)")
-                    stateFlow.value = DownloadState.Completed
-                    return DownloadState.Completed
-                } else {
-                    tmpFile.delete()
-                    lastError = "Failed to rename temp file"
-                }
-            } catch (e: Exception) {
-                tmpFile.delete()
-                lastError = e.message ?: "Unknown error"
-                Log.e(TAG, "Download error for $cdnKey (attempt $attempt)", e)
-                if (attempt < MAX_RETRIES) {
-                    kotlinx.coroutines.delay(RETRY_DELAY_MS * attempt)
-                }
+        stateFlow.value = DownloadState.Downloading(0f, 0L, entry.size)
+        var lastReportedProgress = -1f
+        val resolved = sharedAssets.resolveAsset(cdnKey, manifest) { progress ->
+            val fraction = progress.fraction
+            if (fraction - lastReportedProgress >= PROGRESS_UPDATE_INTERVAL || fraction >= 1f) {
+                stateFlow.value = DownloadState.Downloading(
+                    progress = fraction,
+                    bytesDownloaded = progress.bytesDownloaded,
+                    totalBytes = progress.totalBytes,
+                )
+                _globalDownloadProgress.value = fraction
+                lastReportedProgress = fraction
             }
         }
 
-        // CDN download failed — fall back to bundled asset if available
-        if (isAssetBundled(cdnKey)) {
-            Log.i(TAG, "CDN download failed for $cdnKey, using bundled asset as fallback")
-            stateFlow.value = DownloadState.Completed
-            return DownloadState.Completed
+        return if (resolved != null) {
+            if (resolved.source == AssetSource.DOWNLOAD) {
+                Log.i(TAG, "Downloaded $cdnKey (${entry.size / 1024}KB)")
+            }
+            DownloadState.Completed.also { stateFlow.value = it }
+        } else {
+            DownloadState.Failed("Unable to resolve asset: $cdnKey").also {
+                stateFlow.value = it
+            }
         }
-
-        val finalError = lastError ?: "Unknown error"
-        stateFlow.value = DownloadState.Failed(finalError)
-        return DownloadState.Failed(finalError)
     }
 
     suspend fun downloadCategory(
@@ -410,48 +292,56 @@ class AssetDownloadManager @Inject constructor(
         beginGlobalDownload()
 
         try {
-            val totalBytes = assets.sumOf { it.size }
-            var downloadedBytes = 0L
-            var allSuccess = true
-
-            for (asset in assets) {
-                if (isAssetAvailable(asset.cdnKey)) {
-                    downloadedBytes += asset.size
-                    val progress = downloadedBytes.toFloat() / totalBytes
-                    _globalDownloadProgress.value = progress
-                    onProgress?.invoke(progress, downloadedBytes, totalBytes)
-                    continue
-                }
-
-                // Calculate where this file sits in the overall batch so progress
-                // advances smoothly from batchOffset to batchOffset+batchScale
-                // instead of resetting 0→1 for every individual file.
-                val batchOffset = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
-                val batchScale = if (totalBytes > 0) asset.size.toFloat() / totalBytes else 1f
-
-                val stateFlow = getOrCreateStateFlow(asset.cdnKey)
-                val mutex = getOrCreateMutex(asset.cdnKey)
-                val result = mutex.withLock {
-                    if (isAssetAvailable(asset.cdnKey)) {
-                        stateFlow.value = DownloadState.Completed
-                        DownloadState.Completed
-                    } else {
-                        downloadAssetInternal(asset.cdnKey, manifest, stateFlow, batchOffset, batchScale)
+            var currentAsset: String? = null
+            var currentAssetOffset = 0L
+            var lastAggregateBytes = 0L
+            var lastReportedProgress = -1f
+            val result = sharedAssets.downloadCategory(category, manifest) { progress ->
+                val assetChanged = progress.currentAsset != null &&
+                    progress.currentAsset != currentAsset
+                progress.currentAsset?.let { cdnKey ->
+                    if (cdnKey != currentAsset) {
+                        currentAsset = cdnKey
+                        currentAssetOffset = lastAggregateBytes
+                    }
+                    manifest.assets[cdnKey]?.let { entry ->
+                        val assetBytes = (progress.bytesDownloaded - currentAssetOffset)
+                            .coerceIn(0L, entry.size)
+                        val assetProgress = if (entry.size > 0L) {
+                            assetBytes.toFloat() / entry.size
+                        } else {
+                            1f
+                        }
+                        getOrCreateStateFlow(cdnKey).value = DownloadState.Downloading(
+                            progress = assetProgress,
+                            bytesDownloaded = assetBytes,
+                            totalBytes = entry.size,
+                        )
                     }
                 }
 
-                if (result is DownloadState.Completed) {
-                    downloadedBytes += asset.size
-                } else {
-                    allSuccess = false
+                val fraction = progress.fraction
+                if (
+                    fraction - lastReportedProgress >= PROGRESS_UPDATE_INTERVAL ||
+                    fraction >= 1f ||
+                    assetChanged
+                ) {
+                    _globalDownloadProgress.value = fraction
+                    onProgress?.invoke(fraction, progress.bytesDownloaded, progress.totalBytes)
+                    lastReportedProgress = fraction
                 }
-                val progress = downloadedBytes.toFloat() / totalBytes
-                _globalDownloadProgress.value = progress
-                onProgress?.invoke(progress, downloadedBytes, totalBytes)
+                lastAggregateBytes = progress.bytesDownloaded
             }
 
-            if (allSuccess) _categoryCompleted.tryEmit(category)
-            return@withContext allSuccess
+            result.resolvedAssets.forEach {
+                getOrCreateStateFlow(it.cdnKey).value = DownloadState.Completed
+            }
+            result.missingAssets.forEach { cdnKey ->
+                getOrCreateStateFlow(cdnKey).value =
+                    DownloadState.Failed("Unable to resolve asset: $cdnKey")
+            }
+            if (result.isComplete) _categoryCompleted.tryEmit(category)
+            return@withContext result.isComplete
         } finally {
             endGlobalDownload()
         }
@@ -520,9 +410,7 @@ class AssetDownloadManager @Inject constructor(
     companion object {
         private const val TAG = "AssetDownloadManager"
         private const val CDN_ASSETS_DIR = "cdn_assets"
-        private const val MANIFEST_ASSET_PATH = "manifest.json"
-        private const val MAX_RETRIES = 3
-        private const val RETRY_DELAY_MS = 2000L
         private const val BUFFER_SIZE = 8192
+        private const val PROGRESS_UPDATE_INTERVAL = 0.01f
     }
 }

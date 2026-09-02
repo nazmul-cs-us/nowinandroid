@@ -81,6 +81,8 @@ fun PrayerSettingsScreen(
     appVersion: String = "Unknown",
     audioState: AudioSettingsState = AudioSettingsState(),
     audioActions: AudioSettingsActions = AudioSettingsActions(),
+    contentStorageState: ContentStorageState = ContentStorageState(),
+    contentStorageActions: ContentStorageActions = ContentStorageActions(),
 ) {
     // One section open at a time, as on Android: the sections are long enough
     // that several open at once buries the one being read.
@@ -237,6 +239,7 @@ fun PrayerSettingsScreen(
                     selectedIdentifier = audioState.selectedNarrationVoiceIdentifier,
                     selectedSpeakerId = audioState.selectedNarrationSpeakerId,
                     isSpeaking = audioState.isNarrationSpeaking,
+                    status = audioState.narrationStatus,
                     error = audioState.narrationError,
                     onVoiceSelected = audioActions.onNarrationVoiceSelected,
                     onSpeakerSelected = audioActions.onNarrationSpeakerSelected,
@@ -248,8 +251,24 @@ fun PrayerSettingsScreen(
             SettingsGroupLabel("App & support")
 
             SettingsSection(
+                title = "Content & Storage",
+                subtitle = "Manage downloaded content",
+                iconGlyph = FlaticonIcons.STORAGE,
+                isExpanded = expanded == SECTION_CONTENT,
+                onToggleExpanded = {
+                    if (expanded != SECTION_CONTENT) contentStorageActions.onRefresh()
+                    expanded = if (expanded == SECTION_CONTENT) null else SECTION_CONTENT
+                },
+            ) {
+                ContentStorageSettingsSection(
+                    state = contentStorageState,
+                    actions = contentStorageActions,
+                )
+            }
+
+            SettingsSection(
                 title = "About",
-                subtitle = "Version & attributions",
+                subtitle = "Version & legal info",
                 iconGlyph = FlaticonIcons.INFO,
                 isExpanded = expanded == SECTION_ABOUT,
                 onToggleExpanded = {
@@ -287,3 +306,4 @@ private const val SECTION_ABOUT = "about"
 private const val SECTION_TRAVEL = "travel"
 private const val SECTION_VOICE = "voice"
 private const val SECTION_NARRATION = "narration"
+private const val SECTION_CONTENT = "content"

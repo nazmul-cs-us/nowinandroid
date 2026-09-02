@@ -40,6 +40,7 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.prayerDefaultsFor
 import com.starception.submission.shared.PrayerSchedule
+import com.starception.submission.shared.assets.iosCloudAssets
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
 import com.starception.submission.shared.notifications.IosPrayerSchedulePublisher
@@ -62,12 +63,17 @@ import com.starception.submission.shared.weather.CurrentConditionsClient
 import kotlin.time.Clock
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.Foundation.NSBundle
+import platform.Foundation.NSProcessInfo
 import platform.UIKit.UIViewController
 
 /**
@@ -88,6 +94,9 @@ fun PrayerTimesViewController(
     val speechRecognizer = remember { PlatformSpeechRecognizer() }
     val speechSynthesizer = remember { PlatformSpeechSynthesizer() }
     val coroutineScope = rememberCoroutineScope()
+    val startInSettings = remember {
+        NSProcessInfo.processInfo.arguments.any { it == "--start-settings" }
+    }
 
     var location by remember { mutableStateOf(locationStore.location()) }
     var resolved by remember { mutableStateOf(false) }
@@ -133,22 +142,35 @@ fun PrayerTimesViewController(
     }
     var isNarrationSpeaking by remember { mutableStateOf(false) }
     var selectedNarrationSpeakerId by remember { mutableStateOf(audioStore.narrationSpeakerId()) }
+    var narrationStatus by remember { mutableStateOf<String?>(null) }
     var narrationError by remember { mutableStateOf<String?>(null) }
     var narrationSession by remember { mutableStateOf(0) }
+    var narrationJob by remember { mutableStateOf<Job?>(null) }
+    var recognitionJob by remember { mutableStateOf<Job?>(null) }
     var automaticTravelDuaRequests by remember { mutableStateOf(0) }
+    var contentStorageState by remember { mutableStateOf(ContentStorageState()) }
+    var contentDownloadJob by remember { mutableStateOf<Job?>(null) }
+    var contentRefreshJob by remember { mutableStateOf<Job?>(null) }
     val travelDuaMonitor = remember {
         IosTravelDuaMonitor { automaticTravelDuaRequests += 1 }
     }
 
     fun stopAllSpeech() {
         narrationSession += 1
+        narrationJob?.cancel()
+        narrationJob = null
         sherpaService?.stopSpeaking()
         speechSynthesizer.stop()
         isTravelDuaPlaying = false
         isNarrationSpeaking = false
+        narrationStatus = null
     }
 
     fun playTravelDua() {
+        recognitionSession += 1
+        recognitionJob?.cancel()
+        recognitionJob = null
+        sherpaService?.stopRecognition()
         speechRecognizer.stop()
         stopAllSpeech()
         narrationError = null
@@ -166,6 +188,98 @@ fun PrayerTimesViewController(
         }
     }
 
+    fun refreshContentStorage(message: String? = null, retryCategory: String? = null) {
+        contentRefreshJob?.cancel()
+        contentStorageState = contentStorageState.copy(
+            isLoading = true,
+            error = message,
+            retryCategoryKey = retryCategory,
+        )
+        contentRefreshJob = coroutineScope.launch {
+            val refreshed = loadIosContentStorageState()
+            contentStorageState = refreshed.copy(
+                error = message ?: refreshed.error,
+                retryCategoryKey = retryCategory,
+            )
+            contentRefreshJob = null
+        }
+    }
+
+    fun downloadContentCategory(category: String) {
+        if (contentDownloadJob?.isActive == true) return
+        contentStorageState = contentStorageState.copy(
+            error = null,
+            categories = contentStorageState.categories.map {
+                if (it.categoryKey == category) {
+                    it.copy(isDownloading = true, progress = 0f)
+                } else {
+                    it
+                }
+            },
+        )
+        contentDownloadJob = coroutineScope.launch {
+            var message: String? = null
+            try {
+                val manifest = iosCloudAssets.loadManifest()
+                    ?: error("The Cloudflare asset manifest is unavailable")
+                val result = iosCloudAssets.downloadCategory(category, manifest) { progress ->
+                    contentStorageState = contentStorageState.copy(
+                        categories = contentStorageState.categories.map {
+                            if (it.categoryKey == category) {
+                                it.copy(isDownloading = true, progress = progress.fraction)
+                            } else {
+                                it
+                            }
+                        },
+                    )
+                }
+                if (!result.isComplete) {
+                    message = "Could not download ${result.missingAssets.size} files. Try again."
+                }
+            } catch (_: CancellationException) {
+                // User-requested cancellation is reflected by the refreshed cache state.
+            } catch (error: Exception) {
+                message = error.message ?: "The content download failed"
+            } finally {
+                contentStorageState = contentStorageState.copy(
+                    categories = contentStorageState.categories.map {
+                        if (it.categoryKey == category) it.copy(isDownloading = false) else it
+                    },
+                )
+                contentDownloadJob = null
+                refreshContentStorage(message, retryCategory = category.takeIf { message != null })
+            }
+        }
+    }
+
+    fun deleteContentCategory(category: String) {
+        if (contentDownloadJob?.isActive == true || contentRefreshJob?.isActive == true) return
+        if (category.startsWith("model_")) {
+            recognitionSession += 1
+            recognitionJob?.cancel()
+            recognitionJob = null
+            sherpaService?.stopRecognition()
+            speechRecognizer.stop()
+            recognitionTestState = VoiceTestState.IDLE
+            recognitionTestText = "Say yes or no to verify recognition."
+            stopAllSpeech()
+        }
+        contentStorageState = contentStorageState.copy(isLoading = true, error = null)
+        contentRefreshJob = coroutineScope.launch {
+            val message = try {
+                val manifest = iosCloudAssets.loadManifest()
+                    ?: error("The Cloudflare asset manifest is unavailable")
+                iosCloudAssets.deleteCategory(category, manifest)
+                null
+            } catch (error: Exception) {
+                error.message ?: "The downloaded content could not be deleted"
+            }
+            val refreshed = loadIosContentStorageState()
+            contentStorageState = refreshed.copy(error = message ?: refreshed.error)
+            contentRefreshJob = null
+        }
+    }
+
     LaunchedEffect(travelDuaSettings) {
         travelDuaMonitor.update(travelDuaSettings)
     }
@@ -180,6 +294,10 @@ fun PrayerTimesViewController(
             speechRecognizer.stop()
             speechSynthesizer.stop()
             sherpaService?.shutdown()
+            recognitionJob?.cancel()
+            narrationJob?.cancel()
+            contentDownloadJob?.cancel()
+            contentRefreshJob?.cancel()
         }
     }
 
@@ -304,6 +422,7 @@ fun PrayerTimesViewController(
         typography = sharedTypography(),
     ) {
         SharedNavHost(
+            startInSettings = startInSettings,
             latitude = place.latitude,
             longitude = place.longitude,
             today = today,
@@ -383,6 +502,7 @@ fun PrayerTimesViewController(
                         selectedNarrationVoiceIdentifier = selectedNarrationVoiceIdentifier,
                         selectedNarrationSpeakerId = selectedNarrationSpeakerId,
                         isNarrationSpeaking = isNarrationSpeaking,
+                        narrationStatus = narrationStatus,
                         narrationError = narrationError,
                     ),
                     audioActions = AudioSettingsActions(
@@ -394,6 +514,8 @@ fun PrayerTimesViewController(
                         onStopTravelDua = { stopAllSpeech() },
                         onRecognitionModeSelected = { mode ->
                             recognitionSession += 1
+                            recognitionJob?.cancel()
+                            recognitionJob = null
                             sherpaService?.stopRecognition()
                             speechRecognizer.stop()
                             recognitionTestState = VoiceTestState.IDLE
@@ -403,6 +525,7 @@ fun PrayerTimesViewController(
                         },
                         onStartRecognitionTest = {
                             stopAllSpeech()
+                            recognitionJob?.cancel()
                             val session = ++recognitionSession
                             recognitionTestState = VoiceTestState.LISTENING
                             recognitionTestText = if (sherpaService == null) {
@@ -410,7 +533,7 @@ fun PrayerTimesViewController(
                             } else {
                                 "Preparing offline model..."
                             }
-                            coroutineScope.launch {
+                            recognitionJob = coroutineScope.launch {
                                 if (sherpaService == null) {
                                     speechRecognizer.start(recognitionMode) { event ->
                                         if (session == recognitionSession) {
@@ -510,6 +633,8 @@ fun PrayerTimesViewController(
                         },
                         onStopRecognitionTest = {
                             recognitionSession += 1
+                            recognitionJob?.cancel()
+                            recognitionJob = null
                             sherpaService?.stopRecognition()
                             speechRecognizer.stop()
                             recognitionTestState = VoiceTestState.IDLE
@@ -521,6 +646,7 @@ fun PrayerTimesViewController(
                             selectedNarrationSpeakerId = 0
                             audioStore.saveNarrationVoiceIdentifier(voice.identifier)
                             audioStore.saveNarrationSpeakerId(0)
+                            narrationStatus = null
                             narrationError = null
                         },
                         onNarrationSpeakerSelected = { speakerId ->
@@ -533,9 +659,14 @@ fun PrayerTimesViewController(
                             audioStore.saveNarrationSpeakerId(selectedNarrationSpeakerId)
                         },
                         onPreviewNarration = {
+                            recognitionSession += 1
+                            recognitionJob?.cancel()
+                            recognitionJob = null
+                            sherpaService?.stopRecognition()
                             speechRecognizer.stop()
                             stopAllSpeech()
                             val session = narrationSession
+                            narrationStatus = null
                             narrationError = null
                             isNarrationSpeaking = true
                             if (sherpaService == null) {
@@ -551,22 +682,24 @@ fun PrayerTimesViewController(
                                     narrationError = "The selected system voice is unavailable"
                                 }
                             } else {
-                                coroutineScope.launch {
-                                    narrationError = "Preparing offline voice..."
+                                narrationJob = coroutineScope.launch {
+                                    narrationStatus = "Preparing offline voice..."
                                     val voiceId = selectedNarrationVoiceIdentifier
                                         ?: IosSherpaAssetResolver.KOKORO_VOICE_ID
                                     val paths = IosSherpaAssetResolver.tts(voiceId) { progress ->
                                         if (session == narrationSession) {
-                                            narrationError = "Downloading offline voice ${(progress * 100).toInt()}%"
+                                            narrationStatus =
+                                                "Downloading offline voice ${(progress * 100).toInt()}%"
                                         }
                                     }
                                     if (session != narrationSession) return@launch
                                     if (paths == null) {
                                         isNarrationSpeaking = false
+                                        narrationStatus = null
                                         narrationError = "Unable to download the offline voice model"
                                         return@launch
                                     }
-                                    narrationError = null
+                                    narrationStatus = null
                                     val sink = object : IosSherpaEventSink {
                                         override fun onRecognitionStarted() = Unit
                                         override fun onKeyword(keyword: String) = Unit
@@ -583,6 +716,7 @@ fun PrayerTimesViewController(
                                         override fun onError(message: String) {
                                             if (session == narrationSession) {
                                                 isNarrationSpeaking = false
+                                                narrationStatus = null
                                                 narrationError = message
                                             }
                                         }
@@ -596,6 +730,7 @@ fun PrayerTimesViewController(
                                         )
                                     ) {
                                         isNarrationSpeaking = false
+                                        narrationStatus = null
                                         narrationError = "Unable to start the offline voice"
                                     }
                                 }
@@ -603,14 +738,68 @@ fun PrayerTimesViewController(
                         },
                         onStopNarration = { stopAllSpeech() },
                     ),
+                    contentStorageState = contentStorageState,
+                    contentStorageActions = ContentStorageActions(
+                        onRefresh = { refreshContentStorage() },
+                        onDownloadCategory = ::downloadContentCategory,
+                        onCancelDownload = { contentDownloadJob?.cancel() },
+                        onDeleteCategory = ::deleteContentCategory,
+                    ),
                 )
             },
         )
     }
 }
 
+private suspend fun loadIosContentStorageState(): ContentStorageState =
+    withContext(Dispatchers.Default) {
+        try {
+            val manifest = iosCloudAssets.loadManifest()
+                ?: return@withContext ContentStorageState(
+                    error = "The Cloudflare asset manifest is unavailable",
+                )
+            val categories = manifest.categories
+                .filterKeys { it in IOS_CONTENT_STORAGE_CATEGORIES }
+                .map { (category, info) ->
+                val status = iosCloudAssets.getCategoryStatus(category, manifest)
+                ContentStorageCategoryState(
+                    categoryKey = category,
+                    displayName = storageCategoryDisplayName(category),
+                    description = storageCategoryDescription(category),
+                    totalSize = status.totalBytes.takeIf { it > 0L } ?: info.totalSize,
+                    downloadedSize = status.downloadedBytes,
+                    availableSize = status.availableBytes,
+                    fileCount = status.totalFiles.takeIf { it > 0 } ?: info.fileCount,
+                    required = info.required,
+                    isDownloaded = status.isDownloaded,
+                    isAvailable = status.isAvailable,
+                    progress = if (status.totalBytes > 0L) {
+                        status.downloadedBytes.toFloat() / status.totalBytes
+                    } else {
+                        1f
+                    },
+                )
+            }.sortedWith(
+                compareByDescending<ContentStorageCategoryState> { it.required }
+                    .thenBy { it.displayName },
+            )
+            ContentStorageState(categories = categories)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            ContentStorageState(error = error.message ?: "Downloaded content could not be checked")
+        }
+    }
+
 private const val NARRATION_SAMPLE =
     "Assalamu alaikum, this is your selected narration voice."
+private val IOS_CONTENT_STORAGE_CATEGORIES = setOf(
+    "hadith_sahih_bukhari",
+    "model_asr",
+    "model_kws",
+    "model_tts_kokoro",
+    "model_tts_vits",
+)
 private const val TRAVEL_DUA_ARABIC =
     "سبحان الذي سخر لنا هذا وما كنا له مقرنين وإنا إلى ربنا لمنقلبون"
 
