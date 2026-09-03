@@ -98,6 +98,7 @@ import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedTopic
 import com.starception.submission.shared.content.SharedTopicArticle
+import com.starception.submission.shared.content.SharedTopics
 import com.starception.submission.shared.content.createSharedNewsRepository
 import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
@@ -110,6 +111,7 @@ import com.starception.submission.shared.quran.metadataLabel
 import com.starception.submission.shared.hadith.SharedHadith
 import com.starception.submission.shared.hadith.createSharedHadithRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
@@ -2110,6 +2112,9 @@ private fun TopLevelScaffold(
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= EXPANDED_WIDTH
+            // Match Android and the home screen: the side rail appears only in
+            // landscape tablet windows; portrait keeps the bottom pill.
+            val useSideRail = maxWidth >= 600.dp && maxHeight >= 600.dp && maxWidth > maxHeight
             Column(
                 modifier = Modifier
                     .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
@@ -2117,7 +2122,7 @@ private fun TopLevelScaffold(
                     .align(Alignment.TopCenter)
                     .safeDrawingPadding()
                     .padding(
-                        start = if (expanded) 80.dp else 16.dp,
+                        start = if (useSideRail) 80.dp else 16.dp,
                         end = 16.dp,
                     ),
             ) {
@@ -2130,7 +2135,7 @@ private fun TopLevelScaffold(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(
                             top = 12.dp,
-                            bottom = if (expanded) 24.dp else 88.dp,
+                            bottom = if (useSideRail) 24.dp else 88.dp,
                         ),
                     ) {
                         content(expanded)
@@ -2148,7 +2153,7 @@ private fun TopLevelScaffold(
                     grid(Modifier.fillMaxWidth().weight(1f))
                 }
             }
-            if (expanded) {
+            if (useSideRail) {
                 FloatingSideBar(
                     items = SharedBottomBarItems,
                     selectedIndex = selectedIndex,

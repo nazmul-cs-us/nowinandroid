@@ -17,4 +17,6 @@ actual fun createSharedNewsRepository(): SharedNewsRepository = object : SharedN
     ): List<SharedNewsResource> = emptyList()
 
     override suspend fun newsById(id: Int): SharedNewsResource? = null
+
+    override suspend fun searchNews(query: String, limit: Int): List<SharedNewsResource> = emptyList()
 }

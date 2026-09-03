@@ -4,6 +4,8 @@ import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
 import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CFunction
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -11,6 +13,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +27,7 @@ import sqlite3.SQLITE_OK
 import sqlite3.SQLITE_OPEN_READONLY
 import sqlite3.SQLITE_ROW
 import sqlite3.sqlite3_bind_int
+import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_text
@@ -99,6 +103,24 @@ private class IosSharedNewsRepository : SharedNewsRepository {
             ).firstOrNull()
         }
 
+    override suspend fun searchNews(query: String, limit: Int): List<SharedNewsResource> =
+        withContext(Dispatchers.Default) {
+            val term = query.trim()
+            if (term.isEmpty() || limit <= 0) return@withContext emptyList()
+            val pattern = "%${escapeLikeTerm(term)}%"
+            queryNews(
+                path = databasePath(),
+                sql = """
+                    $NEWS_SELECT
+                    FROM news_resources n
+                    WHERE n.title LIKE ? ESCAPE '\' OR n.content LIKE ? ESCAPE '\'
+                    ORDER BY n.id ASC
+                    LIMIT ?
+                """.trimIndent(),
+                arguments = listOf(pattern, pattern, limit),
+            )
+        }
+
     private suspend fun databasePath(): String {
         databasePathMutex.lock()
         return try {
@@ -123,11 +145,26 @@ private const val NEWS_SELECT = """
 
 private fun placeholders(count: Int): String = List(count) { "?" }.joinToString(",")
 
+/** Escapes SQLite LIKE wildcards in user input; paired with `ESCAPE '\'` in queries. */
+private fun escapeLikeTerm(term: String): String = buildString(term.length) {
+    term.forEach { character ->
+        when (character) {
+            '\\', '%', '_' -> append('\\').append(character)
+            else -> append(character)
+        }
+    }
+}
+
+/** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
+@OptIn(ExperimentalForeignApi::class)
+private val SQLITE_TRANSIENT: CPointer<CFunction<(COpaquePointer?) -> Unit>>? =
+    (-1L).toCPointer()
+
 @OptIn(ExperimentalForeignApi::class)
 private suspend fun queryNews(
     path: String,
     sql: String,
-    arguments: List<Int>,
+    arguments: List<Any>,
 ): List<SharedNewsResource> {
     val coroutineContext = currentCoroutineContext()
     return memScoped {
@@ -146,7 +183,18 @@ private suspend fun queryNews(
             }
             try {
                 arguments.forEachIndexed { index, value ->
-                    check(sqlite3_bind_int(statement.value, index + 1, value) == SQLITE_OK) {
+                    val bindResult = when (value) {
+                        is Int -> sqlite3_bind_int(statement.value, index + 1, value)
+                        is String -> sqlite3_bind_text(
+                            statement.value,
+                            index + 1,
+                            value,
+                            -1,
+                            SQLITE_TRANSIENT,
+                        )
+                        else -> error("Unsupported news query argument type at ${index + 1}")
+                    }
+                    check(bindResult == SQLITE_OK) {
                         "Unable to bind news query argument ${index + 1}"
                     }
                 }

@@ -35,6 +35,8 @@ interface SharedNewsRepository {
     ): List<SharedNewsResource>
 
     suspend fun newsById(id: Int): SharedNewsResource?
+
+    suspend fun searchNews(query: String, limit: Int = 30): List<SharedNewsResource>
 }
 
 expect fun createSharedNewsRepository(): SharedNewsRepository

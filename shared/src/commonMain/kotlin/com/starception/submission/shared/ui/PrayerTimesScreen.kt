@@ -212,7 +212,9 @@ fun PrayerTimesScreen(
                 // reuse the single-pane layout and simply show more of the
                 // carousel; only landscape tablets split into two panes.
                 val useTwoPaneLayout = isTablet && !isTabletPortrait
-                val useSideNavigation = isTablet
+                // Match Android: the floating bottom pill in portrait, the side
+                // rail only in landscape two-pane layouts.
+                val useSideNavigation = useTwoPaneLayout
                 // iOS has taller status/navigation safe areas than Android. Reserving
                 // their measured space keeps the location card above the floating bar.
                 val portraitInsightHeight = if (isTablet) {
@@ -243,6 +245,16 @@ fun PrayerTimesScreen(
                 val tabletCardHeight = (
                     (paneContentHeight - 44.dp - (8.dp * 3)) / 3
                 ).coerceIn(96.dp, 190.dp)
+                // Portrait tablet single-pane: the schedule always shows all
+                // six prayers, and its three rows absorb the height left after
+                // the header (58), hero block (~454), schedule header (44),
+                // location card (58), and paddings, so nothing pools below.
+                // Budget: safe areas + header (58) + insights title (44) +
+                // hero (400) + gaps + schedule header (52) + location (58) +
+                // bottom-bar clearance (112) ≈ 810dp; rows share the rest.
+                val portraitCardHeight = (
+                    (maxHeight - 810.dp) / 3
+                ).coerceIn(96.dp, 132.dp)
                 Box(
                     modifier = Modifier
                         .widthIn(max = 1200.dp)
@@ -327,13 +339,67 @@ fun PrayerTimesScreen(
                                     onTogglePrayerNotification = onTogglePrayerNotification,
                                     showExpandControl = false,
                                     compact = !isTablet,
-                                    // Portrait tablets have a tall, narrow right
-                                    // pane; one card per row fills it evenly.
-                                    columns = if (isTabletPortrait) 1 else 2,
                                     cardMinHeight = if (isTablet) tabletCardHeight else null,
                                 )
                             }
                         }
+                    }
+                } else if (isTabletPortrait) {
+                    // Portrait tablets never need to scroll: every fixed block
+                    // takes its natural height and the hero absorbs whatever
+                    // the window measurement leaves over, so nothing can
+                    // overlap the floating bar or pool at the bottom.
+                    Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                // The pager draws its own 34dp title row plus
+                                // an 8dp gap above the artwork.
+                                val heroTile = (maxHeight - 42.dp).coerceAtLeast(220.dp)
+                                InsightPager(
+                                    day = day,
+                                    placeName = placeName,
+                                    salah = salah,
+                                    onTogglePrayer = onTogglePrayer,
+                                    today = today,
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    quranPlayer = quranPlayer,
+                                    onOpenQuran = onOpenQuran,
+                                    onOpenQibla = onOpenQibla,
+                                    onOpenRecommendation = onOpenRecommendation,
+                                    notifications = notifications,
+                                    tileHeight = heroTile,
+                                    maxPageWidth = 420.dp,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        PrayerScheduleSection(
+                            day = day,
+                            offsets = offsets,
+                            showAllPrayers = true,
+                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                            onAdjustPrayer = onAdjustPrayer,
+                            isTuning = isTuningSchedule,
+                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                            notifications = notifications,
+                            onTogglePrayerNotification = onTogglePrayerNotification,
+                            showExpandControl = false,
+                            compact = false,
+                            cardMinHeight = 104.dp,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        LocationWeatherRow(
+                            placeName = placeName,
+                            temperatureCelsius = day.temperatureCelsius,
+                            conditionLabel = day.conditionLabel,
+                            isLocating = isLocating,
+                            compact = false,
+                            onRefresh = onRefresh,
+                        )
+                        // Keeps the location card clear of the floating pill:
+                        // 56dp pill + 8dp padding + safe-area breathing room.
+                        Spacer(Modifier.height(88.dp))
                     }
                 } else {
                     // The pager and schedule scroll together on a phone so the
@@ -357,7 +423,6 @@ fun PrayerTimesScreen(
                                 onOpenRecommendation = onOpenRecommendation,
                                 notifications = notifications,
                                 tileHeight = portraitInsightHeight,
-                                maxPageWidth = if (isTablet) 420.dp else null,
                             )
                         }
                         item {
@@ -815,7 +880,9 @@ private fun PrayerCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = minHeight ?: if (compact) 78.dp else 96.dp)
+            // Fixed height: the card's reveal layers use fillMaxSize, which
+            // would otherwise expand to any loose parent constraint.
+            .height(minHeight ?: if (compact) 78.dp else 96.dp)
             .clip(cardShape),
         propagateMinConstraints = true,
     ) {
