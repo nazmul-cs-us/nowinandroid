@@ -55,56 +55,23 @@ class TravelDuaPolicyTest {
     }
 
     @Test
-    fun activeGoogleDrivingConfirmation_allowsPlaybackWithoutRecentGps() {
-        assertTrue(
-            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
-                nowElapsedMillis = 200_000L,
-                googleDrivingConfirmed = true,
-                confirmationElapsedMillis = 20_000L,
-            ),
-        )
-    }
-
-    @Test
-    fun exitedOrStaleGoogleDrivingConfirmation_blocksPlayback() {
-        assertFalse(
-            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
-                nowElapsedMillis = 200_000L,
-                googleDrivingConfirmed = false,
-                confirmationElapsedMillis = 20_000L,
-            ),
-        )
-        assertFalse(
-            TravelDuaPolicy.hasActiveGoogleDrivingEvidence(
-                nowElapsedMillis = 320_001L,
-                googleDrivingConfirmed = true,
-                confirmationElapsedMillis = 20_000L,
-            ),
-        )
-    }
-
-    @Test
     fun newerReliableZeroSpeed_blocksFalseGoogleDriving() {
         assertFalse(
             TravelDuaPolicy.shouldAllowTravelDuaPlayback(
                 nowElapsedMillis = 100_000L,
                 lastDrivingSpeedElapsedMillis = 0L,
                 lastZeroSpeedElapsedMillis = 95_000L,
-                googleDrivingConfirmed = true,
-                googleConfirmationElapsedMillis = 40_000L,
             ),
         )
     }
 
     @Test
-    fun activeGoogleDriving_remainsFallbackWhenGpsHasNoRecentEvidence() {
-        assertTrue(
+    fun activeGoogleDriving_withoutRecentGps_blocksPlayback() {
+        assertFalse(
             TravelDuaPolicy.shouldAllowTravelDuaPlayback(
                 nowElapsedMillis = 100_000L,
                 lastDrivingSpeedElapsedMillis = 0L,
                 lastZeroSpeedElapsedMillis = 0L,
-                googleDrivingConfirmed = true,
-                googleConfirmationElapsedMillis = 40_000L,
             ),
         )
     }
@@ -116,8 +83,6 @@ class TravelDuaPolicyTest {
                 nowElapsedMillis = 100_000L,
                 lastDrivingSpeedElapsedMillis = 99_000L,
                 lastZeroSpeedElapsedMillis = 95_000L,
-                googleDrivingConfirmed = true,
-                googleConfirmationElapsedMillis = 40_000L,
             ),
         )
     }

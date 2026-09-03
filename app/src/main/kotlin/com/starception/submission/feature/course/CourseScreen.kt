@@ -34,9 +34,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
@@ -68,7 +65,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -76,11 +72,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import kotlinx.coroutines.launch
 import dagger.hilt.android.EntryPointAccessors
 import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import com.starception.submission.core.ui.FlaticonPlayIcon
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 
 /**
@@ -122,6 +120,24 @@ private val CourseSlate = Color(0xFF5D6574)
 private val CourseBlue = Color(0xFF4F779D)
 private val CourseRust = Color(0xFF99593C)
 private val CourseGold = Color(0xFFD8AB59)
+
+/** Compensates for the right-chevron glyph's asymmetric font side bearings. */
+@Composable
+private fun CourseChevronIcon(
+    glyph: String,
+    contentDescription: String?,
+    tint: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    FlaticonIcon(
+        glyph = glyph,
+        contentDescription = contentDescription,
+        modifier = modifier.offset(x = 2.dp),
+        tint = tint,
+        fontSize = fontSize,
+    )
+}
 
 /**
  * Course Screen - Islamic Learning Platform
@@ -1234,7 +1250,7 @@ private fun AllCoursesEnrolledSection(
         ) {
             // Courses stat
             StatCard(
-                iconGlyph = FlaticonIcons.SCHOOL,
+                iconGlyph = FlaticonIcons.QURAN,
                 value = "$completedCourses/$totalCourses",
                 label = "Courses",
                 modifier = Modifier.weight(1f),
@@ -1451,7 +1467,7 @@ private fun SuggestionCard(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        FlaticonIcon(
+                        CourseChevronIcon(
                             glyph = FlaticonIcons.ANGLE_RIGHT,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.secondary,
@@ -1585,7 +1601,7 @@ private fun CourseProgressRow(
                 }
             }
 
-            FlaticonIcon(
+            CourseChevronIcon(
                 glyph = FlaticonIcons.ANGLE_RIGHT,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1694,11 +1710,11 @@ private fun CourseLearningOverview(
                     color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
+                        CourseChevronIcon(
+                            glyph = FlaticonIcons.ANGLE_RIGHT,
                             contentDescription = "Browse all courses",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp),
+                            fontSize = 19.sp,
                         )
                     }
                 }
@@ -1950,11 +1966,11 @@ private fun CourseCatalogBottomSheet(
                                         )
                                     }
                                 }
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
+                                CourseChevronIcon(
+                                    glyph = FlaticonIcons.ANGLE_RIGHT,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp),
+                                    fontSize = 19.sp,
                                 )
                             }
                         }
@@ -2097,11 +2113,11 @@ private fun OngoingCourseList(
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowForward,
+                                CourseChevronIcon(
+                                    glyph = FlaticonIcons.ANGLE_RIGHT,
                                     contentDescription = "Open ${course.title}",
                                     tint = contentColor,
-                                    modifier = Modifier.size(19.dp),
+                                    fontSize = 18.sp,
                                 )
                             }
                         }
@@ -2256,11 +2272,11 @@ private fun TrainingCourseOverviewCard(
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
+                        CourseChevronIcon(
+                            glyph = FlaticonIcons.ANGLE_RIGHT,
                             contentDescription = "Open ${course.title}",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            fontSize = 19.sp,
                         )
                     }
                 }
@@ -2322,7 +2338,7 @@ private fun LearningInsightCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            FlaticonIcon(
+            CourseChevronIcon(
                 glyph = FlaticonIcons.ANGLE_RIGHT,
                 contentDescription = "Open course",
                 tint = MaterialTheme.colorScheme.onSurface,
@@ -2719,7 +2735,7 @@ private fun LegacyCourseCard(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             CourseStatItem(
-                                iconGlyph = FlaticonIcons.OPEN_BOOK,
+                                iconGlyph = FlaticonIcons.BOOK,
                                 value = course.totalLessons.toString(),
                                 label = if (course.totalLessons == 1) "lesson" else "lessons",
                                 modifier = Modifier.weight(1f),
@@ -2901,7 +2917,7 @@ internal fun getAvailableCourses(): List<Course> {
             title = "Juz Amma Memorization",
             subtitle = "Last 37 Surahs",
             description = "Complete memorization of Juz Amma (30th part) - the most commonly recited surahs in prayers.",
-            iconGlyph = FlaticonIcons.SCHOOL,
+            iconGlyph = FlaticonIcons.QURAN,
             totalLessons = 37,
             // ~556 total ayahs in Juz Amma, estimate 5 ayahs/day = 111 days, rounded to 120
             estimatedDays = 120,
@@ -2917,7 +2933,7 @@ internal fun getAvailableCourses(): List<Course> {
             title = "Complete Quran Reading",
             subtitle = "Read the entire Quran",
             description = "A structured plan to read the complete Quran with daily reading goals and progress tracking.",
-            iconGlyph = FlaticonIcons.OPEN_BOOK,
+            iconGlyph = FlaticonIcons.QURAN,
             totalLessons = 604,
             // 604 pages at 2 pages/day = 302 days, rounded to 300
             estimatedDays = 300,
@@ -3098,11 +3114,11 @@ private fun CourseBigTile(
                         },
                     ) {
                         Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowOutward,
+                            CourseChevronIcon(
+                                glyph = FlaticonIcons.ANGLE_RIGHT,
                                 contentDescription = "Open ${course.title}",
                                 tint = contentColor,
-                                modifier = Modifier.size(19.dp),
+                                fontSize = 18.sp,
                             )
                         }
                     }
@@ -3160,11 +3176,11 @@ private fun CourseBigTile(
                                 },
                             ) {
                                 Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreHoriz,
+                                    FlaticonIcon(
+                                        glyph = FlaticonIcons.SETTINGS,
                                         contentDescription = "More options",
                                         tint = contentColor,
-                                        modifier = Modifier.size(19.dp),
+                                        fontSize = 18.sp,
                                     )
                                 }
                             }
@@ -3176,20 +3192,20 @@ private fun CourseBigTile(
                                 color = accentColor,
                             ) {
                                 Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = if (isEnrolled && !isCompleted) {
-                                            Icons.Default.PlayArrow
-                                        } else {
-                                            Icons.Default.ArrowForward
-                                        },
-                                        contentDescription = if (isEnrolled) {
-                                            "Continue ${course.title}"
-                                        } else {
-                                            "Open ${course.title}"
-                                        },
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp),
-                                    )
+                                    if (isEnrolled && !isCompleted) {
+                                        FlaticonPlayIcon(
+                                            contentDescription = "Continue ${course.title}",
+                                            tint = Color.White,
+                                            iconSize = 20.dp,
+                                        )
+                                    } else {
+                                        CourseChevronIcon(
+                                            glyph = FlaticonIcons.ANGLE_RIGHT,
+                                            contentDescription = "Open ${course.title}",
+                                            tint = Color.White,
+                                            fontSize = 19.sp,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -3273,7 +3289,7 @@ private fun CourseBigTile(
 
                 if (isEnrolled && !isCompleted) {
                     CourseOptionRow(
-                        iconGlyph = FlaticonIcons.OPEN_BOOK,
+                        iconGlyph = FlaticonIcons.BOOK,
                         title = "Continue learning",
                         description = "Open the next lesson in this course",
                         iconColor = MaterialTheme.colorScheme.primary,
@@ -3431,7 +3447,7 @@ private fun CourseOptionRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            FlaticonIcon(
+            CourseChevronIcon(
                 glyph = FlaticonIcons.ANGLE_RIGHT,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

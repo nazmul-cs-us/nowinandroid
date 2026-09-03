@@ -143,11 +143,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.R
-import eu.wewox.pagecurl.ExperimentalPageCurlApi
-import eu.wewox.pagecurl.config.PageCurlConfig
-import eu.wewox.pagecurl.config.rememberPageCurlConfig
-import eu.wewox.pagecurl.page.PageCurl
-import eu.wewox.pagecurl.page.rememberPageCurlState
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.theme.QuranFonts
@@ -192,7 +187,8 @@ private val SurahArtworkLandscapeHeight = 180.dp
 private val MushafEdgeControlTouchWidth = 96.dp
 private val MushafEdgeControlTouchHeight = 112.dp
 private val MushafEdgeControlVisualSize = 44.dp
-private val MushafEdgeControlCollapsedWidth = 5.dp
+private val MushafEdgeControlCollapsedWidth = 10.dp
+private val MushafEdgeControlCollapsedHeight = 64.dp
 
 /**
  * Container for surah navigation with drag gesture anywhere on screen.
@@ -5742,7 +5738,7 @@ private fun MushafPageWithFrame(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val glowColor = MaterialTheme.colorScheme.primary
     val markerColor = onSurfaceColor.copy(alpha = 0.90f)
-    // PageCurl snapshots its first page draw. If precise marker geometry is still
+    // The pager renders its first page before precise marker geometry is ready. If
     // being prepared during that draw, use the reserved inline slots themselves
     // to render the rosettes so a cached page can never lose its ayah endings.
     // Once geometry is ready, the two ink-aware Canvas passes below take over.
@@ -5959,7 +5955,7 @@ private fun MushafPageWithFrame(
         }.getOrNull()
     }
 
-    // PageCurl caches its page draw. Starting this value at zero and animating it
+    // Starting this value at zero and animating it
     // after the first draw left the initial page permanently marker-less; returning
     // from another page happened to redraw it at the animation's final value.
     // Geometry is prepared before the curl is created now, so paint it immediately.
@@ -6341,7 +6337,6 @@ private fun MushafPageWithFrame(
 // Builds one master AnnotatedString, measures lines, splits at line boundaries.
 // Ayahs flow naturally across pages like a real printed Quran.
 // ---------------------------------------------------------------------------
-@OptIn(ExperimentalPageCurlApi::class)
 @Composable
 private fun MushafPagerView(
     ayahs: List<com.starception.submission.core.qurandatabase.Ayah>,
@@ -6375,30 +6370,15 @@ private fun MushafPagerView(
 
     val markerColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
-    // PageCurl 1.5.1 composes only current-1/current/current+1. Keep its state as
-    // the single source of truth so the full 131-page Al-Baqarah list is never
-    // represented by 131 graphics layers.
+    // Keep only the current page and Compose's bounded neighbour in memory. The former
+    // curl renderer retained multiple full-screen graphics layers during rapid turns;
+    // together with Arabic TextLayout objects this exhausted the 256 MB app heap.
     var pagerPageCount by remember { androidx.compose.runtime.mutableIntStateOf(1) }
-    val state = rememberPageCurlState(
-        initialCurrent = initialPage.coerceAtLeast(0),
+    val state = rememberPagerState(
+        initialPage = 0,
+        pageCount = { pagerPageCount },
     )
-    val pageCurlConfig = rememberPageCurlConfig(
-        backPageColor = surfaceColor,
-        backPageContentAlpha = 0.10f,
-        shadowColor = Color.Black,
-        shadowAlpha = 0.18f,
-        shadowRadius = 12.dp,
-        dragForwardEnabled = true,
-        dragBackwardEnabled = true,
-        // A single tap must stay available to the reader, and a double tap must
-        // reveal translation rather than advancing a page.
-        tapForwardEnabled = false,
-        tapBackwardEnabled = false,
-        tapCustomEnabled = false,
-        dragInteraction = PageCurlConfig.StartEndDragInteraction(
-            pointerBehavior = PageCurlConfig.DragInteraction.PointerBehavior.PageEdge,
-        ),
-    )
+    var initialPageRestored by remember(ayahs) { mutableStateOf(false) }
 
     // Pinch streams a new font size every frame; re-measuring the whole surah at
     // that rate janks the gesture and dumps the reader onto a different page.
@@ -6428,12 +6408,16 @@ private fun MushafPagerView(
         MushafKeyBus.bind(
             next = {
                 mushafScope.launch {
-                    if (state.current < pagerPageCount - 1) state.next()
+                    if (state.currentPage < pagerPageCount - 1) {
+                        state.animateScrollToPage(state.currentPage + 1)
+                    }
                 }
             },
             prev = {
                 mushafScope.launch {
-                    if (state.current > 0) state.prev()
+                    if (state.currentPage > 0) {
+                        state.animateScrollToPage(state.currentPage - 1)
+                    }
                 }
             },
         )
@@ -6826,12 +6810,12 @@ private fun MushafPagerView(
                                 }
 
                                 if (directionDecided && !isVerticalScroll) {
-                                    // PageCurl owns horizontal movement. Do not
+                                    // HorizontalPager owns horizontal movement. Do not
                                     // consume here or its child detector cannot
                                     // anchor the paper edge to the reader's finger.
                                 } else if (directionDecided && isVerticalScroll) {
-                                    // PageCurl treats an unrestricted Y drag as a left/right
-                                    // page turn, so claim the vertical stream before it reaches
+                                    // The pager treats an unrestricted Y drag as part of a page
+                                    // turn, so claim the vertical stream before it reaches
                                     // the child and route it into the parent Surah list instead.
                                     change.consume()
                                     verticalDragTotal += delta.y
@@ -6858,7 +6842,9 @@ private fun MushafPagerView(
                                     // info returns to Mushaf without skipping a page.
                                     verticalDragTotal < -verticalThreshold -> {
                                         if (startedAtMushaf) {
-                                            if (state.current < pagerPageCount - 1) state.next()
+                                            if (state.currentPage < pagerPageCount - 1) {
+                                                state.animateScrollToPage(state.currentPage + 1)
+                                            }
                                         } else {
                                             parentScrollState?.animateScrollToItem(
                                                 index = 1,
@@ -7071,15 +7057,24 @@ private fun MushafPagerView(
                 pages
             }
 
-            LaunchedEffect(paginatedPages.size) {
+            LaunchedEffect(paginatedPages.size, initialPage) {
                 pagerPageCount = paginatedPages.size.coerceAtLeast(1)
-                if (paginatedPages.isNotEmpty() && state.current > paginatedPages.lastIndex) {
-                    state.snapTo(paginatedPages.lastIndex)
+                // Let Pager observe the new count before restoring a saved page that may
+                // be outside the one-page bootstrap count used during pagination.
+                androidx.compose.runtime.withFrameNanos { }
+                if (paginatedPages.isNotEmpty() && !initialPageRestored) {
+                    state.scrollToPage(initialPage.coerceIn(0, paginatedPages.lastIndex))
+                    initialPageRestored = true
+                } else if (
+                    paginatedPages.isNotEmpty() &&
+                    state.currentPage > paginatedPages.lastIndex
+                ) {
+                    state.scrollToPage(paginatedPages.lastIndex)
                 }
             }
 
-            LaunchedEffect(state.current, paginatedPages.size) {
-                onPageChange(state.current, paginatedPages.size)
+            LaunchedEffect(state.currentPage, paginatedPages.size) {
+                onPageChange(state.currentPage, paginatedPages.size)
             }
 
             // Publish current Mushaf page to PullToSyncContainer's mini-bar.
@@ -7087,22 +7082,26 @@ private fun MushafPagerView(
             DisposableEffect(
                 surahNameArabic,
                 surahNameEnglish,
-                state.current,
+                state.currentPage,
                 paginatedPages.size,
             ) {
                 if (paginatedPages.isNotEmpty()) {
                     MushafMiniBarBus.bind(
                         owner = miniBarOwner,
                         next = {
-                            if (state.current < pagerPageCount - 1) {
-                                mushafScope.launch { state.next() }
+                            if (state.currentPage < pagerPageCount - 1) {
+                                mushafScope.launch {
+                                    state.animateScrollToPage(state.currentPage + 1)
+                                }
                             } else if (ayahs.first().surahNumber < 114) {
                                 onNavigateToNextSurah()
                             }
                         },
                         previous = {
-                            if (state.current > 0) {
-                                mushafScope.launch { state.prev() }
+                            if (state.currentPage > 0) {
+                                mushafScope.launch {
+                                    state.animateScrollToPage(state.currentPage - 1)
+                                }
                             } else if (ayahs.first().surahNumber > 1) {
                                 onNavigateToPreviousSurah()
                             }
@@ -7118,7 +7117,7 @@ private fun MushafPagerView(
                         jumpToPage = { requestedPage ->
                             val pageIndex = (requestedPage - 1)
                                 .coerceIn(0, pagerPageCount - 1)
-                            mushafScope.launch { state.snapTo(pageIndex) }
+                            mushafScope.launch { state.scrollToPage(pageIndex) }
                         },
                     )
                     MushafMiniBarBus.publish(
@@ -7127,7 +7126,7 @@ private fun MushafPagerView(
                             surahNumber = ayahs.first().surahNumber,
                             surahNameArabic = surahNameArabic,
                             surahNameEnglish = surahNameEnglish,
-                            currentPage = state.current + 1,
+                            currentPage = state.currentPage + 1,
                             totalPages = paginatedPages.size,
                         ),
                     )
@@ -7144,7 +7143,7 @@ private fun MushafPagerView(
             LaunchedEffect(arabicFontSize) {
                 if (arabicFontSize == committedFontSize) return@LaunchedEffect
                 kotlinx.coroutines.delay(250)
-                pendingAnchorAyah = paginatedPages.getOrNull(state.current)
+                pendingAnchorAyah = paginatedPages.getOrNull(state.currentPage)
                     ?.ayahRanges?.firstOrNull()?.first ?: 0
                 committedFontSize = arabicFontSize
             }
@@ -7153,7 +7152,7 @@ private fun MushafPagerView(
                     val idx = paginatedPages.indexOfFirst { page ->
                         page.ayahRanges.any { it.first == pendingAnchorAyah }
                     }
-                    if (idx >= 0 && idx != state.current) state.snapTo(idx)
+                    if (idx >= 0 && idx != state.currentPage) state.scrollToPage(idx)
                     pendingAnchorAyah = 0
                 }
             }
@@ -7189,7 +7188,7 @@ private fun MushafPagerView(
                 androidx.compose.runtime.mutableStateMapOf<AnnotatedString, List<MarkerGeometry>>()
             }
             val pagerEmPx = with(density) { typesetFontSize.sp.toPx() }
-            LaunchedEffect(state.current, paginatedPages, inkGeomCache) {
+            LaunchedEffect(state.currentPage, paginatedPages, inkGeomCache) {
                 if (paginatedPages.isEmpty()) return@LaunchedEffect
                 fun pruneGeometryCache(centerPage: Int) {
                     val retainedTexts = (centerPage - 1..centerPage + 1)
@@ -7200,7 +7199,7 @@ private fun MushafPagerView(
                     }
                 }
 
-                val requestedPage = state.current
+                val requestedPage = state.currentPage
                 // Prune BEFORE doing any work. Previously pruning happened only
                 // after current/next/previous scans all completed. A rapid swipe
                 // cancelled that coroutine before it reached cleanup, allowing
@@ -7246,7 +7245,7 @@ private fun MushafPagerView(
                 } finally {
                     // Cancellation from the next swipe still executes this block.
                     // Read the latest page so stale work cannot preserve old keys.
-                    pruneGeometryCache(state.current)
+                    pruneGeometryCache(state.currentPage)
                 }
             }
 
@@ -7267,7 +7266,7 @@ private fun MushafPagerView(
                     }
                     if (targetIndex >= 0) {
                         consumedScrollToAyah = scrollToAyah
-                        if (targetIndex != state.current) state.snapTo(targetIndex)
+                        if (targetIndex != state.currentPage) state.scrollToPage(targetIndex)
                     }
                 }
             }
@@ -7325,24 +7324,18 @@ private fun MushafPagerView(
                     )
                 }
             }
-            // PageCurl composes its page before the asynchronous ink scan finishes,
+            // The pager composes its page before the asynchronous ink scan finishes,
             // and that initial captured draw does not reliably refresh when only the
             // geometry map changes. Keep the geometry in the curl's identity so the
             // prepared markers are installed when ready, but render the Quran text
             // immediately. Geometry is decorative; blocking the entire reader on it
             // left a permanently blank page whenever an ink scan failed. It also meant
-            // PageCurl still had a zero page count while search/offline restoration
-            // effects attempted to snap, which could crash inside PageCurlState.
-            val currentPageText = paginatedPages.getOrNull(state.current)?.text
+            // The pager still had a bootstrap page count while search/offline restoration
+            // effects attempted to snap, which could request an out-of-range page.
+            val currentPageText = paginatedPages.getOrNull(state.currentPage)?.text
             val currentPageGeometry = currentPageText?.let(inkGeomCache::get)
-            // PageCurl's content is regular Compose content and observes geometry
-            // state directly. Keying the entire curl by a newly computed geometry
-            // list destroyed and rebuilt all three page subcompositions after each
-            // turn, leaving old draw caches for GC and making later swipes slower.
-            PageCurl(
-                count = paginatedPages.size,
+            HorizontalPager(
                 state = state,
-                config = pageCurlConfig,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
@@ -7353,12 +7346,12 @@ private fun MushafPagerView(
                         scaleY = preview
                     }
             ) { pageIndex ->
-                val page = paginatedPages.getOrNull(pageIndex) ?: return@PageCurl
+                val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
                 MushafPageWithFrame(
                     pageText = page.text,
                     tajweed = page.tajweed,
                     inlineContent = pageInlineContent,
-                    inkGeometries = if (pageIndex == state.current) {
+                    inkGeometries = if (pageIndex == state.currentPage) {
                         currentPageGeometry
                     } else {
                         inkGeomCache[page.text]
@@ -7377,12 +7370,12 @@ private fun MushafPagerView(
                     // the translation it is explaining. Outranks the search
                     // highlight, which is stale once the reader starts tapping.
                     highlightedAyahNumber = inlinedAyah ?: highlightedAyahNumber,
-                    interactive = pageIndex == state.current,
+                    interactive = pageIndex == state.currentPage,
                     onAyahDoubleTap = { ayahNumber ->
                         // No re-anchoring here on purpose. The gloss is inserted AFTER
                         // the tapped ayah, which sits on this page, so every line before
                         // this page's first character is untouched and repagination
-                        // reproduces the same page boundaries up to it — state.current
+                        // reproduces the same page boundaries up to it — state.currentPage
                         // still points at the page being read. The anchor that used to
                         // be set here is what dragged the reader backwards, because it
                         // re-snapped to the first page that merely *contains* the ayah.
@@ -7394,9 +7387,9 @@ private fun MushafPagerView(
                 )
             }
 
-            val atFirstPage = state.current == 0
+            val atFirstPage = state.currentPage == 0
             val atLastPage = paginatedPages.isNotEmpty() &&
-                state.current == paginatedPages.lastIndex
+                state.currentPage == paginatedPages.lastIndex
             val surahNumber = ayahs.first().surahNumber
             var leftEdgeControlVerticalFraction by remember {
                 mutableFloatStateOf(0.50f)
@@ -7439,7 +7432,9 @@ private fun MushafPagerView(
                     if (atFirstPage) {
                         onNavigateToPreviousSurah()
                     } else {
-                        mushafScope.launch { state.prev() }
+                        mushafScope.launch {
+                            state.animateScrollToPage(state.currentPage - 1)
+                        }
                     }
                 },
                 onLongPress = onNavigateToPreviousSurah,
@@ -7459,7 +7454,9 @@ private fun MushafPagerView(
                     if (atLastPage) {
                         onNavigateToNextSurah()
                     } else {
-                        mushafScope.launch { state.next() }
+                        mushafScope.launch {
+                            state.animateScrollToPage(state.currentPage + 1)
+                        }
                     }
                 },
                 onLongPress = onNavigateToNextSurah,
@@ -7526,7 +7523,16 @@ private fun MushafEdgeTurnControl(
     val currentPerformHandleAction by rememberUpdatedState(performHandleAction)
     val currentPerformSurahTurn by rememberUpdatedState(performSurahTurn)
     val currentLongPressEnabled by rememberUpdatedState(longPressEnabled)
-    val dragTouchSlop = with(LocalDensity.current) { 2.dp.toPx() }
+    // Use Android's platform touch slop. The former 2dp threshold interpreted normal
+    // finger tremor as a vertical drag, so ACTION_UP never performed the page turn.
+    val platformTouchSlop = android.view.ViewConfiguration
+        .get(LocalView.current.context)
+        .scaledTouchSlop
+        .toFloat()
+    val dragTouchSlop = maxOf(
+        platformTouchSlop,
+        with(LocalDensity.current) { 8.dp.toPx() },
+    )
     val visualWidth by animateDpAsState(
         targetValue = if (isExpanded) {
             MushafEdgeControlVisualSize
@@ -7535,6 +7541,20 @@ private fun MushafEdgeTurnControl(
         },
         animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing),
         label = "Mushaf edge handle width",
+    )
+    val visualHeight by animateDpAsState(
+        targetValue = if (isExpanded) {
+            MushafEdgeControlVisualSize
+        } else {
+            MushafEdgeControlCollapsedHeight
+        },
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "Mushaf edge handle height",
+    )
+    val expansionProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "Mushaf edge handle transformation",
     )
     val visualEdgeOffset by animateDpAsState(
         // Samsung-style edge controls are physically attached to the display:
@@ -7550,6 +7570,9 @@ private fun MushafEdgeTurnControl(
         isLeftEdge -> "Previous Mushaf page"
         else -> "Next Mushaf page"
     }
+    val arrowColor = MaterialTheme.colorScheme.onSurface.copy(
+        alpha = if (enabled) 0.82f else 0.30f,
+    )
     // Use the pointer's screen coordinate rather than its coordinate inside this
     // control. The control is repositioned while it is dragged; a local `event.y`
     // therefore shifts with the control and makes the next delta collapse to zero.
@@ -7565,7 +7588,7 @@ private fun MushafEdgeTurnControl(
             .width(MushafEdgeControlTouchWidth)
             .height(MushafEdgeControlTouchHeight)
             // Both controls sit inside Android's back-gesture strip. Exclude only
-            // this target. The visual remains a 44dp circle / 5dp collapsed
+            // this target. The visual remains a 44dp circle / 10x64dp collapsed
             // sliver, while the invisible 96x112dp hit area extends inward and
             // above/below it. This gives the Samsung-small visual a forgiving
             // target without obscuring Quran text.
@@ -7665,22 +7688,45 @@ private fun MushafEdgeTurnControl(
                     x = if (isLeftEdge) visualEdgeOffset else -visualEdgeOffset,
                 )
                 .width(visualWidth)
-                .height(MushafEdgeControlVisualSize),
+                .height(visualHeight),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isExpanded,
-                    enter = fadeIn(animationSpec = tween(140)),
-                    exit = fadeOut(animationSpec = tween(90)),
-                ) {
-                    Icon(
-                        imageVector = if (isLeftEdge) {
-                            Icons.AutoMirrored.Filled.ArrowBack
-                        } else {
-                            Icons.AutoMirrored.Filled.ArrowForward
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val progress = expansionProgress
+                val centerY = size.height / 2f
+                val tipX = if (isLeftEdge) size.width * 0.28f else size.width * 0.72f
+                val tailX = if (isLeftEdge) size.width * 0.72f else size.width * 0.28f
+                val wingX = if (isLeftEdge) size.width * 0.48f else size.width * 0.52f
+
+                // A small chevron remains visible in the resting edge pill. As the
+                // surface widens and shortens, the chevron grows and gains a shaft,
+                // reading as one handle transforming into a complete page arrow.
+                val collapsedWingDelta = 4.dp.toPx()
+                val expandedWingDelta = 9.dp.toPx()
+                val wingDelta = lerp(collapsedWingDelta, expandedWingDelta, progress)
+                val wingColor = arrowColor.copy(
+                    alpha = arrowColor.alpha * lerp(0.58f, 1f, progress),
+                )
+                drawLine(
+                    color = wingColor,
+                    start = Offset(tipX, centerY),
+                    end = Offset(wingX, centerY - wingDelta),
+                    strokeWidth = lerp(1.6.dp.toPx(), 2.4.dp.toPx(), progress),
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = wingColor,
+                    start = Offset(tipX, centerY),
+                    end = Offset(wingX, centerY + wingDelta),
+                    strokeWidth = lerp(1.6.dp.toPx(), 2.4.dp.toPx(), progress),
+                    cap = StrokeCap.Round,
+                )
+                if (progress > 0.02f) {
+                    drawLine(
+                        color = arrowColor.copy(alpha = arrowColor.alpha * progress),
+                        start = Offset(lerp(tipX, tailX, progress), centerY),
+                        end = Offset(tipX, centerY),
+                        strokeWidth = 2.4.dp.toPx(),
+                        cap = StrokeCap.Round,
                     )
                 }
             }

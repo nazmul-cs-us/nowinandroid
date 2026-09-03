@@ -30,6 +30,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +67,9 @@ import com.starception.submission.core.designsystem.component.NiaTextButton
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDragHandle
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -85,6 +89,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -169,86 +174,102 @@ fun LessonCompletionBottomSheet(
     ) {
         NiaBottomSheetTheme {
             NiaBottomSheetFrame {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-            // Completion mark
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(34.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Title
-            Text(
-                text = "Ready to complete?",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Confirm your progress and optionally save a short voice reflection.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Text(
-                        text = "LESSON",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = lessonTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Recording Section
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 12.dp, bottom = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    NiaBottomSheetDragHandle()
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(46.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Box(modifier = Modifier.size(46.dp), contentAlignment = Alignment.Center) {
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.COMPLETED,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontSize = 23.sp,
+                                )
+                            }
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = "Complete lesson",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Confirm your progress. A voice note is optional.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(38.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                            ) {
+                                Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                                    FlaticonIcon(
+                                        glyph = FlaticonIcons.BOOK,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        fontSize = 19.sp,
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Lesson",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = lessonTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     AnimatedContent(
                         targetState = isRecording,
                         transitionSpec = {
@@ -258,39 +279,40 @@ fun LessonCompletionBottomSheet(
                         label = "recording_state",
                     ) { recording ->
                         if (recording) {
-                            // Recording UI
-                            RecordingIndicator(
-                                seconds = recordingSeconds,
-                                onStop = {
-                                    recordingManager.stopRecording()
-                                    isRecording = false
-                                    hasRecording = true
-                                },
-                                onCancel = {
-                                    recordingManager.cancelRecording()
-                                    isRecording = false
-                                },
-                            )
+                            VoiceNoteStateSurface {
+                                RecordingIndicator(
+                                    seconds = recordingSeconds,
+                                    onStop = {
+                                        recordingManager.stopRecording()
+                                        isRecording = false
+                                        hasRecording = true
+                                    },
+                                    onCancel = {
+                                        recordingManager.cancelRecording()
+                                        isRecording = false
+                                    },
+                                )
+                            }
                         } else if (hasRecording) {
-                            // Playback UI
-                            RecordingPlayback(
-                                isPlaying = isPlaying,
-                                onPlay = {
-                                    isPlaying = recordingManager.startPlayback(courseId, lessonId) {
+                            VoiceNoteStateSurface {
+                                RecordingPlayback(
+                                    isPlaying = isPlaying,
+                                    onPlay = {
+                                        isPlaying = recordingManager.startPlayback(courseId, lessonId) {
+                                            isPlaying = false
+                                        }
+                                    },
+                                    onStop = {
+                                        recordingManager.stopPlayback()
                                         isPlaying = false
-                                    }
-                                },
-                                onStop = {
-                                    recordingManager.stopPlayback()
-                                    isPlaying = false
-                                },
-                                onDelete = {
-                                    recordingManager.deleteRecording(courseId, lessonId)
-                                    hasRecording = false
-                                },
-                            )
+                                    },
+                                    onDelete = {
+                                        recordingManager.deleteRecording(courseId, lessonId)
+                                        hasRecording = false
+                                    },
+                                )
+                            }
                         } else {
-                            // Start recording UI
                             RecordButton(
                                 hasPermission = audioPermissionState.status.isGranted,
                                 onRequestPermission = {
@@ -304,49 +326,41 @@ fun LessonCompletionBottomSheet(
                             )
                         }
                     }
-                }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            // Completion is the primary action; deferring remains visually secondary.
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                NiaOutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            onComplete(hasRecording)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                ) {
-                    Text(
-                        text = "Complete lesson",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                    NiaOutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                sheetState.hide()
+                                onComplete(hasRecording)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    ) {
+                        Text(
+                            text = "Mark as complete",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
 
-                NiaTextButton(
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            onDismiss()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                ) {
-                    Text("Not yet")
+                    NiaTextButton(
+                        onClick = {
+                            scope.launch {
+                                sheetState.hide()
+                                onDismiss()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                    ) {
+                        Text("Keep learning")
+                    }
                 }
-            }
-            }
             }
         }
     }
@@ -358,29 +372,83 @@ private fun RecordButton(
     onRequestPermission: () -> Unit,
     onStartRecording: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Surface(
+        onClick = {
+            if (hasPermission) {
+                onStartRecording()
+            } else {
+                onRequestPermission()
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
     ) {
-        NiaOutlinedButton(
-            onClick = {
-                if (hasPermission) {
-                    onStartRecording()
-                } else {
-                    onRequestPermission()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Add Voice Note")
+            Surface(
+                modifier = Modifier.size(38.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                    FlaticonIcon(
+                        glyph = FlaticonIcons.MICROPHONE,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontSize = 18.sp,
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Voice note",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Optional reflection or proof of completion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = "Add",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Optional — add a short reflection or proof of completion.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+@Composable
+private fun VoiceNoteStateSurface(
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
+    ) {
+        Box(
+            modifier = Modifier.padding(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            content()
+        }
     }
 }
 
