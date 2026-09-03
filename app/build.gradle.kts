@@ -250,6 +250,7 @@ dependencies {
     testImplementation(libs.hilt.android.testing)
     testImplementation(projects.sync.syncTest)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.okhttp.mockwebserver)
 
     testDemoImplementation(libs.androidx.navigation.testing)
     testDemoImplementation(libs.robolectric)

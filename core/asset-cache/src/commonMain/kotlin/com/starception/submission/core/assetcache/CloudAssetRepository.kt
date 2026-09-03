@@ -103,6 +103,28 @@ class CloudAssetRepository(
                 }
                 val remoteManifest = remoteJson?.let(::parseManifest)
                 if (remoteManifest != null) {
+                    val previousManifest = cachedManifest ?: try {
+                        platform.readCachedText(manifestPath)?.let(::parseManifest)
+                    } catch (error: Exception) {
+                        error.rethrowIfCancellation()
+                        null
+                    }
+                    previousManifest?.assets?.forEach { (cdnKey, previousEntry) ->
+                        val remoteEntry = remoteManifest.assets[cdnKey]
+                        val isStale = remoteEntry == null ||
+                            previousEntry.size != remoteEntry.size ||
+                            !previousEntry.sha256.equals(remoteEntry.sha256, ignoreCase = true)
+                        if (isStale) {
+                            mutexFor(cdnKey).withLock {
+                                try {
+                                    platform.deleteCachedAsset(cdnKey)
+                                } catch (error: Exception) {
+                                    error.rethrowIfCancellation()
+                                    // Stale-cache cleanup is best effort.
+                                }
+                            }
+                        }
+                    }
                     try {
                         platform.writeCachedText(manifestPath, remoteJson)
                     } catch (error: Exception) {

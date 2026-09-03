@@ -13,6 +13,8 @@ data class SharedTopic(
     val name: String,
     val shortDescription: String,
     val longDescription: String,
+    val url: String? = null,
+    val imageUrl: String? = null,
 )
 
 /** A readable item generated from the same source databases as Android news. */

@@ -111,9 +111,9 @@ enum class TtsVoice(
 ) {
     KOKORO_EN(
         displayName = "Kokoro",
-        description = "High-quality English TTS with 10 natural voices",
+        description = "High-quality English TTS with 11 natural voices",
         isMultiSpeaker = true,
-        totalSpeakers = 10,
+        totalSpeakers = 11,
         modelType = TtsModelType.KOKORO,
         modelFile = "kokoro-int8-en-v0_19/model.int8.onnx",
         tokensFile = "kokoro-int8-en-v0_19/tokens.txt",

@@ -49,7 +49,7 @@ struct iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ComposePrayerTimesView()
-                .ignoresSafeArea()
+                .ignoresSafeArea(.container)
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         PrayerNotificationCoordinator.shared.refresh()

@@ -17,14 +17,17 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +56,7 @@ import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
+import com.starception.submission.shared.settings.VoiceRecognitionMode
 
 /**
  * The prayer settings screen.
@@ -91,43 +95,52 @@ fun PrayerSettingsScreen(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Box(
+            modifier = Modifier.fillMaxSize().safeDrawingPadding(),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 760.dp)
+                    .fillMaxSize()
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 16.dp),
             ) {
-                IconTapTarget(
-                    icon = NiaIcons.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    visualSize = 40.dp,
-                    onClick = onBack,
-                )
-                Column(
-                    modifier = Modifier.padding(start = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
+                    IconTapTarget(
+                        icon = NiaIcons.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        visualSize = 40.dp,
+                        onClick = onBack,
                     )
-                    Text(
-                        text = "Prayer, audio, notifications and app preferences.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Column(
+                        modifier = Modifier.padding(start = 8.dp).weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Prayer times, audio, notifications, and app preferences.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
 
-            SettingsGroupLabel("Prayer & personalization")
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .imePadding()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SettingsGroupLabel("Prayer & personalization")
 
             SettingsSection(
                 title = "Appearance",
@@ -151,7 +164,7 @@ fun PrayerSettingsScreen(
 
             SettingsSection(
                 title = "Prayer Times",
-                subtitle = "Calculation method & location",
+                subtitle = "Calculation method & adjustments",
                 iconGlyph = FlaticonIcons.SCHEDULE,
                 isExpanded = expanded == SECTION_PRAYER,
                 onToggleExpanded = {
@@ -186,7 +199,7 @@ fun PrayerSettingsScreen(
 
             SettingsSection(
                 title = "Travel Dua",
-                subtitle = "Auto-play dua when driving",
+                subtitle = "Auto-play while driving in the foreground",
                 iconGlyph = FlaticonIcons.TRAVEL,
                 isExpanded = expanded == SECTION_TRAVEL,
                 onToggleExpanded = {
@@ -200,11 +213,11 @@ fun PrayerSettingsScreen(
                     onStopAudioChain = audioActions.onStopTravelDua,
                     isPlaying = audioState.isTravelDuaPlaying,
                     testButtonLabel = "Test Travel Dua",
-                    playbackDescription = "Best effort while iOS location updates are available.",
+                    playbackDescription = "Automatic playback works only while the app is in the foreground.",
                 )
             }
 
-            SettingsGroupLabel("Voice & Salah intelligence")
+            SettingsGroupLabel("Voice")
 
             SettingsSection(
                 title = "Voice Recognition",
@@ -212,6 +225,7 @@ fun PrayerSettingsScreen(
                 iconGlyph = FlaticonIcons.MICROPHONE,
                 isExpanded = expanded == SECTION_VOICE,
                 onToggleExpanded = {
+                    if (expanded != SECTION_VOICE) contentStorageActions.onRefresh()
                     expanded = if (expanded == SECTION_VOICE) null else SECTION_VOICE
                 },
             ) {
@@ -222,6 +236,12 @@ fun PrayerSettingsScreen(
                     onModeSelected = audioActions.onRecognitionModeSelected,
                     onStartTest = audioActions.onStartRecognitionTest,
                     onStopTest = audioActions.onStopRecognitionTest,
+                    modelCategoryKey = when (audioState.recognitionMode) {
+                        VoiceRecognitionMode.KEYWORDS -> "model_kws"
+                        VoiceRecognitionMode.TRANSCRIPTION -> "model_asr"
+                    },
+                    contentStorageState = contentStorageState,
+                    contentStorageActions = contentStorageActions,
                 )
             }
 
@@ -231,6 +251,7 @@ fun PrayerSettingsScreen(
                 iconGlyph = FlaticonIcons.VOLUME,
                 isExpanded = expanded == SECTION_NARRATION,
                 onToggleExpanded = {
+                    if (expanded != SECTION_NARRATION) contentStorageActions.onRefresh()
                     expanded = if (expanded == SECTION_NARRATION) null else SECTION_NARRATION
                 },
             ) {
@@ -245,6 +266,13 @@ fun PrayerSettingsScreen(
                     onSpeakerSelected = audioActions.onNarrationSpeakerSelected,
                     onPreview = audioActions.onPreviewNarration,
                     onStop = audioActions.onStopNarration,
+                    modelCategoryKey = when (audioState.selectedNarrationVoiceIdentifier) {
+                        "SHERPA_VITS_VCTK" -> "model_tts_vits"
+                        "SHERPA_KOKORO", null -> "model_tts_kokoro"
+                        else -> null
+                    },
+                    contentStorageState = contentStorageState,
+                    contentStorageActions = contentStorageActions,
                 )
             }
 
@@ -268,7 +296,7 @@ fun PrayerSettingsScreen(
 
             SettingsSection(
                 title = "About",
-                subtitle = "Version & legal info",
+                subtitle = "Version & attributions",
                 iconGlyph = FlaticonIcons.INFO,
                 isExpanded = expanded == SECTION_ABOUT,
                 onToggleExpanded = {
@@ -282,7 +310,9 @@ fun PrayerSettingsScreen(
                 )
             }
 
-            Spacer(Modifier.fillMaxWidth().height(32.dp))
+                    Spacer(Modifier.fillMaxWidth().height(32.dp))
+                }
+            }
         }
     }
 }

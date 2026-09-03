@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -96,9 +98,17 @@ fun VoiceRecognitionSettingsSection(
     onModeSelected: (VoiceRecognitionMode) -> Unit,
     onStartTest: () -> Unit,
     onStopTest: () -> Unit,
+    modelCategoryKey: String? = null,
+    contentStorageState: ContentStorageState = ContentStorageState(),
+    contentStorageActions: ContentStorageActions = ContentStorageActions(),
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val modelState = contentStorageState.categories.firstOrNull {
+        it.categoryKey == modelCategoryKey
+    }
+    val modelAvailable = modelCategoryKey == null ||
+        (modelState?.isAvailable == true && !contentStorageState.isLoading)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = "Recognition mode",
@@ -106,30 +116,30 @@ fun VoiceRecognitionSettingsSection(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            RecognitionModeCard(
-                title = "Keywords",
-                detail = "Fast yes/no",
-                icon = FlaticonIcons.QUICK_ACTION,
-                selected = selectedMode == VoiceRecognitionMode.KEYWORDS,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onModeSelected(VoiceRecognitionMode.KEYWORDS)
-                },
-                modifier = Modifier.weight(1f),
-            )
-            RecognitionModeCard(
-                title = "Transcription",
-                detail = "Full speech",
-                icon = FlaticonIcons.VOICE,
-                selected = selectedMode == VoiceRecognitionMode.TRANSCRIPTION,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onModeSelected(VoiceRecognitionMode.TRANSCRIPTION)
-                },
-                modifier = Modifier.weight(1f),
-            )
-        }
+        ResponsiveRecognitionModeCards(
+            items = listOf(
+                RecognitionModeSetting(
+                    title = "Keywords",
+                    detail = "Fast yes/no",
+                    icon = FlaticonIcons.QUICK_ACTION,
+                    selected = selectedMode == VoiceRecognitionMode.KEYWORDS,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onModeSelected(VoiceRecognitionMode.KEYWORDS)
+                    },
+                ),
+                RecognitionModeSetting(
+                    title = "Transcription",
+                    detail = "Full speech",
+                    icon = FlaticonIcons.VOICE,
+                    selected = selectedMode == VoiceRecognitionMode.TRANSCRIPTION,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onModeSelected(VoiceRecognitionMode.TRANSCRIPTION)
+                    },
+                ),
+            ),
+        )
         Text(
             text = if (selectedMode == VoiceRecognitionMode.KEYWORDS) {
                 "Uses the offline keyword model and returns as soon as yes or no is heard."
@@ -139,8 +149,24 @@ fun VoiceRecognitionSettingsSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (modelCategoryKey != null) {
+            ModelStorageControl(
+                state = modelState,
+                isLoading = contentStorageState.isLoading,
+                error = contentStorageState.error.takeIf {
+                    contentStorageState.retryCategoryKey == null ||
+                        contentStorageState.retryCategoryKey == modelCategoryKey
+                },
+                actionsEnabled = !contentStorageState.isDownloading && !contentStorageState.isLoading,
+                onRefresh = contentStorageActions.onRefresh,
+                onDownload = { contentStorageActions.onDownloadCategory(modelCategoryKey) },
+                onCancel = contentStorageActions.onCancelDownload,
+                onDelete = { contentStorageActions.onDeleteCategory(modelCategoryKey) },
+            )
+        }
         NiaOutlinedButton(
             onClick = if (testState == VoiceTestState.LISTENING) onStopTest else onStartTest,
+            enabled = testState == VoiceTestState.LISTENING || modelAvailable,
             modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
             FlaticonIcon(
@@ -166,6 +192,40 @@ fun VoiceRecognitionSettingsSection(
                 detail = testText,
                 error = testState == VoiceTestState.ERROR,
             )
+        }
+    }
+}
+
+private data class RecognitionModeSetting(
+    val title: String,
+    val detail: String,
+    val icon: String,
+    val selected: Boolean,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun ResponsiveRecognitionModeCards(items: List<RecognitionModeSetting>) {
+    BoxWithConstraints {
+        val columns = if (maxWidth < 300.dp) 1 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.chunked(columns).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowItems.forEach { item ->
+                        RecognitionModeCard(
+                            title = item.title,
+                            detail = item.detail,
+                            icon = item.icon,
+                            selected = item.selected,
+                            onClick = item.onClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -231,9 +291,17 @@ fun NarrationSettingsSection(
     onSpeakerSelected: (Int) -> Unit,
     onPreview: () -> Unit,
     onStop: () -> Unit,
+    modelCategoryKey: String? = null,
+    contentStorageState: ContentStorageState = ContentStorageState(),
+    contentStorageActions: ContentStorageActions = ContentStorageActions(),
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val modelState = contentStorageState.categories.firstOrNull {
+        it.categoryKey == modelCategoryKey
+    }
+    val modelAvailable = modelCategoryKey == null ||
+        (modelState?.isAvailable == true && !contentStorageState.isLoading)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = "Voice",
@@ -304,9 +372,24 @@ fun NarrationSettingsSection(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        if (modelCategoryKey != null) {
+            ModelStorageControl(
+                state = modelState,
+                isLoading = contentStorageState.isLoading,
+                error = contentStorageState.error.takeIf {
+                    contentStorageState.retryCategoryKey == null ||
+                        contentStorageState.retryCategoryKey == modelCategoryKey
+                },
+                actionsEnabled = !contentStorageState.isDownloading && !contentStorageState.isLoading,
+                onRefresh = contentStorageActions.onRefresh,
+                onDownload = { contentStorageActions.onDownloadCategory(modelCategoryKey) },
+                onCancel = contentStorageActions.onCancelDownload,
+                onDelete = { contentStorageActions.onDeleteCategory(modelCategoryKey) },
+            )
+        }
         NiaOutlinedButton(
             onClick = if (isSpeaking) onStop else onPreview,
-            enabled = voices.isNotEmpty(),
+            enabled = isSpeaking || (voices.isNotEmpty() && modelAvailable),
             modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
             FlaticonIcon(
@@ -319,6 +402,126 @@ fun NarrationSettingsSection(
         }
         if (status != null) StatusCard("Preparing voice", status, error = false)
         if (error != null) StatusCard("Narration unavailable", error, error = true)
+    }
+}
+
+@Composable
+private fun ModelStorageControl(
+    state: ContentStorageCategoryState?,
+    isLoading: Boolean,
+    error: String?,
+    actionsEnabled: Boolean,
+    onRefresh: () -> Unit,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = state?.displayName ?: "Voice model",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = when {
+                    state?.isDownloading == true -> "Downloading ${(state.progress * 100).toInt()}%"
+                    state?.isAvailable == true -> "Available / ${formatStorageSize(state.totalSize)}"
+                    state != null && state.downloadedSize > 0L ->
+                        "Incomplete / ${formatStorageSize(state.downloadedSize)} of " +
+                            formatStorageSize(state.totalSize)
+                    state != null -> "Not downloaded / ${formatStorageSize(state.totalSize)}"
+                    isLoading -> "Checking model status..."
+                    else -> "Model status unavailable"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state?.isDownloading == true) {
+                LinearProgressIndicator(
+                    progress = { state.progress.coerceIn(0f, 1f) },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                )
+            }
+            if (error != null) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            when {
+                state?.isDownloading == true -> {
+                    NiaOutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        FlaticonIcon(
+                            glyph = FlaticonIcons.PAUSE,
+                            contentDescription = null,
+                            fontSize = 17.sp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cancel download")
+                    }
+                }
+                state == null && !isLoading -> {
+                    NiaOutlinedButton(
+                        onClick = onRefresh,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Check again")
+                    }
+                }
+                state != null && (!state.isAvailable || state.downloadedSize > 0L) -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (!state.isAvailable) {
+                            NiaOutlinedButton(
+                                onClick = onDownload,
+                                enabled = actionsEnabled,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.DOWNLOAD,
+                                    contentDescription = null,
+                                    fontSize = 17.sp,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Download")
+                            }
+                        }
+                        if (state.downloadedSize > 0L) {
+                            NiaOutlinedButton(
+                                onClick = onDelete,
+                                enabled = actionsEnabled,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.DELETE,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    fontSize = 17.sp,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Delete")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

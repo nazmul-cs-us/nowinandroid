@@ -64,6 +64,7 @@ import kotlin.time.Clock
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -122,7 +123,7 @@ fun PrayerTimesViewController(
                     IosSherpaAssetResolver.KOKORO_VOICE_ID,
                     "Kokoro",
                     "High-quality English",
-                    totalSpeakers = 10,
+                    totalSpeakers = 11,
                 ),
                 NarrationVoice(
                     IosSherpaAssetResolver.VITS_VOICE_ID,
@@ -217,21 +218,26 @@ fun PrayerTimesViewController(
                 }
             },
         )
-        contentDownloadJob = coroutineScope.launch {
+        lateinit var downloadJob: Job
+        downloadJob = coroutineScope.launch(start = CoroutineStart.LAZY) {
             var message: String? = null
             try {
                 val manifest = iosCloudAssets.loadManifest()
                     ?: error("The Cloudflare asset manifest is unavailable")
                 val result = iosCloudAssets.downloadCategory(category, manifest) { progress ->
-                    contentStorageState = contentStorageState.copy(
-                        categories = contentStorageState.categories.map {
-                            if (it.categoryKey == category) {
-                                it.copy(isDownloading = true, progress = progress.fraction)
-                            } else {
-                                it
-                            }
-                        },
-                    )
+                    coroutineScope.launch(Dispatchers.Main) {
+                        if (contentDownloadJob === downloadJob && downloadJob.isActive) {
+                            contentStorageState = contentStorageState.copy(
+                                categories = contentStorageState.categories.map {
+                                    if (it.categoryKey == category) {
+                                        it.copy(isDownloading = true, progress = progress.fraction)
+                                    } else {
+                                        it
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
                 if (!result.isComplete) {
                     message = "Could not download ${result.missingAssets.size} files. Try again."
@@ -241,15 +247,19 @@ fun PrayerTimesViewController(
             } catch (error: Exception) {
                 message = error.message ?: "The content download failed"
             } finally {
-                contentStorageState = contentStorageState.copy(
-                    categories = contentStorageState.categories.map {
-                        if (it.categoryKey == category) it.copy(isDownloading = false) else it
-                    },
-                )
-                contentDownloadJob = null
-                refreshContentStorage(message, retryCategory = category.takeIf { message != null })
+                if (contentDownloadJob === downloadJob) {
+                    contentStorageState = contentStorageState.copy(
+                        categories = contentStorageState.categories.map {
+                            if (it.categoryKey == category) it.copy(isDownloading = false) else it
+                        },
+                    )
+                    contentDownloadJob = null
+                    refreshContentStorage(message, retryCategory = category.takeIf { message != null })
+                }
             }
         }
+        contentDownloadJob = downloadJob
+        downloadJob.start()
     }
 
     fun deleteContentCategory(category: String) {
@@ -559,13 +569,11 @@ fun PrayerTimesViewController(
                                         }
                                     }
                                 } else {
-                                    val paths = IosSherpaAssetResolver.recognition(recognitionMode) { progress ->
-                                        recognitionTestText = "Downloading offline model ${(progress * 100).toInt()}%"
-                                    }
+                                    val paths = IosSherpaAssetResolver.recognition(recognitionMode)
                                     if (session != recognitionSession) return@launch
                                     if (paths == null) {
                                         recognitionTestState = VoiceTestState.ERROR
-                                        recognitionTestText = "Unable to download the offline recognition model"
+                                        recognitionTestText = "The offline recognition model is unavailable"
                                         return@launch
                                     }
                                     val sink = object : IosSherpaEventSink {
@@ -686,17 +694,12 @@ fun PrayerTimesViewController(
                                     narrationStatus = "Preparing offline voice..."
                                     val voiceId = selectedNarrationVoiceIdentifier
                                         ?: IosSherpaAssetResolver.KOKORO_VOICE_ID
-                                    val paths = IosSherpaAssetResolver.tts(voiceId) { progress ->
-                                        if (session == narrationSession) {
-                                            narrationStatus =
-                                                "Downloading offline voice ${(progress * 100).toInt()}%"
-                                        }
-                                    }
+                                    val paths = IosSherpaAssetResolver.tts(voiceId)
                                     if (session != narrationSession) return@launch
                                     if (paths == null) {
                                         isNarrationSpeaking = false
                                         narrationStatus = null
-                                        narrationError = "Unable to download the offline voice model"
+                                        narrationError = "The offline voice model is unavailable"
                                         return@launch
                                     }
                                     narrationStatus = null
@@ -795,6 +798,7 @@ private const val NARRATION_SAMPLE =
     "Assalamu alaikum, this is your selected narration voice."
 private val IOS_CONTENT_STORAGE_CATEGORIES = setOf(
     "hadith_sahih_bukhari",
+    "news",
     "model_asr",
     "model_kws",
     "model_tts_kokoro",

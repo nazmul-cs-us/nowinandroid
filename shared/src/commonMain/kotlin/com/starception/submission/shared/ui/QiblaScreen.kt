@@ -10,6 +10,7 @@ package com.starception.submission.shared.ui
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +62,7 @@ internal fun QiblaScreen(latitude: Double, longitude: Double, onBack: () -> Unit
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier.widthIn(max = 1000.dp).fillMaxSize().align(Alignment.TopCenter)
+                modifier = Modifier.widthIn(max = 760.dp).fillMaxSize().align(Alignment.TopCenter)
                     .safeDrawingPadding().padding(horizontal = 16.dp),
             ) {
                 Row(
@@ -139,7 +139,9 @@ private fun CompassPanel(
                 headingAccuracyDegrees = reading.accuracyDegrees,
                 qiblaBearing = bearing,
                 modifier = Modifier
-                    .size(300.dp)
+                    .widthIn(max = 300.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
                     .clip(CircleShape)
                     .semantics {
                         contentDescription = "WorldWind Qibla compass from your location to Makkah"

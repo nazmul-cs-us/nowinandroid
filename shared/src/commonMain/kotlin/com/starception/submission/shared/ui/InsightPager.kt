@@ -58,7 +58,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
@@ -109,12 +114,14 @@ fun InsightPager(
     today: LocalDate,
     latitude: Double,
     longitude: Double,
+    quranPlayer: QuranAudioPlayer,
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
-    tileHeight: androidx.compose.ui.unit.Dp = 220.dp,
-    isLandscape: Boolean = false,
+    tileHeight: Dp = 220.dp,
+    fullWidthPage: Boolean = false,
+    maxPageWidth: Dp? = null,
     modifier: Modifier = Modifier,
 ) {
     val pageCount = 5
@@ -128,7 +135,6 @@ fun InsightPager(
         qiblaBearing(latitude, longitude).roundToInt()
     }
     val nextPrayerText = day.nextPrayer?.let { "$it in ${day.countdown}" }.orEmpty()
-    val quranPlayer = remember { QuranAudioPlayer() }
     var isReadingAudio by remember { mutableStateOf(false) }
     var prayerSceneIndex by remember(today) { mutableStateOf(today.toEpochDays().mod(3)) }
     val autoAdvanceProgress = remember { Animatable(0f) }
@@ -182,24 +188,26 @@ fun InsightPager(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(if (maxPageWidth != null) 0.dp else 6.dp),
+            ) {
                 repeat(pageCount) { index ->
                     val selected = pagerState.currentPage % pageCount == index
+                    val indicatorWidth = if (selected) 26.dp else 6.dp
                     Box(
                         modifier = Modifier
-                            .size(
-                                width = if (selected) 26.dp else 6.dp,
-                                height = 6.dp,
-                            )
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                            .then(
+                                if (maxPageWidth != null) {
+                                    Modifier.size(44.dp)
                                 } else {
-                                    MaterialTheme.colorScheme.outlineVariant
+                                    Modifier.size(width = indicatorWidth, height = 6.dp)
                                 },
                             )
-                            .clickable {
+                            .semantics {
+                                contentDescription = "Insight ${index + 1} of $pageCount"
+                                this.selected = selected
+                            }
+                            .clickable(role = Role.Tab) {
                                 pagerScope.launch {
                                     val currentLogicalPage = pagerState.currentPage % pageCount
                                     pagerState.animateScrollToPage(
@@ -207,15 +215,29 @@ fun InsightPager(
                                     )
                                 }
                             },
+                        contentAlignment = Alignment.Center,
                     ) {
-                        if (selected) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(autoAdvanceProgress.value)
-                                    .height(6.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary),
-                            )
+                        Box(
+                            modifier = Modifier
+                                .size(width = indicatorWidth, height = 6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                ),
+                        ) {
+                            if (selected) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(autoAdvanceProgress.value)
+                                        .height(6.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                )
+                            }
                         }
                     }
                 }
@@ -223,13 +245,14 @@ fun InsightPager(
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // Keep Android's card aspect ratio. Portrait intentionally leaves a
-            // neighboring card visible; landscape dedicates its left pane to it.
-            val pageWidth = if (isLandscape) {
-                maxWidth
+            // Keep Android's card aspect ratio. Partial-width pages leave a
+            // neighboring card visible; a two-pane hero can consume its column.
+            val boundedPageWidth = maxPageWidth?.let { minOf(maxWidth, it) } ?: maxWidth
+            val pageWidth = if (fullWidthPage) {
+                boundedPageWidth
             } else {
                 (tileHeight * (250f / 288f))
-                    .coerceAtMost(maxWidth * 0.64f)
+                    .coerceAtMost(minOf(maxWidth * 0.64f, boundedPageWidth))
                     .coerceAtLeast(140.dp)
             }
             HorizontalPager(
@@ -458,7 +481,7 @@ private fun ArtworkTile(
     label: String,
     title: String,
     subtitle: String,
-    tileHeight: androidx.compose.ui.unit.Dp,
+    tileHeight: Dp,
     modifier: Modifier = Modifier,
     arabicTitle: String? = null,
     onClick: (() -> Unit)? = null,

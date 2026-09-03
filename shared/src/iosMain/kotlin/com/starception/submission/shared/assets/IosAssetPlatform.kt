@@ -48,9 +48,12 @@ internal class IosAssetPlatform : AssetPlatform {
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
     ): String? {
         val temporaryKey = ".temporary/${NSUUID.UUID().UUIDString}/${cdnKey.substringAfterLast('/')}"
-        val path = platform.download(url, temporaryKey)
-        if (path != null) onProgress(platform.fileSize(path), platform.fileSize(path))
-        return path
+        return platform.download(
+            url = url,
+            cdnKey = temporaryKey,
+            resumeDataKey = cdnKey,
+            onProgress = onProgress,
+        )
     }
 
     override suspend fun fileSize(absolutePath: String): Long? = platform.fileSize(absolutePath)

@@ -14,19 +14,27 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSBundle
 import platform.Foundation.NSData
+import platform.Foundation.NSError
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSHTTPURLResponse
+import platform.Foundation.NSLock
 import platform.Foundation.NSMutableURLRequest
 import platform.Foundation.NSNumber
 import platform.Foundation.NSString
 import platform.Foundation.NSURL
+import platform.Foundation.NSURLIsExcludedFromBackupKey
 import platform.Foundation.NSURLResponse
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionConfiguration
+import platform.Foundation.NSURLSessionDownloadDelegateProtocol
+import platform.Foundation.NSURLSessionDownloadTask
+import platform.Foundation.NSURLSessionDownloadTaskResumeData
+import platform.Foundation.NSURLSessionTask
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.NSUUID
 import platform.Foundation.NSUserDomainMask
@@ -34,9 +42,11 @@ import platform.Foundation.create
 import platform.Foundation.dataUsingEncoding
 import platform.Foundation.dataTaskWithRequest
 import platform.Foundation.dataWithContentsOfFile
+import platform.Foundation.downloadTaskWithResumeData
 import platform.Foundation.downloadTaskWithRequest
 import platform.Foundation.setHTTPMethod
 import platform.Foundation.writeToFile
+import platform.darwin.NSObject
 import platform.posix.fclose
 import platform.posix.ferror
 import platform.posix.fopen
@@ -44,6 +54,7 @@ import platform.posix.fread
 import platform.posix.rename
 
 private const val ASSET_DIRECTORY = "StarceptionAssets"
+private const val RESUME_DATA_DIRECTORY = ".resume-data"
 private const val HASH_BUFFER_SIZE = 64 * 1024
 
 /**
@@ -57,6 +68,19 @@ private const val HASH_BUFFER_SIZE = 64 * 1024
 object AssetPlatform {
     private val fileManager: NSFileManager
         get() = NSFileManager.defaultManager
+
+    private val downloadDelegate = AssetDownloadDelegate()
+    private val downloadSession by lazy {
+        val configuration = NSURLSessionConfiguration.defaultSessionConfiguration.apply {
+            timeoutIntervalForRequest = 60.0
+            timeoutIntervalForResource = 600.0
+        }
+        NSURLSession.sessionWithConfiguration(
+            configuration = configuration,
+            delegate = downloadDelegate,
+            delegateQueue = null,
+        )
+    }
 
     fun bundledText(name: String): String? = bundledPath(name)?.let(::readText)
 
@@ -96,8 +120,10 @@ object AssetPlatform {
     suspend fun download(
         url: String,
         cdnKey: String,
+        resumeDataKey: String = cdnKey,
         expectedSize: Long? = null,
         expectedSha256: String? = null,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit = { _, _ -> },
     ): String? = suspendCancellableCoroutine { continuation ->
         val source = NSURL.URLWithString(url)
         if (source == null) {
@@ -108,32 +134,33 @@ object AssetPlatform {
         val destination = assetPath(cdnKey)
         createParentDirectory(destination)
         val request = NSMutableURLRequest(uRL = source).apply { setHTTPMethod("GET") }
-        val configuration = NSURLSessionConfiguration.defaultSessionConfiguration.apply {
-            timeoutIntervalForRequest = 60.0
-            timeoutIntervalForResource = 600.0
+        val resumeData = loadResumeData(resumeDataKey)
+        val task = if (resumeData != null) {
+            downloadSession.downloadTaskWithResumeData(resumeData)
+        } else {
+            downloadSession.downloadTaskWithRequest(request)
         }
-        val session = NSURLSession.sessionWithConfiguration(configuration)
-        val task = session.downloadTaskWithRequest(request) { location, response: NSURLResponse?, error ->
-            val status = (response as? NSHTTPURLResponse)?.statusCode?.toInt()
-            val result = if (error == null && status in 200..299 && location?.path != null) {
-                promoteDownload(
-                    downloadedPath = requireNotNull(location.path),
-                    destination = destination,
-                    expectedSize = expectedSize,
-                    expectedSha256 = expectedSha256,
-                )
-            } else {
-                null
-            }
-            if (continuation.isActive) continuation.resume(result)
-        }
-        continuation.invokeOnCancellation { task.cancel() }
+        downloadDelegate.register(
+            task,
+            DownloadContext(
+                destination = destination,
+                resumeDataKey = resumeDataKey,
+                expectedSize = expectedSize,
+                expectedSha256 = expectedSha256,
+                onProgress = onProgress,
+                continuation = continuation,
+            ),
+        )
+        continuation.invokeOnCancellation { downloadDelegate.cancel(task) }
         task.resume()
     }
 
     fun delete(cdnKey: String): Boolean {
         val path = assetPath(cdnKey)
-        return !fileManager.fileExistsAtPath(path) || fileManager.removeItemAtPath(path, error = null)
+        val deletedAsset = !fileManager.fileExistsAtPath(path) ||
+            fileManager.removeItemAtPath(path, error = null)
+        val deletedResumeData = clearResumeData(cdnKey)
+        return deletedAsset && deletedResumeData
     }
 
     suspend fun fetchText(url: String): String? = suspendCancellableCoroutine { continuation ->
@@ -170,15 +197,22 @@ object AssetPlatform {
         return destination
     }
 
-    private fun promoteDownload(
+    private fun stageDownload(
         downloadedPath: String,
+        destination: String,
+    ): String? {
+        val staging = "$destination.${NSUUID.UUID().UUIDString}.download"
+        return staging.takeIf {
+            fileManager.moveItemAtPath(downloadedPath, toPath = staging, error = null)
+        }
+    }
+
+    private fun promoteDownload(
+        staging: String,
         destination: String,
         expectedSize: Long?,
         expectedSha256: String?,
     ): String? {
-        val staging = "$destination.${NSUUID.UUID().UUIDString}.download"
-        if (!fileManager.moveItemAtPath(downloadedPath, toPath = staging, error = null)) return null
-
         val validSize = expectedSize == null || fileManager.fileSize(staging) == expectedSize
         val validHash = expectedSha256 == null || sha256(staging).equals(expectedSha256, ignoreCase = true)
         if (!validSize || !validHash || rename(staging, destination) != 0) {
@@ -194,6 +228,33 @@ object AssetPlatform {
             "Invalid CDN key: $cdnKey"
         }
         return "${assetRootPath()}/$normalized"
+    }
+
+    private fun resumeDataPath(cdnKey: String): String =
+        assetPath("$RESUME_DATA_DIRECTORY/${cdnKey.trimStart('/')}.resumeData")
+
+    private fun loadResumeData(cdnKey: String): NSData? {
+        val path = resumeDataPath(cdnKey)
+        if (fileManager.fileSize(path) <= 0L) {
+            clearResumeData(cdnKey)
+            return null
+        }
+        return NSData.dataWithContentsOfFile(path) ?: run {
+            clearResumeData(cdnKey)
+            null
+        }
+    }
+
+    private fun persistResumeData(cdnKey: String, data: NSData?): Boolean {
+        if (data == null || data.length == 0uL) return clearResumeData(cdnKey)
+        val path = resumeDataPath(cdnKey)
+        createParentDirectory(path)
+        return data.writeToFile(path, atomically = true)
+    }
+
+    private fun clearResumeData(cdnKey: String): Boolean {
+        val path = resumeDataPath(cdnKey)
+        return !fileManager.fileExistsAtPath(path) || fileManager.removeItemAtPath(path, error = null)
     }
 
     private fun assetRootPath(): String {
@@ -212,6 +273,9 @@ object AssetPlatform {
             attributes = null,
             error = null,
         )
+        check(root.setResourceValue(true, forKey = NSURLIsExcludedFromBackupKey, error = null)) {
+            "Unable to exclude the asset directory from iCloud backup"
+        }
         return requireNotNull(root.path) { "The asset directory has no path" }
     }
 
@@ -250,6 +314,117 @@ object AssetPlatform {
     private fun NSFileManager.fileSize(path: String): Long {
         val attributes = attributesOfItemAtPath(path, error = null) ?: return 0L
         return (attributes["NSFileSize"] as? NSNumber)?.longLongValue ?: 0L
+    }
+
+    private class DownloadContext(
+        val destination: String,
+        val resumeDataKey: String,
+        val expectedSize: Long?,
+        val expectedSha256: String?,
+        val onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
+        val continuation: CancellableContinuation<String?>,
+        var stagingPath: String? = null,
+        var cancellationRequested: Boolean = false,
+        var resumeOffset: Long = 0L,
+        var resumedExpectedBytes: Long = 0L,
+    )
+
+    private class AssetDownloadDelegate : NSObject(), NSURLSessionDownloadDelegateProtocol {
+        private val lock = NSLock()
+        private val downloads = mutableMapOf<ULong, DownloadContext>()
+
+        fun register(task: NSURLSessionDownloadTask, context: DownloadContext) {
+            withLock { downloads[task.taskIdentifier] = context }
+        }
+
+        fun cancel(task: NSURLSessionDownloadTask) {
+            val context = withLock {
+                downloads[task.taskIdentifier]?.also { it.cancellationRequested = true }
+            } ?: return
+            task.cancelByProducingResumeData { resumeData ->
+                persistResumeData(context.resumeDataKey, resumeData)
+            }
+        }
+
+        override fun URLSession(
+            session: NSURLSession,
+            downloadTask: NSURLSessionDownloadTask,
+            didResumeAtOffset: Long,
+            expectedTotalBytes: Long,
+        ) {
+            val context = withLock { downloads[downloadTask.taskIdentifier] } ?: return
+            context.resumeOffset = didResumeAtOffset.coerceAtLeast(0L)
+            context.resumedExpectedBytes = expectedTotalBytes
+            if (context.resumeOffset == 0L) clearResumeData(context.resumeDataKey)
+            context.onProgress(context.resumeOffset, expectedTotalBytes)
+        }
+
+        override fun URLSession(
+            session: NSURLSession,
+            downloadTask: NSURLSessionDownloadTask,
+            didWriteData: Long,
+            totalBytesWritten: Long,
+            totalBytesExpectedToWrite: Long,
+        ) {
+            val context = withLock { downloads[downloadTask.taskIdentifier] }
+            context ?: return
+            val downloaded = context.resumeOffset + totalBytesWritten
+            val expected = context.resumedExpectedBytes.takeIf { it > 0L }
+                ?: totalBytesExpectedToWrite
+            context.onProgress(downloaded, expected)
+        }
+
+        override fun URLSession(
+            session: NSURLSession,
+            downloadTask: NSURLSessionDownloadTask,
+            didFinishDownloadingToURL: NSURL,
+        ) {
+            val context = withLock { downloads[downloadTask.taskIdentifier] } ?: return
+            val status = (downloadTask.response as? NSHTTPURLResponse)?.statusCode?.toInt()
+            val downloadedPath = didFinishDownloadingToURL.path
+            if (status in 200..299 && downloadedPath != null) {
+                context.stagingPath = stageDownload(downloadedPath, context.destination)
+            }
+        }
+
+        override fun URLSession(
+            session: NSURLSession,
+            task: NSURLSessionTask,
+            didCompleteWithError: NSError?,
+        ) {
+            val context = withLock { downloads.remove(task.taskIdentifier) } ?: return
+            val stagingPath = context.stagingPath
+            val result = if (didCompleteWithError == null && stagingPath != null) {
+                promoteDownload(
+                    staging = stagingPath,
+                    destination = context.destination,
+                    expectedSize = context.expectedSize,
+                    expectedSha256 = context.expectedSha256,
+                )
+            } else {
+                stagingPath?.let { fileManager.removeItemAtPath(it, error = null) }
+                null
+            }
+            val errorResumeData = didCompleteWithError
+                ?.userInfo
+                ?.get(NSURLSessionDownloadTaskResumeData) as? NSData
+            when {
+                result != null -> clearResumeData(context.resumeDataKey)
+                context.cancellationRequested -> Unit
+                errorResumeData != null -> persistResumeData(context.resumeDataKey, errorResumeData)
+                else -> clearResumeData(context.resumeDataKey)
+            }
+            if (context.continuation.isActive) context.continuation.resume(result)
+        }
+
+        private fun <T> withLock(block: () -> T): T {
+            lock.lock()
+            return try {
+                block()
+            } finally {
+                lock.unlock()
+            }
+        }
     }
 }
 
@@ -363,6 +538,7 @@ private val SHA256_CONSTANTS = uintArrayOf(
 private val BUNDLED_ASSET_NAMES = mapOf(
     "manifest.json" to "manifest.json",
     "topics.db" to "topics.db",
+    "databases/news.db" to "news.db",
     "databases/quranic_duas.db" to "quranic_duas.db",
     "databases/fortress_of_the_muslim.db" to "fortress_of_the_muslim_v2.db",
     "databases/fortress_of_the_muslim_v2.db" to "fortress_of_the_muslim_v2.db",

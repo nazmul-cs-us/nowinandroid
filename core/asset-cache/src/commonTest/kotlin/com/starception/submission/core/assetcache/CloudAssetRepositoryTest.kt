@@ -48,19 +48,98 @@ class CloudAssetRepositoryTest {
     }
 
     @Test
+    fun validRemoteManifestDeletesChangedAndRemovedCachedAssetsBeforeAdoption() = runTest {
+        val original = AssetManifest.fromJson(manifestJson(version = 1))
+        val removedEntry = AssetEntry(
+            cdnKey = "audio/removed.mp3",
+            size = 8,
+            sha256 = "hash-removed",
+            category = "audio",
+            required = false,
+        )
+        val previous = original.copy(
+            assets = original.assets + (removedEntry.cdnKey to removedEntry),
+        )
+        val changedEntry = original.assets.getValue("audio/two.mp3").copy(sha256 = "hash-updated")
+        val remote = original.copy(
+            version = 2,
+            assets = original.assets + (changedEntry.cdnKey to changedEntry),
+        )
+        val platform = FakeAssetPlatform().apply {
+            bundledTexts["manifest.json"] = original.toJson()
+            cachedTexts["manifest.json"] = previous.toJson()
+            remoteTexts["https://cdn.example/manifest.json"] = remote.toJson()
+            previous.assets.values.forEach { addCached(it.cdnKey, it.size, it.sha256) }
+        }
+
+        val loaded = CloudAssetRepository(platform).loadManifest()
+
+        assertEquals(remote, loaded)
+        assertEquals(remote.toJson(), platform.cachedTexts["manifest.json"])
+        assertEquals(
+            setOf("audio/two.mp3", "audio/removed.mp3"),
+            platform.deletedCachedKeys.toSet(),
+        )
+        assertNotNull(platform.cachedAssetPath("audio/one file!.mp3"))
+        assertNull(platform.cachedAssetPath("audio/two.mp3"))
+        assertNull(platform.cachedAssetPath("audio/removed.mp3"))
+        val manifestWrite = platform.storageEvents.indexOf("write:manifest.json")
+        assertTrue(manifestWrite > platform.storageEvents.indexOf("delete:audio/two.mp3"))
+        assertTrue(manifestWrite > platform.storageEvents.indexOf("delete:audio/removed.mp3"))
+    }
+
+    @Test
+    fun remoteRefreshComparesInMemoryManifestAndPreservesUnchangedAssets() = runTest {
+        val previous = AssetManifest.fromJson(manifestJson(version = 1))
+        val changedEntry = previous.assets.getValue("audio/two.mp3").copy(size = 7)
+        val remote = previous.copy(
+            version = 2,
+            assets = previous.assets + (changedEntry.cdnKey to changedEntry),
+        )
+        val platform = FakeAssetPlatform().apply {
+            bundledTexts["manifest.json"] = previous.toJson()
+            remoteTexts["https://cdn.example/manifest.json"] = previous.toJson()
+            previous.assets.values.forEach { addCached(it.cdnKey, it.size, it.sha256) }
+        }
+        val repository = CloudAssetRepository(platform)
+        repository.loadManifest()
+        platform.cachedTexts["manifest.json"] = "not json"
+        platform.remoteTexts["https://cdn.example/manifest.json"] = remote.toJson()
+        platform.deletedCachedKeys.clear()
+
+        val loaded = repository.loadManifest(forceRefresh = true)
+
+        assertEquals(remote, loaded)
+        assertEquals(remote, repository.getCachedManifest())
+        assertEquals(remote.toJson(), platform.cachedTexts["manifest.json"])
+        assertEquals(listOf("audio/two.mp3"), platform.deletedCachedKeys)
+        assertNotNull(platform.cachedAssetPath("audio/one file!.mp3"))
+    }
+
+    @Test
     fun manifestLoadingFallsBackFromInvalidRemoteToCacheThenBundle() = runTest {
         val cachedPlatform = FakeAssetPlatform().apply {
             bundledTexts["manifest.json"] = manifestJson(version = 1)
             cachedTexts["manifest.json"] = manifestJson(version = 2)
             remoteTexts["https://cdn.example/manifest.json"] = "not json"
+            addCached("audio/one file!.mp3", size = 4, sha256 = "hash-one")
         }
         assertEquals(2, CloudAssetRepository(cachedPlatform).loadManifest()?.version)
+        assertTrue(cachedPlatform.deletedCachedKeys.isEmpty())
+        assertNotNull(cachedPlatform.cachedAssetPath("audio/one file!.mp3"))
+        assertTrue(cachedPlatform.storageEvents.isEmpty())
+        assertEquals(manifestJson(version = 2), cachedPlatform.cachedTexts["manifest.json"])
 
         val bundledPlatform = FakeAssetPlatform().apply {
             bundledTexts["manifest.json"] = manifestJson(version = 1)
             cachedTexts["manifest.json"] = "broken"
+            addCached("audio/one file!.mp3", size = 4, sha256 = "hash-one")
         }
         assertEquals(1, CloudAssetRepository(bundledPlatform).loadManifest()?.version)
+        assertTrue(bundledPlatform.deletedCachedKeys.isEmpty())
+        assertNotNull(bundledPlatform.cachedAssetPath("audio/one file!.mp3"))
+        assertTrue(bundledPlatform.storageEvents.isEmpty())
+        assertEquals("broken", bundledPlatform.cachedTexts["manifest.json"])
     }
 
     @Test
@@ -218,6 +297,7 @@ private class FakeAssetPlatform : AssetPlatform {
     val downloadedKeys = mutableListOf<String>()
     val deletedCachedKeys = mutableListOf<String>()
     val deletedFiles = mutableListOf<String>()
+    val storageEvents = mutableListOf<String>()
     var downloadError: Exception? = null
     var sha256Requests = 0
 
@@ -245,6 +325,7 @@ private class FakeAssetPlatform : AssetPlatform {
     override suspend fun readCachedText(relativePath: String): String? = cachedTexts[relativePath]
 
     override suspend fun writeCachedText(relativePath: String, content: String) {
+        storageEvents += "write:$relativePath"
         cachedTexts[relativePath] = content
     }
 
@@ -290,6 +371,7 @@ private class FakeAssetPlatform : AssetPlatform {
     }
 
     override suspend fun deleteCachedAsset(cdnKey: String): Boolean {
+        storageEvents += "delete:$cdnKey"
         deletedCachedKeys += cdnKey
         val path = cachedPaths.remove(cdnKey) ?: return false
         return files.remove(path) != null

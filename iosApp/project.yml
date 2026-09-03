@@ -26,6 +26,11 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+        excludes:
+          - PrivacyInfo.xcprivacy
+      - path: Sources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+        type: file
       - path: Shared
       - path: ../app/src/main/assets/manifest.json
         buildPhase: resources
@@ -33,6 +38,9 @@ targets:
       # Reference the Android asset in place so the 6.8 MB database has one
       # source of truth while Xcode still copies it into the iOS app bundle.
       - path: ../app/src/main/assets/databases/quran.db
+        buildPhase: resources
+        type: file
+      - path: ../app/src/main/assets/databases/news.db
         buildPhase: resources
         type: file
       # The Interests destination reads the same topic catalog and source
@@ -136,8 +144,10 @@ targets:
         # Core Location refuses to prompt without this string, and the refusal is
         # silent — no fix ever arrives and the app just shows the fallback city.
         NSLocationWhenInUseUsageDescription: >-
-          Location is used on device to calculate prayer times and, when enabled,
-          detect driving for the Travel Dua. It is never sent anywhere.
+          Your location is used to calculate prayer times and Qibla direction.
+          Coordinates are shared with Open-Meteo for local weather and with Apple
+          to look up your place name and time zone. If you enable Travel Dua,
+          location may also be used while the app is open to estimate driving.
         NSMicrophoneUsageDescription: >-
           The microphone is used only when you test voice recognition or answer a
           hands-free prompt.
@@ -149,6 +159,11 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
     configFiles:

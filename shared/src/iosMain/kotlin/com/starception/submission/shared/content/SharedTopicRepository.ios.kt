@@ -47,7 +47,7 @@ private class IosSharedTopicRepository : SharedTopicRepository {
 
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readTopics(): List<SharedTopic> = query("topics", "db", """
-        SELECT id, name, short_description, long_description
+        SELECT id, name, short_description, long_description, url, image_url
         FROM topics
         ORDER BY id ASC
     """.trimIndent()) { statement ->
@@ -56,6 +56,8 @@ private class IosSharedTopicRepository : SharedTopicRepository {
             name = statement.text(1),
             shortDescription = statement.text(2),
             longDescription = statement.text(3),
+            url = statement.text(4).ifBlank { null },
+            imageUrl = statement.text(5).ifBlank { null },
         )
     }
 

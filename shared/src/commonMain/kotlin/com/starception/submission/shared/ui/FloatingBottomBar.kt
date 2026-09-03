@@ -46,6 +46,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -113,9 +118,9 @@ fun FloatingBottomBar(
     Row(
         modifier = modifier
             .safeDrawingPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .widthIn(max = 560.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -161,7 +166,8 @@ fun FloatingBottomBar(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp)
-                                .clickable(enabled = item.enabled) { onSelect(index) },
+                                .semantics { selected = index == selectedIndex }
+                                .clickable(enabled = item.enabled, role = Role.Tab) { onSelect(index) },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -185,7 +191,12 @@ fun FloatingBottomBar(
         if (onVoiceTap != null) {
             Surface(
                 onClick = onVoiceTap,
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier
+                    .size(52.dp)
+                    .semantics {
+                        contentDescription = "Voice assistant"
+                        role = Role.Button
+                    },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.onSurface,
                 contentColor = MaterialTheme.colorScheme.surface,
@@ -246,7 +257,8 @@ fun FloatingSideBar(
                                 androidx.compose.ui.graphics.Color.Transparent
                             },
                         )
-                        .clickable(enabled = item.enabled) { onSelect(index) },
+                        .semantics { this.selected = selected }
+                        .clickable(enabled = item.enabled, role = Role.Tab) { onSelect(index) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(

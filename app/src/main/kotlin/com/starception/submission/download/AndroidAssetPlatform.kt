@@ -21,11 +21,13 @@ import com.starception.submission.core.assetcache.AssetPlatform
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 
 internal class AndroidAssetPlatform(
     private val context: Context,
@@ -77,35 +79,183 @@ internal class AndroidAssetPlatform(
         cdnKey: String,
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
     ): String? = withContext(Dispatchers.IO) {
-        val temporary = File(root, ".temporary/$cdnKey.tmp")
+        val temporary = partialFile(root, cdnKey)
+        val metadata = partialMetadataFile(temporary)
         temporary.parentFile?.mkdirs()
         repeat(3) { attempt ->
-            val completed = runCatching {
-                client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                    if (!response.isSuccessful) return@use false
-                    val body = response.body ?: return@use false
-                    val total = body.contentLength()
-                    var downloaded = 0L
-                    FileOutputStream(temporary).use { output ->
-                        body.byteStream().use { input ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                output.write(buffer, 0, count)
-                                downloaded += count
-                                onProgress(downloaded, total)
-                            }
-                        }
-                    }
-                    true
+            var restarted = false
+            while (true) {
+                val result = try {
+                    downloadOnce(url, temporary, metadata, onProgress)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    DownloadResult.RETRY
                 }
-            }.getOrDefault(false)
-            if (completed) return@withContext temporary.absolutePath
-            temporary.delete()
+
+                if (result == DownloadResult.COMPLETE) {
+                    return@withContext temporary.absolutePath
+                }
+                if (result != DownloadResult.RESTART || restarted) break
+
+                deletePartial(temporary)
+                restarted = true
+            }
             if (attempt < 2) delay(1_000L * (attempt + 1))
         }
         null
+    }
+
+    private fun downloadOnce(
+        url: String,
+        temporary: File,
+        metadata: File,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
+    ): DownloadResult {
+        val offset = temporary.length().takeIf { temporary.isFile } ?: 0L
+        val savedEtag = runCatching { metadata.takeIf(File::isFile)?.readText() }
+            .getOrNull()
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+        val request = Request.Builder().url(url).apply {
+            if (offset > 0L) {
+                header("Range", "bytes=$offset-")
+                savedEtag
+                    ?.takeUnless { it.startsWith("W/", ignoreCase = true) }
+                    ?.let { header("If-Range", it) }
+            }
+        }.build()
+
+        return client.newCall(request).execute().use { response ->
+            when (response.code) {
+                200 -> writeResponse(
+                    response = response,
+                    temporary = temporary,
+                    metadata = metadata,
+                    offset = 0L,
+                    append = false,
+                    totalBytes = response.body?.contentLength() ?: -1L,
+                    expectedResponseBytes = response.body?.contentLength() ?: -1L,
+                    onProgress = onProgress,
+                )
+                206 -> resumeResponse(
+                    response = response,
+                    temporary = temporary,
+                    metadata = metadata,
+                    offset = offset,
+                    savedEtag = savedEtag,
+                    onProgress = onProgress,
+                )
+                416 -> handleRangeNotSatisfiable(response, temporary, offset, onProgress)
+                else -> DownloadResult.RETRY
+            }
+        }
+    }
+
+    private fun resumeResponse(
+        response: Response,
+        temporary: File,
+        metadata: File,
+        offset: Long,
+        savedEtag: String?,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
+    ): DownloadResult {
+        val range = parseContentRange(response.header("Content-Range"))
+            ?: return DownloadResult.RESTART
+        val responseLength = response.body?.contentLength() ?: -1L
+        val responseEtag = response.header("ETag")
+        val validBounds = range.lastByte >= range.firstByte &&
+            (range.totalBytes == null || range.lastByte < range.totalBytes) &&
+            range.lastByte - range.firstByte < Long.MAX_VALUE
+        val rangeLength = if (validBounds) range.lastByte - range.firstByte + 1L else -1L
+        val validRange = range.firstByte == offset &&
+            validBounds &&
+            (responseLength < 0L || responseLength == rangeLength) &&
+            (savedEtag == null || responseEtag == null || savedEtag == responseEtag)
+        if (!validRange) return DownloadResult.RESTART
+
+        val totalBytes = range.totalBytes ?: -1L
+        return writeResponse(
+            response = response,
+            temporary = temporary,
+            metadata = metadata,
+            offset = offset,
+            append = offset > 0L,
+            totalBytes = totalBytes,
+            expectedResponseBytes = rangeLength,
+            onProgress = onProgress,
+        ).let { result ->
+            if (
+                result == DownloadResult.COMPLETE &&
+                range.totalBytes != null &&
+                temporary.length() < range.totalBytes
+            ) {
+                DownloadResult.RETRY
+            } else {
+                result
+            }
+        }
+    }
+
+    private fun writeResponse(
+        response: Response,
+        temporary: File,
+        metadata: File,
+        offset: Long,
+        append: Boolean,
+        totalBytes: Long,
+        expectedResponseBytes: Long,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
+    ): DownloadResult {
+        val body = response.body ?: return DownloadResult.RETRY
+        if (offset > 0L) onProgress(offset, totalBytes)
+
+        var responseBytes = 0L
+        FileOutputStream(temporary, append).use { output ->
+            val responseEtag = response.header("ETag")
+            if (responseEtag != null) {
+                metadata.writeText(responseEtag)
+            } else if (!append) {
+                metadata.delete()
+            }
+            body.byteStream().use { input ->
+                val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    output.write(buffer, 0, count)
+                    responseBytes += count
+                    onProgress(offset + responseBytes, totalBytes)
+                }
+            }
+        }
+        return if (expectedResponseBytes < 0L || responseBytes == expectedResponseBytes) {
+            DownloadResult.COMPLETE
+        } else {
+            DownloadResult.RETRY
+        }
+    }
+
+    private fun handleRangeNotSatisfiable(
+        response: Response,
+        temporary: File,
+        offset: Long,
+        onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit,
+    ): DownloadResult {
+        val totalBytes = parseUnsatisfiedContentRange(response.header("Content-Range"))
+        return if (
+            offset > 0L &&
+            totalBytes != null &&
+            totalBytes == offset &&
+            temporary.length() == offset
+        ) {
+            onProgress(offset, totalBytes)
+            DownloadResult.COMPLETE
+        } else if (offset > 0L) {
+            DownloadResult.RESTART
+        } else {
+            DownloadResult.RETRY
+        }
     }
 
     override suspend fun fileSize(absolutePath: String): Long? =
@@ -125,21 +275,26 @@ internal class AndroidAssetPlatform(
     }.getOrNull()
 
     override suspend fun commitDownloadedAsset(temporaryPath: String, cdnKey: String): String {
+        val temporary = File(temporaryPath)
         val target = file(cdnKey)
         target.parentFile?.mkdirs()
         target.delete()
-        check(File(temporaryPath).renameTo(target))
+        check(temporary.renameTo(target))
+        partialMetadataFile(temporary).delete()
         return target.absolutePath
     }
 
-    override suspend fun deleteFile(absolutePath: String): Boolean = File(absolutePath).delete()
+    override suspend fun deleteFile(absolutePath: String): Boolean = deletePartial(File(absolutePath))
 
-    override suspend fun deleteCachedAsset(cdnKey: String): Boolean = file(cdnKey).delete()
+    override suspend fun deleteCachedAsset(cdnKey: String): Boolean {
+        val asset = file(cdnKey)
+        val deletedAsset = asset.delete()
+        val deletedPartial = deletePartial(partialFile(root, cdnKey))
+        return (deletedAsset || deletedPartial) && !asset.exists()
+    }
 
     private fun file(cdnKey: String): File {
-        val normalized = cdnKey.trimStart('/')
-        require(normalized.isNotEmpty() && normalized.split('/').none { it == "." || it == ".." })
-        return File(root, normalized)
+        return File(root, normalizeCdnKey(cdnKey))
     }
 
     private fun bundledPath(cdnKey: String): String = when {
@@ -147,5 +302,66 @@ internal class AndroidAssetPlatform(
         cdnKey.startsWith("json/") -> cdnKey.substringAfter("json/")
         cdnKey.startsWith("models/") -> cdnKey.substringAfter("models/")
         else -> cdnKey
+    }
+
+    private data class ContentRange(
+        val firstByte: Long,
+        val lastByte: Long,
+        val totalBytes: Long?,
+    )
+
+    private enum class DownloadResult {
+        COMPLETE,
+        RETRY,
+        RESTART,
+    }
+
+    companion object {
+        internal const val PARTIAL_METADATA_SUFFIX = ".etag"
+        private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024
+        private val CONTENT_RANGE = Regex(
+            """bytes (\d+)-(\d+)/(\d+|\*)""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val UNSATISFIED_CONTENT_RANGE = Regex(
+            """bytes \*/(\d+)""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        internal fun partialFile(root: File, cdnKey: String): File =
+            File(root, ".temporary/${normalizeCdnKey(cdnKey)}.tmp")
+
+        internal fun partialMetadataFile(partial: File): File =
+            File(partial.parentFile, partial.name + PARTIAL_METADATA_SUFFIX)
+
+        internal fun deletePartial(partial: File): Boolean {
+            val deletedPartial = partial.delete()
+            val deletedMetadata = partialMetadataFile(partial).delete()
+            return deletedPartial || deletedMetadata
+        }
+
+        private fun normalizeCdnKey(cdnKey: String): String {
+            val normalized = cdnKey.trimStart('/')
+            require(
+                normalized.isNotEmpty() && normalized.split('/').none { it == "." || it == ".." },
+            )
+            return normalized
+        }
+
+        private fun parseContentRange(value: String?): ContentRange? {
+            val match = value?.trim()?.let(CONTENT_RANGE::matchEntire) ?: return null
+            return runCatching {
+                ContentRange(
+                    firstByte = match.groupValues[1].toLong(),
+                    lastByte = match.groupValues[2].toLong(),
+                    totalBytes = match.groupValues[3].takeUnless { it == "*" }?.toLong(),
+                )
+            }.getOrNull()
+        }
+
+        private fun parseUnsatisfiedContentRange(value: String?): Long? {
+            val match = value?.trim()?.let(UNSATISFIED_CONTENT_RANGE::matchEntire) ?: return null
+            return match.groupValues[1].toLongOrNull()
+        }
     }
 }

@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
@@ -98,6 +99,7 @@ import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
 import com.starception.submission.shared.SharedPrayerSlot
@@ -161,6 +163,7 @@ fun PrayerTimesScreen(
     onOpenRecommendation: () -> Unit = {},
     selectedBottomIndex: Int = 0,
     onSelectBottom: (Int) -> Unit = {},
+    quranPlayer: QuranAudioPlayer = LocalQuranAudioPlayer.current,
 ) {
     var showAllPrayers by remember { mutableStateOf(false) }
     var isTuningSchedule by remember { mutableStateOf(false) }
@@ -201,24 +204,63 @@ fun PrayerTimesScreen(
             color = Color.Transparent,
         ) {
             BoxWithConstraints(Modifier.fillMaxSize().background(homeCanvas)) {
-            val useTwoPaneLayout = maxWidth > maxHeight
-            val useSideNavigation = useTwoPaneLayout
-            // iOS has taller status/navigation safe areas than Android. Reserving
-            // their measured space keeps the location card above the floating bar.
-            val portraitInsightHeight = (maxHeight - 652.dp).coerceIn(192.dp, 280.dp)
-            val landscapeInsightHeight = (maxHeight - 182.dp).coerceIn(220.dp, 560.dp)
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 1100.dp)
-                    .fillMaxSize()
-                    .align(Alignment.TopCenter)
-                    .safeDrawingPadding()
-                    .padding(
-                        start = if (useSideNavigation) 80.dp else 24.dp,
-                        end = 24.dp,
-                    )
-                    .padding(top = 8.dp),
-            ) {
+                // Requiring room in both axes keeps wide, short phones out of tablet sizing.
+                val isTablet = maxWidth >= 600.dp && maxHeight >= 600.dp
+                val isTabletPortrait = isTablet && maxWidth <= maxHeight
+                // The phone and tablet share one design language: identical
+                // cards at identical aspect ratios. Portrait tablets therefore
+                // reuse the single-pane layout and simply show more of the
+                // carousel; only landscape tablets split into two panes.
+                val useTwoPaneLayout = isTablet && !isTabletPortrait
+                val useSideNavigation = isTablet
+                // iOS has taller status/navigation safe areas than Android. Reserving
+                // their measured space keeps the location card above the floating bar.
+                val portraitInsightHeight = if (isTablet) {
+                    // Carousel pages keep the phone card's 250:288 aspect; the
+                    // height just scales up so pages stay proportionate.
+                    (maxHeight * 0.34f).coerceIn(320.dp, 400.dp)
+                } else {
+                    (maxHeight - 652.dp).coerceIn(192.dp, 280.dp)
+                }
+                // Measured two-pane sizing: both panes share the height below
+                // the search header (~150dp of status bar, header, paddings).
+                val paneContentHeight = maxHeight - 150.dp
+                // The hero pane is 5/11 of the row; keep the card's 288/250
+                // aspect instead of stretching it to an arbitrary height.
+                val heroPaneWidth = (maxWidth - 124.dp) * (5f / 11f)
+                val landscapeInsightHeight = if (isTablet) {
+                    minOf(
+                        // Pane minus the "Insights" title row (44), location
+                        // card (58), and their gap (12).
+                        paneContentHeight - 114.dp,
+                        heroPaneWidth * (288f / 250f),
+                    ).coerceAtLeast(320.dp)
+                } else {
+                    (maxHeight - 182.dp).coerceIn(220.dp, 400.dp)
+                }
+                // Landscape schedule: three rows of two cards split the pane
+                // minus the schedule header (44) and 8dp row gaps evenly.
+                val tabletCardHeight = (
+                    (paneContentHeight - 44.dp - (8.dp * 3)) / 3
+                ).coerceIn(96.dp, 190.dp)
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 1200.dp)
+                        .fillMaxSize()
+                        .align(Alignment.TopCenter),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .safeDrawingPadding()
+                            .padding(
+                                start = if (useSideNavigation) 80.dp else 24.dp,
+                                end = 24.dp,
+                            )
+                            .padding(top = 8.dp),
+                    ) {
                 PrayerHomeHeader(
                     onOpenSettings = onOpenSettings,
                     onOpenProfile = onOpenProfile,
@@ -234,7 +276,7 @@ fun PrayerTimesScreen(
                         horizontalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         LazyColumn(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(if (isTablet) 5f else 1f),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             contentPadding = PaddingValues(bottom = 84.dp),
                         ) {
@@ -247,12 +289,14 @@ fun PrayerTimesScreen(
                                     today = today,
                                     latitude = latitude,
                                     longitude = longitude,
+                                    quranPlayer = quranPlayer,
                                     onOpenQuran = onOpenQuran,
                                     onOpenQibla = onOpenQibla,
                                     onOpenRecommendation = onOpenRecommendation,
                                     notifications = notifications,
                                     tileHeight = landscapeInsightHeight,
-                                    isLandscape = true,
+                                    fullWidthPage = true,
+                                    maxPageWidth = if (isTablet) 520.dp else null,
                                 )
                             }
                             item {
@@ -267,7 +311,7 @@ fun PrayerTimesScreen(
                             }
                         }
                         LazyColumn(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(if (isTablet) 6f else 1f),
                             contentPadding = PaddingValues(bottom = 84.dp),
                         ) {
                             item {
@@ -282,7 +326,11 @@ fun PrayerTimesScreen(
                                     notifications = notifications,
                                     onTogglePrayerNotification = onTogglePrayerNotification,
                                     showExpandControl = false,
-                                    compact = true,
+                                    compact = !isTablet,
+                                    // Portrait tablets have a tall, narrow right
+                                    // pane; one card per row fills it evenly.
+                                    columns = if (isTabletPortrait) 1 else 2,
+                                    cardMinHeight = if (isTablet) tabletCardHeight else null,
                                 )
                             }
                         }
@@ -303,11 +351,13 @@ fun PrayerTimesScreen(
                                 today = today,
                                 latitude = latitude,
                                 longitude = longitude,
+                                quranPlayer = quranPlayer,
                                 onOpenQuran = onOpenQuran,
                                 onOpenQibla = onOpenQibla,
                                 onOpenRecommendation = onOpenRecommendation,
                                 notifications = notifications,
                                 tileHeight = portraitInsightHeight,
+                                maxPageWidth = if (isTablet) 420.dp else null,
                             )
                         }
                         item {
@@ -337,24 +387,25 @@ fun PrayerTimesScreen(
                         }
                     }
                 }
-            }
+                    }
 
-            if (useSideNavigation) {
-                FloatingSideBar(
-                    items = SharedBottomBarItems,
-                    selectedIndex = selectedBottomIndex,
-                    onSelect = onSelectBottom,
-                    modifier = Modifier.align(Alignment.CenterStart),
-                )
-            } else {
-                FloatingBottomBar(
-                    items = SharedBottomBarItems,
-                    selectedIndex = selectedBottomIndex,
-                    onSelect = onSelectBottom,
-                    onVoiceTap = onVoiceTap,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
+                    if (useSideNavigation) {
+                        FloatingSideBar(
+                            items = SharedBottomBarItems,
+                            selectedIndex = selectedBottomIndex,
+                            onSelect = onSelectBottom,
+                            modifier = Modifier.align(Alignment.CenterStart),
+                        )
+                    } else {
+                        FloatingBottomBar(
+                            items = SharedBottomBarItems,
+                            selectedIndex = selectedBottomIndex,
+                            onSelect = onSelectBottom,
+                            onVoiceTap = onVoiceTap,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                }
             }
         }
     }
@@ -369,7 +420,7 @@ private fun PrayerHomeHeader(
     onVoiceTap: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -385,7 +436,7 @@ private fun PrayerHomeHeader(
         )
         Surface(
             onClick = onOpenSearch,
-            modifier = Modifier.weight(1f).height(48.dp),
+            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -493,6 +544,8 @@ private fun PrayerScheduleSection(
     onTogglePrayerNotification: (String) -> Unit,
     showExpandControl: Boolean,
     compact: Boolean,
+    columns: Int = 2,
+    cardMinHeight: Dp? = null,
 ) {
     var revealedCard by remember { mutableStateOf<RevealedPrayerCard?>(null) }
 
@@ -502,7 +555,7 @@ private fun PrayerScheduleSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -537,7 +590,7 @@ private fun PrayerScheduleSection(
                 },
                 modifier = Modifier
                     .widthIn(min = if (compact) 126.dp else 148.dp)
-                    .height(if (compact) 36.dp else 44.dp),
+                    .heightIn(min = if (compact) 40.dp else 44.dp),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = if (compact) 5.dp else 6.dp),
@@ -572,8 +625,11 @@ private fun PrayerScheduleSection(
                 }
             }
         }
-        val prayerRows = day.dashboardSlots().chunked(2)
-        prayerRows.take(2).forEach { pair ->
+        val prayerRows = day.dashboardSlots().chunked(columns.coerceIn(1, 2))
+        // The first four prayers always stay visible; the rest sit behind the
+        // Show All control, regardless of how many cards each row holds.
+        val alwaysVisibleRows = (4 + columns - 1) / columns
+        prayerRows.take(alwaysVisibleRows).forEach { pair ->
             PrayerCardRow(
                 slots = pair,
                 offsets = offsets,
@@ -584,6 +640,7 @@ private fun PrayerScheduleSection(
                 notifications = notifications,
                 onTogglePrayerNotification = onTogglePrayerNotification,
                 compact = compact,
+                cardMinHeight = cardMinHeight,
             )
         }
         AnimatedVisibility(
@@ -595,18 +652,21 @@ private fun PrayerScheduleSection(
                 animationSpec = tween(durationMillis = 680, easing = FastOutSlowInEasing),
             ) + fadeOut(animationSpec = tween(durationMillis = 180)),
         ) {
-            prayerRows.getOrNull(2)?.let { pair ->
-                PrayerCardRow(
-                    slots = pair,
-                    offsets = offsets,
-                    onAdjustPrayer = onAdjustPrayer,
-                    isTuning = isTuning,
-                    revealedCard = revealedCard,
-                    onRevealChange = { revealedCard = it },
-                    notifications = notifications,
-                    onTogglePrayerNotification = onTogglePrayerNotification,
-                    compact = compact,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                prayerRows.drop(alwaysVisibleRows).forEach { pair ->
+                    PrayerCardRow(
+                        slots = pair,
+                        offsets = offsets,
+                        onAdjustPrayer = onAdjustPrayer,
+                        isTuning = isTuning,
+                        revealedCard = revealedCard,
+                        onRevealChange = { revealedCard = it },
+                        notifications = notifications,
+                        onTogglePrayerNotification = onTogglePrayerNotification,
+                        compact = compact,
+                        cardMinHeight = cardMinHeight,
+                    )
+                }
             }
         }
         if (showExpandControl) {
@@ -645,6 +705,7 @@ private fun PrayerCardRow(
     notifications: PrayerNotificationPreferences,
     onTogglePrayerNotification: (String) -> Unit,
     compact: Boolean,
+    cardMinHeight: Dp? = null,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         slots.forEach { slot ->
@@ -662,6 +723,7 @@ private fun PrayerCardRow(
                 notificationEnabled = notifications.isNotificationEnabledForPrayer(slot.name),
                 onToggleNotification = { onTogglePrayerNotification(slot.name) },
                 compact = compact,
+                minHeight = cardMinHeight,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -680,6 +742,7 @@ private fun PrayerCard(
     notificationEnabled: Boolean,
     onToggleNotification: () -> Unit,
     compact: Boolean,
+    minHeight: Dp? = null,
     modifier: Modifier = Modifier,
 ) {
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -750,64 +813,73 @@ private fun PrayerCard(
     val cardShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
 
     Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .height(if (compact) 78.dp else 96.dp)
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight ?: if (compact) 78.dp else 96.dp)
             .clip(cardShape),
+        propagateMinConstraints = true,
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .widthIn(min = resetWidth, max = resetWidth)
-                .align(Alignment.CenterStart)
-                .background(MaterialTheme.colorScheme.tertiaryContainer)
-                .clickable(enabled = isTuning) {
-                    onAdjust(-offsetMinutes)
-                    onRevealChange(null)
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Reset",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxHeight()
-                .widthIn(min = adjustWidth, max = adjustWidth)
-                .align(Alignment.CenterEnd)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxSize(),
         ) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxHeight()
-                    .clickable(enabled = isTuning) { onAdjust(-1) },
+                    .widthIn(min = resetWidth, max = resetWidth)
+                    .align(Alignment.CenterStart)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+                    .clickable(enabled = isTuning) {
+                        onAdjust(-offsetMinutes)
+                        onRevealChange(null)
+                    },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Remove,
-                    contentDescription = "Decrease ${slot.name} time",
-                    tint = MaterialTheme.colorScheme.error,
+                Text(
+                    text = "Reset",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
             }
-            Box(
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxHeight()
-                    .clickable(enabled = isTuning) { onAdjust(1) },
-                contentAlignment = Alignment.Center,
+                    .widthIn(min = adjustWidth, max = adjustWidth)
+                    .align(Alignment.CenterEnd)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "Increase ${slot.name} time",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(enabled = isTuning) { onAdjust(-1) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Remove,
+                        contentDescription = "Decrease ${slot.name} time",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(enabled = isTuning) { onAdjust(1) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Increase ${slot.name} time",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
 
@@ -1052,7 +1124,7 @@ private fun LocationWeatherRow(
 ) {
     if (compact) {
         Box(
-            modifier = modifier.fillMaxWidth().height(40.dp),
+            modifier = modifier.fillMaxWidth().heightIn(min = 40.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
             Surface(
@@ -1074,14 +1146,14 @@ private fun LocationWeatherRow(
     val placeDetail = placeParts.getOrNull(1).orEmpty()
     Surface(
         onClick = onRefresh,
-        modifier = modifier.fillMaxWidth().height(58.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
         shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

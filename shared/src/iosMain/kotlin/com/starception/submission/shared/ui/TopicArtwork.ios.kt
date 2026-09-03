@@ -8,6 +8,7 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.UIKitView
@@ -54,25 +55,27 @@ internal actual fun LocationMarkerArtwork(tint: Color, modifier: Modifier) {
 
 @Composable
 private fun BundledImage(name: String, contentMode: UIViewContentMode, modifier: Modifier) {
+    val image = remember(name) { bundledImage(name) }
     UIKitView(
         factory = {
             UIImageView().apply {
                 clipsToBounds = true
                 this.contentMode = contentMode
-                image = bundledImage(name)
+                this.image = image
             }
         },
         modifier = modifier,
         update = { imageView ->
             imageView.contentMode = contentMode
-            imageView.image = bundledImage(name)
+            imageView.image = image
         },
     )
 }
 
 private fun bundledImage(name: String): UIImage? =
-    NSBundle.mainBundle.pathForResource(name, ofType = "png")
-        ?.let { UIImage.imageWithContentsOfFile(it) }
+    UIImage.imageNamed(name)
+        ?: NSBundle.mainBundle.pathForResource(name, ofType = "png")
+            ?.let { UIImage.imageWithContentsOfFile(it) }
 
 private fun Color.toUIColor(): UIColor = UIColor.colorWithRed(
     red = red.toDouble(),

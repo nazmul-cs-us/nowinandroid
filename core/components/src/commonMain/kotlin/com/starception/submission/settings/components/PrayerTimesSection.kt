@@ -1,6 +1,7 @@
 package com.starception.submission.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -311,55 +312,41 @@ private fun TimeOffsetsGrid(
     offsets: PrayerTimeOffsets,
     onOffsetsChange: (PrayerTimeOffsets) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OffsetField(
-                label = "Fajr",
-                value = offsets.fajr,
-                onValueChange = { onOffsetsChange(offsets.copy(fajr = it)) },
-                modifier = Modifier.weight(1f)
-            )
-            OffsetField(
-                label = "Sunrise",
-                value = offsets.sunrise,
-                onValueChange = { onOffsetsChange(offsets.copy(sunrise = it)) },
-                modifier = Modifier.weight(1f)
-            )
-            OffsetField(
-                label = "Dhuhr",
-                value = offsets.dhuhr,
-                onValueChange = { onOffsetsChange(offsets.copy(dhuhr = it)) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OffsetField(
-                label = "Asr",
-                value = offsets.asr,
-                onValueChange = { onOffsetsChange(offsets.copy(asr = it)) },
-                modifier = Modifier.weight(1f)
-            )
-            OffsetField(
-                label = "Maghrib",
-                value = offsets.maghrib,
-                onValueChange = { onOffsetsChange(offsets.copy(maghrib = it)) },
-                modifier = Modifier.weight(1f)
-            )
-            OffsetField(
-                label = "Isha",
-                value = offsets.isha,
-                onValueChange = { onOffsetsChange(offsets.copy(isha = it)) },
-                modifier = Modifier.weight(1f)
-            )
+    val fields = listOf(
+        OffsetFieldSpec("Fajr", offsets.fajr) { onOffsetsChange(offsets.copy(fajr = it)) },
+        OffsetFieldSpec("Sunrise", offsets.sunrise) { onOffsetsChange(offsets.copy(sunrise = it)) },
+        OffsetFieldSpec("Dhuhr", offsets.dhuhr) { onOffsetsChange(offsets.copy(dhuhr = it)) },
+        OffsetFieldSpec("Asr", offsets.asr) { onOffsetsChange(offsets.copy(asr = it)) },
+        OffsetFieldSpec("Maghrib", offsets.maghrib) { onOffsetsChange(offsets.copy(maghrib = it)) },
+        OffsetFieldSpec("Isha", offsets.isha) { onOffsetsChange(offsets.copy(isha = it)) },
+    )
+    BoxWithConstraints {
+        val columns = if (maxWidth < 360.dp) 2 else 3
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            fields.chunked(columns).forEach { rowFields ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowFields.forEach { field ->
+                        OffsetField(
+                            label = field.label,
+                            value = field.value,
+                            onValueChange = field.onValueChange,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+private data class OffsetFieldSpec(
+    val label: String,
+    val value: Int,
+    val onValueChange: (Int) -> Unit,
+)
 
 @Composable
 private fun OffsetField(
@@ -399,25 +386,26 @@ private fun CustomAnglesGrid(
     val effectiveDefaultIshaAngle = defaultIshaAngle ?: 18.0
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AngleField(
-                label = "Fajr",
-                value = fajrAngle,
-                defaultValue = defaultFajrAngle,
-                onValueChange = onFajrAngleChange,
-                modifier = Modifier.weight(1f)
-            )
-            AngleField(
-                label = "Isha",
-                value = ishaAngle,
-                defaultValue = effectiveDefaultIshaAngle,
-                onValueChange = onIshaAngleChange,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        ResponsiveSettingsFieldPair(
+            first = { modifier ->
+                AngleField(
+                    label = "Fajr",
+                    value = fajrAngle,
+                    defaultValue = defaultFajrAngle,
+                    onValueChange = onFajrAngleChange,
+                    modifier = modifier,
+                )
+            },
+            second = { modifier ->
+                AngleField(
+                    label = "Isha",
+                    value = ishaAngle,
+                    defaultValue = effectiveDefaultIshaAngle,
+                    onValueChange = onIshaAngleChange,
+                    modifier = modifier,
+                )
+            },
+        )
         Text(
             text = "Leave empty to use method defaults (Fajr: ${defaultFajrAngle}°, Isha: ${effectiveDefaultIshaAngle}°)",
             style = MaterialTheme.typography.bodySmall,
@@ -470,27 +458,28 @@ private fun AdvancedOverridesGrid(
     onMaghribOffsetChange: (Int?) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            MinuteField(
-                label = "Isha Delay",
-                value = ishaDelay,
-                defaultValue = defaultIshaDelay,
-                onValueChange = onIshaDelayChange,
-                hint = "min after Maghrib",
-                modifier = Modifier.weight(1f)
-            )
-            MinuteField(
-                label = "Maghrib Offset",
-                value = maghribOffset,
-                defaultValue = defaultMaghribOffset,
-                onValueChange = onMaghribOffsetChange,
-                hint = "min after sunset",
-                modifier = Modifier.weight(1f)
-            )
-        }
+        ResponsiveSettingsFieldPair(
+            first = { modifier ->
+                MinuteField(
+                    label = "Isha Delay",
+                    value = ishaDelay,
+                    defaultValue = defaultIshaDelay,
+                    onValueChange = onIshaDelayChange,
+                    hint = "min after Maghrib",
+                    modifier = modifier,
+                )
+            },
+            second = { modifier ->
+                MinuteField(
+                    label = "Maghrib Offset",
+                    value = maghribOffset,
+                    defaultValue = defaultMaghribOffset,
+                    onValueChange = onMaghribOffsetChange,
+                    hint = "min after sunset",
+                    modifier = modifier,
+                )
+            },
+        )
         Text(
             text = buildString {
                 append("Isha delay: minutes after Maghrib (used by Umm al-Qura). ")
@@ -499,6 +488,29 @@ private fun AdvancedOverridesGrid(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun ResponsiveSettingsFieldPair(
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit,
+) {
+    BoxWithConstraints {
+        if (maxWidth < 320.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                first(Modifier.fillMaxWidth())
+                second(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                first(Modifier.weight(1f))
+                second(Modifier.weight(1f))
+            }
+        }
     }
 }
 

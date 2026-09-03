@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -34,6 +35,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,9 +95,10 @@ import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
 import com.starception.submission.shared.content.LocalProfile
 import com.starception.submission.shared.content.SharedContentStore
+import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedTopic
 import com.starception.submission.shared.content.SharedTopicArticle
-import com.starception.submission.shared.content.SharedTopics
+import com.starception.submission.shared.content.createSharedNewsRepository
 import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
 import com.starception.submission.shared.content.searchCatalog
@@ -128,6 +135,24 @@ private sealed interface TopicArticlesState {
     data class Error(val message: String) : TopicArticlesState
 }
 
+private sealed interface SharedNewsState {
+    data object Loading : SharedNewsState
+    data class Loaded(val news: List<SharedNewsResource>) : SharedNewsState
+    data class Error(val message: String) : SharedNewsState
+}
+
+private sealed interface TopicNewsState {
+    data object Loading : TopicNewsState
+    data class Loaded(
+        val news: List<SharedNewsResource>,
+        val nextOffset: Int,
+        val hasMore: Boolean,
+        val loadingMore: Boolean = false,
+        val loadMoreError: String? = null,
+    ) : TopicNewsState
+    data class Error(val message: String) : TopicNewsState
+}
+
 private sealed interface HadithsState {
     data object Loading : HadithsState
     data class Loaded(val hadiths: List<SharedHadith>) : HadithsState
@@ -143,7 +168,7 @@ internal fun SearchScreen(
 ) {
     var query by remember { mutableStateOf("") }
     val results = remember(query) { searchCatalog(query) }
-    SharedDetailScaffold(title = "Search", onBack = onBack) {
+    SharedDetailScaffold(title = "Search", onBack = onBack, maxContentWidth = 900.dp) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -197,39 +222,48 @@ internal fun ProfileScreen(
     var profile by remember { mutableStateOf(store.profile()) }
     var saved by remember { mutableStateOf(false) }
     SharedDetailScaffold(title = "Local profile", onBack = onBack) {
-        SupportingCard(
-            title = "Private on this device",
-            body = "No external account is connected. These preferences are stored locally and are not synced.",
-        )
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = profile.displayName,
-            onValueChange = { profile = profile.copy(displayName = it.take(40)); saved = false },
-            label = { Text("Display name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(20.dp))
-        Text("Daily reading goal", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "${profile.dailyReadingGoalMinutes} minutes",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Slider(
-            value = profile.dailyReadingGoalMinutes.toFloat(),
-            onValueChange = {
-                profile = profile.copy(dailyReadingGoalMinutes = it.roundToInt())
-                saved = false
-            },
-            valueRange = 5f..60f,
-            steps = 10,
-            modifier = Modifier.semantics { contentDescription = "Daily Quran reading goal" },
-        )
-        Button(
-            onClick = { store.saveProfile(profile); profile = store.profile(); saved = true },
-            modifier = Modifier.fillMaxWidth(),
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            Text(if (saved) "Saved locally" else "Save preferences")
+            item {
+                Column {
+                    SupportingCard(
+                        title = "Private on this device",
+                        body = "No external account is connected. These preferences are stored locally and are not synced.",
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = profile.displayName,
+                        onValueChange = { profile = profile.copy(displayName = it.take(40)); saved = false },
+                        label = { Text("Display name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Text("Daily reading goal", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${profile.dailyReadingGoalMinutes} minutes",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = profile.dailyReadingGoalMinutes.toFloat(),
+                        onValueChange = {
+                            profile = profile.copy(dailyReadingGoalMinutes = it.roundToInt())
+                            saved = false
+                        },
+                        valueRange = 5f..60f,
+                        steps = 10,
+                        modifier = Modifier.semantics { contentDescription = "Daily Quran reading goal" },
+                    )
+                    Button(
+                        onClick = { store.saveProfile(profile); profile = store.profile(); saved = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (saved) "Saved locally" else "Save preferences")
+                    }
+                }
+            }
         }
     }
 }
@@ -249,7 +283,7 @@ internal fun QuranLibraryScreen(
                 term.lowercase() in it.nameEnglish.lowercase() || it.number == term.toIntOrNull()
         }
     }
-    SharedDetailScaffold(title = "The Quran", onBack = onBack) {
+    SharedDetailScaffold(title = "The Quran", onBack = onBack, maxContentWidth = 900.dp) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -280,6 +314,7 @@ internal fun QuranLibraryScreen(
 internal fun QuranDetailScreen(
     number: Int,
     store: SharedContentStore,
+    player: QuranAudioPlayer,
     onBack: () -> Unit,
 ) {
     val surah = QuranData.surahs.firstOrNull { it.number == number }
@@ -293,7 +328,6 @@ internal fun QuranDetailScreen(
     var loadAttempt by remember(number) { mutableStateOf(0) }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
-    val player = remember { QuranAudioPlayer() }
     DisposableEffect(player) { onDispose { player.stop() } }
     LaunchedEffect(number, loadAttempt) {
         ayahState = QuranAyahState.Loading
@@ -521,7 +555,7 @@ internal fun BukhariBookDetailScreen(
             HadithsState.Error(error.message ?: "The Sahih al-Bukhari database could not be read.")
         }
     }
-    SharedDetailScaffold(title = book.nameEnglish, onBack = onBack) {
+    SharedDetailScaffold(title = book.nameEnglish, onBack = onBack, maxContentWidth = 900.dp) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -730,21 +764,30 @@ internal fun RecommendationScreen(
 ) {
     val recommendation = remember(date) { dailyRecommendation(date) }
     SharedDetailScaffold(title = "Daily suggestion", onBack = onBack) {
-        Text(recommendation.category, color = MaterialTheme.colorScheme.primary)
-        Text(
-            recommendation.title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(recommendation.summary, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(16.dp))
-        SupportingCard(
-            title = "How this was selected",
-            body = "${recommendation.reason} This is a deterministic on-device recommendation, not a response from a remote AI service.",
-        )
-        Spacer(Modifier.height(16.dp))
-        RecommendationAction(recommendation, onOpenSurah, onOpenBukhariBook)
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            item {
+                Column {
+                    Text(recommendation.category, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        recommendation.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(recommendation.summary, style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(16.dp))
+                    SupportingCard(
+                        title = "How this was selected",
+                        body = "${recommendation.reason} This is a deterministic on-device recommendation, not a response from a remote AI service.",
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    RecommendationAction(recommendation, onOpenSurah, onOpenBukhariBook)
+                }
+            }
+        }
     }
 }
 
@@ -773,34 +816,184 @@ internal fun ForYouScreen(
     onOpenRecommendation: () -> Unit,
     onOpenSurah: (Int) -> Unit,
     onSelectBottom: (Int) -> Unit,
+    onOpenNews: (Int) -> Unit = {},
+    onOpenTopic: (Int) -> Unit = {},
 ) {
-    val recommendation = remember(date) { dailyRecommendation(date) }
-    val interests = store.interests()
-    TopLevelScaffold(title = "For you", selectedIndex = 1, onSelectBottom = onSelectBottom) {
-        item {
-            SupportingCard(
-                title = recommendation.title,
-                body = recommendation.summary,
-                onClick = onOpenRecommendation,
-            )
+    val topicRepository = remember { createSharedTopicRepository() }
+    val newsRepository = remember { createSharedNewsRepository() }
+    var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
+    var topicsLoading by remember { mutableStateOf(true) }
+    var topicsError by remember { mutableStateOf<String?>(null) }
+    var followedTopicIds by remember { mutableStateOf(store.followedTopicIds()) }
+    var bookmarkedNewsIds by remember { mutableStateOf(store.bookmarkedNewsIds()) }
+    var viewedNewsIds by remember { mutableStateOf(store.viewedNewsIds()) }
+    var onboardingHidden by remember { mutableStateOf(store.isOnboardingHidden()) }
+    var newsState by remember { mutableStateOf<SharedNewsState>(SharedNewsState.Loading) }
+
+    LaunchedEffect(topicRepository) {
+        topicsLoading = true
+        try {
+            topics = topicRepository.topics()
+            topicsError = null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            topicsError = error.message ?: "Unable to read topics"
         }
-        item {
-            val surah = QuranData.surahs[(date.day - 1) % QuranData.surahs.size]
-            SupportingCard(
-                title = "Continue with ${surah.nameEnglish}",
-                body = "A daily chapter chosen from the shared Quran catalog.",
-                onClick = { onOpenSurah(surah.number) },
-            )
+        topicsLoading = false
+    }
+    LaunchedEffect(newsRepository, followedTopicIds) {
+        newsState = if (followedTopicIds.isEmpty()) {
+            SharedNewsState.Loaded(emptyList())
+        } else {
+            try {
+                SharedNewsState.Loaded(newsRepository.newsForTopics(followedTopicIds, limit = 100))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                SharedNewsState.Error(error.message ?: "Unable to read news")
+            }
         }
-        item {
-            SupportingCard(
-                title = "Your interests",
-                body = interests.takeIf { it.isNotEmpty() }
-                    ?.mapNotNull { id -> sharedTopic(id.toIntOrNull() ?: -1)?.name }
-                    ?.sorted()
-                    ?.joinToString()
-                    ?: "Choose topics in Interests to shape this local feed.",
-            )
+    }
+    val topicsById = remember(topics) { topics.associateBy(SharedTopic::id) }
+
+    TopLevelScaffold(
+        title = "For you",
+        selectedIndex = 1,
+        onSelectBottom = onSelectBottom,
+        adaptiveGrid = true,
+    ) { expanded ->
+        if (!onboardingHidden) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "What are you interested in?",
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Updates from topics you follow will appear here. Follow some things to get started.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            when {
+                topicsLoading -> item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                topicsError != null -> item(span = { GridItemSpan(maxLineSpan) }) {
+                    SupportingCard("Unable to load topics", topicsError.orEmpty())
+                }
+                else -> gridItems(
+                    items = topics,
+                    key = { "onboarding:${it.id}" },
+                    span = { GridItemSpan(maxLineSpan) },
+                ) { topic ->
+                    OnboardingTopicRow(
+                        topic = topic,
+                        followed = topic.id in followedTopicIds,
+                        onFollowChanged = { followed ->
+                            store.setTopicFollowed(topic.id, followed)
+                            followedTopicIds = if (followed) {
+                                followedTopicIds + topic.id
+                            } else {
+                                followedTopicIds - topic.id
+                            }
+                        },
+                    )
+                }
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Button(
+                    onClick = {
+                        store.setOnboardingHidden(true)
+                        onboardingHidden = true
+                    },
+                    enabled = followedTopicIds.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .semantics { contentDescription = "Finish choosing topics" },
+                ) { Text("Done") }
+            }
+        }
+
+        when (val state = newsState) {
+            SharedNewsState.Loading -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            is SharedNewsState.Error -> item(span = { GridItemSpan(maxLineSpan) }) {
+                SupportingCard("Unable to load your feed", state.message)
+            }
+            is SharedNewsState.Loaded -> if (state.news.isEmpty() && onboardingHidden) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SupportingCard(
+                        title = "Your feed is empty",
+                        body = "Follow a few topics and related content will appear here.",
+                        action = "Browse topics",
+                        onAction = { onSelectBottom(4) },
+                    )
+                }
+            } else {
+                gridItems(state.news, key = { "news:${it.id}" }) { news ->
+                    SharedNewsResourceCard(
+                        news = news,
+                        topicsById = topicsById,
+                        bookmarked = news.id in bookmarkedNewsIds,
+                        viewed = news.id in viewedNewsIds,
+                        onToggleBookmark = {
+                            val bookmarked = news.id !in bookmarkedNewsIds
+                            store.setNewsBookmarked(news.id, bookmarked)
+                            bookmarkedNewsIds = if (bookmarked) bookmarkedNewsIds + news.id else bookmarkedNewsIds - news.id
+                        },
+                        onClick = {
+                            if (news.id !in viewedNewsIds) {
+                                store.markNewsViewed(news.id)
+                                viewedNewsIds = viewedNewsIds + news.id
+                            }
+                            onOpenNews(news.id)
+                        },
+                        onTopicClick = onOpenTopic,
+                        compact = expanded,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingTopicRow(
+    topic: SharedTopic,
+    followed: Boolean,
+    onFollowChanged: (Boolean) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TopicArtwork(topic.name, Modifier.size(48.dp).padding(8.dp))
+            Text(topic.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(12.dp).weight(1f))
+            FilledIconToggleButton(checked = followed, onCheckedChange = onFollowChanged) {
+                Icon(
+                    if (followed) NiaIcons.Check else NiaIcons.Add,
+                    contentDescription = if (followed) "Unfollow ${topic.name}" else "Follow ${topic.name}",
+                )
+            }
         }
     }
 }
@@ -811,23 +1004,122 @@ internal fun SavedScreen(
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
     onSelectBottom: (Int) -> Unit,
+    onOpenNews: (Int) -> Unit = {},
+    onOpenTopic: (Int) -> Unit = {},
 ) {
-    val surahs = store.bookmarkedSurahs()
-    val books = store.savedBukhariBooks()
-    TopLevelScaffold(title = "Saved", selectedIndex = 2, onSelectBottom = onSelectBottom) {
-        if (surahs.isEmpty() && books.isEmpty()) {
-            item {
+    val newsRepository = remember { createSharedNewsRepository() }
+    val topicRepository = remember { createSharedTopicRepository() }
+    var bookmarkedIds by remember { mutableStateOf(store.bookmarkedNewsIds()) }
+    var viewedIds by remember { mutableStateOf(store.viewedNewsIds()) }
+    var state by remember { mutableStateOf<SharedNewsState>(SharedNewsState.Loading) }
+    var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
+    var removedForUndo by remember { mutableStateOf<SharedNewsResource?>(null) }
+    var loadAttempt by remember { mutableStateOf(0) }
+    val savedBukhariBooks = BukhariBooks.all.filter { it.id in store.savedBukhariBooks() }
+
+    LaunchedEffect(topicRepository) {
+        topics = try {
+            topicRepository.topics()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+    LaunchedEffect(newsRepository, loadAttempt) {
+        state = if (bookmarkedIds.isEmpty()) {
+            SharedNewsState.Loaded(emptyList())
+        } else {
+            try {
+                SharedNewsState.Loaded(newsRepository.newsByIds(bookmarkedIds))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                SharedNewsState.Error(error.message ?: "Unable to read saved news")
+            }
+        }
+    }
+    val topicsById = remember(topics) { topics.associateBy(SharedTopic::id) }
+
+    TopLevelScaffold(
+        title = "Saved",
+        selectedIndex = 2,
+        onSelectBottom = onSelectBottom,
+        adaptiveGrid = true,
+    ) { expanded ->
+        removedForUndo?.let { removed ->
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 SupportingCard(
-                    title = "Nothing saved yet",
-                    body = "Bookmark a Quran chapter or Bukhari book and it will stay here across launches.",
+                    title = "Removed from Saved",
+                    body = removed.title,
+                    action = "Undo",
+                    onAction = {
+                        store.setNewsBookmarked(removed.id, true)
+                        bookmarkedIds = bookmarkedIds + removed.id
+                        state = when (val current = state) {
+                            is SharedNewsState.Loaded -> current.copy(news = listOf(removed) + current.news)
+                            else -> SharedNewsState.Loaded(listOf(removed))
+                        }
+                        removedForUndo = null
+                    },
                 )
             }
         }
-        items(QuranData.surahs.filter { it.number in surahs }) {
-            SurahRow(it, saved = true, onClick = { onOpenSurah(it.number) })
+        when (val current = state) {
+            SharedNewsState.Loading -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            is SharedNewsState.Error -> item(span = { GridItemSpan(maxLineSpan) }) {
+                SupportingCard(
+                    title = "Unable to load saved news",
+                    body = current.message,
+                    action = "Try again",
+                    onAction = { loadAttempt++ },
+                )
+            }
+            is SharedNewsState.Loaded -> if (
+                current.news.isEmpty() && savedBukhariBooks.isEmpty() && removedForUndo == null
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SupportingCard(
+                        title = "Nothing saved yet",
+                        body = "News you bookmark will appear here across launches.",
+                    )
+                }
+            } else {
+                gridItems(current.news, key = { "saved:${it.id}" }) { news ->
+                    SharedNewsResourceCard(
+                        news = news,
+                        topicsById = topicsById,
+                        bookmarked = true,
+                        viewed = news.id in viewedIds,
+                        onToggleBookmark = {
+                            store.setNewsBookmarked(news.id, false)
+                            bookmarkedIds = bookmarkedIds - news.id
+                            removedForUndo = news
+                            state = current.copy(news = current.news.filterNot { it.id == news.id })
+                        },
+                        onClick = {
+                            if (news.id !in viewedIds) {
+                                store.markNewsViewed(news.id)
+                                viewedIds = viewedIds + news.id
+                            }
+                            onOpenNews(news.id)
+                        },
+                        onTopicClick = onOpenTopic,
+                        compact = expanded,
+                    )
+                }
+            }
         }
-        items(BukhariBooks.all.filter { it.id in books }) {
-            BukhariBookRow(it, saved = true, onClick = { onOpenBukhariBook(it.id) })
+        gridItems(savedBukhariBooks, key = { "saved-bukhari:${it.id}" }) { book ->
+            BukhariBookRow(
+                book = book,
+                saved = true,
+                onClick = { onOpenBukhariBook(book.id) },
+            )
         }
     }
 }
@@ -835,14 +1127,14 @@ internal fun SavedScreen(
 @Composable
 internal fun CourseScreen(store: SharedContentStore, onSelectBottom: (Int) -> Unit) {
     var completed by remember { mutableStateOf(store.completedLessons()) }
-    TopLevelScaffold(title = "Course", selectedIndex = 3, onSelectBottom = onSelectBottom) {
+    TopLevelScaffold(title = "Course", selectedIndex = 3, onSelectBottom = onSelectBottom) { _ ->
         item {
             Text(
                 "Foundations · ${completed.size}/${SharedCourseLessons.size} complete",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        items(SharedCourseLessons, key = { it.number }) { lesson ->
+        gridItems(SharedCourseLessons, key = { it.number }) { lesson ->
             SupportingCard(
                 title = "${lesson.number}. ${lesson.title}",
                 body = lesson.summary,
@@ -860,26 +1152,97 @@ internal fun InterestsScreen(
     onOpenTopic: (Int) -> Unit,
 ) {
     val repository = remember { createSharedTopicRepository() }
-    var topics by remember { mutableStateOf(SharedTopics) }
-    var selected by remember { mutableStateOf(store.interests()) }
+    var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
+    var followedTopicIds by remember { mutableStateOf(store.followedTopicIds()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var selectedTopicId by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(repository) {
-        topics = runCatching { repository.topics() }
-            .getOrDefault(SharedTopics)
-            .ifEmpty { SharedTopics }
+        loading = true
+        try {
+            val loadedTopics = repository.topics()
+            val order = store.topicOrder()
+            val topicsById = loadedTopics.associateBy(SharedTopic::id)
+            topics = order.mapNotNull(topicsById::get) +
+                loadedTopics.filterNot { it.id in order }
+            if (selectedTopicId == null || loadedTopics.none { it.id == selectedTopicId }) {
+                selectedTopicId = topics.firstOrNull()?.id
+            }
+            error = null
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Throwable) {
+            error = failure.message ?: "Unable to read topics"
+        }
+        loading = false
     }
     TopLevelScaffold(
         title = "Interests",
         selectedIndex = 4,
         onSelectBottom = onSelectBottom,
         itemSpacing = 0.dp,
-    ) {
-        items(topics, key = { it.id }) { topic ->
-            TopicInterestRow(
-                topic = topic,
-                following = topic.id.toString() in selected,
-                onOpen = { onOpenTopic(topic.id) },
-                onToggle = { selected = store.toggleInterest(topic.id.toString()) },
-            )
+        expandedPane = { modifier ->
+            val selectedTopic = topics.firstOrNull { it.id == selectedTopicId }
+            if (selectedTopic == null) {
+                Box(modifier, contentAlignment = Alignment.Center) {
+                    Text("Select a topic", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                TopicInterestDetailPane(
+                    topic = selectedTopic,
+                    following = selectedTopic.id in followedTopicIds,
+                    onToggle = { followed ->
+                        store.setTopicFollowed(selectedTopic.id, followed)
+                        followedTopicIds = if (followed) {
+                            followedTopicIds + selectedTopic.id
+                        } else {
+                            followedTopicIds - selectedTopic.id
+                        }
+                    },
+                    onOpen = { onOpenTopic(selectedTopic.id) },
+                    modifier = modifier,
+                )
+            }
+        },
+    ) { expanded ->
+        when {
+            loading -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            error != null -> item(span = { GridItemSpan(maxLineSpan) }) {
+                SupportingCard("Unable to load topics", error.orEmpty())
+            }
+            topics.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                SupportingCard("No topics", "The topic database is empty.")
+            }
+            else -> gridItems(topics, key = { it.id }) { topic ->
+                val index = topics.indexOfFirst { it.id == topic.id }
+                TopicInterestRow(
+                    topic = topic,
+                    following = topic.id in followedTopicIds,
+                    selected = expanded && topic.id == selectedTopicId,
+                    canMoveEarlier = index > 0,
+                    canMoveLater = index in 0 until topics.lastIndex,
+                    onOpen = {
+                        if (expanded) selectedTopicId = topic.id else onOpenTopic(topic.id)
+                    },
+                    onToggle = { followed ->
+                        store.setTopicFollowed(topic.id, followed)
+                        followedTopicIds = if (followed) followedTopicIds + topic.id else followedTopicIds - topic.id
+                    },
+                    onMove = { offset ->
+                        val target = index + offset
+                        if (index >= 0 && target in topics.indices) {
+                            topics = topics.toMutableList().apply {
+                                add(target, removeAt(index))
+                            }
+                            store.saveTopicOrder(topics.map(SharedTopic::id))
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -888,8 +1251,12 @@ internal fun InterestsScreen(
 private fun TopicInterestRow(
     topic: SharedTopic,
     following: Boolean,
+    selected: Boolean,
+    canMoveEarlier: Boolean,
+    canMoveLater: Boolean,
     onOpen: () -> Unit,
-    onToggle: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onMove: (Int) -> Unit,
 ) {
     ListItem(
         leadingContent = {
@@ -902,25 +1269,51 @@ private fun TopicInterestRow(
             Text(topic.shortDescription, style = MaterialTheme.typography.bodyMedium)
         },
         trailingContent = {
-            FilledIconToggleButton(
-                checked = following,
-                onCheckedChange = { onToggle() },
-                colors = IconButtonDefaults.iconToggleButtonColors(
-                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-            ) {
-                Icon(
-                    imageVector = if (following) NiaIcons.Check else NiaIcons.Add,
-                    contentDescription = if (following) {
-                        "Unfollow ${topic.name}"
-                    } else {
-                        "Follow ${topic.name}"
-                    },
-                )
+            Column(horizontalAlignment = Alignment.End) {
+                FilledIconToggleButton(
+                    checked = following,
+                    onCheckedChange = onToggle,
+                    colors = IconButtonDefaults.iconToggleButtonColors(
+                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = if (following) NiaIcons.Check else NiaIcons.Add,
+                        contentDescription = if (following) {
+                            "Unfollow ${topic.name}"
+                        } else {
+                            "Follow ${topic.name}"
+                        },
+                    )
+                }
+                Row {
+                    TextButton(
+                        onClick = { onMove(-1) },
+                        enabled = canMoveEarlier,
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.semantics {
+                            contentDescription = "Move ${topic.name} earlier"
+                        },
+                    ) { Text("Up", style = MaterialTheme.typography.labelSmall) }
+                    TextButton(
+                        onClick = { onMove(1) },
+                        enabled = canMoveLater,
+                        contentPadding = PaddingValues(horizontal = 6.dp),
+                        modifier = Modifier.semantics {
+                            contentDescription = "Move ${topic.name} later"
+                        },
+                    ) { Text("Down", style = MaterialTheme.typography.labelSmall) }
+                }
             }
         },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        colors = ListItemDefaults.colors(
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+            } else {
+                Color.Transparent
+            },
+        ),
         modifier = Modifier
             // TopLevelScaffold already supplies 16 dp; Android's list supplies 24 dp.
             .padding(horizontal = 8.dp)
@@ -933,6 +1326,68 @@ private fun TopicInterestRow(
 }
 
 @Composable
+private fun TopicInterestDetailPane(
+    topic: SharedTopic,
+    following: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                TopicArtwork(
+                    topicName = topic.name,
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
+                )
+            }
+            item {
+                Text(topic.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            }
+            item {
+                Text(
+                    topic.longDescription.ifBlank { topic.shortDescription },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                FilterChip(
+                    selected = following,
+                    onClick = { onToggle(!following) },
+                    label = { Text(if (following) "FOLLOWING" else "FOLLOW") },
+                    leadingIcon = {
+                        Icon(
+                            if (following) NiaIcons.Check else NiaIcons.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                )
+            }
+            item {
+                Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open topic")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun TopicNewsScreen(
     topicId: Int,
     store: SharedContentStore,
@@ -940,22 +1395,61 @@ internal fun TopicNewsScreen(
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
     onOpenArticle: (Int, Int) -> Unit,
+    onOpenNews: (Int) -> Unit = {},
+    onOpenTopic: (Int) -> Unit = {},
 ) {
-    val repository = remember { createSharedTopicRepository() }
+    val topicRepository = remember { createSharedTopicRepository() }
+    val newsRepository = remember { createSharedNewsRepository() }
     var topic by remember(topicId) { mutableStateOf(sharedTopic(topicId)) }
-    var state by remember(topicId) { mutableStateOf<TopicArticlesState>(TopicArticlesState.Loading) }
-    var followedTopics by remember { mutableStateOf(store.interests()) }
-    var savedArticles by remember { mutableStateOf(store.bookmarkedTopicArticles()) }
+    var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
+    var state by remember(topicId) { mutableStateOf<TopicNewsState>(TopicNewsState.Loading) }
+    var followedTopics by remember { mutableStateOf(store.followedTopicIds()) }
+    var bookmarkedNewsIds by remember { mutableStateOf(store.bookmarkedNewsIds()) }
+    var viewedNewsIds by remember { mutableStateOf(store.viewedNewsIds()) }
+    var requestedOffset by remember(topicId) { mutableStateOf(0) }
+    var loadAttempt by remember(topicId) { mutableStateOf(0) }
 
-    LaunchedEffect(topicId, repository) {
-        topic = runCatching { repository.topics().firstOrNull { it.id == topicId } }
-            .getOrNull() ?: sharedTopic(topicId)
-        if (topicId != 7 && topicId != 8) {
-            state = runCatching { repository.articles(topicId) }
-                .fold(
-                    onSuccess = { TopicArticlesState.Loaded(it) },
-                    onFailure = { TopicArticlesState.Error(it.message ?: "Unable to read topic content") },
-                )
+    LaunchedEffect(topicId, topicRepository) {
+        try {
+            val loadedTopics = topicRepository.topics()
+            topics = loadedTopics
+            topic = loadedTopics.firstOrNull { it.id == topicId } ?: sharedTopic(topicId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            topic = sharedTopic(topicId)
+        }
+    }
+    LaunchedEffect(topicId, newsRepository, requestedOffset, loadAttempt) {
+        val existing = state as? TopicNewsState.Loaded
+        if (requestedOffset > 0 && existing == null) return@LaunchedEffect
+        state = if (requestedOffset == 0) {
+            TopicNewsState.Loading
+        } else {
+            requireNotNull(existing).copy(loadingMore = true, loadMoreError = null)
+        }
+        try {
+            val page = newsRepository.newsForTopic(
+                topicId = topicId,
+                limit = TOPIC_NEWS_PAGE_SIZE,
+                offset = requestedOffset,
+            )
+            val combined = if (requestedOffset == 0) {
+                page
+            } else {
+                requireNotNull(existing).news + page
+            }
+            state = TopicNewsState.Loaded(
+                news = combined.distinctBy(SharedNewsResource::id),
+                nextOffset = requestedOffset + page.size,
+                hasMore = page.size == TOPIC_NEWS_PAGE_SIZE,
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            val message = error.message ?: "Unable to read topic news"
+            state = existing?.copy(loadingMore = false, loadMoreError = message)
+                ?: TopicNewsState.Error(message)
         }
     }
 
@@ -968,59 +1462,168 @@ internal fun TopicNewsScreen(
     }
 
     TopicPageScaffold(
-        followed = currentTopic.id.toString() in followedTopics,
+        followed = currentTopic.id in followedTopics,
         onBack = onBack,
         onFollowChanged = {
-            followedTopics = store.toggleInterest(currentTopic.id.toString())
+            val followed = currentTopic.id !in followedTopics
+            store.setTopicFollowed(currentTopic.id, followed)
+            followedTopics = if (followed) followedTopics + currentTopic.id else followedTopics - currentTopic.id
         },
-    ) {
-        if (topicId != 8) {
-            item { TopicPageHeader(currentTopic) }
-        }
-        when (topicId) {
-            7 -> items(QuranData.surahs, key = { it.number }) { surah ->
-                QuranNewsCard(surah = surah, onClick = { onOpenSurah(surah.number) })
+    ) { expanded ->
+        item(span = { GridItemSpan(maxLineSpan) }) { TopicPageHeader(currentTopic) }
+        when (val current = state) {
+            TopicNewsState.Loading -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(40.dp),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator() }
             }
-            8 -> items(BukhariBooks.all, key = { it.id }) { book ->
-                BukhariBookRow(
-                    book = book,
-                    saved = book.id in store.savedBukhariBooks(),
-                    onClick = { onOpenBukhariBook(book.id) },
-                )
-            }
-            else -> when (val current = state) {
-                TopicArticlesState.Loading -> item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(40.dp),
-                        contentAlignment = Alignment.Center,
-                    ) { CircularProgressIndicator() }
+            is TopicNewsState.Error -> item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.padding(horizontal = 24.dp)) {
+                    SupportingCard(
+                        title = "Unable to load news",
+                        body = current.message,
+                        action = "Try again",
+                        onAction = { loadAttempt++ },
+                    )
                 }
-                is TopicArticlesState.Error -> item {
+            }
+            is TopicNewsState.Loaded -> if (current.news.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.padding(horizontal = 24.dp)) {
-                        SupportingCard("Unable to load news", current.message)
+                        SupportingCard("No content yet", "There are no items in this topic.")
                     }
                 }
-                is TopicArticlesState.Loaded -> {
-                    if (current.articles.isEmpty()) {
-                        item {
-                            Box(Modifier.padding(horizontal = 24.dp)) {
-                                SupportingCard("No content yet", "There are no items in this topic.")
+            } else {
+                val topicsById = topics.associateBy(SharedTopic::id)
+                gridItems(current.news, key = { it.id }) { news ->
+                    SharedNewsResourceCard(
+                        news = news,
+                        topicsById = topicsById,
+                        bookmarked = news.id in bookmarkedNewsIds,
+                        viewed = news.id in viewedNewsIds,
+                        onToggleBookmark = {
+                            val bookmarked = news.id !in bookmarkedNewsIds
+                            store.setNewsBookmarked(news.id, bookmarked)
+                            bookmarkedNewsIds = if (bookmarked) bookmarkedNewsIds + news.id else bookmarkedNewsIds - news.id
+                        },
+                        onClick = {
+                            if (news.id !in viewedNewsIds) {
+                                store.markNewsViewed(news.id)
+                                viewedNewsIds = viewedNewsIds + news.id
+                            }
+                            onOpenNews(news.id)
+                        },
+                        onTopicClick = { selectedTopicId ->
+                            if (selectedTopicId != topicId) onOpenTopic(selectedTopicId)
+                        },
+                        modifier = Modifier.padding(
+                            horizontal = if (expanded) 6.dp else 24.dp,
+                            vertical = if (expanded) 6.dp else 12.dp,
+                        ),
+                        currentTopicId = topicId,
+                        compact = expanded,
+                    )
+                }
+                if (current.hasMore || current.loadingMore || current.loadMoreError != null) {
+                    item(key = "load-more", span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            when {
+                                current.loadingMore -> CircularProgressIndicator(
+                                    modifier = Modifier.semantics {
+                                        contentDescription = "Loading more topic news"
+                                    },
+                                )
+                                current.loadMoreError != null -> SupportingCard(
+                                    title = "Unable to load more news",
+                                    body = current.loadMoreError,
+                                    action = "Try again",
+                                    onAction = { loadAttempt++ },
+                                )
+                                else -> OutlinedButton(
+                                    onClick = { requestedOffset = current.nextOffset },
+                                ) { Text("Load more") }
                             }
                         }
-                    } else {
-                        items(current.articles, key = { it.id }) { article ->
-                            val articleKey = "$topicId:${article.id}"
-                            TopicArticleRow(
-                                article = article,
-                                topic = currentTopic,
-                                bookmarked = articleKey in savedArticles,
-                                onToggleBookmark = {
-                                    savedArticles = store.toggleTopicArticle(topicId, article.id)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun NewsDetailScreen(
+    id: Int,
+    store: SharedContentStore,
+    onBack: () -> Unit,
+) {
+    val repository = remember { createSharedNewsRepository() }
+    var state by remember(id) { mutableStateOf<SharedNewsState>(SharedNewsState.Loading) }
+    var bookmarked by remember(id) { mutableStateOf(id in store.bookmarkedNewsIds()) }
+    var loadAttempt by remember(id) { mutableStateOf(0) }
+
+    LaunchedEffect(id, repository, loadAttempt) {
+        store.markNewsViewed(id)
+        state = try {
+            repository.newsById(id)?.let { SharedNewsState.Loaded(listOf(it)) }
+                ?: SharedNewsState.Error("News $id was not found.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            SharedNewsState.Error(error.message ?: "Unable to read this news item")
+        }
+    }
+
+    SharedDetailScaffold(title = "News", onBack = onBack) {
+        when (val current = state) {
+            SharedNewsState.Loading -> Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is SharedNewsState.Error -> Column(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SupportingCard("Unable to load news", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is SharedNewsState.Loaded -> {
+                val news = current.news.first()
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            FilledIconToggleButton(
+                                checked = bookmarked,
+                                onCheckedChange = { checked ->
+                                    store.setNewsBookmarked(id, checked)
+                                    bookmarked = checked
                                 },
-                                onClick = { onOpenArticle(topicId, article.id) },
-                            )
+                            ) {
+                                Icon(
+                                    if (bookmarked) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
+                                    if (bookmarked) {
+                                        "Remove bookmark for ${news.title}"
+                                    } else {
+                                        "Bookmark ${news.title}"
+                                    },
+                                )
+                            }
                         }
                     }
+                    item { SharedNewsDetailContent(news) }
                 }
             }
         }
@@ -1032,14 +1635,14 @@ private fun TopicPageScaffold(
     followed: Boolean,
     onBack: () -> Unit,
     onFollowChanged: () -> Unit,
-    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+    content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val wide = maxWidth >= 700.dp
+            val expanded = maxWidth >= EXPANDED_WIDTH
             Column(
                 modifier = Modifier
-                    .widthIn(max = if (wide) 900.dp else 680.dp)
+                    .widthIn(max = 900.dp)
                     .fillMaxSize()
                     .align(Alignment.TopCenter)
                     .safeDrawingPadding(),
@@ -1072,11 +1675,14 @@ private fun TopicPageScaffold(
                         modifier = Modifier.padding(end = 24.dp),
                     )
                 }
-                LazyColumn(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (expanded) 2 else 1),
                     modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = PaddingValues(bottom = 28.dp),
-                    content = content,
-                )
+                ) {
+                    content(expanded)
+                }
             }
         }
     }
@@ -1259,11 +1865,13 @@ internal fun TopicArticleDetailScreen(
         mutableStateOf<TopicArticlesState>(TopicArticlesState.Loading)
     }
     LaunchedEffect(topicId, articleId, repository) {
-        state = runCatching { repository.articles(topicId) }
-            .fold(
-                onSuccess = { TopicArticlesState.Loaded(it) },
-                onFailure = { TopicArticlesState.Error(it.message ?: "Unable to read this item") },
-            )
+        state = try {
+            TopicArticlesState.Loaded(repository.articles(topicId))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            TopicArticlesState.Error(error.message ?: "Unable to read this item")
+        }
     }
 
     SharedDetailScaffold(title = topic?.name ?: "Reading", onBack = onBack) {
@@ -1400,6 +2008,9 @@ internal fun TopicArticleDetailScreen(
     }
 }
 
+private const val TOPIC_NEWS_PAGE_SIZE = 100
+private val EXPANDED_WIDTH = 700.dp
+
 @Composable
 private fun ReaderSection(
     title: String,
@@ -1464,17 +2075,18 @@ private fun ReaderTag(text: String, selected: Boolean = true) {
 internal fun SharedDetailScaffold(
     title: String,
     onBack: () -> Unit,
+    maxContentWidth: Dp = 720.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val wide = maxWidth >= 700.dp
             Column(
                 modifier = Modifier
-                    .widthIn(max = if (wide) 900.dp else 680.dp)
+                    .widthIn(max = maxContentWidth)
                     .fillMaxSize()
                     .align(Alignment.TopCenter)
                     .safeDrawingPadding()
+                    .imePadding()
                     .padding(horizontal = 16.dp),
             ) {
                 ScreenHeader(title, onBack)
@@ -1491,31 +2103,66 @@ private fun TopLevelScaffold(
     selectedIndex: Int,
     onSelectBottom: (Int) -> Unit,
     itemSpacing: Dp = 10.dp,
-    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+    adaptiveGrid: Boolean = false,
+    expandedPane: (@Composable (Modifier) -> Unit)? = null,
+    content: LazyGridScope.(expanded: Boolean) -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val expanded = maxWidth >= EXPANDED_WIDTH
             Column(
                 modifier = Modifier
-                    .widthIn(max = 900.dp)
+                    .widthIn(max = if (expandedPane != null) 1200.dp else 1100.dp)
                     .fillMaxSize()
                     .align(Alignment.TopCenter)
                     .safeDrawingPadding()
-                    .padding(horizontal = 16.dp),
+                    .padding(
+                        start = if (expanded) 80.dp else 16.dp,
+                        end = 16.dp,
+                    ),
             ) {
                 ScreenHeader(title)
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(itemSpacing),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
-                    content = content,
+                val grid: @Composable (Modifier) -> Unit = { modifier ->
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(if (adaptiveGrid && expanded) 2 else 1),
+                        modifier = modifier,
+                        verticalArrangement = Arrangement.spacedBy(itemSpacing),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(
+                            top = 12.dp,
+                            bottom = if (expanded) 24.dp else 88.dp,
+                        ),
+                    ) {
+                        content(expanded)
+                    }
+                }
+                if (expanded && expandedPane != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        grid(Modifier.weight(0.55f).fillMaxHeight())
+                        expandedPane(Modifier.weight(0.45f).fillMaxHeight())
+                    }
+                } else {
+                    grid(Modifier.fillMaxWidth().weight(1f))
+                }
+            }
+            if (expanded) {
+                FloatingSideBar(
+                    items = SharedBottomBarItems,
+                    selectedIndex = selectedIndex,
+                    onSelect = onSelectBottom,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            } else {
+                FloatingBottomBar(
+                    items = SharedBottomBarItems,
+                    selectedIndex = selectedIndex,
+                    onSelect = onSelectBottom,
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
-            FloatingBottomBar(
-                items = SharedBottomBarItems,
-                selectedIndex = selectedIndex,
-                onSelect = onSelectBottom,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
         }
     }
 }

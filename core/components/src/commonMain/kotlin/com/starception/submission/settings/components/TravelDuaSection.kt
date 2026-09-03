@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -126,70 +127,58 @@ fun TravelDuaSection(
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Compact 2x2 grid for sliders
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CompactSliderCard(
-                        iconGlyph = FlaticonIcons.TIMER,
-                        label = "Driving",
-                        description = "How long you need to drive before the Travel Dua plays. Prevents triggering during short trips.",
-                        value = settings.playbackDelaySeconds,
-                        minValue = 10,
-                        maxValue = 180,
-                        unit = "s",
-                        modifier = Modifier.weight(1f),
-                        onValueChange = { value ->
-                            onSettingsChanged(settings.copy(playbackDelaySeconds = value))
-                        }
-                    )
-                    CompactSliderCard(
-                        iconGlyph = FlaticonIcons.SCHEDULE,
-                        label = "Cooldown",
-                        description = "Minimum wait time before the dua can play again. Prevents repeating on the same journey.",
-                        value = settings.cooldownMinutes,
-                        minValue = 1,
-                        maxValue = 30,
-                        unit = "m",
-                        modifier = Modifier.weight(1f),
-                        onValueChange = { value ->
-                            onSettingsChanged(settings.copy(cooldownMinutes = value))
-                        }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CompactSliderCard(
-                        iconGlyph = FlaticonIcons.TRAFFIC,
-                        label = "Gap",
-                        description = "How long you can stop (traffic light, etc.) before the driving timer resets.",
-                        value = settings.gapToleranceMinutes,
-                        minValue = 1,
-                        maxValue = 15,
-                        unit = "m",
-                        modifier = Modifier.weight(1f),
-                        onValueChange = { value ->
-                            onSettingsChanged(settings.copy(gapToleranceMinutes = value))
-                        }
-                    )
-                    CompactSliderCard(
-                        iconGlyph = FlaticonIcons.SPEED,
-                        label = "Speed",
-                        description = "Minimum speed to be considered 'driving'. Lower values may trigger while walking.",
-                        value = settings.drivingSpeedThresholdKmh,
-                        minValue = 10,
-                        maxValue = 40,
-                        unit = "km/h",
-                        modifier = Modifier.weight(1f),
-                        onValueChange = { value ->
-                            onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
-                        }
-                    )
-                }
+                ResponsiveCompactSliderGrid(
+                    items = listOf(
+                        CompactSliderSetting(
+                            iconGlyph = FlaticonIcons.TIMER,
+                            label = "Driving",
+                            description = "How long you need to drive before the Travel Dua plays. Prevents triggering during short trips.",
+                            value = settings.playbackDelaySeconds,
+                            minValue = 10,
+                            maxValue = 180,
+                            unit = "s",
+                            onValueChange = { value ->
+                                onSettingsChanged(settings.copy(playbackDelaySeconds = value))
+                            },
+                        ),
+                        CompactSliderSetting(
+                            iconGlyph = FlaticonIcons.SCHEDULE,
+                            label = "Cooldown",
+                            description = "Minimum wait time before the dua can play again. Prevents repeating on the same journey.",
+                            value = settings.cooldownMinutes,
+                            minValue = 1,
+                            maxValue = 30,
+                            unit = "m",
+                            onValueChange = { value ->
+                                onSettingsChanged(settings.copy(cooldownMinutes = value))
+                            },
+                        ),
+                        CompactSliderSetting(
+                            iconGlyph = FlaticonIcons.TRAFFIC,
+                            label = "Gap",
+                            description = "How long you can stop (traffic light, etc.) before the driving timer resets.",
+                            value = settings.gapToleranceMinutes,
+                            minValue = 1,
+                            maxValue = 15,
+                            unit = "m",
+                            onValueChange = { value ->
+                                onSettingsChanged(settings.copy(gapToleranceMinutes = value))
+                            },
+                        ),
+                        CompactSliderSetting(
+                            iconGlyph = FlaticonIcons.SPEED,
+                            label = "Speed",
+                            description = "Minimum speed to be considered 'driving'. Lower values may trigger while walking.",
+                            value = settings.drivingSpeedThresholdKmh,
+                            minValue = 10,
+                            maxValue = 40,
+                            unit = "km/h",
+                            onValueChange = { value ->
+                                onSettingsChanged(settings.copy(drivingSpeedThresholdKmh = value))
+                            },
+                        ),
+                    ),
+                )
 
                 Spacer(modifier = Modifier.height(2.dp))
 
@@ -240,6 +229,46 @@ fun TravelDuaSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
                 )
+            }
+        }
+    }
+}
+
+private data class CompactSliderSetting(
+    val iconGlyph: String,
+    val label: String,
+    val description: String,
+    val value: Int,
+    val minValue: Int,
+    val maxValue: Int,
+    val unit: String,
+    val onValueChange: (Int) -> Unit,
+)
+
+@Composable
+private fun ResponsiveCompactSliderGrid(items: List<CompactSliderSetting>) {
+    BoxWithConstraints {
+        val columns = if (maxWidth < 340.dp) 1 else 2
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.chunked(columns).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    rowItems.forEach { item ->
+                        CompactSliderCard(
+                            iconGlyph = item.iconGlyph,
+                            label = item.label,
+                            description = item.description,
+                            value = item.value,
+                            minValue = item.minValue,
+                            maxValue = item.maxValue,
+                            unit = item.unit,
+                            modifier = Modifier.weight(1f),
+                            onValueChange = item.onValueChange,
+                        )
+                    }
+                }
             }
         }
     }

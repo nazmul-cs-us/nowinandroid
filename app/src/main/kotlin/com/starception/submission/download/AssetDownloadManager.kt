@@ -202,6 +202,10 @@ class AssetDownloadManager @Inject constructor(
 
         Log.e(TAG, "Checksum mismatch for $cdnKey — deleting so it is re-downloaded")
         file.delete()
+        AndroidAssetPlatform.deletePartial(
+            AndroidAssetPlatform.partialFile(cdnAssetsDir, cdnKey),
+        )
+        verifiedChecksums.remove(cdnKey)
         getOrCreateStateFlow(cdnKey).value = DownloadState.NotStarted
         false
     }
@@ -357,8 +361,13 @@ class AssetDownloadManager @Inject constructor(
 
     fun deleteAsset(cdnKey: String): Boolean {
         val file = File(cdnAssetsDir, cdnKey)
-        val deleted = file.delete()
+        val deletedAsset = file.delete()
+        val deletedPartial = AndroidAssetPlatform.deletePartial(
+            AndroidAssetPlatform.partialFile(cdnAssetsDir, cdnKey),
+        )
+        val deleted = (deletedAsset || deletedPartial) && !file.exists()
         if (deleted) {
+            verifiedChecksums.remove(cdnKey)
             getOrCreateStateFlow(cdnKey).value = DownloadState.NotStarted
         }
         return deleted
@@ -391,7 +400,15 @@ class AssetDownloadManager @Inject constructor(
 
     fun getTotalDownloadedSize(): Long {
         var total = 0L
-        cdnAssetsDir.walkTopDown().filter { it.isFile }.forEach { total += it.length() }
+        val temporaryDir = File(cdnAssetsDir, ".temporary").toPath()
+        cdnAssetsDir.walkTopDown()
+            .filter {
+                it.isFile && !(
+                    it.toPath().startsWith(temporaryDir) &&
+                        it.name.endsWith(AndroidAssetPlatform.PARTIAL_METADATA_SUFFIX)
+                )
+            }
+            .forEach { total += it.length() }
         return total
     }
 

@@ -17,13 +17,17 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.content.SharedContentStore
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
@@ -52,6 +56,7 @@ object PrayerSettingsRoute
 @Serializable object ProfileRoute
 @Serializable object QuranLibraryRoute
 @Serializable data class QuranDetailRoute(val number: Int)
+@Serializable data class NewsDetailRoute(val id: Int)
 @Serializable data class BukhariBookRoute(val id: Int)
 @Serializable data class BukhariHadithRoute(val id: Int)
 @Serializable data class TopicRoute(val id: Int)
@@ -68,6 +73,10 @@ data class SharedHomeActions(
     val onOpenRecommendation: () -> Unit,
     val onSelectBottom: (Int) -> Unit,
 )
+
+internal val LocalQuranAudioPlayer = staticCompositionLocalOf<QuranAudioPlayer> {
+    error("No QuranAudioPlayer provided")
+}
 
 /**
  * Hosts the shared screens.
@@ -89,6 +98,20 @@ fun SharedNavHost(
     settings: @Composable (onBack: () -> Unit) -> Unit,
 ) {
     val contentStore = remember { SharedContentStore() }
+    val quranPlayer = remember { QuranAudioPlayer() }
+    DisposableEffect(quranPlayer) {
+        onDispose { quranPlayer.stop() }
+    }
+    val openNews: (Int) -> Unit = { id ->
+        if (id in SURAH_NEWS_ID_RANGE) {
+            navController.navigate(QuranDetailRoute(id - SURAH_NEWS_ID_OFFSET))
+        } else {
+            navController.navigate(NewsDetailRoute(id))
+        }
+    }
+    val openTopic: (Int) -> Unit = { id ->
+        navController.navigate(TopicRoute(id)) { launchSingleTop = true }
+    }
     val selectBottom: (Int) -> Unit = { index ->
         when (index) {
             0 -> navController.navigate(PrayerTimesRoute) {
@@ -124,17 +147,19 @@ fun SharedNavHost(
         modifier = modifier,
     ) {
         composable<PrayerTimesRoute> {
-            home(
-                SharedHomeActions(
-                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
-                    onOpenProfile = { navController.navigate(ProfileRoute) },
-                    onOpenSearch = { navController.navigate(SearchRoute) },
-                    onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
-                    onOpenQibla = { navController.navigate(QiblaRoute) },
-                    onOpenRecommendation = { navController.navigate(RecommendationRoute) },
-                    onSelectBottom = selectBottom,
-                ),
-            )
+            CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
+                home(
+                    SharedHomeActions(
+                        onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                        onOpenProfile = { navController.navigate(ProfileRoute) },
+                        onOpenSearch = { navController.navigate(SearchRoute) },
+                        onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
+                        onOpenQibla = { navController.navigate(QiblaRoute) },
+                        onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                        onSelectBottom = selectBottom,
+                    ),
+                )
+            }
         }
         composable<PrayerSettingsRoute> {
             // popBackStack rather than navigate(home): navigating would push a
@@ -149,6 +174,8 @@ fun SharedNavHost(
                 onOpenRecommendation = { navController.navigate(RecommendationRoute) },
                 onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                 onSelectBottom = selectBottom,
+                onOpenNews = openNews,
+                onOpenTopic = openTopic,
             )
         }
         composable<SavedRoute> {
@@ -157,6 +184,8 @@ fun SharedNavHost(
                 onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                 onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
                 onSelectBottom = selectBottom,
+                onOpenNews = openNews,
+                onOpenTopic = openTopic,
             )
         }
         composable<CourseRoute> {
@@ -166,7 +195,7 @@ fun SharedNavHost(
             InterestsScreen(
                 store = contentStore,
                 onSelectBottom = selectBottom,
-                onOpenTopic = { navController.navigate(TopicRoute(it)) },
+                onOpenTopic = openTopic,
             )
         }
         composable<SearchRoute> {
@@ -191,8 +220,26 @@ fun SharedNavHost(
             QuranDetailScreen(
                 number = entry.toRoute<QuranDetailRoute>().number,
                 store = contentStore,
+                player = quranPlayer,
                 onBack = { navController.popBackStack() },
             )
+        }
+        composable<NewsDetailRoute> { entry ->
+            val id = entry.toRoute<NewsDetailRoute>().id
+            if (id in SURAH_NEWS_ID_RANGE) {
+                QuranDetailScreen(
+                    number = id - SURAH_NEWS_ID_OFFSET,
+                    store = contentStore,
+                    player = quranPlayer,
+                    onBack = { navController.popBackStack() },
+                )
+            } else {
+                NewsDetailScreen(
+                    id = id,
+                    store = contentStore,
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
         composable<BukhariBookRoute> { entry ->
             BukhariBookDetailScreen(
@@ -218,6 +265,8 @@ fun SharedNavHost(
                 onOpenArticle = { topicId, articleId ->
                     navController.navigate(TopicArticleRoute(topicId, articleId))
                 },
+                onOpenNews = openNews,
+                onOpenTopic = openTopic,
             )
         }
         composable<TopicArticleRoute> { entry ->
@@ -242,3 +291,6 @@ fun SharedNavHost(
         }
     }
 }
+
+private val SURAH_NEWS_ID_RANGE = 2001..2114
+private const val SURAH_NEWS_ID_OFFSET = 2000
