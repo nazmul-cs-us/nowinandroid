@@ -192,7 +192,7 @@ private fun TitleBarContent(
       text = title.takeIf { showTitle() } ?: "",
       size = 16.sp,
       color = GlanceTheme.colors.onSurface,
-      weight = WidgetFontWeight.Medium,
+      weight = WidgetFontWeight.Bold,
       modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
     )
     if (titleBarAction != null && titleBarActionIconRes != null) {
@@ -224,9 +224,9 @@ private fun TextStack(
   // the least important text on the card in the largest type — the prayer widget beside it
   // opens with its content at ~20sp, and these two should read as the same family.
   val bodySize = when {
-    width >= 300.dp -> 19.sp
-    width >= 220.dp -> 18.sp
-    else -> 17.sp
+    width >= 300.dp -> 20.sp
+    width >= 220.dp -> 19.sp
+    else -> 18.sp
   }
   // Set against the app's own Arabic, not against the Latin body beside it. The reader
   // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
@@ -279,24 +279,57 @@ private fun TextStack(
         // muted secondary at Medium it read as a caption on the text rather than a label
         // for it, and at a glance the card did not say whether it was showing a hadith or
         // a dua — which is the first thing it should answer.
-        Row(
-          modifier = GlanceModifier
-            .wrapContentWidth()
-            .height(40.dp)
-            .background(GlanceTheme.colors.primaryContainer)
-            .cornerRadius(50.dp)
-            .padding(horizontal = 12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
+        if (data.contentTitle != null) {
+          Row(
+            modifier = GlanceModifier
+              .wrapContentWidth()
+              .height(36.dp)
+              .background(GlanceTheme.colors.primaryContainer)
+              .cornerRadius(50.dp)
+              .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            WidgetText(
+              text = data.caption.uppercase(),
+              size = 11.sp,
+              color = GlanceTheme.colors.onPrimaryContainer,
+              weight = WidgetFontWeight.Medium,
+              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+          }
+          Spacer(modifier = GlanceModifier.height(8.dp))
           WidgetText(
-            text = data.caption.uppercase(),
-            size = 11.sp,
-            color = GlanceTheme.colors.onPrimaryContainer,
-            weight = WidgetFontWeight.Medium,
-            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            text = data.contentTitle,
+            size = if (width >= 300.dp) 20.sp else 19.sp,
+            color = GlanceTheme.colors.onSurface,
+            weight = WidgetFontWeight.Bold,
+            maxLines = 2,
+            modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
           )
+        } else {
+          Row(
+            modifier = GlanceModifier
+              .wrapContentWidth()
+              .height(36.dp)
+              .background(GlanceTheme.colors.primaryContainer)
+              .cornerRadius(50.dp)
+              .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            WidgetText(
+              text = data.caption.uppercase(),
+              size = 11.sp,
+              color = GlanceTheme.colors.onPrimaryContainer,
+              weight = WidgetFontWeight.Medium,
+              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+          }
         }
-        Spacer(modifier = GlanceModifier.height(8.dp))
+        Spacer(
+          modifier = GlanceModifier.height(
+            if (data.contentTitle != null) 6.dp else 12.dp,
+          ),
+        )
         WidgetText(
           text = data.text,
           size = bodySize,
@@ -306,12 +339,13 @@ private fun TextStack(
           maxLines = 100,
         )
         if (arabic != null) {
-          Spacer(modifier = GlanceModifier.height(12.dp))
+          Spacer(modifier = GlanceModifier.height(6.dp))
           Column(
             modifier = GlanceModifier
               .fillMaxWidth()
-              .background(GlanceTheme.colors.secondaryContainer)
-              .cornerRadius(16.dp)
+              // Match the card itself so the transparent Arabic bitmap reads as native
+              // widget text instead of a separate inset panel.
+              .background(GlanceTheme.colors.widgetBackground)
               .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
           ) {
@@ -319,7 +353,7 @@ private fun TextStack(
               text = arabic,
               size = arabicSize,
               width = contentSize.width - 24.dp,
-              color = GlanceTheme.colors.onSecondaryContainer,
+              color = GlanceTheme.colors.onSurface,
             )
           }
         }
@@ -534,6 +568,8 @@ data class LongTextLayoutData(
   val key: String,
   val text: String,
   val caption: String,
+  /** Optional descriptive heading, currently used for Fortress dua chapter titles. */
+  val contentTitle: String? = null,
   /** Arabic original, rendered under the text when the card has height to spare. */
   val arabic: String? = null,
   /** Book the text came from, shown in the footer's left corner. */

@@ -46,6 +46,8 @@ internal data class DailyReminder(
     val text: String,
     val caption: String,
     val target: WidgetNavigationTarget?,
+    /** Descriptive heading shown between the kind chip and body, used for Fortress duas. */
+    val contentTitle: String? = null,
     /** Book this came from, for the footer's left corner — "Sahih Bukhari". */
     val sourceName: String? = null,
     /** Where in that book, for the footer's right corner — "#156". */
@@ -128,14 +130,19 @@ internal object DailyReminderRepository {
             // Moving on would make the selection depend on database health; stopping lets
             // the caller fall through to the dua, which is honest and still deterministic.
             if (hadith == null) break
-            val text = hadith.textPlain?.let(::reflow)?.takeIf { it.isNotBlank() } ?: continue
-            if (!isSelfContained(text)) continue
+            val fullText = hadith.textPlain?.let(::reflow)?.takeIf { it.isNotBlank() } ?: continue
+            if (!isSelfContained(fullText)) continue
+            val (narratorTitle, bodyText) = splitNarratorTitle(fullText)
 
             val collection = hadith.collectionName.takeIf { it.isNotBlank() } ?: "Sahih Bukhari"
             val category = BukhariBooks.findByHadithId(number)?.nameEnglish
             found = DailyReminder(
                 key = "hadith-$number",
-                text = text,
+                // The narrator is the hadith's heading, not the first sentence of its
+                // body. Splitting it prevents "Narrated Abu Huraira" from appearing
+                // twice while giving Bukhari reminders the same strong hierarchy as a
+                // Fortress dua's chapter title.
+                text = bodyText,
                 // The kind, not the source. The subtitle's job is to say what the reader is
                 // looking at before they read it; "Bukhari" answers a question they had not
                 // asked yet, and a Fortress chapter title ("Invocation for when you see the
@@ -143,6 +150,7 @@ internal object DailyReminderRepository {
                 // underneath it. The source is still carried in [target], which is where it
                 // matters — it is what the tap opens.
                 caption = "Hadith",
+                contentTitle = narratorTitle,
                 sourceName = collection,
                 sourceDetail = buildString {
                     append("#$number")
@@ -192,6 +200,26 @@ internal object DailyReminderRepository {
     private val PARAGRAPH_BREAK = Regex("""\n\s*\n""")
     private val REPEATED_SPACE = Regex("""\s{2,}""")
     private val SPACE_BEFORE_PUNCTUATION = Regex("""\s+([,.;:!?،؛؟])""")
+
+    /**
+     * Moves Bukhari's leading "Narrated …:" attribution into the reminder title.
+     *
+     * The bound avoids treating an unusually long narration chain as a heading. Hadith
+     * without the standard opener keep their full text and simply omit the title.
+     */
+    private fun splitNarratorTitle(text: String): Pair<String?, String> {
+        val match = NARRATOR_OPENER.find(text) ?: return null to text
+        val title = match.groupValues[1].trim().replaceFirstChar { first ->
+            if (first.isLowerCase()) first.titlecase() else first.toString()
+        }
+        val body = text.substring(match.range.last + 1).trimStart()
+        return title to body.takeIf { it.isNotBlank() }.orEmpty()
+    }
+
+    private val NARRATOR_OPENER = Regex(
+        pattern = """^(Narrated\s+[^:\n]{1,120}):\s*""",
+        option = RegexOption.IGNORE_CASE,
+    )
 
     /**
      * Whether a hadith says something on its own.
@@ -258,11 +286,18 @@ internal object DailyReminderRepository {
             // The translation, not the Arabic: the widget's typeface is Ubuntu Sans and
             // the card is a few lines tall, neither of which serves an Arabic text well.
             // The detail screen this opens shows the Arabic properly.
-            val text = dua.translation?.let(::reflow)?.takeIf { it.isNotBlank() } ?: return@let null
+            val text = dua.translation
+                ?.let(::reflow)
+                ?.let(::cleanDuaText)
+                ?.takeIf { it.isNotBlank() }
+                ?: return@let null
             DailyReminder(
                 key = "dua-${dua.id}",
                 text = text,
                 caption = "Dua",
+                contentTitle = dua.chapterTitle
+                    .let(::withoutDuaNumber)
+                    .takeIf { it.isNotBlank() },
                 sourceName = "Fortress of the Muslim",
                 // The topic, not the chapter title. A Fortress chapter is named for the
                 // occasion in full — "What to say if you see someone afflicted" — which is
@@ -284,6 +319,32 @@ internal object DailyReminderRepository {
             )
         }
     }
+
+    /** Removes display-only invocation numbering while leaving meaningful numbers intact. */
+    private fun withoutDuaNumber(value: String): String = value
+        .replace(DUA_NUMBER_PREFIX, "")
+        .replace(DUA_NUMBER_SUFFIX, "")
+        .trim()
+
+    private fun cleanDuaText(value: String): String = withoutDuaNumber(value)
+        // Fortress translations contain inline footnote markers such as "morning 1 and"
+        // and "laziness.)2". They have no corresponding footnotes in the widget, so they
+        // read like invocation numbering and should not be exposed there.
+        .replace(DUA_FOOTNOTE_MARKER, "")
+        .replace(REPEATED_SPACE, " ")
+        .replace(MISSING_SENTENCE_SPACE, "$1 ")
+        .trim()
+
+    private val DUA_NUMBER_PREFIX = Regex(
+        pattern = """^\s*(?:(?:dua|supplication|invocation)\s*(?:no\.?|number|#)?\s*#?\d+\s*[.):-]?|\d+\s*[.):-])\s*""",
+        option = RegexOption.IGNORE_CASE,
+    )
+    private val DUA_NUMBER_SUFFIX = Regex(
+        pattern = """\s*[:\-–—]?\s*(?:dua|supplication|invocation)\s*(?:no\.?|number|#)?\s*\d+\s*$""",
+        option = RegexOption.IGNORE_CASE,
+    )
+    private val DUA_FOOTNOTE_MARKER = Regex("""(?<!\d)[1-9](?!\d)""")
+    private val MISSING_SENTENCE_SPACE = Regex("""([.)])(?=[A-Z])""")
 
     /**
      * The app's own topic for a Fortress chapter, matched the same way [DuaCategory] does.
