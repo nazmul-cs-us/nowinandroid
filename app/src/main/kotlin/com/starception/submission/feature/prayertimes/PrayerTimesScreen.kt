@@ -2613,8 +2613,7 @@ fun PrayerTimesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(tileHeight)
-                                .padding(vertical = 2.dp),
+                                .height(tileHeight),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2655,8 +2654,7 @@ fun PrayerTimesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(tileHeight)
-                                .padding(vertical = 2.dp),
+                                .height(tileHeight),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2704,8 +2702,7 @@ fun PrayerTimesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(tileHeight)
-                                .padding(vertical = 2.dp),
+                                .height(tileHeight),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2746,8 +2743,7 @@ fun PrayerTimesScreen(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(tileHeight)
-                                .padding(vertical = 2.dp),
+                                .height(tileHeight),
                             onShowPopup = { prayerName ->
                                 android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                 popupDialState = prayerName
@@ -2819,8 +2815,7 @@ fun PrayerTimesScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(tileHeight)
-                                    .padding(vertical = 2.dp),
+                                    .height(tileHeight),
                                 onShowPopup = { prayerName ->
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName
@@ -2861,8 +2856,7 @@ fun PrayerTimesScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(tileHeight)
-                                    .padding(vertical = 2.dp),
+                                    .height(tileHeight),
                                 onShowPopup = { prayerName ->
                                     android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
                                     popupDialState = prayerName

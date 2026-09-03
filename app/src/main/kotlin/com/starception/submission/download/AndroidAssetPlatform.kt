@@ -297,12 +297,7 @@ internal class AndroidAssetPlatform(
         return File(root, normalizeCdnKey(cdnKey))
     }
 
-    private fun bundledPath(cdnKey: String): String = when {
-        cdnKey.startsWith("databases/quran/") -> "databases/${cdnKey.substringAfterLast('/')}"
-        cdnKey.startsWith("json/") -> cdnKey.substringAfter("json/")
-        cdnKey.startsWith("models/") -> cdnKey.substringAfter("models/")
-        else -> cdnKey
-    }
+    private fun bundledPath(cdnKey: String): String = bundledPathForCdnKey(cdnKey)
 
     private data class ContentRange(
         val firstByte: Long,
@@ -319,6 +314,14 @@ internal class AndroidAssetPlatform(
     companion object {
         internal const val PARTIAL_METADATA_SUFFIX = ".etag"
         private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024
+
+        internal fun bundledPathForCdnKey(cdnKey: String): String = when {
+            cdnKey.startsWith("databases/quran/") -> "databases/${cdnKey.substringAfterLast('/')}"
+            cdnKey.startsWith("json/") -> cdnKey.substringAfter("json/")
+            cdnKey.startsWith("models/") -> cdnKey.substringAfter("models/")
+            else -> cdnKey
+        }
+
         private val CONTENT_RANGE = Regex(
             """bytes (\d+)-(\d+)/(\d+|\*)""",
             RegexOption.IGNORE_CASE,

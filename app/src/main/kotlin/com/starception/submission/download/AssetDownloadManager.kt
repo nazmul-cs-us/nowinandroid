@@ -123,19 +123,14 @@ class AssetDownloadManager @Inject constructor(
      * Check if an asset is bundled in the APK's assets folder.
      */
     private fun isAssetBundled(cdnKey: String): Boolean {
-        return try {
-            context.assets.open(cdnKey).use { it.available() > 0 }
-        } catch (e: Exception) {
-            // Try common subdirectories as fallback
-            if (!cdnKey.contains("/")) {
-                try {
-                    context.assets.open("databases/$cdnKey").use { it.available() > 0 }
-                } catch (_: Exception) {
-                    false
-                }
-            } else {
-                false
-            }
+        val paths = buildList {
+            add(AndroidAssetPlatform.bundledPathForCdnKey(cdnKey))
+            if (!cdnKey.contains("/")) add("databases/$cdnKey")
+        }
+        return paths.distinct().any { path ->
+            runCatching {
+                context.assets.open(path).use { it.available() > 0 }
+            }.getOrDefault(false)
         }
     }
 

@@ -26,6 +26,26 @@ class AndroidAssetPlatformTest {
         get() = File(context.filesDir, "cdn_assets")
 
     @Test
+    fun bundledAssetPathMapsManifestDirectoriesToPackagedAssets() {
+        assertEquals(
+            "databases/quran.db",
+            AndroidAssetPlatform.bundledPathForCdnKey("databases/quran/quran.db"),
+        )
+        assertEquals(
+            "sahih_bukhari.json",
+            AndroidAssetPlatform.bundledPathForCdnKey("json/sahih_bukhari.json"),
+        )
+        assertEquals(
+            "whisper.bin",
+            AndroidAssetPlatform.bundledPathForCdnKey("models/whisper.bin"),
+        )
+        assertEquals(
+            "databases/news.db",
+            AndroidAssetPlatform.bundledPathForCdnKey("databases/news.db"),
+        )
+    }
+
+    @Test
     fun resumesPartialWithRangeAndIfRangeAndReportsWholeObjectProgress() = runBlocking {
         val content = "abcdefghij".toByteArray()
         val cdnKey = "test/resume.bin"
