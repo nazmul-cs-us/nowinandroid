@@ -64,6 +64,8 @@ fun NotificationsSection(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
     modifier: Modifier = Modifier,
+    notificationPermissionGranted: Boolean = true,
+    onRequestNotificationPermission: (onGranted: () -> Unit) -> Unit = { it() },
     /**
      * Whether the platform has granted Do Not Disturb control. Android must ask;
      * iOS has nothing to ask for, so it passes true.
@@ -72,6 +74,8 @@ fun NotificationsSection(
     onOpenDndAccessSettings: () -> Unit = {},
     showSilentDuringPrayer: Boolean = true,
 ) {
+    val notificationsActive = preferences.notificationsEnabled && notificationPermissionGranted
+
     Column(modifier = modifier) {
         // Master toggle
         ListItem(
@@ -84,14 +88,19 @@ fun NotificationsSection(
             },
             supportingContent = {
                 Text(
-                    if (preferences.notificationsEnabled) "Enabled" else "Disabled",
+                    when {
+                        preferences.notificationsEnabled && !notificationPermissionGranted ->
+                            "Permission required"
+                        preferences.notificationsEnabled -> "Enabled"
+                        else -> "Disabled"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             leadingContent = {
                 FlaticonIcon(
-                    glyph = if (preferences.notificationsEnabled)
+                    glyph = if (notificationsActive)
                         FlaticonIcons.NOTIFICATIONS_ACTIVE
                     else
                         FlaticonIcons.NOTIFICATIONS,
@@ -102,9 +111,15 @@ fun NotificationsSection(
             },
             trailingContent = {
                 Switch(
-                    checked = preferences.notificationsEnabled,
+                    checked = notificationsActive,
                     onCheckedChange = { enabled ->
-                        onPreferencesChanged(preferences.copy(notificationsEnabled = enabled))
+                        if (enabled) {
+                            onRequestNotificationPermission {
+                                onPreferencesChanged(preferences.copy(notificationsEnabled = true))
+                            }
+                        } else {
+                            onPreferencesChanged(preferences.copy(notificationsEnabled = false))
+                        }
                     }
                 )
             }
@@ -112,7 +127,7 @@ fun NotificationsSection(
 
         // Sub-settings - only visible when notifications enabled
         AnimatedVisibility(
-            visible = preferences.notificationsEnabled,
+            visible = notificationsActive,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {

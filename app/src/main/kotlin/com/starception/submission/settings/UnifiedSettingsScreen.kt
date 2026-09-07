@@ -79,6 +79,8 @@ import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.rememberAudioChainPermissionGate
+import com.starception.submission.settings.components.rememberNotificationPermissionGate
+import com.starception.submission.settings.components.rememberPhysicalActivityPermissionGate
 import com.starception.submission.settings.components.rememberDndAccess
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
@@ -111,6 +113,8 @@ fun UnifiedSettingsScreen(
     val ttsSettings by viewModel.ttsSettings.collectAsStateWithLifecycle()
     val contentCategories by viewModel.contentCategories.collectAsStateWithLifecycle()
     val totalDownloadedSize by viewModel.totalDownloadedSize.collectAsStateWithLifecycle()
+    val notificationPermissionGate = rememberNotificationPermissionGate()
+    val physicalActivityPermissionGate = rememberPhysicalActivityPermissionGate()
 
     val listState = rememberLazyListState()
 
@@ -332,6 +336,8 @@ fun UnifiedSettingsScreen(
                         NotificationsSection(
                             preferences = notificationPreferences,
                             onPreferencesChanged = viewModel::updateNotificationPreferences,
+                            notificationPermissionGranted = notificationPermissionGate.isGranted,
+                            onRequestNotificationPermission = notificationPermissionGate.request,
                             hasDndAccess = hasDndAccess,
                             onOpenDndAccessSettings = {
                                 com.starception.submission.prayer.silent
@@ -356,7 +362,10 @@ fun UnifiedSettingsScreen(
                             onSettingsChanged = viewModel::updateTravelDuaSettings,
                             onTriggerAudioChain = viewModel::triggerFullAudioChain,
                             onStopAudioChain = viewModel::stopAudioChain,
-                            isPlaying = isAudioChainPlaying
+                            isPlaying = isAudioChainPlaying,
+                            activityPermissionGranted = physicalActivityPermissionGate.isGranted,
+                            onRequestActivityPermission = physicalActivityPermissionGate.request,
+                            onRequestPlaybackPermission = audioChainPermissionGate,
                         )
                     }
                 }

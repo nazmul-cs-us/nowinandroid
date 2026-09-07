@@ -33,6 +33,8 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
@@ -266,6 +268,16 @@ private val PrayerReferenceSlate = Color(0xFF5D6574)
 private val PrayerReferenceBlue = Color(0xFF4F779D)
 private val PrayerReferenceRust = Color(0xFF99593C)
 private val PrayerReferenceGold = Color(0xFFD8AB59)
+
+private const val PERMISSION_ONBOARDING_PREFERENCES = "permission_onboarding_preferences"
+private const val KEY_PERMISSION_ONBOARDING_COMPLETE = "initial_permission_flow_complete"
+
+private enum class PermissionOnboardingStep {
+    Location,
+    Notifications,
+    PhysicalActivity,
+    Complete,
+}
 
 private data class PrayerTileWeatherAlert(
     val visual: PrayerWeatherVisual,
@@ -1148,28 +1160,105 @@ fun PrayerTimesScreen(
         }
     }
     
-    // PERMISSION REQUEST STRATEGY - Request permissions politely on first screen load
-    LaunchedEffect(Unit) {
-        // STEP 1: Request location permission for accurate prayer times
-        val locationStatus = locationPermissionState.status
-        if (locationStatus is Denied && !locationStatus.shouldShowRationale) {
-            locationPermissionState.launchPermissionRequest()
-            kotlinx.coroutines.delay(500) // Small delay between permission requests
+    // Request missing first-launch permissions sequentially. Completion is persisted whether the
+    // user grants or denies each request, so reopening the app never becomes a permission nag loop.
+    val permissionOnboardingPreferences = remember(activityContext) {
+        activityContext.getSharedPreferences(
+            PERMISSION_ONBOARDING_PREFERENCES,
+            Context.MODE_PRIVATE,
+        )
+    }
+    var permissionOnboardingComplete by remember {
+        mutableStateOf(
+            permissionOnboardingPreferences.getBoolean(
+                KEY_PERMISSION_ONBOARDING_COMPLETE,
+                false,
+            ),
+        )
+    }
+    var permissionOnboardingStep by rememberSaveable {
+        mutableStateOf(PermissionOnboardingStep.Location)
+    }
+    var permissionRequestInFlight by rememberSaveable { mutableStateOf(false) }
+
+    fun advancePermissionOnboarding(nextStep: PermissionOnboardingStep) {
+        permissionRequestInFlight = false
+        permissionOnboardingStep = nextStep
+        if (nextStep == PermissionOnboardingStep.Complete) {
+            permissionOnboardingPreferences.edit()
+                .putBoolean(KEY_PERMISSION_ONBOARDING_COMPLETE, true)
+                .apply()
+            permissionOnboardingComplete = true
         }
-        
-        // STEP 2: Request notification permission for prayer alerts (Android 13+)
-        // Only request if we're on Android 13+ where this permission is required
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val notificationStatus = notificationPermissionState.status
-            if (notificationStatus is Denied && !notificationStatus.shouldShowRationale) {
-                notificationPermissionState.launchPermissionRequest()
-                kotlinx.coroutines.delay(500) // Small delay between permission requests
+    }
+
+    val automaticLocationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        advancePermissionOnboarding(PermissionOnboardingStep.Notifications)
+    }
+    val automaticNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        advancePermissionOnboarding(PermissionOnboardingStep.PhysicalActivity)
+    }
+    val automaticPhysicalActivityPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        advancePermissionOnboarding(PermissionOnboardingStep.Complete)
+    }
+
+    LaunchedEffect(
+        permissionOnboardingComplete,
+        permissionOnboardingStep,
+        permissionRequestInFlight,
+        locationPermissionState.status,
+        notificationPermissionState.status,
+        activityRecognitionPermissionState?.status,
+    ) {
+        if (permissionOnboardingComplete || permissionRequestInFlight) return@LaunchedEffect
+
+        when (permissionOnboardingStep) {
+            PermissionOnboardingStep.Location -> {
+                if (locationPermissionState.status is com.google.accompanist.permissions.PermissionStatus.Granted) {
+                    advancePermissionOnboarding(PermissionOnboardingStep.Notifications)
+                } else {
+                    permissionRequestInFlight = true
+                    automaticLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            }
+            PermissionOnboardingStep.Notifications -> {
+                if (
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    notificationPermissionState.status is com.google.accompanist.permissions.PermissionStatus.Granted
+                ) {
+                    advancePermissionOnboarding(PermissionOnboardingStep.PhysicalActivity)
+                } else {
+                    permissionRequestInFlight = true
+                    automaticNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            PermissionOnboardingStep.PhysicalActivity -> {
+                if (
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                    activityRecognitionPermissionState?.status is
+                        com.google.accompanist.permissions.PermissionStatus.Granted
+                ) {
+                    advancePermissionOnboarding(PermissionOnboardingStep.Complete)
+                } else {
+                    permissionRequestInFlight = true
+                    automaticPhysicalActivityPermissionLauncher.launch(
+                        Manifest.permission.ACTIVITY_RECOGNITION,
+                    )
+                }
+            }
+            PermissionOnboardingStep.Complete -> {
+                advancePermissionOnboarding(PermissionOnboardingStep.Complete)
             }
         }
-        
-        // STEP 3: Audio permission will be requested only when user tries to play Quran audio
-        // No automatic request here - permission will be requested on-demand
     }
+
+    // Audio permission remains on-demand when the user starts audio playback.
     
     // LIVE CLOCK UPDATES - Updates current time every minute for real-time prayer status
     LaunchedEffect(Unit) {

@@ -81,6 +81,8 @@ fun TravelDuaSection(
     modifier: Modifier = Modifier,
     testButtonLabel: String = "Test Audio Chain",
     playbackDescription: String = "Travel Dua → Hadith → Quran • Say YES/NO to complete",
+    activityPermissionGranted: Boolean = true,
+    onRequestActivityPermission: (onGranted: () -> Unit) -> Unit = { it() },
     /**
      * Asks for whatever the platform needs before the audio chain may play, and
      * invokes the callback once it may. Android requests RECORD_AUDIO and audio
@@ -89,6 +91,7 @@ fun TravelDuaSection(
     onRequestPlaybackPermission: (onGranted: () -> Unit) -> Unit = { it() },
 ) {
     val haptic = LocalHapticFeedback.current
+    val travelDuaActive = settings.enabled && activityPermissionGranted
 
     // State to track if we need to trigger audio chain after permissions are granted
     var pendingAudioChainTrigger by remember { mutableStateOf(false) }
@@ -105,17 +108,27 @@ fun TravelDuaSection(
         // Master toggle with modern switch
         ModernSwitchRow(
             title = "Auto-Play Travel Dua",
-            subtitle = if (settings.enabled) "Plays dua when driving detected" else "Tap to enable",
-            checked = settings.enabled,
+            subtitle = when {
+                settings.enabled && !activityPermissionGranted -> "Physical Activity permission required"
+                settings.enabled -> "Plays dua when driving detected"
+                else -> "Tap to enable"
+            },
+            checked = travelDuaActive,
             onCheckedChange = { enabled ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onSettingsChanged(settings.copy(enabled = enabled))
+                if (enabled) {
+                    onRequestActivityPermission {
+                        onSettingsChanged(settings.copy(enabled = true))
+                    }
+                } else {
+                    onSettingsChanged(settings.copy(enabled = false))
+                }
             }
         )
 
         // Sub-settings - only visible when enabled
         AnimatedVisibility(
-            visible = settings.enabled,
+            visible = travelDuaActive,
             enter = fadeIn() + expandVertically(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
