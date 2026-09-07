@@ -34,11 +34,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import com.starception.submission.download.AssetDownloadScreen
-import com.starception.submission.download.DownloadScreenState
+import com.starception.submission.download.shouldShowContentSetup
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -329,11 +326,15 @@ class MainActivity : FragmentActivity() {
 
                 // First-launch content setup: block ONLY when required content is missing
                 // (NeedsDownload). On AllReady/Loading/Error we open straight to the app, so normal
-                // launches have no delay. Once setup is done (downloaded or skipped → onReady) we
-                // never show it again this session.
+                // launches have no delay. Completion is persisted by the download ViewModel so a
+                // completed or skipped setup does not return after the app process restarts.
                 val contentState by downloadViewModel.screenState.collectAsStateWithLifecycle()
-                var contentSetupDone by rememberSaveable { mutableStateOf(false) }
-                val showContentSetup = contentState is DownloadScreenState.NeedsDownload && !contentSetupDone
+                val isContentSetupComplete by
+                    downloadViewModel.isContentSetupComplete.collectAsStateWithLifecycle()
+                val showContentSetup = shouldShowContentSetup(
+                    screenState = contentState,
+                    isSetupComplete = isContentSetupComplete,
+                )
 
                 if (showContentSetup) {
                     // Re-check on resume so a decision made in init() while assets were still
@@ -341,7 +342,6 @@ class MainActivity : FragmentActivity() {
                     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { downloadViewModel.recheck() }
                     AssetDownloadScreen(
                         viewModel = downloadViewModel,
-                        onReady = { contentSetupDone = true },
                     )
                 } else {
                     CompositionLocalProvider(

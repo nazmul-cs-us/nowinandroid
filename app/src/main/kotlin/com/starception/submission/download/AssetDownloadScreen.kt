@@ -42,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -60,15 +59,9 @@ import com.starception.submission.core.designsystem.animation.NiaTransitions
 @Composable
 fun AssetDownloadScreen(
     viewModel: AssetDownloadViewModel,
-    onReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
-    val isReady = screenState is DownloadScreenState.AllReady
-
-    LaunchedEffect(isReady) {
-        if (isReady) onReady()
-    }
 
     AnimatedContent(
         targetState = screenState,
@@ -93,7 +86,7 @@ fun AssetDownloadScreen(
                 LoadingContent(modifier)
             }
             is DownloadScreenState.AllReady -> {
-                // onReady() fires from the LaunchedEffect above; nothing to draw here.
+                // MainActivity observes this state and replaces setup with the app content.
             }
             is DownloadScreenState.Error -> {
                 ErrorContent(

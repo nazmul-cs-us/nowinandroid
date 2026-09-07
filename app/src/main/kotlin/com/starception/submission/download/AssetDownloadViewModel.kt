@@ -55,8 +55,13 @@ class AssetDownloadViewModel @Inject constructor(
     private val downloadManager: AssetDownloadManager,
 ) : ViewModel() {
 
+    private val contentSetupPreferences = ContentSetupPreferences(context)
+
     private val _screenState = MutableStateFlow<DownloadScreenState>(DownloadScreenState.Loading)
     val screenState: StateFlow<DownloadScreenState> = _screenState.asStateFlow()
+
+    private val _isContentSetupComplete = MutableStateFlow(contentSetupPreferences.isComplete)
+    val isContentSetupComplete: StateFlow<Boolean> = _isContentSetupComplete.asStateFlow()
 
     private var manifest: AssetManifest? = null
     private var isCurrentlyDownloading = false
@@ -86,6 +91,7 @@ class AssetDownloadViewModel @Inject constructor(
 
                 // Check if all required assets are already available (bundled fallback works)
                 if (downloadManager.hasEssentialAssets(m)) {
+                    markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All essential assets ready")
                     return@launch
@@ -94,6 +100,7 @@ class AssetDownloadViewModel @Inject constructor(
                 // Also check if all required categories are individually complete
                 val requiredKeys = m.categories.filter { it.value.required }.keys
                 if (requiredKeys.all { downloadManager.isCategoryComplete(it, m) }) {
+                    markContentSetupComplete()
                     _screenState.value = DownloadScreenState.AllReady
                     Log.i(TAG, "All required categories complete, skipping download screen")
                     return@launch
@@ -171,6 +178,7 @@ class AssetDownloadViewModel @Inject constructor(
                 } catch (e: Exception) {
                     Log.e(TAG, "Error regenerating news.db", e)
                 }
+                markContentSetupComplete()
                 _screenState.value = DownloadScreenState.AllReady
             }
             return
@@ -256,7 +264,14 @@ class AssetDownloadViewModel @Inject constructor(
      * Skip downloading optional content and proceed with bundled assets.
      */
     fun skipOptionalDownloads() {
+        markContentSetupComplete()
         _screenState.value = DownloadScreenState.AllReady
+    }
+
+    private fun markContentSetupComplete() {
+        if (_isContentSetupComplete.value) return
+        contentSetupPreferences.markComplete()
+        _isContentSetupComplete.value = true
     }
 
     private fun updateDownloadingState(downloading: Boolean) {
