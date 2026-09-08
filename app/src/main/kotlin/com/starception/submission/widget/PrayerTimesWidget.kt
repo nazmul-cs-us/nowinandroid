@@ -100,6 +100,12 @@ private val IshaAccent = DayNightColorProvider(Color(0xFF6042B8), Color(0xFFC6B8
 private val HEADER_TOUCH_TARGET_TOP_PADDING = 4.dp
 private val TITLE_BAR_HEIGHT = 52.dp
 
+// Titled layouts finish with an inset card (the next-prayer or timetable surface). Its
+// final row contributes its own visual clearance, so a full 16dp outer bottom inset would
+// double the visible space below the last item. Four dp keeps the perceived content edge
+// aligned with the header's 16dp visible top edge while retaining separation at the shell.
+private val TITLED_WIDGET_BOTTOM_PADDING = 4.dp
+
 /** Lines the phase title may wrap to; the ramp will not pick a size needing more. */
 private const val TITLE_MAX_LINES = 2
 
@@ -256,10 +262,12 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
                         // figures that are then handed to it is what keeps the choice and
                         // the sizing from disagreeing.
                         val innerWidth = (size.width - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
-                        // The Scaffold pads the sides and the bottom; the title bar
-                        // includes the matching top inset.
+                        // The title bar owns the top inset. Titled content ends in an
+                        // inset surface, so its smaller shell inset avoids double-padding
+                        // below the final row.
                         val titledHeight =
-                            (size.height - TITLE_BAR_HEIGHT - WIDGET_PADDING).coerceAtLeast(1.dp)
+                            (size.height - TITLE_BAR_HEIGHT - TITLED_WIDGET_BOTTOM_PADDING)
+                                .coerceAtLeast(1.dp)
                         val bareHeight =
                             (size.height - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
                         when {
@@ -582,10 +590,10 @@ private fun TitledSurface(
     Scaffold(
         backgroundColor = TransparentWidgetBackground,
         horizontalPadding = WIDGET_PADDING,
-        // Scaffold pads the sides only. Add the same 16dp at the bottom; the title bar
-        // carries the matching top inset.
+        // Scaffold pads the sides only. The final content is already an inset surface,
+        // so use the compensated bottom inset instead of stacking another full 16dp.
         modifier = GlanceModifier
-            .padding(bottom = WIDGET_PADDING)
+            .padding(bottom = TITLED_WIDGET_BOTTOM_PADDING)
             .clickable(actionStartActivity<MainActivity>()),
         titleBar = {
             // Glance's own TitleBar is not used here, and only for one reason: its title
@@ -721,19 +729,7 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         // theme's primary colour is strongest in the middle and fades completely at
         // both ends. Glance cannot paint a Brush, so the same five-stop gradient is
         // rasterised into this tiny bitmap and displayed vertically.
-        Image(
-            provider = ImageProvider(
-                fadingSeparatorBitmap(
-                    GlanceTheme.colors.primary.getColor(LocalContext.current),
-                    vertical = true,
-                ),
-            ),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = GlanceModifier
-                .width(1.dp)
-                .height(32.dp),
-        )
+        FadingVerticalSeparator()
         Spacer(modifier = GlanceModifier.width(2.dp))
     }
 }
@@ -770,6 +766,22 @@ private fun fadingSeparatorBitmap(primary: Color, vertical: Boolean): Bitmap {
         paint,
     )
     return bitmap
+}
+
+/** The app's location divider, shared by both widget header information groups. */
+@Composable
+private fun FadingVerticalSeparator(height: Dp = 32.dp) {
+    Image(
+        provider = ImageProvider(
+            fadingSeparatorBitmap(
+                GlanceTheme.colors.primary.getColor(LocalContext.current),
+                vertical = true,
+            ),
+        ),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = GlanceModifier.width(1.dp).height(height),
+    )
 }
 
 /** The location divider turned horizontally for timetable section and row separators. */
@@ -1445,13 +1457,13 @@ private fun ReferenceFullPrayerContent(
     val heroHeight = 98.dp
     val sectionGap = 8.dp
     val nextHeight = 54.dp
-    val panelVerticalPadding = 8f
+    val panelTopPadding = 8f
     val panelHeaderHeight = 24f
     val fixedHeight = heroHeight.value +
         sectionGap.value +
         nextHeight.value +
         sectionGap.value +
-        (panelVerticalPadding * 2f) +
+        panelTopPadding +
         panelHeaderHeight +
         5f +
         (state.prayers.size - 1).coerceAtLeast(0)
@@ -1713,8 +1725,13 @@ private fun ReferencePrayerSchedulePanel(
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(if (compact) 16.dp else 20.dp)
             .padding(
-                horizontal = if (compact) 8.dp else 10.dp,
-                vertical = if (compact) 6.dp else 8.dp,
+                start = if (compact) 8.dp else 10.dp,
+                top = if (compact) 6.dp else 8.dp,
+                end = if (compact) 8.dp else 10.dp,
+                // The widget surface already supplies the uniform outer bottom inset.
+                // Adding another inset here made the space after Isha look larger than
+                // the visible top inset, even though the outer card itself was even.
+                bottom = 0.dp,
             ),
     ) {
         Row(
@@ -2014,8 +2031,10 @@ private fun NextPrayerBanner(
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
             WidgetText(
-                text = "Coming up",
-                size = (if (compact) 13f else 14f).sp,
+                // Use the same tracked, all-caps treatment as the current-prayer label
+                // in the hero (for example, "D H U H R").
+                text = "N E X T  P R A Y E R",
+                size = (if (compact) 9.5f else 10.5f).sp,
                 color = GlanceTheme.colors.primary,
                 weight = WidgetFontWeight.Bold,
             )

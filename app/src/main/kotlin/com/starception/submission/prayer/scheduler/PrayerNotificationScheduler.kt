@@ -240,14 +240,24 @@ object PrayerNotificationScheduler {
         val delayMillis = java.time.Duration.between(currentTime, notificationTime).toMillis()
 
         if (delayMillis > 0) {
-            // WorkManager is also the fallback prayer-boundary trigger for DND when
-            // exact alarms are unavailable. A main-prayer job must therefore remain
-            // scheduled when silent mode is enabled, even if this prayer's bell is off.
+            // AlarmManager is the one delivery path when exact alarms are available.
+            // WorkManager is a fallback, not a second copy of the same notification:
+            // scheduling both made a prayer notification (and its Adhan) fire twice.
             val notificationsEnabled = isNotificationEnabledForPrayer(context, prayerName)
             val needsSilentModeFallback =
                 notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
                     isSilentDuringPrayerEnabled(context)
-            if (notificationsEnabled || needsSilentModeFallback) {
+            if (canScheduleExactAlarms(context)) {
+                scheduleWithAlarmManager(
+                    context,
+                    prayerName,
+                    prayerTime,
+                    notificationType,
+                    notificationTime,
+                    requestCode,
+                    priorMinutes,
+                )
+            } else if (notificationsEnabled || needsSilentModeFallback) {
                 scheduleWithWorkManager(
                     context,
                     prayerName,
@@ -259,9 +269,6 @@ object PrayerNotificationScheduler {
             } else {
                 Log.d(TAG, "🔕 Skipping WorkManager path for $prayerName")
             }
-
-            // AlarmManager also owns the independent silent-mode path.
-            scheduleWithAlarmManager(context, prayerName, prayerTime, notificationType, notificationTime, requestCode, priorMinutes)
         }
     }
     
@@ -296,7 +303,17 @@ object PrayerNotificationScheduler {
             .build()
         
         val workManager = WorkManager.getInstance(context)
-        workManager.enqueue(workRequest)
+        val uniqueWorkName = buildString {
+            append(WORK_NAME_PREFIX)
+            append(prayerName.lowercase().replace(' ', '_'))
+            append('_')
+            append(notificationType)
+        }
+        workManager.enqueueUniqueWork(
+            uniqueWorkName,
+            ExistingWorkPolicy.REPLACE,
+            workRequest,
+        )
         
         Log.d(TAG, "📱 Scheduled with WorkManager: $prayerName ($notificationType) in ${delayMillis / 1000}s")
     }
