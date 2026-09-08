@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.starception.submission.prayer.model.*
+import com.starception.submission.prayer.service.resolvePrayerTimeZoneOffset
 import com.starception.submission.usersettings.UserSettingsStore
 import com.starception.submission.widget.PrayerWidgetUpdater
 import java.time.LocalDateTime
@@ -2747,13 +2748,24 @@ class PrayerSettingsRepository @Inject constructor(
         if (!prefs.contains(KEY_CACHED_LOCATION_LAT)) return null
 
         return try {
+            val latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble()
+            val longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble()
+            val countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: ""
+            val cachedTimeZoneOffset =
+                prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
+            val timeZoneOffset = if (countryCode.equals("BD", ignoreCase = true)) {
+                resolvePrayerTimeZoneOffset(latitude, longitude, "BD")
+            } else {
+                cachedTimeZoneOffset
+            }
+
             Location(
-                latitude = prefs.getFloat(KEY_CACHED_LOCATION_LAT, 0f).toDouble(),
-                longitude = prefs.getFloat(KEY_CACHED_LOCATION_LON, 0f).toDouble(),
-                timeZoneOffset = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble(),
+                latitude = latitude,
+                longitude = longitude,
+                timeZoneOffset = timeZoneOffset,
                 city = prefs.getString(KEY_CACHED_LOCATION_CITY, "") ?: "",
                 country = prefs.getString(KEY_CACHED_LOCATION_COUNTRY, "") ?: "",
-                countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: "",
+                countryCode = countryCode,
                 area = prefs.getString(KEY_CACHED_LOCATION_AREA, "") ?: "",
                 subLocality = prefs.getString(KEY_CACHED_LOCATION_SUB_LOCALITY, "") ?: "",
                 thoroughfare = prefs.getString(KEY_CACHED_LOCATION_THOROUGHFARE, "") ?: "",
@@ -2884,6 +2896,18 @@ class PrayerSettingsRepository @Inject constructor(
             val subLocality = prefs.getString(KEY_CACHED_LOCATION_SUB_LOCALITY, "") ?: ""
             val thoroughfare = prefs.getString(KEY_CACHED_LOCATION_THOROUGHFARE, "") ?: ""
             val administrativeArea = prefs.getString(KEY_CACHED_LOCATION_ADMIN_AREA, "") ?: ""
+            val countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: ""
+            val timezone = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
+
+            // Builds before the Bangladesh timezone fix cached UTC+5:30 prayer
+            // times. Reject that schedule so callers recalculate it at UTC+6.
+            if (countryCode.equals("BD", ignoreCase = true) && timezone != 6.0) {
+                Log.w(
+                    TAG,
+                    "Rejecting Bangladesh prayer cache with invalid timezone UTC$timezone",
+                )
+                return null
+            }
             
             logPrefRead(KEY_CACHED_LOCATION_LAT, latitude, 0f)
             logPrefRead(KEY_CACHED_LOCATION_LON, longitude, 0f)
@@ -2899,15 +2923,11 @@ class PrayerSettingsRepository @Inject constructor(
                 longitude = longitude,
                 city = city,
                 country = country,
-                countryCode = run {
-                    val countryCode = prefs.getString(KEY_CACHED_LOCATION_COUNTRY_CODE, "") ?: ""
-                    logPrefRead(KEY_CACHED_LOCATION_COUNTRY_CODE, countryCode, "")
-                    countryCode
+                countryCode = countryCode.also {
+                    logPrefRead(KEY_CACHED_LOCATION_COUNTRY_CODE, it, "")
                 },
-                timeZoneOffset = run {
-                    val timezone = prefs.getFloat(KEY_CACHED_LOCATION_TIMEZONE, 0f).toDouble()
-                    logPrefRead(KEY_CACHED_LOCATION_TIMEZONE, timezone, 0f)
-                    timezone
+                timeZoneOffset = timezone.also {
+                    logPrefRead(KEY_CACHED_LOCATION_TIMEZONE, it, 0f)
                 },
                 area = area,
                 subLocality = subLocality,

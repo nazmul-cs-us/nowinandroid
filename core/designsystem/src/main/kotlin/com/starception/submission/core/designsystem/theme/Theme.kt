@@ -16,6 +16,7 @@
 
 package com.starception.submission.core.designsystem.theme
 
+import android.content.Context
 import android.os.Build
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
@@ -108,25 +109,15 @@ fun NiaTheme(
     disableDynamicTheming: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    // Color scheme
-    val colorScheme = when (themeBrand) {
-        ThemeBrand.DEFAULT -> when {
-            !disableDynamicTheming && supportsDynamicTheming() -> {
-                val context = LocalContext.current
-                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }
-            else -> if (darkTheme) DarkDefaultColorScheme else LightDefaultColorScheme
-        }
-        ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
-        ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
-        ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalColorScheme else LightRoyalColorScheme
-        ThemeBrand.CUSTOM -> {
-            val primary = if (customSeedColor == Color.Unspecified) Color(0xFF6750A4) else customSeedColor
-            val secondary = if (customSecondaryColor == Color.Unspecified) null else customSecondaryColor
-            val tertiary = if (customTertiaryColor == Color.Unspecified) null else customTertiaryColor
-            colorSchemeFromSeeds(primary, secondary, tertiary, darkTheme)
-        }
-    }
+    val colorScheme = niaColorScheme(
+        context = LocalContext.current,
+        darkTheme = darkTheme,
+        themeBrand = themeBrand,
+        customSeedColor = customSeedColor,
+        customSecondaryColor = customSecondaryColor,
+        customTertiaryColor = customTertiaryColor,
+        disableDynamicTheming = disableDynamicTheming,
+    )
     // Gradient colors
     val emptyGradientColors = GradientColors(container = colorScheme.surfaceColorAtElevation(2.dp))
     val defaultGradientColors = GradientColors(
@@ -178,6 +169,39 @@ fun NiaTheme(
             typography = NiaTypography,
             content = content,
         )
+    }
+}
+
+/**
+ * Resolves the exact color scheme used by [NiaTheme].
+ *
+ * This is intentionally usable outside a normal Material composition. Android widgets
+ * render through Glance/RemoteViews, but they still need to use the same selected theme,
+ * custom colors and Material You setting as the in-app home screen.
+ */
+fun niaColorScheme(
+    context: Context,
+    darkTheme: Boolean,
+    themeBrand: ThemeBrand,
+    customSeedColor: Color = Color.Unspecified,
+    customSecondaryColor: Color = Color.Unspecified,
+    customTertiaryColor: Color = Color.Unspecified,
+    disableDynamicTheming: Boolean = true,
+): androidx.compose.material3.ColorScheme = when (themeBrand) {
+    ThemeBrand.DEFAULT -> when {
+        !disableDynamicTheming && supportsDynamicTheming() -> {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        else -> if (darkTheme) DarkDefaultColorScheme else LightDefaultColorScheme
+    }
+    ThemeBrand.ANDROID -> if (darkTheme) DarkAndroidColorScheme else LightAndroidColorScheme
+    ThemeBrand.COASTAL -> if (darkTheme) DarkCoastalColorScheme else LightCoastalColorScheme
+    ThemeBrand.ROYAL -> if (darkTheme) DarkRoyalColorScheme else LightRoyalColorScheme
+    ThemeBrand.CUSTOM -> {
+        val primary = if (customSeedColor == Color.Unspecified) Color(0xFF6750A4) else customSeedColor
+        val secondary = if (customSecondaryColor == Color.Unspecified) null else customSecondaryColor
+        val tertiary = if (customTertiaryColor == Color.Unspecified) null else customTertiaryColor
+        colorSchemeFromSeeds(primary, secondary, tertiary, darkTheme)
     }
 }
 

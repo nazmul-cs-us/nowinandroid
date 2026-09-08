@@ -48,6 +48,7 @@ import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
 import com.starception.submission.widget.WidgetFontWeight
+import com.starception.submission.widget.TransparentWidgetBackground
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.cornerRadius
@@ -132,7 +133,7 @@ fun LongTextLayout(
   }
 
   Scaffold(
-    backgroundColor = GlanceTheme.colors.widgetBackground,
+    backgroundColor = TransparentWidgetBackground,
     horizontalPadding = widgetPadding,
     modifier = GlanceModifier
       .padding(

@@ -15,7 +15,8 @@
  */
 package com.starception.submission.widget.samples.text
 
-import com.starception.submission.widget.PrayerWidgetColors
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -25,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.glance.GlanceId
-import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.AppWidgetId
@@ -54,12 +54,13 @@ class TextWithImageAppWidget : GlanceAppWidget() {
     val initialData = withContext(Dispatchers.Default) {
       repo.load(context)
     }
+    val themeSource = loadWidgetThemeSource(context)
 
     provideContent {
       val data by repo.data().collectAsState(initial = initialData)
       val coroutineScope = rememberCoroutineScope()
 
-      GlanceTheme(colors = PrayerWidgetColors) {
+      StarceptionWidgetTheme(themeSource) {
         key(LocalSize.current) {
           WidgetContent(
             data = data,

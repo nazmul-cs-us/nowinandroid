@@ -23,7 +23,15 @@ import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.updateAll
+import com.starception.submission.widget.samples.collections.ActionListAppWidget
+import com.starception.submission.widget.samples.collections.CheckListAppWidget
+import com.starception.submission.widget.samples.collections.ImageGridAppWidget
+import com.starception.submission.widget.samples.collections.ImageTextListAppWidget
+import com.starception.submission.widget.samples.text.LongTextAppWidget
 import com.starception.submission.widget.samples.text.TextWithImageAppWidget
+import com.starception.submission.widget.samples.toolbars.ExpressiveToolbarAppWidget
+import com.starception.submission.widget.samples.toolbars.SearchToolBarAppWidget
+import com.starception.submission.widget.samples.toolbars.ToolBarAppWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -146,6 +154,14 @@ object PrayerWidgetUpdater {
             // no cadence at all: its provider declares updatePeriodMillis=0, so nothing
             // redrew it between taps of its own refresh button.
             TextWithImageAppWidget(),
+            LongTextAppWidget(),
+            ImageTextListAppWidget(),
+            CheckListAppWidget(),
+            ActionListAppWidget(),
+            ImageGridAppWidget(),
+            ExpressiveToolbarAppWidget(),
+            ToolBarAppWidget(),
+            SearchToolBarAppWidget(),
         ).forEach { widget ->
             try {
                 widget.updateAll(appContext)

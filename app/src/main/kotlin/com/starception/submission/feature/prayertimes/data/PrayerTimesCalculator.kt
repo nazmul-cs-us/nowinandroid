@@ -5,6 +5,7 @@ import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.service.resolvePrayerTimeZoneOffset
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -209,7 +210,7 @@ class PrayerTimesCalculator(private val context: Context) {
                 android.util.Log.d("PrayerCalculation", "🔄 FORCE GPS REFRESH MODE: Skipping saved location to fetch fresh GPS")
             }
             
-            val location = when {
+            val resolvedLocation = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
                 // BUT: Skip if forceGpsRefresh=true (pull-to-refresh) or if it has "Current Location" bug
                 userSettings.location != null && 
@@ -353,6 +354,23 @@ class PrayerTimesCalculator(private val context: Context) {
                 }
             }
             
+            // Repair locations cached by older builds, where Bangladesh was
+            // incorrectly swallowed by India's broad coordinate range (UTC+5:30).
+            val location = if (
+                resolvedLocation.countryCode.equals("BD", ignoreCase = true) ||
+                resolvedLocation.country.equals("Bangladesh", ignoreCase = true)
+            ) {
+                resolvedLocation.copy(
+                    timeZoneOffset = resolvePrayerTimeZoneOffset(
+                        resolvedLocation.latitude,
+                        resolvedLocation.longitude,
+                        "BD",
+                    ),
+                )
+            } else {
+                resolvedLocation
+            }
+
             // STEP 5: CALCULATE PRAYER TIMES using astronomical formulas
             android.util.Log.i(TAG, "🔄 STEP 5: ASTRONOMICAL CALCULATION")
             android.util.Log.i(TAG, "Executing comprehensive Islamic prayer time calculations")

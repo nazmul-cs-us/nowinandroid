@@ -16,12 +16,12 @@
 
 package com.starception.submission.widget.samples.toolbars
 
-import com.starception.submission.widget.PrayerWidgetColors
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
-import androidx.glance.GlanceTheme
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -42,8 +42,9 @@ class ToolBarAppWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val themeSource = loadWidgetThemeSource(context)
         provideContent {
-            GlanceTheme(colors = PrayerWidgetColors) {
+            StarceptionWidgetTheme(themeSource) {
                 WidgetContent()
             }
         }

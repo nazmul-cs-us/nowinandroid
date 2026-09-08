@@ -21,6 +21,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.data.FakeCheckListDataRepository.Companion.demoData
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowStartPadding
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowEndPadding
@@ -115,12 +116,13 @@ fun CheckListLayout(
   }
 
   Scaffold(
-    backgroundColor = GlanceTheme.colors.widgetBackground,
+    backgroundColor = TransparentWidgetBackground,
     horizontalPadding = scaffoldHorizontalPadding,
-    modifier = GlanceModifier.padding(
-      top = scaffoldTopPadding,
-      bottom = widgetPadding
-    ),
+    modifier = GlanceModifier
+      .padding(
+        top = scaffoldTopPadding,
+        bottom = widgetPadding
+      ),
     titleBar = if (showTitleBar()) {
       titleBar()
     } else {

@@ -21,6 +21,73 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
+ * Resolves the civil UTC offset used by prayer-time calculations when a timezone
+ * database lookup is unavailable.
+ *
+ * Country codes take priority because rectangular coordinate ranges overlap;
+ * India's coarse range, for example, also contains all of Bangladesh.
+ */
+internal fun resolvePrayerTimeZoneOffset(
+    latitude: Double,
+    longitude: Double,
+    countryCode: String? = null,
+): Double {
+    when (countryCode?.uppercase(Locale.ROOT)) {
+        "BD" -> return 6.0
+        "IN" -> return 5.5
+        "PK" -> return 5.0
+        "AE", "OM" -> return 4.0
+        "SA", "KW", "QA", "BH", "TR" -> return 3.0
+        "EG" -> return 2.0
+        "MY", "SG" -> return 8.0
+    }
+
+    return when {
+        // UAE (Dubai, Abu Dhabi, Sharjah, etc.) - GMT+4
+        latitude in 24.0..26.5 && longitude in 54.0..56.5 -> 4.0
+
+        // Saudi Arabia (Riyadh, Jeddah, Mecca, Medina) - GMT+3
+        latitude in 20.0..32.0 && longitude in 36.0..51.0 -> 3.0
+
+        // Kuwait - GMT+3
+        latitude in 28.5..30.5 && longitude in 46.5..48.5 -> 3.0
+
+        // Qatar - GMT+3
+        latitude in 24.0..26.5 && longitude in 50.0..52.0 -> 3.0
+
+        // Bahrain - GMT+3
+        latitude in 25.5..26.5 && longitude in 50.0..51.0 -> 3.0
+
+        // Oman - GMT+4
+        latitude in 16.0..26.5 && longitude in 51.5..60.0 -> 4.0
+
+        // Egypt (Cairo, Alexandria) - GMT+2
+        latitude in 22.0..32.0 && longitude in 24.0..37.0 -> 2.0
+
+        // Pakistan - GMT+5
+        latitude in 23.0..37.0 && longitude in 60.0..78.0 -> 5.0
+
+        // India - GMT+5.5
+        latitude in 6.0..38.0 && longitude in 68.0..98.0 -> 5.5
+
+        // Bangladesh - GMT+6. Country-code resolution above disambiguates the
+        // overlapping India/Bangladesh bounding boxes.
+        latitude in 20.0..27.0 && longitude in 88.0..93.0 -> 6.0
+
+        // Malaysia/Singapore - GMT+8
+        latitude in 1.0..7.5 && longitude in 99.5..120.0 -> 8.0
+
+        // Turkey - GMT+3
+        latitude in 35.0..43.0 && longitude in 25.0..45.0 -> 3.0
+
+        else -> {
+            val estimatedOffset = longitude / 15.0
+            (kotlin.math.round(estimatedOffset * 2.0) / 2.0).coerceIn(-12.0, 12.0)
+        }
+    }
+}
+
+/**
  * ENHANCED LOCATION SERVICE: Advanced GPS/Network location provider for prayer times
  * 
  * This service provides reliable, fast location acquisition optimized for prayer time
@@ -382,7 +449,10 @@ class EnhancedLocationService @Inject constructor(
         val baseLocation = Location(
             latitude = androidLocation.latitude,
             longitude = androidLocation.longitude,
-            timeZoneOffset = getTimezoneOffset(androidLocation.latitude, androidLocation.longitude),
+            // The device timezone is more reliable than a rectangular coordinate
+            // guess while reverse geocoding is still pending (or unavailable).
+            timeZoneOffset = TimeZone.getDefault()
+                .getOffset(System.currentTimeMillis()) / 3_600_000.0,
             altitude = androidLocation.altitude
         )
         
@@ -466,6 +536,11 @@ class EnhancedLocationService @Inject constructor(
                         android.util.Log.i("EnhancedLocationService", "      🏙️ FINAL CITY NAME: '$cityName'")
                         
                         val enrichedLocation = baseLocation.copy(
+                            timeZoneOffset = getTimezoneOffset(
+                                androidLocation.latitude,
+                                androidLocation.longitude,
+                                resolvedCountryCode,
+                            ),
                             city = cityName,
                             country = address.countryName ?: "",
                             countryCode = resolvedCountryCode,
@@ -563,7 +638,11 @@ class EnhancedLocationService @Inject constructor(
                         Location(
                             latitude = address.latitude,
                             longitude = address.longitude,
-                            timeZoneOffset = getTimezoneOffset(address.latitude, address.longitude),
+                            timeZoneOffset = getTimezoneOffset(
+                                address.latitude,
+                                address.longitude,
+                                resolvedCountryCode,
+                            ),
                             city = address.locality ?: address.subAdminArea ?: "",
                             country = address.countryName ?: "",
                             countryCode = resolvedCountryCode,
@@ -611,49 +690,12 @@ class EnhancedLocationService @Inject constructor(
      * @param longitude GPS longitude coordinate
      * @return UTC offset in hours (e.g., 4.0 for GMT+4, -5.0 for GMT-5)
      */
-    private fun getTimezoneOffset(latitude: Double, longitude: Double): Double {
-        // Known timezone corrections for major cities/regions
-        when {
-            // UAE (Dubai, Abu Dhabi, Sharjah, etc.) - GMT+4
-            latitude in 24.0..26.5 && longitude in 54.0..56.5 -> return 4.0
-            
-            // Saudi Arabia (Riyadh, Jeddah, Mecca, Medina) - GMT+3
-            latitude in 20.0..32.0 && longitude in 36.0..51.0 -> return 3.0
-            
-            // Kuwait - GMT+3
-            latitude in 28.5..30.5 && longitude in 46.5..48.5 -> return 3.0
-            
-            // Qatar - GMT+3
-            latitude in 24.0..26.5 && longitude in 50.0..52.0 -> return 3.0
-            
-            // Bahrain - GMT+3
-            latitude in 25.5..26.5 && longitude in 50.0..51.0 -> return 3.0
-            
-            // Oman - GMT+4
-            latitude in 16.0..26.5 && longitude in 51.5..60.0 -> return 4.0
-            
-            // Egypt (Cairo, Alexandria) - GMT+2
-            latitude in 22.0..32.0 && longitude in 24.0..37.0 -> return 2.0
-            
-            // Pakistan - GMT+5
-            latitude in 23.0..37.0 && longitude in 60.0..78.0 -> return 5.0
-            
-            // India - GMT+5.5
-            latitude in 6.0..38.0 && longitude in 68.0..98.0 -> return 5.5
-            
-            // Bangladesh - GMT+6
-            latitude in 20.0..27.0 && longitude in 88.0..93.0 -> return 6.0
-            
-            // Malaysia/Singapore - GMT+8
-            latitude in 1.0..7.5 && longitude in 99.5..120.0 -> return 8.0
-            
-            // Turkey - GMT+3
-            latitude in 35.0..43.0 && longitude in 25.0..45.0 -> return 3.0
-        }
-        
-        // Fallback to longitude-based approximation
-        val estimatedOffset = longitude / 15.0
-        return (kotlin.math.round(estimatedOffset * 2.0) / 2.0).coerceIn(-12.0, 12.0)
+    private fun getTimezoneOffset(
+        latitude: Double,
+        longitude: Double,
+        countryCode: String? = null,
+    ): Double {
+        return resolvePrayerTimeZoneOffset(latitude, longitude, countryCode)
     }
     
     /**

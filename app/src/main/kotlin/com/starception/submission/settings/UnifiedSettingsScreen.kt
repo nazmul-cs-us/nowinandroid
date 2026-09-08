@@ -75,6 +75,7 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.AppIconSection
 import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.DeveloperSettingsSection
 import com.starception.submission.settings.components.NotificationsSection
@@ -297,6 +298,7 @@ fun UnifiedSettingsScreen(
                                 )
                             },
                         )
+                        AppIconSection(modifier = Modifier.padding(top = 20.dp))
                     }
                 }
 

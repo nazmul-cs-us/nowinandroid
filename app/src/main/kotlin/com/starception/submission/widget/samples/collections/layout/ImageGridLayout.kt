@@ -34,6 +34,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.contentPadding
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.gridCells
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.imageCornerRadius
@@ -108,9 +109,10 @@ fun ImageGridLayout(
 
   Scaffold(
     titleBar = { TitleBar() },
-    backgroundColor = GlanceTheme.colors.widgetBackground,
+    backgroundColor = TransparentWidgetBackground,
     horizontalPadding = contentPadding,
-    modifier = GlanceModifier.padding(bottom = contentPadding)
+    modifier = GlanceModifier
+      .padding(bottom = contentPadding)
   ) {
     if (items.isEmpty()) {
       EmptyListContent()

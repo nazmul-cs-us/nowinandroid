@@ -23,6 +23,7 @@ import android.util.Log
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.prayerWindowProgress
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.feature.prayertimes.utils.applyOffsetToTime
@@ -68,6 +69,13 @@ internal data class WidgetPrayer(
     val temperature: String? = null,
 )
 
+/** The next solar event shown beside the refresh action in the detailed widget header. */
+internal data class WidgetSolarEvent(
+    val label: String,
+    val time: String,
+    val isSunset: Boolean,
+)
+
 internal sealed interface PrayerWidgetState {
 
     /**
@@ -81,7 +89,7 @@ internal sealed interface PrayerWidgetState {
         val dateLabel: String,
         val nextPrayer: WidgetPrayer,
         val countdown: String,
-        val sunrise: String,
+        val solarEvent: WidgetSolarEvent,
         val prayers: List<WidgetPrayer>,
         /**
          * The three lines the "Prayer now" tile shows, straight from the same generator:
@@ -102,6 +110,7 @@ internal sealed interface PrayerWidgetState {
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 internal interface PrayerWidgetEntryPoint {
+    fun userDataRepository(): UserDataRepository
     fun prayerSettingsRepository(): PrayerSettingsRepository
     fun prayerTimeCalculatorService(): PrayerTimeCalculatorService
 }
@@ -128,18 +137,30 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         PrayerWidgetEntryPoint::class.java,
     )
     val repository = entryPoint.prayerSettingsRepository()
+    val calculator = entryPoint.prayerTimeCalculatorService()
 
-    val prayerTimes = (
+    val basePrayerTimes = (
         repository.getCachedPrayerTimes()
-            ?: recalculateForToday(repository, entryPoint.prayerTimeCalculatorService())
+            ?: recalculateForDate(repository, calculator, LocalDate.now())
         )
-        ?.withUserOffsets(repository.getCalculationSettingsFromStorage().timeOffsets)
         ?: return PrayerWidgetState.Unavailable
+    val timeOffsets = repository.getCalculationSettingsFromStorage().timeOffsets
+    val prayerTimes = basePrayerTimes.withUserOffsets(timeOffsets)
+    val now = LocalTime.now()
+    val tomorrowSunrise = if (now >= prayerTimes.maghrib) {
+        recalculateForDate(repository, calculator, LocalDate.now().plusDays(1))
+            ?.withUserOffsets(timeOffsets)
+            ?.sunrise
+    } else {
+        null
+    }
 
     return prayerTimes.toWidgetState(
         context = context,
         weather = loadPrayerWeather(context, prayerTimes),
         insight = prayerTimes.toInsight(repository),
+        now = now,
+        tomorrowSunrise = tomorrowSunrise,
     )
 }
 
@@ -237,9 +258,10 @@ private data class WidgetWeather(
     val temperature: String,
 )
 
-private suspend fun recalculateForToday(
+private suspend fun recalculateForDate(
     repository: PrayerSettingsRepository,
     calculator: PrayerTimeCalculatorService,
+    date: LocalDate,
 ): DayPrayerTimes? {
     val location = repository.getCachedLocation()
         ?: repository.getLoadedLocationPreferences().location
@@ -254,9 +276,9 @@ private suspend fun recalculateForToday(
     val settings = repository.getSettings()
 
     return try {
-        calculator.calculatePrayerTimes(LocalDate.now(), location, settings)
+        calculator.calculatePrayerTimes(date, location, settings)
     } catch (e: Exception) {
-        Log.e(TAG, "Widget prayer time recalculation failed", e)
+        Log.e(TAG, "Widget prayer time recalculation failed for $date", e)
         null
     }
 }
@@ -298,9 +320,10 @@ private fun DayPrayerTimes.toWidgetState(
     context: Context,
     weather: Map<String, WidgetWeather>,
     insight: PrayerInsight?,
+    now: LocalTime,
+    tomorrowSunrise: LocalTime?,
 ): PrayerWidgetState.Available {
     val formatter = timeFormatter(context)
-    val now = LocalTime.now()
 
     val prayers = getActualPrayers().map { prayer ->
         WidgetPrayer(
@@ -320,13 +343,29 @@ private fun DayPrayerTimes.toWidgetState(
         )
     }
     val next = prayers.firstOrNull { it.isNext } ?: prayers.first()
+    val showSunset = now >= sunrise && now < maghrib
+    val solarEvent = if (showSunset) {
+        WidgetSolarEvent(
+            label = "Sunset",
+            time = maghrib.format(formatter),
+            isSunset = true,
+        )
+    } else {
+        WidgetSolarEvent(
+            label = "Sunrise",
+            // Once today's sun has set, the next relevant event is tomorrow's sunrise.
+            // Fall back to today's clock time only if that one-off calculation fails.
+            time = (tomorrowSunrise ?: sunrise).format(formatter),
+            isSunset = false,
+        )
+    }
 
     return PrayerWidgetState.Available(
         place = location.shortLabel(),
         dateLabel = hijriDateLabel(LocalDate.now()),
         nextPrayer = next,
         countdown = countdownTo(getActualPrayers().first { it.name == next.name }.time, now),
-        sunrise = sunrise.format(formatter),
+        solarEvent = solarEvent,
         prayers = prayers,
         insight = insight,
         windowProgress = prayerWindowProgress(this, now),

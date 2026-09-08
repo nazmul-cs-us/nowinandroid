@@ -36,6 +36,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.layout.NoDataContent
 import com.starception.submission.widget.samples.text.layout.TextWithImageLayoutDimensions.contentSize
 import com.starception.submission.widget.samples.text.layout.TextWithImageLayoutDimensions.contentSpacing
@@ -122,7 +123,7 @@ fun TextWithImageLayout(
   Scaffold(
     titleBar = titleBar,
     horizontalPadding = widgetPadding,
-    backgroundColor = GlanceTheme.colors.widgetBackground,
+    backgroundColor = TransparentWidgetBackground,
     modifier = GlanceModifier
       .maybeClickable(action)
       .padding(

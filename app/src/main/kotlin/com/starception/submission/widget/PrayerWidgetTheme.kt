@@ -16,68 +16,217 @@
 
 package com.starception.submission.widget
 
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Shader
+import androidx.annotation.DrawableRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.toArgb
+import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
+import androidx.glance.ImageProvider
+import androidx.glance.background
 import androidx.glance.color.ColorProviders
+import androidx.glance.layout.ContentScale
+import androidx.glance.layout.Box
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.material3.ColorProviders
+import androidx.glance.unit.ColorProvider
+import androidx.glance.appwidget.cornerRadius
+import androidx.compose.ui.unit.dp
+import com.starception.submission.core.data.repository.UserDataRepository
+import com.starception.submission.core.designsystem.theme.niaColorScheme
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.UserData
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.first
+import com.starception.submission.R
+
+/** Repository plus first value used before the DataStore flow produces its first frame. */
+internal data class WidgetThemeSource(
+    val repository: UserDataRepository,
+    val initial: UserData,
+)
 
 /**
- * Fixed palette shared by every widget, placed or previewed.
- *
- * Glance's default theme resolves to Material You on API 31+, which means a placed
- * widget takes its colours from the wallpaper. That is the usual recommendation, but it
- * cannot be reconciled with a picker preview: a preview is either a baked PNG (as in
- * platform-samples) or a static layout, and neither can follow the wallpaper. Whichever
- * way round, the widget you see in the list is not the widget you get on the home
- * screen — measured here as a navy preview against a brown-green placed widget.
- *
- * Pinning the palette removes that entirely: preview and placed widget are the same
- * colours on every device. The cost is that widgets no longer tint to the wallpaper.
- *
- * The values are sampled pixel-for-pixel from platform-samples' own preview assets
- * (drawable-nodpi and drawable-night-nodpi sample_check_list_preview.png), so the whole
- * set — the five prayer widgets and the nine ported ones — renders in the palette those
- * previews advertise.
+ * Loads the selected app theme for a widget without maintaining a second preference store.
  */
-private val LightScheme = lightColorScheme(
-    primary = Color(0xFF445E91),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDCE2F9),
-    onPrimaryContainer = Color(0xFF141B2C),
-    secondary = Color(0xFF575E71),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDCE2F9),
-    onSecondaryContainer = Color(0xFF141B2C),
-    background = Color(0xFFECF0FF),
-    onBackground = Color(0xFF1A1B20),
-    surface = Color(0xFFECF0FF),
-    onSurface = Color(0xFF1A1B20),
-    surfaceVariant = Color(0xFFE0E2EC),
-    onSurfaceVariant = Color(0xFF44474F),
-    outline = Color(0xFF74777F),
+internal suspend fun loadWidgetThemeSource(context: Context): WidgetThemeSource {
+    val repository = EntryPointAccessors.fromApplication(
+        context.applicationContext,
+        PrayerWidgetEntryPoint::class.java,
+    ).userDataRepository()
+    return WidgetThemeSource(repository, repository.userData.first())
+}
+
+private val LocalWidgetGradient = staticCompositionLocalOf<ImageProvider> {
+    error("Widget gradient was not provided")
+}
+private val LocalCookieWidgetGradient = staticCompositionLocalOf<ImageProvider> {
+    error("Cookie widget gradient was not provided")
+}
+
+/** Transparent Scaffold paint lets the shared gradient below remain visible. */
+internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
+
+/**
+ * Widget equivalent of NiaTheme plus mainPageBackgroundBrush().
+ *
+ * The same theme resolver is shared with the app, including custom and Material You colors.
+ * Supplying the resolved scheme as both Glance variants is deliberate: the in-app Light/Dark
+ * selection must win over the launcher's system-night resource choice.
+ */
+@Composable
+internal fun StarceptionWidgetTheme(
+    source: WidgetThemeSource,
+    drawRectangularBackground: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val userData by source.repository.userData.collectAsState(initial = source.initial)
+    val context = androidx.glance.LocalContext.current
+    val followsSystemDark =
+        context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+    val darkTheme = when (userData.darkThemeConfig) {
+        DarkThemeConfig.FOLLOW_SYSTEM -> followsSystemDark
+        DarkThemeConfig.LIGHT -> false
+        DarkThemeConfig.DARK -> true
+    }
+    val scheme = niaColorScheme(
+        context = context,
+        darkTheme = darkTheme,
+        themeBrand = userData.themeBrand,
+        customSeedColor = userData.customThemeColor.asThemeColor(),
+        customSecondaryColor = userData.customSecondaryColor.asThemeColor(),
+        customTertiaryColor = userData.customTertiaryColor.asThemeColor(),
+        disableDynamicTheming = !userData.useDynamicColor,
+    )
+    val gradientColors = if (darkTheme) {
+        listOf(
+            scheme.background,
+            scheme.surface,
+            scheme.primary.copy(alpha = 0.05f).compositeOver(scheme.surface),
+            scheme.background,
+        )
+    } else {
+        listOf(
+            scheme.background,
+            scheme.surfaceContainerLow,
+            scheme.secondary.copy(alpha = 0.14f).compositeOver(scheme.surfaceContainerLow),
+        )
+    }
+    val gradient = remember(userData, darkTheme, scheme) {
+        createHomeGradient(gradientColors)
+    }
+    val cookieGradient = remember(userData, darkTheme, scheme) {
+        if (drawRectangularBackground) {
+            gradient
+        } else {
+            createMaskedHomeGradient(
+                context = context,
+                colors = gradientColors,
+                maskRes = R.drawable.four_side_cookie_background,
+            )
+        }
+    }
+
+    GlanceTheme(colors = ColorProviders(light = scheme, dark = scheme)) {
+        CompositionLocalProvider(
+            LocalWidgetGradient provides ImageProvider(gradient),
+            LocalCookieWidgetGradient provides ImageProvider(cookieGradient),
+        ) {
+            if (drawRectangularBackground) {
+                // This must be a separate RemoteViews layer. Scaffold paints its own
+                // background after processing its modifier, so putting the bitmap on
+                // the same view is overwritten even when Scaffold's paint is transparent.
+                Box(
+                    modifier = GlanceModifier
+                        .fillMaxSize()
+                        .themedWidgetBackground()
+                        .cornerRadius(24.dp),
+                ) {
+                    content()
+                }
+            } else {
+                content()
+            }
+        }
+    }
+}
+
+/** Applies the selected-theme home gradient as a stretched, low-cost bitmap background. */
+@Composable
+internal fun GlanceModifier.themedWidgetBackground(): GlanceModifier = background(
+    imageProvider = LocalWidgetGradient.current,
+    contentScale = ContentScale.FillBounds,
 )
 
-private val DarkScheme = darkColorScheme(
-    primary = Color(0xFFB0C6FF),
-    onPrimary = Color(0xFF122F60),
-    primaryContainer = Color(0xFF2B4678),
-    onPrimaryContainer = Color(0xFFDCE2F9),
-    secondary = Color(0xFFBFC6DC),
-    onSecondary = Color(0xFF293042),
-    secondaryContainer = Color(0xFF3F4759),
-    onSecondaryContainer = Color(0xFFDCE2F9),
-    background = Color(0xFF283041),
-    onBackground = Color(0xFFE2E2E9),
-    surface = Color(0xFF283041),
-    onSurface = Color(0xFFE2E2E9),
-    surfaceVariant = Color(0xFF44474F),
-    onSurfaceVariant = Color(0xFFC4C6CF),
-    outline = Color(0xFF8E9099),
+/** Keeps the expressive toolbar's silhouette while filling it with the shared gradient. */
+@Composable
+internal fun GlanceModifier.themedCookieWidgetBackground(): GlanceModifier = background(
+    imageProvider = LocalCookieWidgetGradient.current,
+    contentScale = ContentScale.FillBounds,
 )
 
-/** Pass to `GlanceTheme(colors = PrayerWidgetColors)` in every widget. */
-internal val PrayerWidgetColors: ColorProviders = ColorProviders(
-    light = LightScheme,
-    dark = DarkScheme,
-)
+private fun Int.asThemeColor(): Color = if (this == 0) Color.Unspecified else Color(this)
+
+/** RemoteViews cannot carry a Compose Brush, so render the identical stops once to a tiny strip. */
+private fun createHomeGradient(
+    colors: List<Color>,
+    width: Int = 8,
+    height: Int = 128,
+): Bitmap {
+    return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+        val stops = colors.indices.map { index ->
+            if (colors.lastIndex == 0) 0f else index.toFloat() / colors.lastIndex
+        }.toFloatArray()
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                0f,
+                0f,
+                height.toFloat(),
+                colors.map(Color::toArgb).toIntArray(),
+                stops,
+                Shader.TileMode.CLAMP,
+            )
+        }
+        Canvas(bitmap).drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+    }
+}
+
+private fun createMaskedHomeGradient(
+    context: Context,
+    colors: List<Color>,
+    @DrawableRes maskRes: Int,
+): Bitmap {
+    val size = 256
+    val output = createHomeGradient(colors, width = size, height = size)
+    val mask = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    context.getDrawable(maskRes)?.mutate()?.apply {
+        setBounds(0, 0, size, size)
+        draw(Canvas(mask))
+    }
+    Canvas(output).drawBitmap(
+        mask,
+        0f,
+        0f,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+        },
+    )
+    return output
+}

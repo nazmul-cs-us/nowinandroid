@@ -15,7 +15,8 @@
  */
 package com.starception.submission.widget.samples.text
 
-import com.starception.submission.widget.PrayerWidgetColors
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 
 import android.content.Context
 import androidx.compose.runtime.Composable
@@ -31,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.currentState
 import androidx.glance.GlanceId
-import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -67,6 +67,7 @@ class LongTextAppWidget : GlanceAppWidget() {
     // Loaded once for the first paint, so the card never flashes a placeholder.
     val initialOffset = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[OFFSET_KEY] ?: 0
     val initial = DailyReminderRepository.load(context, initialOffset)
+    val themeSource = loadWidgetThemeSource(context)
 
     provideContent {
       // Read *inside* provideContent, and this is the whole reason refresh works.
@@ -88,7 +89,7 @@ class LongTextAppWidget : GlanceAppWidget() {
         }
       }
 
-      GlanceTheme(colors = PrayerWidgetColors) {
+      StarceptionWidgetTheme(themeSource) {
         LongTextAppWidgetContent(reminder = reminder)
       }
     }

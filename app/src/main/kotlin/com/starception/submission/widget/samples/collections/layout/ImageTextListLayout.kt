@@ -26,6 +26,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.layout.Dimensions.NUM_GRID_CELLS
 import com.starception.submission.widget.samples.collections.layout.Dimensions.fillItemItemPadding
 import com.starception.submission.widget.samples.collections.layout.Dimensions.filledItemCornerRadius
@@ -111,11 +112,12 @@ fun ImageTextListLayout(
   }
 
   Scaffold(
-    backgroundColor = GlanceTheme.colors.widgetBackground,
-    modifier = GlanceModifier.padding(
-      top = scaffoldTopPadding,
-      bottom = widgetPadding
-    ),
+    backgroundColor = TransparentWidgetBackground,
+    modifier = GlanceModifier
+      .padding(
+        top = scaffoldTopPadding,
+        bottom = widgetPadding
+      ),
     titleBar = if (showTitleBar()) {
       titleBar()
     } else {

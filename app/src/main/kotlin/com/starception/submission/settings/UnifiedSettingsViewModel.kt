@@ -29,6 +29,7 @@ import com.starception.submission.settings.components.TtsSettingsState
 import com.starception.submission.settings.components.TtsTestState
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.TTS_VOICE_SAMPLE_TEXT
+import com.starception.submission.widget.PrayerWidgetUpdater
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.download.CategoryDownloadState
@@ -238,6 +239,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         Log.d(TAG, "Updating theme brand to: $themeBrand")
         viewModelScope.launch {
             userDataRepository.setThemeBrand(themeBrand)
+            PrayerWidgetUpdater.refresh(context)
         }
     }
 
@@ -246,6 +248,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userDataRepository.setCustomThemeColors(primary, secondary, tertiary)
             userDataRepository.setThemeBrand(ThemeBrand.CUSTOM)
+            PrayerWidgetUpdater.refresh(context)
         }
     }
 
@@ -253,6 +256,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         Log.d(TAG, "Updating dark theme config to: $darkThemeConfig")
         viewModelScope.launch {
             userDataRepository.setDarkThemeConfig(darkThemeConfig)
+            PrayerWidgetUpdater.refresh(context)
         }
     }
 
@@ -260,6 +264,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         Log.d(TAG, "Updating dynamic color preference to: $useDynamicColor")
         viewModelScope.launch {
             userDataRepository.setDynamicColorPreference(useDynamicColor)
+            PrayerWidgetUpdater.refresh(context)
         }
     }
 
@@ -1333,4 +1338,3 @@ class UnifiedSettingsViewModel @Inject constructor(
         refreshContentCategories()
     }
 }
-

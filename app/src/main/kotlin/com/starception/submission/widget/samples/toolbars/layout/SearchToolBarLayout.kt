@@ -46,6 +46,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.headerItemHeight
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.iconSize
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.itemsSpacing
@@ -103,7 +104,9 @@ fun SearchToolBarLayout(
     }
 
   Scaffold(
-    modifier = GlanceModifier.padding(vertical = widgetPadding),
+    backgroundColor = TransparentWidgetBackground,
+    modifier = GlanceModifier
+      .padding(vertical = widgetPadding),
     horizontalPadding = widgetPadding
   ) {
     when (val layoutSize = SearchToolBarLayoutSize.fromLocalSize()) {

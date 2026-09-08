@@ -1,6 +1,7 @@
 package com.starception.submission.widget.samples.collections
 
-import com.starception.submission.widget.PrayerWidgetColors
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -8,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.glance.GlanceId
-import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
@@ -37,12 +37,13 @@ class ActionListAppWidget : GlanceAppWidget() {
     val initialItems = withContext(Dispatchers.Default) {
       repo.load()
     }
+    val themeSource = loadWidgetThemeSource(context)
 
     provideContent {
       val items by repo.items().collectAsState(initial = initialItems)
       val checkedItems by repo.checkedItems().collectAsState(initial = emptyList())
 
-      GlanceTheme(colors = PrayerWidgetColors) {
+      StarceptionWidgetTheme(themeSource) {
         WidgetContent(
           items = items,
           checkedItems = checkedItems,

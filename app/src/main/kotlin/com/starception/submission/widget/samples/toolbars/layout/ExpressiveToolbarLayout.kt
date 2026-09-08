@@ -43,6 +43,7 @@ import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import androidx.glance.unit.ColorProvider
 import com.starception.submission.R
+import com.starception.submission.widget.themedCookieWidgetBackground
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.minCenterButtonTapTarget
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.minCornerButtonTapTarget
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.scaledButtonBackground
@@ -107,10 +108,7 @@ fun ExpressiveToolbarLayout(
 
 @Composable
 private fun GlanceModifier.fourSidedCookieBackground(): GlanceModifier {
-    return this.background(
-        imageProvider = ImageProvider(R.drawable.four_side_cookie_background),
-        colorFilter = ColorFilter.tint(GlanceTheme.colors.widgetBackground)
-    )
+    return themedCookieWidgetBackground()
 }
 
 /**

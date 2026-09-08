@@ -31,6 +31,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.data.FakeActionListDataRepository.Companion.demoData
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.circularCornerRadius
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.filledItemCornerRadius
@@ -123,8 +124,9 @@ fun ActionListLayout(
   }
 
   Scaffold(
-    backgroundColor = GlanceTheme.colors.widgetBackground,
-    modifier = GlanceModifier.padding(top = scaffoldTopPadding),
+    backgroundColor = TransparentWidgetBackground,
+    modifier = GlanceModifier
+      .padding(top = scaffoldTopPadding),
     titleBar = if (showTitleBar()) {
       titleBar()
     } else {
