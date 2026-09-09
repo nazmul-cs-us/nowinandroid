@@ -199,7 +199,9 @@ data class Dua(
     val instruction: String?,
     val note: String?,
     val postContext: String?,
-    val description: String?
+    val description: String?,
+    /** Recorded Arabic recitation for this invocation, when supplied by Fortress. */
+    val audioUrl: String? = null,
 )
 
 /**
@@ -292,7 +294,8 @@ fun DuaInvocationEntity.toDua(chapterTitle: String = "") = Dua(
     instruction = instruction,
     note = note,
     postContext = postContext,
-    description = description
+    description = description,
+    audioUrl = audioUrl,
 )
 
 fun DuaInvocationEntity.toDuaBasic() = DuaBasic(

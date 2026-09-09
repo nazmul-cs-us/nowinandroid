@@ -278,7 +278,7 @@ interface DuaDao {
         SELECT i.id, i.chapter_id as chapterId, c.title as chapterTitle,
                i.position, i.arabic, i.transliteration, i.translation,
                i.context, i.instruction, i.note, i.post_context as postContext,
-               i.description
+               i.description, i.audio_url as audioUrl
         FROM invocations i
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE i.chapter_id = :chapterId
@@ -293,7 +293,7 @@ interface DuaDao {
         SELECT i.id, i.chapter_id as chapterId, c.title as chapterTitle,
                i.position, i.arabic, i.transliteration, i.translation,
                i.context, i.instruction, i.note, i.post_context as postContext,
-               i.description
+               i.description, i.audio_url as audioUrl
         FROM invocations i
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE i.arabic IS NOT NULL AND i.arabic != ''
@@ -520,7 +520,8 @@ data class DuaWithChapterTitle(
     val instruction: String?,
     val note: String?,
     val postContext: String?,
-    val description: String?
+    val description: String?,
+    val audioUrl: String?,
 )
 
 // Extension function
@@ -536,7 +537,8 @@ fun DuaWithChapterTitle.toDua() = Dua(
     instruction = instruction,
     note = note,
     postContext = postContext,
-    description = description
+    description = description,
+    audioUrl = audioUrl,
 )
 
 fun ChapterWithCount.toDuaChapter() = DuaChapter(

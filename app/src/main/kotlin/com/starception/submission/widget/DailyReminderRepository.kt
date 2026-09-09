@@ -48,9 +48,9 @@ internal data class DailyReminder(
     val target: WidgetNavigationTarget?,
     /** Descriptive heading shown between the kind chip and body, used for Fortress duas. */
     val contentTitle: String? = null,
-    /** Book this came from, for the footer's left corner — "Sahih Bukhari". */
+    /** Book this came from, shown after the reminder in the scrollable source row. */
     val sourceName: String? = null,
-    /** Where in that book, for the footer's right corner — "#156". */
+    /** Where in that book, shown at the end of the scrollable source row. */
     val sourceDetail: String? = null,
     /**
      * The Arabic, shown only when the card has room left after the translation.
@@ -330,7 +330,9 @@ internal object DailyReminderRepository {
         // Fortress translations contain inline footnote markers such as "morning 1 and"
         // and "laziness.)2". They have no corresponding footnotes in the widget, so they
         // read like invocation numbering and should not be exposed there.
-        .replace(DUA_FOOTNOTE_MARKER, "")
+        // A marker can touch both neighbouring words ("says:1Glorified", "He.1one").
+        // Deleting it joined those words; replacing it with whitespace preserves them.
+        .replace(DUA_FOOTNOTE_MARKER, " ")
         .replace(REPEATED_SPACE, " ")
         .replace(MISSING_SENTENCE_SPACE, "$1 ")
         .trim()
@@ -344,7 +346,7 @@ internal object DailyReminderRepository {
         option = RegexOption.IGNORE_CASE,
     )
     private val DUA_FOOTNOTE_MARKER = Regex("""(?<!\d)[1-9](?!\d)""")
-    private val MISSING_SENTENCE_SPACE = Regex("""([.)])(?=[A-Z])""")
+    private val MISSING_SENTENCE_SPACE = Regex("""([.):;!?])(?=[A-Za-z])""")
 
     /**
      * The app's own topic for a Fortress chapter, matched the same way [DuaCategory] does.

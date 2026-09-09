@@ -4,14 +4,17 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetManifest
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.ui.AppTaskProgressBus
 import com.starception.submission.feature.salah.visualization.PosePlaybackSource
+import com.starception.submission.feature.salah.visualization.TwoRakahDuaCatalog
 import com.starception.submission.feature.salah.visualization.VisualizationMode
 import com.starception.submission.feature.salah.visualization.VisualizationState
 import com.starception.submission.feature.salah.visualization.VizPrediction
+import com.starception.submission.feature.salah.visualization.twoRakahFortressChapterIds
 import com.starception.submission.ml.FeatureSpacePCA
 import com.starception.submission.ml.SalahBatchInference
 import com.starception.submission.ml.SalahDataSample
@@ -19,7 +22,10 @@ import com.starception.submission.ml.SalahPosture
 import com.starception.submission.sensor.SalahDataCollectionService
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.voice.SherpaOnnxTtsService
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -282,6 +288,9 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     private val _vizState = MutableStateFlow(VisualizationState())
     val vizState: StateFlow<VisualizationState> = _vizState.asStateFlow()
 
+    private val _twoRakahDuas = MutableStateFlow(TwoRakahDuaCatalog())
+    val twoRakahDuas: StateFlow<TwoRakahDuaCatalog> = _twoRakahDuas.asStateFlow()
+
     private val _allSamples = MutableStateFlow<List<SalahDataSample>>(emptyList())
     val allSamples: StateFlow<List<SalahDataSample>> = _allSamples.asStateFlow()
 
@@ -335,6 +344,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     init {
         loadDeployedModelReport()
+        loadTwoRakahDuas()
         // Set up callbacks
         collectionService.onSampleRecorded = { sample ->
             _uiState.update { state ->
@@ -348,6 +358,37 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         }
         refreshFileList()
         checkTtsAvailability()
+    }
+
+    /** Loads every applicable prayer invocation from the existing Fortress repository. */
+    private fun loadTwoRakahDuas() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val repository = EntryPointAccessors.fromApplication(
+                    getApplication<Application>().applicationContext,
+                    SalahTrainingDuaEntryPoint::class.java,
+                ).duaRepository()
+                val chapters = mutableMapOf<Int, List<com.starception.submission.core.duadatabase.Dua>>()
+                for (chapterId in twoRakahFortressChapterIds.sorted()) {
+                    chapters[chapterId] = repository.getDuasByChapter(chapterId)
+                }
+                _twoRakahDuas.value = TwoRakahDuaCatalog(
+                    isLoading = false,
+                    chapters = chapters,
+                    errorMessage = if (chapters.values.all { it.isEmpty() }) {
+                        "Prayer supplications are unavailable"
+                    } else {
+                        null
+                    },
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Unable to load Fortress prayer supplications", e)
+                _twoRakahDuas.value = TwoRakahDuaCatalog(
+                    isLoading = false,
+                    errorMessage = "Prayer supplications are unavailable",
+                )
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════
@@ -1197,4 +1238,10 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
             collectionService.stopRecording()
         }
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+internal interface SalahTrainingDuaEntryPoint {
+    fun duaRepository(): DuaRepository
 }

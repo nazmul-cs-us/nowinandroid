@@ -52,8 +52,10 @@ import com.starception.submission.MainActivity
 import com.starception.submission.widget.DailyReminder
 import com.starception.submission.widget.DailyReminderRepository
 import com.starception.submission.widget.WidgetNavigationBus
+import com.starception.submission.widget.WidgetNavigationTarget
 import com.starception.submission.widget.samples.text.layout.LongTextLayout
 import com.starception.submission.widget.samples.text.layout.LongTextLayoutData
+import com.starception.submission.core.designsystem.R as DesignR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -101,7 +103,13 @@ class LongTextAppWidget : GlanceAppWidget() {
 
     LongTextLayout(
       title = context.getString(R.string.sample_long_text_app_widget_name),
-      titleIconRes = R.drawable.ic_widget_daily_reminder_flaticon,
+      titleIconRes = when (reminder.target) {
+        is WidgetNavigationTarget.Hadith -> DesignR.drawable.topic_sahih_bukhari
+        is WidgetNavigationTarget.Dua -> DesignR.drawable.topic_quranic_duas
+        else -> R.drawable.ic_widget_daily_reminder_flaticon
+      },
+      titleIconTint = reminder.target !is WidgetNavigationTarget.Hadith &&
+        reminder.target !is WidgetNavigationTarget.Dua,
       titleBarActionIconRes = R.drawable.sample_refresh_icon,
       titleBarActionIconContentDescription = context.getString(
         R.string.sample_refresh_icon_button_label

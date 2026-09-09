@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Multi-line Ubuntu Sans for the Daily Reminder body.
+
+  Full inter-word justification creates conspicuous gaps on a narrow home-screen card, so
+  prose uses a ragged trailing edge while retaining the shared widget font and line metrics.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/ubuntu_sans_regular"
+    android:includeFontPadding="false"
+    android:fallbackLineSpacing="false"
+    android:ellipsize="end" />

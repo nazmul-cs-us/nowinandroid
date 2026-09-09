@@ -43,7 +43,6 @@ import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.background
-import androidx.glance.color.ColorProvider as DayNightColorProvider
 import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
@@ -54,7 +53,6 @@ import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.Box
-import androidx.glance.layout.ContentScale
 import androidx.glance.layout.height
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxWidth
@@ -86,15 +84,6 @@ import com.starception.submission.widget.samples.text.layout.WidgetTextDimension
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
 import com.starception.submission.widget.samples.utils.FontUtils.calculateFontSizeAndMaxLines
 
-private val FooterFrostedBackground = DayNightColorProvider(
-  androidx.compose.ui.graphics.Color(0xE6ECF0FF),
-  androidx.compose.ui.graphics.Color(0xE6283041),
-)
-
-/** Soft frosted transitions framing the scrollable reminder content. */
-private val HeaderFadeHeight = 16.dp
-private val FooterFadeHeight = 20.dp
-
 /**
  * A layout focused on presenting text only content.
  *
@@ -119,6 +108,7 @@ private val FooterFadeHeight = 20.dp
 fun LongTextLayout(
   title: String,
   @DrawableRes titleIconRes: Int,
+  titleIconTint: Boolean = true,
   @DrawableRes titleBarActionIconRes: Int? = null,
   titleBarActionIconContentDescription: String? = null,
   titleBarAction: Action? = null,
@@ -144,6 +134,7 @@ fun LongTextLayout(
       if (showTitleBar) {
         TitleBarContent(
           titleIconRes,
+          titleIconTint,
           title,
           titleBarAction,
           titleBarActionIconRes,
@@ -165,6 +156,7 @@ fun LongTextLayout(
 @Composable
 private fun TitleBarContent(
   titleIconRes: Int,
+  titleIconTint: Boolean,
   title: String,
   titleBarAction: Action?,
   titleBarActionIconRes: Int?,
@@ -185,7 +177,7 @@ private fun TitleBarContent(
     androidx.glance.Image(
       provider = ImageProvider(titleIconRes),
       contentDescription = null,
-      colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+      colorFilter = if (titleIconTint) ColorFilter.tint(GlanceTheme.colors.primary) else null,
       modifier = GlanceModifier.size(22.dp),
     )
     Spacer(modifier = GlanceModifier.width(8.dp))
@@ -252,26 +244,15 @@ private fun TextStack(
   // which is the worst of both.
   val hasSource = data.sourceName != null || data.sourceDetail != null
 
-  // Layer the source over the scrolling copy. RemoteViews cannot run a live RenderEffect,
-  // so the translucent surface and soft gradient are the widget-safe equivalent of a
-  // frosted footer: text disappears gradually under it instead of being sliced against a
-  // hard, solid strip.
-  // Two nested boxes because a Glance Box aligns every child the same way: the outer one
-  // keeps its default top alignment for the header fade, the inner one holds the list and
-  // the footer it is aligned to.
-  Box(modifier = GlanceModifier.fillMaxSize()) {
-  Box(
-    modifier = GlanceModifier.fillMaxSize(),
-    contentAlignment = Alignment.BottomStart,
-  ) {
-    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-      item {
-        Column(modifier = GlanceModifier.maybeClickable(action)) {
-        // The header fade is always present because RemoteViews does not expose the
-        // launcher-managed LazyColumn scroll offset. Give it clear space initially so it
-        // cannot wash over the HADITH/DUA chip. This spacer scrolls away with the list;
-        // once it has gone, content moving under the header receives the intended fade.
-        Spacer(modifier = GlanceModifier.height(HeaderFadeHeight))
+  // Keep every part of the reminder in the same scrollable flow. The citation used to be
+  // pinned over the list with day/night resource fades. That had two visible failures:
+  // launchers in system-dark mode selected the navy fade even when the app-selected widget
+  // theme was light, and the pinned strip covered the final Arabic line. A normal list item
+  // follows the selected Glance theme and can never obscure content above it.
+  LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+    item {
+      Column(modifier = GlanceModifier.maybeClickable(action)) {
+        Spacer(modifier = GlanceModifier.height(8.dp))
         // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
         // prayer widget beside it. Glance cannot carry a bundled font — see
         // widget_text_regular.xml — so the two cards were in different typefaces on the
@@ -335,7 +316,7 @@ private fun TextStack(
           text = data.text,
           size = bodySize,
           color = GlanceTheme.colors.onSurface,
-          weight = WidgetFontWeight.Regular,
+          weight = WidgetFontWeight.RegularRagged,
           // The whole point of the scrolling container: let it run.
           maxLines = 100,
         )
@@ -358,68 +339,45 @@ private fun TextStack(
             )
           }
         }
-        }
-      }
-      if (hasSource) {
-        // Lets the final line scroll completely above the overlaid citation.
-        item { Spacer(modifier = GlanceModifier.height(56.dp)) }
-      }
-    }
-
-    if (hasSource) {
-      Column(modifier = GlanceModifier.fillMaxWidth()) {
-        androidx.glance.Image(
-          provider = ImageProvider(R.drawable.widget_footer_fade),
-          contentDescription = null,
-          contentScale = ContentScale.FillBounds,
-          modifier = GlanceModifier.fillMaxWidth().height(FooterFadeHeight),
-        )
-        Row(
-          modifier = GlanceModifier
-            .fillMaxWidth()
-            .background(FooterFrostedBackground)
-            // Vertical padding only. The citation shares its column with the narration
-            // above, so a horizontal inset here reads as a second margin running down the
-            // card. The frosted surface still spans the full width — the strip bleeds,
-            // the words on it line up with the text.
-            .padding(top = 8.dp, bottom = 2.dp)
-            .maybeClickable(action),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          WidgetText(
-            text = data.sourceName.orEmpty(),
-            size = 12.sp,
-            color = GlanceTheme.colors.outline,
-            weight = WidgetFontWeight.Medium,
-            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-          )
-          Spacer(modifier = GlanceModifier.defaultWeight())
-          if (data.sourceDetail != null) {
+        if (hasSource) {
+          Spacer(modifier = GlanceModifier.height(14.dp))
+          Box(
+            modifier = GlanceModifier
+              .fillMaxWidth()
+              .height(1.dp)
+              .background(GlanceTheme.colors.outline),
+          ) {}
+          Spacer(modifier = GlanceModifier.height(9.dp))
+          Row(
+            modifier = GlanceModifier
+              .fillMaxWidth()
+              .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
             WidgetText(
-              text = data.sourceDetail,
+              text = data.sourceName.orEmpty(),
               size = 12.sp,
               color = GlanceTheme.colors.outline,
               weight = WidgetFontWeight.Medium,
-              // The chapter title a dua cites can be a full sentence; it gives way to the
-              // book name rather than pushing it off the card.
-              modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-              align = WidgetTextAlign.End,
+              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
             )
+            Spacer(modifier = GlanceModifier.defaultWeight())
+            if (data.sourceDetail != null) {
+              WidgetText(
+                text = data.sourceDetail,
+                size = 12.sp,
+                color = GlanceTheme.colors.outline,
+                weight = WidgetFontWeight.Medium,
+                // The chapter title a dua cites can be a full sentence; it gives way to the
+                // book name rather than pushing it off the card.
+                modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+                align = WidgetTextAlign.End,
+              )
+            }
           }
         }
       }
     }
-    }
-    // Drawn last, so it sits over the list: the same soft edge the footer gives, at the
-    // top, where a line scrolling up was otherwise cut against the card's border. Shorter
-    // than the footer's fade because nothing sits under it to be read through — it only
-    // has to dissolve one line.
-    androidx.glance.Image(
-      provider = ImageProvider(R.drawable.widget_header_fade),
-      contentDescription = null,
-      contentScale = ContentScale.FillBounds,
-      modifier = GlanceModifier.fillMaxWidth().height(HeaderFadeHeight),
-    )
   }
 }
 
@@ -573,9 +531,9 @@ data class LongTextLayoutData(
   val contentTitle: String? = null,
   /** Arabic original, rendered under the text when the card has height to spare. */
   val arabic: String? = null,
-  /** Book the text came from, shown in the footer's left corner. */
+  /** Book the text came from, shown after the reminder in the scrollable source row. */
   val sourceName: String? = null,
-  /** Where in that book, shown in the footer's right corner. */
+  /** Where in that book, shown at the end of the scrollable source row. */
   val sourceDetail: String? = null,
 )
 

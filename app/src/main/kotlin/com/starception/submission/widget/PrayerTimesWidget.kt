@@ -906,6 +906,8 @@ internal enum class WidgetTextAlign(val gravity: Int) {
 /** The three weights the widget draws in, each backed by its own one-TextView layout. */
 internal enum class WidgetFontWeight(@LayoutRes val layout: Int) {
     Regular(R.layout.widget_text_regular),
+    /** Regular Ubuntu Sans without narrow-column inter-word stretching. */
+    RegularRagged(R.layout.widget_text_regular_ragged),
     Medium(R.layout.widget_text_medium),
     Bold(R.layout.widget_text_bold),
 
