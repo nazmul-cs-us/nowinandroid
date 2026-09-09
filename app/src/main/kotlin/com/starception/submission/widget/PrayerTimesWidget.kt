@@ -1312,75 +1312,67 @@ private fun NextPrayerStripContent(
     }
 }
 
-/** Every prayer of the day, name over time, with the next one emphasized. */
+/** Every prayer of the day in one calm, evenly divided group. */
 @Composable
 private fun DayStripContent(
     prayers: List<WidgetPrayer>,
     nameSize: Float,
     timeSize: Float,
     showIcons: Boolean = false,
-    highlightedPrayerName: String? = null,
+    currentPrayerName: String? = null,
 ) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth(),
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .background(GlanceTheme.colors.surface)
+            .cornerRadius(14.dp)
+            .padding(horizontal = 3.dp, vertical = 5.dp),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        prayers.forEach { prayer ->
-            val highlighted = prayer.name.equals(highlightedPrayerName, ignoreCase = true)
-            val nameColor = when {
-                highlighted -> GlanceTheme.colors.onPrimaryContainer
-                prayer.isNext -> GlanceTheme.colors.primary
-                prayer.isPast -> GlanceTheme.colors.outline
-                else -> GlanceTheme.colors.onSurfaceVariant
+        prayers.forEachIndexed { index, prayer ->
+            if (index > 0) {
+                FadingVerticalSeparator(height = if (showIcons) 48.dp else 30.dp)
             }
-            val timeColor = when {
-                highlighted -> GlanceTheme.colors.onPrimaryContainer
-                prayer.isNext -> GlanceTheme.colors.primary
-                prayer.isPast -> GlanceTheme.colors.outline
-                else -> GlanceTheme.colors.onSurface
-            }
-            val columnModifier = if (highlighted) {
-                GlanceModifier
-                    .defaultWeight()
-                    .background(GlanceTheme.colors.primaryContainer)
-                    .cornerRadius(11.dp)
-                    .padding(horizontal = 2.dp, vertical = 5.dp)
+            // Current and next already have dedicated sections immediately above this
+            // strip. Repeating two different active treatments here made the five-item
+            // schedule compete with those sections, so both use the same typography.
+            // Only prayers completed before the current prayer are gently muted.
+            val isCurrent = prayer.name.equals(currentPrayerName, ignoreCase = true)
+            val contentColor = if (prayer.isPast && !isCurrent) {
+                GlanceTheme.colors.outline
             } else {
-                GlanceModifier
-                    .defaultWeight()
-                    .padding(horizontal = 2.dp, vertical = 5.dp)
+                GlanceTheme.colors.onSurface
             }
             Column(
-                modifier = columnModifier,
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .padding(horizontal = 1.dp, vertical = 2.dp),
                 horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
             ) {
                 if (showIcons && (prayer.weatherIcon != null || prayer.weatherFrames.isNotEmpty())) {
-                    AnimatedMeteocon(
-                        prayer = prayer,
-                        size = 24.dp,
-                    )
-                    Spacer(modifier = GlanceModifier.height(3.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .size(30.dp)
+                            .background(GlanceTheme.colors.surfaceVariant)
+                            .cornerRadius(15.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AnimatedMeteocon(prayer = prayer, size = 23.dp)
+                    }
+                    Spacer(modifier = GlanceModifier.height(2.dp))
                 }
                 WidgetText(
                     text = prayer.name,
                     size = nameSize.sp,
-                    color = nameColor,
-                    weight = if (highlighted || prayer.isNext) {
-                        WidgetFontWeight.Bold
-                    } else {
-                        WidgetFontWeight.Regular
-                    },
+                    color = contentColor,
+                    weight = WidgetFontWeight.Medium,
                     align = WidgetTextAlign.Center,
                 )
                 WidgetText(
                     text = prayer.time,
                     size = timeSize.sp,
-                    color = timeColor,
-                    weight = if (highlighted || prayer.isNext) {
-                        WidgetFontWeight.Bold
-                    } else {
-                        WidgetFontWeight.Medium
-                    },
+                    color = contentColor,
+                    weight = WidgetFontWeight.Medium,
                     align = WidgetTextAlign.Center,
                 )
             }
@@ -1566,15 +1558,37 @@ private fun ReferencePrayerDayStripPanel(
             .height(height)
             .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(16.dp)
-            .padding(horizontal = if (narrow) 4.dp else 8.dp, vertical = 6.dp),
+            .padding(
+                start = if (narrow) 4.dp else 8.dp,
+                top = 10.dp,
+                end = if (narrow) 4.dp else 8.dp,
+                bottom = 6.dp,
+            ),
     ) {
         if (showHeading) {
-            WidgetText(
-                text = "Today's Prayers",
-                size = (if (narrow) 11f else 12.5f).sp,
-                color = GlanceTheme.colors.onSurface,
-                weight = WidgetFontWeight.Medium,
-            )
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                WidgetText(
+                    text = "Today's Prayers",
+                    size = (if (narrow) 11f else 12.5f).sp,
+                    color = GlanceTheme.colors.onSurface,
+                    weight = WidgetFontWeight.Medium,
+                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                )
+                Spacer(modifier = GlanceModifier.defaultWeight())
+                val statusText = state.insight?.let {
+                    "${state.currentPrayerName().uppercase()} · NOW"
+                } ?: "NEXT · ${state.nextPrayer.name.uppercase()}"
+                WidgetText(
+                    text = statusText,
+                    size = (if (narrow) 8f else 9f).sp,
+                    color = GlanceTheme.colors.primary,
+                    weight = WidgetFontWeight.Bold,
+                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                )
+            }
             Spacer(modifier = GlanceModifier.height(4.dp))
             FadingHorizontalSeparator()
             Spacer(modifier = GlanceModifier.height(3.dp))
@@ -1588,7 +1602,7 @@ private fun ReferencePrayerDayStripPanel(
                 nameSize = if (narrow) 9f else 10.5f,
                 timeSize = if (narrow) 8.5f else 9.5f,
                 showIcons = height >= 92.dp,
-                highlightedPrayerName = state.currentPrayerName(),
+                currentPrayerName = state.currentPrayerName(),
             )
         }
     }

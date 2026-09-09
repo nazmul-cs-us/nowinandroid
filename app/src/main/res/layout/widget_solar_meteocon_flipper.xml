@@ -2,7 +2,8 @@
 <!--
      The Meteocons sunrise/sunset artwork rotates its eight symmetric rays once over
      six seconds. Twenty-four full-loop samples advance every 250ms, retaining the
-     source duration; a short crossfade softens the remaining 15-degree steps.
+     source duration. Solar frames intentionally switch without a crossfade: fading the
+     outgoing ray position over the incoming one creates a persistent double-sun effect.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/meteocon_flipper"
@@ -11,9 +12,7 @@
     android:autoStart="true"
     android:animateFirstView="false"
     android:flipInterval="250"
-    android:inAnimation="@anim/widget_meteocon_fade_in"
-    android:measureAllChildren="true"
-    android:outAnimation="@anim/widget_meteocon_fade_out">
+    android:measureAllChildren="true">
 
     <ImageView
         android:id="@+id/meteocon_frame_0"
