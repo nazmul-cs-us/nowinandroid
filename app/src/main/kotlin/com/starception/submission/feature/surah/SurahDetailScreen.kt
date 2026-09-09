@@ -5313,6 +5313,60 @@ private fun androidx.compose.ui.text.TextLayoutResult.rangeWordRects(
  */
 private data class TajweedSpan(val start: Int, val end: Int, val color: androidx.compose.ui.graphics.Color)
 
+/** A complete page mask for one Tajweed colour. */
+private data class TajweedLayer(
+    val color: androidx.compose.ui.graphics.Color,
+    val path: androidx.compose.ui.graphics.Path,
+)
+
+/**
+ * Resolves overlapping rules exactly once and combines every range of the same
+ * colour into one clipping path. The old renderer redrew the complete shaped
+ * page once per [TajweedSpan], which could mean hundreds of StaticLayout draws
+ * for a dense page and was the source of a recorded main-thread ANR.
+ */
+private fun buildTajweedLayers(
+    layout: androidx.compose.ui.text.TextLayoutResult,
+    spans: List<TajweedSpan>,
+): List<TajweedLayer> {
+    val textLength = layout.layoutInput.text.length
+    if (textLength == 0 || spans.isEmpty()) return emptyList()
+
+    // Later rules won in the original sequential renderer. Resolve that order
+    // per character before grouping so overlaps keep the same visible result.
+    val resolvedColors = arrayOfNulls<androidx.compose.ui.graphics.Color>(textLength)
+    spans.forEach { span ->
+        val start = span.start.coerceIn(0, textLength)
+        val end = span.end.coerceIn(start, textLength)
+        for (offset in start until end) resolvedColors[offset] = span.color
+    }
+
+    val rangesByColor = linkedMapOf<androidx.compose.ui.graphics.Color, MutableList<IntRange>>()
+    var rangeStart = 0
+    while (rangeStart < textLength) {
+        val color = resolvedColors[rangeStart]
+        if (color == null) {
+            rangeStart++
+            continue
+        }
+        var rangeEnd = rangeStart + 1
+        while (rangeEnd < textLength && resolvedColors[rangeEnd] == color) rangeEnd++
+        rangesByColor.getOrPut(color) { mutableListOf() }
+            .add(rangeStart until rangeEnd)
+        rangeStart = rangeEnd
+    }
+
+    return rangesByColor.map { (color, ranges) ->
+        val combinedPath = androidx.compose.ui.graphics.Path()
+        ranges.forEach { range ->
+            combinedPath.addPath(
+                layout.getPathForRange(range.first, range.last + 1),
+            )
+        }
+        TajweedLayer(color = color, path = combinedPath)
+    }
+}
+
 /** The paginated Mushaf's master string and everything indexed against it. */
 private data class MushafMaster(
     val text: AnnotatedString,
@@ -6201,13 +6255,16 @@ private fun MushafPageWithFrame(
 
             // Tajweed, painted over the finished layout.
             //
-            // The letters are drawn once, uncoloured, by the Text below; each rule then
-            // redraws that same layout in its own colour, clipped to the characters it
-            // covers. Because both passes share one TextLayoutResult, the shaping is
-            // identical — a rule can colour a nūn alone without the mīm before it losing
-            // its join, which is exactly what colour spans could not do.
+            // The letters are drawn once, uncoloured, by the Text below. Each Tajweed
+            // colour then redraws that same layout once, clipped to the combined path
+            // of every character using the colour. Because both passes share one
+            // TextLayoutResult, the shaping is identical — a rule can colour a nūn
+            // alone without the mīm before it losing its join.
             pageLayout.value?.let { layout ->
-                if (tajweed.isNotEmpty()) {
+                val tajweedLayers = remember(layout, tajweed) {
+                    buildTajweedLayers(layout, tajweed)
+                }
+                if (tajweedLayers.isNotEmpty()) {
                     androidx.compose.foundation.Canvas(
                         modifier = Modifier
                             .fillMaxSize()
@@ -6218,12 +6275,9 @@ private fun MushafPageWithFrame(
                                 bottom = bottomPadding,
                             ),
                     ) {
-                        tajweed.forEach { span ->
-                            val start = span.start.coerceIn(0, layout.layoutInput.text.length)
-                            val end = span.end.coerceIn(start, layout.layoutInput.text.length)
-                            if (end <= start) return@forEach
-                            clipPath(layout.getPathForRange(start, end)) {
-                                drawText(textLayoutResult = layout, color = span.color)
+                        tajweedLayers.forEach { layer ->
+                            clipPath(layer.path) {
+                                drawText(textLayoutResult = layout, color = layer.color)
                             }
                         }
                     }

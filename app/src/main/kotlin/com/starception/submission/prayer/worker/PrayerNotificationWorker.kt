@@ -15,7 +15,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import android.media.AudioAttributes
-import android.media.MediaPlayer
 import android.net.Uri
 import com.starception.submission.R
 import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
@@ -184,9 +183,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
     }
 
     private suspend fun showPrayerTimeNotification(prayerName: String, prayerTime: String) {
-        // Play Adhan sound
-        playAdhanSound()
-
         // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
         // The notification fires on the prayer's own day, so today's date is the right key.
         val displayName = getPrayerDisplayName(prayerName, LocalDate.now())
@@ -236,37 +232,6 @@ class PrayerNotificationWorker @AssistedInject constructor(
         notificationManager.notify(NOTIFICATION_ID, notification)
 
         Log.d(TAG, "📱 Posted prayer time notification with Adhan: $prayerName at $prayerTime")
-    }
-
-    private fun playAdhanSound() {
-        try {
-            val adhanUri = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.short_adhan}")
-            val mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .build()
-                )
-                setDataSource(applicationContext, adhanUri)
-                prepareAsync()
-                setOnPreparedListener { mp ->
-                    mp.start()
-                    Log.d(TAG, "🔊 Playing Adhan sound")
-                }
-                setOnCompletionListener { mp ->
-                    mp.release()
-                    Log.d(TAG, "✅ Adhan sound playback completed")
-                }
-                setOnErrorListener { mp, what, extra ->
-                    Log.e(TAG, "❌ Error playing Adhan: what=$what, extra=$extra")
-                    mp.release()
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to play Adhan sound", e)
-        }
     }
 
     private suspend fun showPrayerReminderNotification(prayerName: String, prayerTime: String, priorMinutes: Int = DEFAULT_PRIOR_MINUTES) {

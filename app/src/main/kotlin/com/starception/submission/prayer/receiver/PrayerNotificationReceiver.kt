@@ -8,6 +8,8 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -224,7 +226,14 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .setAutoCancel(true)
                     .setOngoing(false)
-                    .setDefaults(NotificationCompat.DEFAULT_ALL)
+                    // The channel is the sole Adhan playback owner. On Android 7.x,
+                    // where channels do not exist, this sound URI provides the same
+                    // single playback path.
+                    .setSound(adhanSoundUri(context))
+                    .setDefaults(
+                        NotificationCompat.DEFAULT_VIBRATE or
+                            NotificationCompat.DEFAULT_LIGHTS,
+                    )
                     .setContentIntent(contentPendingIntent)  // Open app when tapped
                     .build()
             } else {
@@ -240,7 +249,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     weatherInsight?.let { add("${it.summary} — ${it.advice}") }
                     add("Take a moment to prepare.")
                 }.joinToString("\n")
-                NotificationCompat.Builder(context, CHANNEL_ID)
+                NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
                     .setContentTitle("$displayName in $reminderLeadTime")
                     .setContentText(compactContent)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(expandedContent))
@@ -250,7 +259,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setCategory(NotificationCompat.CATEGORY_REMINDER)
                     .setAutoCancel(true)
                     .setOngoing(false)
-                    .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+                    .setDefaults(NotificationCompat.DEFAULT_VIBRATE)
                     .setContentIntent(contentPendingIntent)  // Open app when tapped
                     .build()
             }
@@ -267,24 +276,47 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
     
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build()
+            val prayerChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for prayer times and reminders"
+                description = "Prayer time notifications with Adhan sound"
                 enableLights(true)
                 enableVibration(true)
+                setSound(adhanSoundUri(context), audioAttributes)
+            }
+            val reminderChannel = NotificationChannel(
+                REMINDER_CHANNEL_ID,
+                REMINDER_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "Reminders before prayer times"
+                enableLights(true)
+                enableVibration(true)
+                setSound(null, null)
             }
             
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannels(
+                listOf(prayerChannel, reminderChannel),
+            )
         }
     }
+
+    private fun adhanSoundUri(context: Context): Uri = Uri.parse(
+        "android.resource://${context.packageName}/${R.raw.short_adhan}",
+    )
     
     companion object {
         private const val TAG = "PrayerNotificationReceiver"
         private const val CHANNEL_ID = "prayer_scheduled_notifications"
         private const val CHANNEL_NAME = "Scheduled Prayer Notifications"
+        private const val REMINDER_CHANNEL_ID = "prayer_reminder_notifications"
+        private const val REMINDER_CHANNEL_NAME = "Prayer Reminders"
     }
 }
