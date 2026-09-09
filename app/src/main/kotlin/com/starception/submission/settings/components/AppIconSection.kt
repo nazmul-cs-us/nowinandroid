@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.settings.AppIconChoice
 import com.starception.submission.settings.AppIconManager
 
+private const val APP_ICON_PREVIEW_SCALE = 1.85f
+private const val NEON_ICON_PREVIEW_SCALE = 1.92f
+
 @Composable
 fun AppIconSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -160,7 +163,13 @@ private fun AppIconOption(
                         contentDescription = "${choice.displayName} app icon",
                         modifier = Modifier
                             .fillMaxSize()
-                            .scale(1.75f),
+                            .scale(
+                                if (choice == AppIconChoice.NEON) {
+                                    NEON_ICON_PREVIEW_SCALE
+                                } else {
+                                    APP_ICON_PREVIEW_SCALE
+                                },
+                            ),
                         contentScale = ContentScale.Fit,
                     )
                 }
