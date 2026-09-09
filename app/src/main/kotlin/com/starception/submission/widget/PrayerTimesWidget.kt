@@ -2569,7 +2569,7 @@ private fun AnimatedMeteoconFrames(
     )
 }
 
-private val SOLAR_FRAME_VIEW_IDS = intArrayOf(
+private val METEOCON_FRAME_VIEW_IDS = intArrayOf(
     R.id.meteocon_frame_0,
     R.id.meteocon_frame_1,
     R.id.meteocon_frame_2,
@@ -2588,12 +2588,7 @@ private val SOLAR_FRAME_VIEW_IDS = intArrayOf(
     R.id.meteocon_frame_15,
     R.id.meteocon_frame_16,
     R.id.meteocon_frame_17,
-    R.id.meteocon_frame_18,
-    R.id.meteocon_frame_19,
-    R.id.meteocon_frame_20,
-    R.id.meteocon_frame_21,
-    R.id.meteocon_frame_22,
-    R.id.meteocon_frame_23,
 )
 
-private val WEATHER_FRAME_VIEW_IDS = SOLAR_FRAME_VIEW_IDS.copyOfRange(0, 18)
+private val SOLAR_FRAME_VIEW_IDS = METEOCON_FRAME_VIEW_IDS.copyOfRange(0, 12)
+private val WEATHER_FRAME_VIEW_IDS = METEOCON_FRAME_VIEW_IDS.copyOfRange(0, 18)

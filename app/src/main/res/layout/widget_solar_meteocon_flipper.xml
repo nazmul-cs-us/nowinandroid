@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
      The Meteocons sunrise/sunset artwork rotates its eight symmetric rays once over
-     six seconds. Twenty-four full-loop samples advance every 250ms, retaining the
-     source duration. Solar frames intentionally switch without a crossfade: fading the
-     outgoing ray position over the incoming one creates a persistent double-sun effect.
+     six seconds. Its appearance repeats after each 45-degree turn, so twelve unique
+     frames at 63ms preserve that speed with smooth 3.75-degree steps. Frames intentionally
+     switch without a crossfade: fading two ray positions creates a double-sun effect.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/meteocon_flipper"
@@ -11,7 +11,7 @@
     android:layout_height="match_parent"
     android:autoStart="true"
     android:animateFirstView="false"
-    android:flipInterval="250"
+    android:flipInterval="63"
     android:measureAllChildren="true">
 
     <ImageView
@@ -98,87 +98,4 @@
         android:contentDescription="@null"
         android:scaleType="fitCenter" />
 
-    <ImageView
-        android:id="@+id/meteocon_frame_12"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_13"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_14"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_15"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_16"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_17"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_18"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_19"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_20"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_21"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_22"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
-
-    <ImageView
-        android:id="@+id/meteocon_frame_23"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
 </ViewFlipper>

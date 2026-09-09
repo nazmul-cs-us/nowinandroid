@@ -53,7 +53,10 @@ internal object WidgetMeteocons {
 
     /** Four updates per second, with a short crossfade in the widget host. */
     private const val WEATHER_FRAME_COUNT = 18
-    private const val SOLAR_FRAME_COUNT = 24
+    // Sunrise/sunset has eight identical rays, so its visible artwork repeats every
+    // one-eighth of the six-second Lottie loop. Twelve samples across that 45-degree arc
+    // produce 3.75-degree steps at ~16fps without storing eight duplicate rotations.
+    private const val SOLAR_FRAME_COUNT = 12
 
     /**
      * Weather glyphs are displayed at 17–24dp, so 44px retains their detail while keeping
@@ -123,6 +126,7 @@ internal object WidgetMeteocons {
                 context = context,
                 resource = resource,
                 frameWindowStart = 0f,
+                frameWindowEnd = 1f / 8f,
                 frameCount = SOLAR_FRAME_COUNT,
                 iconPx = SOLAR_ANIMATED_ICON_PX,
             )
@@ -135,6 +139,7 @@ internal object WidgetMeteocons {
         frameCount: Int,
         iconPx: Int,
         frameWindowStart: Float = FRAME_WINDOW_START,
+        frameWindowEnd: Float = 1f,
     ): List<Bitmap> = try {
         val composition = LottieCompositionFactory.fromRawResSync(context, resource).value
         if (composition == null) {
@@ -152,7 +157,7 @@ internal object WidgetMeteocons {
                 // frame of a loop is the same image as the first, and holding it twice
                 // makes the animation visibly stutter.
                 drawable.progress = frameWindowStart +
-                    index.toFloat() * (1f - frameWindowStart) / frameCount
+                    index.toFloat() * (frameWindowEnd - frameWindowStart) / frameCount
                 Bitmap.createBitmap(
                     iconPx,
                     iconPx,
