@@ -1,25 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Animated Meteocon for a home-screen widget.
-
-     A widget's content is RemoteViews, drawn by the launcher's process from a
-     serialised description: there is no Lottie there and no frame loop to drive it, so
-     the animated icon used on the prayer screen cannot be embedded directly. ViewFlipper
-     is the exception — it carries @RemoteView, so RemoteViews accepts it, and with
-     autoStart it advances its children on its own inside the launcher with no help from
-     us. Each child is filled at runtime with one rasterised Lottie frame.
-
-     Eighteen optimized frames cover the visible 4.5 seconds of the source loop at
-     250ms intervals. A 220ms crossfade lets the launcher interpolate each transition
-     smoothly while keeping the RemoteViews payload safe.
-
-     match_parent on both axes, not wrap_content, and the distinction is load-bearing:
-     every child here is match_parent, and FrameLayout — which ViewFlipper extends —
-     derives a wrap_content size from its non-match_parent children only. With none, the
-     flipper collapsed onto the child's own measured size, which for an ImageView under
-     an AT_MOST spec is the bitmap's intrinsic size. The frames are trimmed to their
-     opaque bounds (~28px), so a 20dp icon drew at ~7dp with fitCenter having nothing to
-     scale up to. Filling the box Glance sized gives fitCenter a target again.
+     The Meteocons sunrise/sunset artwork rotates its eight symmetric rays once over
+     six seconds. Twenty-four full-loop samples advance every 250ms, retaining the
+     source duration; a short crossfade softens the remaining 15-degree steps.
 -->
 <ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/meteocon_flipper"
@@ -153,6 +136,48 @@
 
     <ImageView
         android:id="@+id/meteocon_frame_17"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_18"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_19"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_20"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_21"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_22"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <ImageView
+        android:id="@+id/meteocon_frame_23"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@null"

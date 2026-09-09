@@ -7853,27 +7853,109 @@ private fun ayahMarkerDigitFontFamily(languageCode: String): androidx.compose.ui
 }
 
 /**
- * Ayah number rendered inside the same compact ring used by continuous Mushaf
- * reading, so list and page modes share one end-of-ayah visual language.
+ * List-mode end-of-Ayah marker. The Waqf slot is part of this composable's
+ * measured height, so no glyph is painted outside its bounds or clipped by a
+ * parent. The same slot is retained when an Ayah is favorited or has no Waqf,
+ * keeping every ring aligned in the list.
  */
 @Composable
 private fun AyahOrnamentMarker(
     ayahNumber: Int,
+    pauseMark: String = "",
+    arabicFont: String = "default",
+    isFavourite: Boolean = false,
+    hasNote: Boolean = false,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
 ) {
     val arabicDigits = ayahNumber.toArabicIndic()
-    Box(
-        modifier = modifier.border(1.dp, tint, CircleShape),
-        contentAlignment = Alignment.Center,
+    val pauseGlyph = remember(pauseMark) { pauseMarkGlyph(pauseMark) }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = arabicDigits,
-            color = tint,
-            fontWeight = FontWeight.Medium,
-            fontSize = if (arabicDigits.length >= 3) 9.sp else 12.sp,
-            lineHeight = 13.sp,
-        )
+        // Let this slot grow with system font scaling. A fixed 11dp slot cut
+        // off the upper half of tall IndoPak/PDMSSaleem Waqf glyphs.
+        Box(
+            modifier = Modifier
+                .heightIn(min = 14.dp)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            if (pauseGlyph.isNotEmpty()) {
+                Text(
+                    text = pauseGlyph,
+                    color = tint,
+                    fontFamily = getArabicFontFamily(arabicFont),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.wrapContentWidth(unbounded = true),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isFavourite) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Favourite",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp),
+                )
+                Text(
+                    text = ayahNumber.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(1.dp, tint, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = arabicDigits,
+                        color = tint,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = if (arabicDigits.length >= 3) 9.sp else 12.sp,
+                        lineHeight = 13.sp,
+                    )
+                }
+            }
+
+            if (hasNote) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .align(Alignment.TopEnd),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Has note",
+                            tint = MaterialTheme.colorScheme.onTertiary,
+                            modifier = Modifier.size(10.dp),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -7894,6 +7976,16 @@ private fun AyahTrackItem(
     onLongPress: () -> Unit = {},
     onDoubleTap: () -> Unit = {}
 ) {
+    // Keep the terminal Waqf sign with the end-of-Ayah marker, matching the
+    // Mushaf renderer. Leaving the combining mark in the Arabic sentence lets
+    // shaping and RTL placement strand it beside the marker instead.
+    val parts = ayah.text.split("\n\n")
+    val rawArabicText = parts.getOrNull(0) ?: ayah.text
+    val (arabicText, pauseMark) = remember(rawArabicText) {
+        splitTrailingPauseMark(rawArabicText)
+    }
+    val translationText = parts.getOrNull(1)
+
     // Soft tint when this ayah is the one currently being recited, OR was
     // jumped to from search (e.g. "Ayatul Kursi" → 2:255). Reciting wins so a
     // playing ayah is still visually distinct from the search-target tint.
@@ -7931,68 +8023,14 @@ private fun AyahTrackItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Track number or heart icon if favourited
-            if (isFavourite) {
-                // Show heart icon with ayah number inside for favourited ayahs
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    // Heart icon background
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = "Favourite",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    // Ayah number overlaid on heart
-                    Text(
-                        text = ayah.numberInSurah.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(bottom = 2.dp) // Slight adjustment for visual centering
-                    )
-                }
-            } else {
-                // Ayah number stamped inside the Mushaf ayah-ending ornament
-                // (same marker as continuous reading). Note indicator stacks
-                // on the top-right when the ayah has a note.
-                Box {
-                    AyahOrnamentMarker(
-                        ayahNumber = ayah.numberInSurah,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    // Note indicator badge
-                    if (hasNote) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier
-                                .size(16.dp)
-                                .align(Alignment.TopEnd)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Has note",
-                                    tint = MaterialTheme.colorScheme.onTertiary,
-                                    modifier = Modifier.size(10.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Ayah text (no truncation - shows full text including both Arabic and translation)
-            // Split Arabic and translation text for separate styling
-            val parts = ayah.text.split("\n\n")
-            val arabicText = parts.getOrNull(0) ?: ayah.text
-            val translationText = parts.getOrNull(1)
+            AyahOrnamentMarker(
+                ayahNumber = ayah.numberInSurah,
+                pauseMark = pauseMark,
+                arabicFont = arabicFont,
+                isFavourite = isFavourite,
+                hasNote = hasNote,
+                modifier = Modifier.width(40.dp),
+            )
 
             // Convert alignment string to both TextAlign and Alignment enum
             val textAlign = when (textAlignment) {

@@ -87,12 +87,6 @@ import com.starception.submission.R
 /** Matches the ported layouts' own widgetPadding so the two sit consistently. */
 private val WIDGET_PADDING = 16.dp
 
-/** Prayer-specific accents mirror the reference artwork while remaining legible at night. */
-private val FajrAccent = DayNightColorProvider(Color(0xFFE9AD22), Color(0xFFFFD166))
-private val DhuhrAccent = DayNightColorProvider(Color(0xFFF1B72F), Color(0xFFFFD166))
-private val MaghribAccent = DayNightColorProvider(Color(0xFFD86F2F), Color(0xFFFFA66F))
-private val IshaAccent = DayNightColorProvider(Color(0xFF6042B8), Color(0xFFC6B8FF))
-
 // The header icons are 24dp and vertically centered in the refresh button's 48dp touch
 // target. Four dp above that target plus its 12dp internal inset puts the first visible
 // pixel at the same 16dp edge used on the other three sides. The hero below sizes itself
@@ -699,14 +693,7 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         modifier = GlanceModifier.wrapContentWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        Image(
-            provider = ImageProvider(R.drawable.flaticon_weather_clear),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(
-                if (state.solarEvent.isSunset) MaghribAccent else FajrAccent,
-            ),
-            modifier = GlanceModifier.size(22.dp),
-        )
+        AnimatedSolarMeteocon(event = state.solarEvent, size = 28.dp)
         Spacer(modifier = GlanceModifier.width(5.dp))
         Column(modifier = GlanceModifier.wrapContentWidth()) {
             WidgetText(
@@ -1371,7 +1358,6 @@ private fun DayStripContent(
                     AnimatedMeteocon(
                         prayer = prayer,
                         size = 24.dp,
-                        tint = prayerAccent(prayer),
                     )
                     Spacer(modifier = GlanceModifier.height(3.dp))
                 }
@@ -1758,7 +1744,6 @@ private fun ReferencePrayerSchedulePanel(
             AnimatedMeteocon(
                 prayer = state.nextPrayer,
                 size = if (compact) 17.dp else 19.dp,
-                tint = GlanceTheme.colors.onSurfaceVariant,
             )
             state.nextPrayer.temperature?.let { temperature ->
                 Spacer(modifier = GlanceModifier.width(5.dp))
@@ -1786,7 +1771,6 @@ private fun ReferencePrayerSchedulePanel(
             textSize = if (compact) 13f else 14.5f,
             rowHeight = rowHeight,
             showWeatherIcons = true,
-            usePrayerIconAccents = true,
             showDividers = true,
             compact = compact,
             highlightedPrayerName = state.currentPrayerName(),
@@ -1981,7 +1965,6 @@ private fun PrayerSchedulePanel(
             textSize = if (compact) 14f else 16f,
             rowHeight = rowHeight,
             showWeatherIcons = true,
-            usePrayerIconAccents = true,
             showDividers = false,
             compact = compact,
         )
@@ -2182,7 +2165,6 @@ private fun PrayerScheduleList(
     showTemperature: Boolean = true,
     showDividers: Boolean = true,
     showWeatherIcons: Boolean = false,
-    usePrayerIconAccents: Boolean = false,
     compact: Boolean = false,
     highlightedPrayerName: String? = null,
 ) {
@@ -2214,7 +2196,6 @@ private fun PrayerScheduleList(
                         AnimatedMeteocon(
                             prayer = prayer,
                             size = if (compact) 20.dp else 24.dp,
-                            tint = if (usePrayerIconAccents) prayerAccent(prayer) else null,
                         )
                         Spacer(modifier = GlanceModifier.width(if (compact) 8.dp else 10.dp))
                     }
@@ -2510,44 +2491,61 @@ private fun ExpressiveProgressBar(progress: Float, width: androidx.compose.ui.un
 private fun AnimatedMeteocon(
     prayer: WidgetPrayer,
     size: androidx.compose.ui.unit.Dp,
-    tint: ColorProvider? = null,
 ) {
-    val frames = prayer.weatherFrames
+    AnimatedMeteoconFrames(
+        still = prayer.weatherIcon,
+        frames = prayer.weatherFrames,
+        size = size,
+        layout = R.layout.widget_meteocon_flipper,
+        frameViewIds = WEATHER_FRAME_VIEW_IDS,
+    )
+}
+
+/** Meteocons Fill solar artwork is already coloured, so it must never receive a tint. */
+@Composable
+private fun AnimatedSolarMeteocon(
+    event: WidgetSolarEvent,
+    size: androidx.compose.ui.unit.Dp,
+) {
+    AnimatedMeteoconFrames(
+        still = event.icon,
+        frames = event.frames,
+        size = size,
+        layout = R.layout.widget_solar_meteocon_flipper,
+        frameViewIds = SOLAR_FRAME_VIEW_IDS,
+    )
+}
+
+@Composable
+private fun AnimatedMeteoconFrames(
+    still: Bitmap?,
+    frames: List<Bitmap>,
+    size: androidx.compose.ui.unit.Dp,
+    @LayoutRes layout: Int,
+    frameViewIds: IntArray,
+) {
     val context = LocalContext.current
 
-    // The artwork is now the Mono set — one black silhouette — so it has to be tinted to
-    // be anything but a black smudge on a light card. Tinted to the same accent the
-    // countdown beside it uses, so the row reads as one thing.
-    val resolvedTint = tint ?: GlanceTheme.colors.primary
-
     if (frames.size < 2) {
-        prayer.weatherIcon?.let {
+        still?.let { bitmap ->
             Image(
-                provider = ImageProvider(it),
+                provider = ImageProvider(bitmap),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(resolvedTint),
                 modifier = GlanceModifier.size(size),
             )
         }
         return
     }
 
-    // setColorFilter over setImageViewBitmap rather than recolouring the bitmaps: the
-    // frames are cached per weather code and shared by every widget, so tinting them at
-    // render time would bake one theme's colour into the cache. ImageView.setColorFilter
-    // is remotable and applies SRC_ATOP, which recolours the glyph and leaves its alpha —
-    // exactly what a solid silhouette needs.
-    val tintArgb = resolvedTint.getColor(context).toArgb()
     val remoteViews = RemoteViews(
         context.packageName,
-        R.layout.widget_meteocon_flipper,
+        layout,
     ).apply {
-        FRAME_VIEW_IDS.forEachIndexed { index, viewId ->
+        frameViewIds.forEachIndexed { index, viewId ->
             // The layout has a fixed number of children; cycle the available frames over
             // them so a short render still fills every slot rather than leaving blanks
             // that would read as a stutter.
             setImageViewBitmap(viewId, frames[index % frames.size])
-            setInt(viewId, "setColorFilter", tintArgb)
         }
     }
 
@@ -2557,20 +2555,31 @@ private fun AnimatedMeteocon(
     )
 }
 
-@Composable
-private fun prayerAccent(prayer: WidgetPrayer): ColorProvider = when (prayer.name.lowercase()) {
-    "fajr" -> FajrAccent
-    "dhuhr" -> DhuhrAccent
-    "maghrib" -> MaghribAccent
-    "isha" -> IshaAccent
-    else -> GlanceTheme.colors.primary
-}
-
-private val FRAME_VIEW_IDS = intArrayOf(
+private val SOLAR_FRAME_VIEW_IDS = intArrayOf(
     R.id.meteocon_frame_0,
     R.id.meteocon_frame_1,
     R.id.meteocon_frame_2,
     R.id.meteocon_frame_3,
     R.id.meteocon_frame_4,
     R.id.meteocon_frame_5,
+    R.id.meteocon_frame_6,
+    R.id.meteocon_frame_7,
+    R.id.meteocon_frame_8,
+    R.id.meteocon_frame_9,
+    R.id.meteocon_frame_10,
+    R.id.meteocon_frame_11,
+    R.id.meteocon_frame_12,
+    R.id.meteocon_frame_13,
+    R.id.meteocon_frame_14,
+    R.id.meteocon_frame_15,
+    R.id.meteocon_frame_16,
+    R.id.meteocon_frame_17,
+    R.id.meteocon_frame_18,
+    R.id.meteocon_frame_19,
+    R.id.meteocon_frame_20,
+    R.id.meteocon_frame_21,
+    R.id.meteocon_frame_22,
+    R.id.meteocon_frame_23,
 )
+
+private val WEATHER_FRAME_VIEW_IDS = SOLAR_FRAME_VIEW_IDS.copyOfRange(0, 18)

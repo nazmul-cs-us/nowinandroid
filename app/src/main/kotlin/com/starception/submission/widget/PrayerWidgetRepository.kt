@@ -59,10 +59,9 @@ internal data class WidgetPrayer(
     /** Meteocon for the forecast hour nearest this prayer; null when unknown. */
     val weatherIcon: Bitmap? = null,
     /**
-     * Frames of the same Meteocon for ViewFlipper playback. Only populated for the next
-     * prayer: every frame is a bitmap crossing Binder, so animating all five would blow
-     * the RemoteViews budget for no real gain — one focal animation reads better than
-     * five competing ones anyway.
+     * Optimized frames of the same Meteocon for launcher-side ViewFlipper playback.
+     * Rendering is cached by weather resource, so prayers with the same forecast reuse
+     * the same Bitmap instances in RemoteViews' shared bitmap cache.
      */
     val weatherFrames: List<Bitmap> = emptyList(),
     /** Rounded degrees for that same hour, e.g. "38°"; null when unknown. */
@@ -74,6 +73,9 @@ internal data class WidgetSolarEvent(
     val label: String,
     val time: String,
     val isSunset: Boolean,
+    /** Dedicated Meteocons Fill artwork; it keeps its original multicolour palette. */
+    val icon: Bitmap? = null,
+    val frames: List<Bitmap> = emptyList(),
 )
 
 internal sealed interface PrayerWidgetState {
@@ -334,17 +336,13 @@ private fun DayPrayerTimes.toWidgetState(
             // Fajr rolling over, so it must not be dimmed as past.
             isPast = !prayer.isNext && prayer.time.isBefore(now),
             weatherIcon = weather[prayer.name]?.icon,
-            weatherFrames = if (prayer.isNext) {
-                weather[prayer.name]?.frames.orEmpty()
-            } else {
-                emptyList()
-            },
+            weatherFrames = weather[prayer.name]?.frames.orEmpty(),
             temperature = weather[prayer.name]?.temperature,
         )
     }
     val next = prayers.firstOrNull { it.isNext } ?: prayers.first()
     val showSunset = now >= sunrise && now < maghrib
-    val solarEvent = if (showSunset) {
+    val solarEventWithoutArtwork = if (showSunset) {
         WidgetSolarEvent(
             label = "Sunset",
             time = maghrib.format(formatter),
@@ -359,6 +357,13 @@ private fun DayPrayerTimes.toWidgetState(
             isSunset = false,
         )
     }
+    val solarEvent = solarEventWithoutArtwork.copy(
+        icon = WidgetMeteocons.forSolarEvent(context, solarEventWithoutArtwork.isSunset),
+        frames = WidgetMeteocons.solarAnimationFrames(
+            context,
+            solarEventWithoutArtwork.isSunset,
+        ),
+    )
 
     return PrayerWidgetState.Available(
         place = location.shortLabel(),

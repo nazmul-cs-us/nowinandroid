@@ -51,16 +51,17 @@ internal object WidgetMeteocons {
     // for all five responsive size buckets stays comfortably inside the budget.
     private const val ICON_PX = 96
 
-    /**
-     * Frames sampled per animated icon, matching the child count of
-     * widget_meteocon_flipper.xml. Every frame is a separate bitmap crossing Binder, so
-     * this is the single biggest lever on the widget's payload — raising it is what
-     * breaks a widget with TransactionTooLargeException, not the number of widgets.
-     */
-    private const val FRAME_COUNT = 6
+    /** Four updates per second, with a short crossfade in the widget host. */
+    private const val WEATHER_FRAME_COUNT = 18
+    private const val SOLAR_FRAME_COUNT = 24
 
-    /** 56px x 6 frames is ~75 KB per animated icon; 96px would nearly double that. */
-    private const val ANIMATED_ICON_PX = 56
+    /**
+     * Weather glyphs are displayed at 17–24dp, so 44px retains their detail while keeping
+     * all five animated prayer rows below Binder's RemoteViews bitmap budget. The larger
+     * header solar icon gets a denser 56px raster.
+     */
+    private const val WEATHER_ANIMATED_ICON_PX = 44
+    private const val SOLAR_ANIMATED_ICON_PX = 56
 
     /**
      * Where the sampled loop starts, for the same reason [REPRESENTATIVE_FRAME] is not 0:
@@ -85,17 +86,56 @@ internal object WidgetMeteocons {
     }
 
     /**
-     * [FRAME_COUNT] frames spread evenly across the Meteocon's loop, for playback in a
+     * Frames spread evenly across the Meteocon's visible loop, for playback in a
      * ViewFlipper. Empty when the artwork could not be rendered, which callers should
      * treat as "fall back to the still icon".
      */
     @Synchronized
     fun animationFrames(context: Context, weatherCode: Int, isDay: Boolean): List<Bitmap> {
         val resource = meteoconResource(weatherCode, isDay)
-        return frameCache.getOrPut(resource) { renderFrames(context, resource) }
+        return frameCache.getOrPut(resource) {
+            renderFrames(
+                context = context,
+                resource = resource,
+                frameCount = WEATHER_FRAME_COUNT,
+                iconPx = WEATHER_ANIMATED_ICON_PX,
+            )
+        }
     }
 
-    private fun renderFrames(context: Context, @RawRes resource: Int): List<Bitmap> = try {
+    /** Dedicated multicolour Fill artwork for the next sunrise or sunset. */
+    @Synchronized
+    fun forSolarEvent(context: Context, isSunset: Boolean): Bitmap? {
+        val resource = solarEventResource(isSunset)
+        return cache.getOrPut(resource) { render(context, resource) }
+    }
+
+    /** Frames for the dedicated Fill sunrise/sunset artwork used in the widget header. */
+    @Synchronized
+    fun solarAnimationFrames(context: Context, isSunset: Boolean): List<Bitmap> {
+        val resource = solarEventResource(isSunset)
+        // Unlike condition icons, sunrise/sunset has no entrance to skip: its only
+        // motion is one full rotation of eight symmetric rays. Sampling the generic
+        // 25%-to-100% window produced 45-degree steps, which are identical for an
+        // eight-ray sun and therefore appeared completely static.
+        return frameCache.getOrPut(resource) {
+            renderFrames(
+                context = context,
+                resource = resource,
+                frameWindowStart = 0f,
+                frameCount = SOLAR_FRAME_COUNT,
+                iconPx = SOLAR_ANIMATED_ICON_PX,
+            )
+        }
+    }
+
+    private fun renderFrames(
+        context: Context,
+        @RawRes resource: Int,
+        frameCount: Int,
+        iconPx: Int,
+        frameWindowStart: Float = FRAME_WINDOW_START,
+    ): List<Bitmap> = try {
         val composition = LottieCompositionFactory.fromRawResSync(context, resource).value
         if (composition == null) {
             Log.w(TAG, "Meteocon $resource could not be parsed for animation")
@@ -103,19 +143,19 @@ internal object WidgetMeteocons {
         } else {
             val drawable = LottieDrawable().apply {
                 setComposition(composition)
-                setBounds(0, 0, ANIMATED_ICON_PX, ANIMATED_ICON_PX)
+                setBounds(0, 0, iconPx, iconPx)
             }
             // Every frame is trimmed to the same box (computed from the fullest frame)
             // so the glyph does not jitter as the animation advances.
-            List(FRAME_COUNT) { index ->
+            List(frameCount) { index ->
                 // Spread over [FRAME_WINDOW_START, 1f), stopping short of 1f: the last
                 // frame of a loop is the same image as the first, and holding it twice
                 // makes the animation visibly stutter.
-                drawable.progress = FRAME_WINDOW_START +
-                    index.toFloat() * (1f - FRAME_WINDOW_START) / FRAME_COUNT
+                drawable.progress = frameWindowStart +
+                    index.toFloat() * (1f - frameWindowStart) / frameCount
                 Bitmap.createBitmap(
-                    ANIMATED_ICON_PX,
-                    ANIMATED_ICON_PX,
+                    iconPx,
+                    iconPx,
                     Bitmap.Config.ARGB_8888,
                 ).also { drawable.draw(Canvas(it)) }
             }.let { frames ->
@@ -188,38 +228,41 @@ internal object WidgetMeteocons {
         return Bitmap.createBitmap(this, box.left, box.top, box.width(), box.height())
     }
 
+    @RawRes
+    private fun solarEventResource(isSunset: Boolean): Int = if (isSunset) {
+        R.raw.meteocon_fill_sunset
+    } else {
+        R.raw.meteocon_fill_sunrise
+    }
+
     /**
      * Open-Meteo WMO weather code to Meteocon artwork.
      *
      * Mirrors the mapping the prayer screen uses so the widget never disagrees with the
      * app about the same hour's sky.
      *
-     * The Mono style, not Fill, and the reason is contrast rather than taste. Fill draws
-     * its clouds in near-white with the weather picked out in colour: on a photographic
-     * launcher wallpaper that reads, but this icon sits on the widget's own light surface,
-     * where a white cloud all but disappeared — a rain icon measured about 9% ink against
-     * the card, and only its two blue drops were visible at all. Mono is a single black
-     * silhouette, which the caller tints to a theme colour, so it carries the same weight
-     * as the type beside it whatever the weather.
+     * Uses Meteocons' official Fill collection throughout. These resources are the exact
+     * versioned Lottie files from the same collection as the sunrise/sunset header icons,
+     * so their built-in gradients and colours must be preserved by callers.
      */
     @RawRes
     private fun meteoconResource(weatherCode: Int, isDay: Boolean): Int = when (weatherCode) {
-        0 -> if (isDay) R.raw.meteocon_mono_clear_day else R.raw.meteocon_mono_clear_night
+        0 -> if (isDay) R.raw.meteocon_fill_clear_day else R.raw.meteocon_fill_clear_night
         1, 2 -> if (isDay) {
-            R.raw.meteocon_mono_partly_cloudy_day
+            R.raw.meteocon_fill_partly_cloudy_day
         } else {
-            R.raw.meteocon_mono_partly_cloudy_night
+            R.raw.meteocon_fill_partly_cloudy_night
         }
-        3 -> if (isDay) R.raw.meteocon_mono_overcast_day else R.raw.meteocon_mono_overcast_night
-        45, 48 -> if (isDay) R.raw.meteocon_mono_fog_day else R.raw.meteocon_mono_fog_night
-        in 51..57 -> R.raw.meteocon_mono_drizzle
-        in 61..67, in 80..82 -> R.raw.meteocon_mono_rain
-        in 71..77, 85, 86 -> R.raw.meteocon_mono_snow
+        3 -> if (isDay) R.raw.meteocon_fill_overcast_day else R.raw.meteocon_fill_overcast_night
+        45, 48 -> if (isDay) R.raw.meteocon_fill_fog_day else R.raw.meteocon_fill_fog_night
+        in 51..57 -> R.raw.meteocon_fill_drizzle
+        in 61..67, in 80..82 -> R.raw.meteocon_fill_rain
+        in 71..77, 85, 86 -> R.raw.meteocon_fill_snow
         in 95..99 -> if (isDay) {
-            R.raw.meteocon_mono_thunderstorms_day
+            R.raw.meteocon_fill_thunderstorms_day
         } else {
-            R.raw.meteocon_mono_thunderstorms_night
+            R.raw.meteocon_fill_thunderstorms_night
         }
-        else -> R.raw.meteocon_mono_cloudy
+        else -> R.raw.meteocon_fill_cloudy
     }
 }
