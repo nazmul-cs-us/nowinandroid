@@ -3607,11 +3607,13 @@ private fun Visualization3DCard(
                                             vizState.copy(
                                                 mode = com.starception.submission.feature.salah.visualization.VisualizationMode.PHONE_MODEL,
                                                 posePlaybackSource = PosePlaybackSource.TWO_RAKAH_SAMPLE,
+                                                sampleRakahCount = 2,
+                                                twoRakahStepIndex = 0,
                                             ),
                                         )
                                     },
                                 ) {
-                                    Text("View 2 Rak'ah sample")
+                                    Text("View prayer sample")
                                 }
                             }
                         }

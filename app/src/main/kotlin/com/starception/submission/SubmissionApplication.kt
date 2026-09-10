@@ -296,6 +296,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                             com.starception.submission.services.ChapterRecitationService.toggle(appCtx)
                         }
                         override fun seekTo(positionMs: Int) { /* seek from bar not wired for service yet */ }
+                        override fun stop() {
+                            com.starception.submission.services.ChapterRecitationService.stop(appCtx)
+                        }
                     }
 
                 // Bridge the service's playback state/progress back to the in-app media bar

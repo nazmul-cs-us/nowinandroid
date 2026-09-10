@@ -19,9 +19,7 @@ package com.starception.submission.widget
 import android.appwidget.AppWidgetManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Shader
 import android.os.Build
 import android.content.res.Configuration
 import android.content.Context
@@ -719,72 +717,6 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         FadingVerticalSeparator()
         Spacer(modifier = GlanceModifier.width(2.dp))
     }
-}
-
-/** Raster equivalent of PrayerTimesScreen's rounded five-stop location divider. */
-private fun fadingSeparatorBitmap(primary: Color, vertical: Boolean): Bitmap {
-    val width = if (vertical) 3 else 96
-    val height = if (vertical) 96 else 3
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(
-            0f,
-            0f,
-            if (vertical) 0f else width.toFloat(),
-            if (vertical) height.toFloat() else 0f,
-            intArrayOf(
-                primary.copy(alpha = 0f).toArgb(),
-                primary.copy(alpha = 0.06f).toArgb(),
-                primary.copy(alpha = 0.30f).toArgb(),
-                primary.copy(alpha = 0.06f).toArgb(),
-                primary.copy(alpha = 0f).toArgb(),
-            ),
-            floatArrayOf(0f, 0.2f, 0.5f, 0.8f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-    }
-    Canvas(bitmap).drawRoundRect(
-        0f,
-        0f,
-        width.toFloat(),
-        height.toFloat(),
-        width / 2f,
-        width / 2f,
-        paint,
-    )
-    return bitmap
-}
-
-/** The app's location divider, shared by both widget header information groups. */
-@Composable
-private fun FadingVerticalSeparator(height: Dp = 32.dp) {
-    Image(
-        provider = ImageProvider(
-            fadingSeparatorBitmap(
-                GlanceTheme.colors.primary.getColor(LocalContext.current),
-                vertical = true,
-            ),
-        ),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = GlanceModifier.width(1.dp).height(height),
-    )
-}
-
-/** The location divider turned horizontally for timetable section and row separators. */
-@Composable
-private fun FadingHorizontalSeparator() {
-    Image(
-        provider = ImageProvider(
-            fadingSeparatorBitmap(
-                GlanceTheme.colors.primary.getColor(LocalContext.current),
-                vertical = false,
-            ),
-        ),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = GlanceModifier.fillMaxWidth().height(1.dp),
-    )
 }
 
 /**

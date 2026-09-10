@@ -48,6 +48,7 @@ import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
 import com.starception.submission.widget.WidgetFontWeight
 import com.starception.submission.widget.TransparentWidgetBackground
+import com.starception.submission.widget.FadingHorizontalSeparator
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.cornerRadius
@@ -244,14 +245,23 @@ private fun TextStack(
   // which is the worst of both.
   val hasSource = data.sourceName != null || data.sourceDetail != null
 
-  // Keep every part of the reminder in the same scrollable flow. The citation used to be
-  // pinned over the list with day/night resource fades. That had two visible failures:
-  // launchers in system-dark mode selected the navy fade even when the app-selected widget
-  // theme was light, and the pinned strip covered the final Arabic line. A normal list item
-  // follows the selected Glance theme and can never obscure content above it.
-  LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-    item {
-      Column(modifier = GlanceModifier.maybeClickable(action)) {
+  // Keep the source visible without drawing it over the reminder. The list receives the
+  // remaining height and scrolls independently; the footer is a normal sibling beneath it,
+  // so even the final Arabic line can scroll fully into view instead of disappearing under
+  // a frosted overlay.
+  Column(
+    modifier = GlanceModifier.fillMaxSize(),
+    verticalAlignment = verticalAlignment,
+  ) {
+    LazyColumn(
+      modifier = if (hasSource) {
+        GlanceModifier.fillMaxWidth().defaultWeight()
+      } else {
+        GlanceModifier.fillMaxSize()
+      },
+    ) {
+      item {
+        Column(modifier = GlanceModifier.maybeClickable(action)) {
         Spacer(modifier = GlanceModifier.height(8.dp))
         // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
         // prayer widget beside it. Glance cannot carry a bundled font — see
@@ -339,42 +349,38 @@ private fun TextStack(
             )
           }
         }
-        if (hasSource) {
-          Spacer(modifier = GlanceModifier.height(14.dp))
-          Box(
-            modifier = GlanceModifier
-              .fillMaxWidth()
-              .height(1.dp)
-              .background(GlanceTheme.colors.outline),
-          ) {}
-          Spacer(modifier = GlanceModifier.height(9.dp))
-          Row(
-            modifier = GlanceModifier
-              .fillMaxWidth()
-              .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            WidgetText(
-              text = data.sourceName.orEmpty(),
-              size = 12.sp,
-              color = GlanceTheme.colors.outline,
-              weight = WidgetFontWeight.Medium,
-              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-            )
-            Spacer(modifier = GlanceModifier.defaultWeight())
-            if (data.sourceDetail != null) {
-              WidgetText(
-                text = data.sourceDetail,
-                size = 12.sp,
-                color = GlanceTheme.colors.outline,
-                weight = WidgetFontWeight.Medium,
-                // The chapter title a dua cites can be a full sentence; it gives way to the
-                // book name rather than pushing it off the card.
-                modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-                align = WidgetTextAlign.End,
-              )
-            }
-          }
+        }
+      }
+    }
+
+    if (hasSource) {
+      FadingHorizontalSeparator()
+      Row(
+        modifier = GlanceModifier
+          .fillMaxWidth()
+          .padding(top = 9.dp, bottom = 2.dp)
+          .maybeClickable(action),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        WidgetText(
+          text = data.sourceName.orEmpty(),
+          size = 12.sp,
+          color = GlanceTheme.colors.outline,
+          weight = WidgetFontWeight.Medium,
+          modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+        )
+        Spacer(modifier = GlanceModifier.defaultWeight())
+        if (data.sourceDetail != null) {
+          WidgetText(
+            text = data.sourceDetail,
+            size = 12.sp,
+            color = GlanceTheme.colors.outline,
+            weight = WidgetFontWeight.Medium,
+            // The chapter title a dua cites can be a full sentence; it gives way to the
+            // book name rather than pushing it off the card.
+            modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+            align = WidgetTextAlign.End,
+          )
         }
       }
     }
@@ -531,9 +537,9 @@ data class LongTextLayoutData(
   val contentTitle: String? = null,
   /** Arabic original, rendered under the text when the card has height to spare. */
   val arabic: String? = null,
-  /** Book the text came from, shown after the reminder in the scrollable source row. */
+  /** Book the text came from, shown in the always-visible footer. */
   val sourceName: String? = null,
-  /** Where in that book, shown at the end of the scrollable source row. */
+  /** Where in that book, shown at the end of the always-visible footer. */
   val sourceDetail: String? = null,
 )
 

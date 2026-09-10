@@ -26,6 +26,8 @@ data class VisualizationState(
     val mode: VisualizationMode = VisualizationMode.PHONE_MODEL,
     val bodyShapeStyle: BodyShapeStyle = BodyShapeStyle.REFERENCE,
     val posePlaybackSource: PosePlaybackSource = PosePlaybackSource.RECORDED,
+    /** Number of rak'ahs in the built-in prayer sample (2, 3, or 4). */
+    val sampleRakahCount: Int = 2,
     val twoRakahStepIndex: Int = 0,
     val isTwoRakahPlaying: Boolean = false,
     val visiblePostures: Set<SalahPosture> = SalahPosture.classificationLabels.toSet(),

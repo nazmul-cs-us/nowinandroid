@@ -104,20 +104,25 @@ fun VisualizationControls(
                     },
                     label = { Text("Recorded") },
                 )
-                FilterChip(
-                    selected = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE,
-                    onClick = {
-                        onStateChange(
-                            state.copy(
-                                posePlaybackSource = PosePlaybackSource.TWO_RAKAH_SAMPLE,
-                                mode = VisualizationMode.PHONE_MODEL,
-                                isPlaying = false,
-                                isTwoRakahPlaying = false,
-                            ),
-                        )
-                    },
-                    label = { Text("2 Rak'ah") },
-                )
+                (2..4).forEach { rakahCount ->
+                    FilterChip(
+                        selected = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE &&
+                            state.sampleRakahCount == rakahCount,
+                        onClick = {
+                            onStateChange(
+                                state.copy(
+                                    posePlaybackSource = PosePlaybackSource.TWO_RAKAH_SAMPLE,
+                                    sampleRakahCount = rakahCount,
+                                    twoRakahStepIndex = 0,
+                                    mode = VisualizationMode.PHONE_MODEL,
+                                    isPlaying = false,
+                                    isTwoRakahPlaying = false,
+                                ),
+                            )
+                        },
+                        label = { Text("$rakahCount Rak'ah") },
+                    )
+                }
             }
 
             SectionHeader("Body shape")
@@ -490,7 +495,7 @@ fun PlaybackBar(
     onStateChange: (VisualizationState) -> Unit
 ) {
     val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
-    val itemCount = if (isTwoRakah) twoRakahSample.size else state.totalSamples
+    val itemCount = if (isTwoRakah) state.currentPrayerSample().size else state.totalSamples
     val currentIndex = if (isTwoRakah) state.twoRakahStepIndex else state.playbackIndex
     val isPlaying = if (isTwoRakah) state.isTwoRakahPlaying else state.isPlaying
     val currentStep = if (isTwoRakah) state.currentTwoRakahStep() else null
@@ -682,7 +687,7 @@ fun VisualizationPlaybackDeck(
     modifier: Modifier = Modifier,
 ) {
     val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
-    val itemCount = if (isTwoRakah) twoRakahSample.size else state.totalSamples
+    val itemCount = if (isTwoRakah) state.currentPrayerSample().size else state.totalSamples
     val currentIndex = if (isTwoRakah) state.twoRakahStepIndex else state.playbackIndex
     val isPlaying = if (isTwoRakah) state.isTwoRakahPlaying else state.isPlaying
     val currentStep = if (isTwoRakah) state.currentTwoRakahStep() else null

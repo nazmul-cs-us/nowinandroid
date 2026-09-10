@@ -89,6 +89,7 @@ object ChapterAudioController {
         fun play(url: String, title: String)
         fun togglePlayPause()
         fun seekTo(positionMs: Int)
+        fun stop()
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -143,6 +144,40 @@ object ChapterAudioController {
                 play(url, source)
             }
         }
+    }
+
+    /** Starts [url] from the beginning even when it is the currently loaded clip. */
+    fun playFromStart(url: String) {
+        resolveJob?.cancel()
+        resolveJob = null
+        stopPlayback()
+        currentUrl = url
+        loadingUrl = url
+        playbackDelegate?.let { delegate ->
+            delegate.play(url, currentTitle.orEmpty())
+            return
+        }
+        val resolver = localAudioResolver
+        if (resolver == null) {
+            play(url, url)
+            return
+        }
+        resolveJob = scope.launch {
+            val source = runCatching { resolver(url) }.getOrNull() ?: url
+            if (currentUrl == url) play(url, source)
+        }
+    }
+
+    /** Stops playback only when [expectedUrl] still owns the player, when supplied. */
+    fun stop(expectedUrl: String? = null) {
+        if (expectedUrl != null && currentUrl != expectedUrl) return
+        resolveJob?.cancel()
+        resolveJob = null
+        playbackDelegate?.stop()
+        stopPlayback()
+        currentUrl = null
+        loadingUrl = null
+        onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
     }
 
     /** Play/pause the currently loaded track — invoked by the global media mini-bar. */
@@ -239,10 +274,6 @@ object ChapterAudioController {
     }
 
     fun release() {
-        resolveJob?.cancel()
-        resolveJob = null
-        stopPlayback()
-        currentUrl = null
-        onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
+        stop()
     }
 }

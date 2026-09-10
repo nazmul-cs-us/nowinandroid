@@ -21,9 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,12 +68,52 @@ fun TwoRakahDuaPanel(
     val isThisAudioPlaying = audioUrl != null &&
         ChapterAudioController.currentUrl == audioUrl && ChapterAudioController.isPlaying
     val isThisAudioLoading = audioUrl != null && ChapterAudioController.loadingUrl == audioUrl
+    var automaticAudioUrl by remember { mutableStateOf<String?>(null) }
+    val latestAutomaticAudioUrl by rememberUpdatedState(automaticAudioUrl)
     val context = LocalContext.current
     val selectedFont = remember(context) {
         context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
             .getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
     }
     val arabicFont = remember(selectedFont) { getArabicFontFamilyForDua(selectedFont) }
+
+    fun playSelectedDuaFromStart() {
+        val dua = selectedDua ?: return
+        val url = dua.audioUrl ?: return
+        val playbackTitle = "${dua.chapterTitle}: Dua ${dua.position}"
+        ChapterAudioController.currentTitle = playbackTitle
+        ChapterAudioController.currentTopic = "Fortress of the Muslim"
+        ChapterAudioController.playlistTitles = listOf(playbackTitle)
+        ChapterAudioController.playFromStart(url)
+    }
+
+    // Starting the prayer sample now starts the authentic recording for its current phase.
+    // The step index is part of the key so repeated phases (such as both sujud) replay the
+    // clip from the beginning instead of toggling the previous playback off.
+    LaunchedEffect(
+        state.isTwoRakahPlaying,
+        state.sampleRakahCount,
+        state.twoRakahStepIndex,
+        audioUrl,
+    ) {
+        val previousUrl = automaticAudioUrl
+        if (!state.isTwoRakahPlaying || audioUrl == null) {
+            previousUrl?.let(ChapterAudioController::stop)
+            automaticAudioUrl = null
+            return@LaunchedEffect
+        }
+        if (previousUrl != null && previousUrl != audioUrl) {
+            ChapterAudioController.stop(previousUrl)
+        }
+        automaticAudioUrl = audioUrl
+        playSelectedDuaFromStart()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            latestAutomaticAudioUrl?.let(ChapterAudioController::stop)
+        }
+    }
 
     Surface(
         modifier = modifier
@@ -122,15 +166,11 @@ fun TwoRakahDuaPanel(
                     IconButton(
                         onClick = {
                             onPauseSample()
-                            val dua = checkNotNull(selectedDua)
-                            val playbackTitle = "${dua.chapterTitle}: Dua ${dua.position}"
-                            ChapterAudioController.currentTitle = playbackTitle
-                            ChapterAudioController.currentTopic = "Fortress of the Muslim"
-                            // A singleton playlist makes the application-level Fortress player
-                            // stop after this explicit training preview. An empty playlist means
-                            // "continue in book order" and would silently play the next dua.
-                            ChapterAudioController.playlistTitles = listOf(playbackTitle)
-                            ChapterAudioController.toggle(audioUrl)
+                            if (isThisAudioPlaying || isThisAudioLoading) {
+                                ChapterAudioController.stop(audioUrl)
+                            } else {
+                                playSelectedDuaFromStart()
+                            }
                         },
                         modifier = Modifier.size(40.dp),
                     ) {

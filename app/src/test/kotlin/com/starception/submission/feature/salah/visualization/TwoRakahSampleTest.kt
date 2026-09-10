@@ -45,4 +45,22 @@ class TwoRakahSampleTest {
 
         assertEquals(listOf(22, 23, 24, null, 25), finalSteps.map { it.fortressChapterId })
     }
+
+    @Test
+    fun threeAndFourRakahSamplesContainEveryRakahAndRequiredSittings() {
+        listOf(threeRakahSample to 3, fourRakahSample to 4).forEach { (sample, count) ->
+            assertEquals((1..count).toList(), sample.map { it.rakah }.distinct())
+            for (rakah in 1..count) {
+                val steps = sample.filter { it.rakah == rakah }
+                assertEquals(1, steps.count { it.posture == SalahPosture.RUKU })
+                assertEquals(2, steps.count { it.posture == SalahPosture.SUJUD })
+                assertEquals(1, steps.count { it.posture == SalahPosture.JALSA })
+            }
+            assertTrue(sample.any { it.rakah == 2 && it.label == "First tashahhud" })
+            assertEquals(
+                listOf(22, 23, 24, null, 25),
+                sample.takeLast(5).map { it.fortressChapterId },
+            )
+        }
+    }
 }

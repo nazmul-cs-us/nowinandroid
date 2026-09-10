@@ -70,6 +70,7 @@ import io.github.sceneview.rememberRenderer
 import io.github.sceneview.rememberView
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
+import com.starception.submission.core.ui.ChapterAudioController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.coroutines.coroutineContext
@@ -176,13 +177,26 @@ fun Visualization3DView(
             !state.isTwoRakahPlaying
         ) return@LaunchedEffect
 
-        val index = state.twoRakahStepIndex.coerceIn(twoRakahSample.indices)
-        val step = twoRakahSample[index]
+        val sample = state.currentPrayerSample()
+        val index = state.twoRakahStepIndex.coerceIn(sample.indices)
+        val step = sample[index]
         delay(
             (step.durationMillis / state.playbackSpeed.coerceIn(0.5f, 10f))
                 .toLong()
                 .coerceAtLeast(120L),
         )
+        // Recorded Fortress clips can be longer than the pose's minimum display time (or
+        // need a moment to download on first use). Keep the figure on the matching phase
+        // until its recitation finishes so the next phase cannot cut it off.
+        while (
+            coroutineContext.isActive &&
+            latestState.isTwoRakahPlaying &&
+            latestState.twoRakahStepIndex == index &&
+            step.fortressChapterId != null &&
+            (ChapterAudioController.loadingUrl != null || ChapterAudioController.isPlaying)
+        ) {
+            delay(100L)
+        }
         if (
             latestState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE &&
             latestState.isTwoRakahPlaying &&
@@ -190,8 +204,8 @@ fun Visualization3DView(
         ) {
             latestOnStateChange(
                 latestState.copy(
-                    twoRakahStepIndex = (index + 1).coerceAtMost(twoRakahSample.lastIndex),
-                    isTwoRakahPlaying = index < twoRakahSample.lastIndex,
+                    twoRakahStepIndex = (index + 1).coerceAtMost(sample.lastIndex),
+                    isTwoRakahPlaying = index < sample.lastIndex,
                 ),
             )
         }
@@ -376,7 +390,7 @@ fun Visualization3DView(
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
                         Text(
                             text = if (twoRakahStep != null) {
-                                "2 RAK'AH SAMPLE · STEP ${state.twoRakahStepIndex + 1} OF ${twoRakahSample.size}"
+                                "${state.sampleRakahCount} RAK'AH SAMPLE · STEP ${state.twoRakahStepIndex + 1} OF ${state.currentPrayerSample().size}"
                             } else {
                                 "3D POSE REVIEW"
                             },

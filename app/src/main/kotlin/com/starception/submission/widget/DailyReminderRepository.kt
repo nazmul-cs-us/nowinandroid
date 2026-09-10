@@ -48,9 +48,9 @@ internal data class DailyReminder(
     val target: WidgetNavigationTarget?,
     /** Descriptive heading shown between the kind chip and body, used for Fortress duas. */
     val contentTitle: String? = null,
-    /** Book this came from, shown after the reminder in the scrollable source row. */
+    /** Book this came from, shown in the widget's always-visible footer. */
     val sourceName: String? = null,
-    /** Where in that book, shown at the end of the scrollable source row. */
+    /** Where in that book, shown at the end of the always-visible footer. */
     val sourceDetail: String? = null,
     /**
      * The Arabic, shown only when the card has room left after the translation.

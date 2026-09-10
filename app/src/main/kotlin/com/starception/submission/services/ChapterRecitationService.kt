@@ -223,9 +223,18 @@ class ChapterRecitationService : Service() {
         subtitle: String,
         continuousHandoff: Boolean,
     ) {
-        // Same source already loaded → treat as a play/pause toggle.
+        // A fresh play request for the same source means replay from the beginning.
+        // Play/pause requests arrive through ACTION_TOGGLE and never enter this branch.
         if (source == currentSource && mediaPlayer != null) {
-            togglePlayPause()
+            val player = mediaPlayer ?: return
+            runCatching {
+                player.seekTo(0)
+                player.start()
+                ChapterRecitationState.publish(true, currentTitle, currentSubtitle)
+                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                startForegroundNotification()
+                startProgressUpdates()
+            }
             return
         }
         currentSource = source
