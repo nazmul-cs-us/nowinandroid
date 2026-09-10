@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.download.AssetDownloadManager
-import com.starception.submission.download.AssetManifest
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.ui.AppTaskProgressBus
 import com.starception.submission.feature.salah.visualization.PosePlaybackSource
@@ -81,8 +80,9 @@ data class SalahDataCollectionUiState(
     val guidedPrepareTotal: Int = 0,
     // TTS download state
     val isTtsAvailable: Boolean = false,
-    val isTtsDownloading: Boolean = false,
-    val ttsDownloadError: String? = null
+    /** Missing CDN category rendered by the app-wide MissingContentCard. */
+    val ttsDownloadCategory: String? = null,
+    val ttsVoiceName: String = TtsVoice.KOKORO_EN.displayName,
 )
 
 data class DataFileInfo(
@@ -319,7 +319,6 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     // Lazy TTS service and download manager via Hilt EntryPoint
     private var ttsService: SherpaOnnxTtsService? = null
     private var downloadManager: AssetDownloadManager? = null
-    private var ttsDownloadJob: Job? = null
 
     private fun getEntryPoint(): SherpaOnnxTtsEntryPoint =
         EntryPointAccessors.fromApplication(
@@ -341,6 +340,9 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         }
         return downloadManager!!
     }
+
+    /** Shared download manager used by the app-wide missing-content UI. */
+    fun assetDownloadManager(): AssetDownloadManager = getDownloadManager()
 
     init {
         loadDeployedModelReport()
@@ -419,83 +421,48 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
 
     fun checkTtsAvailability() {
         viewModelScope.launch(Dispatchers.IO) {
+            val voice = selectedTtsVoice()
+            val categories = selectedVoiceCategories()
             try {
                 val dm = getDownloadManager()
                 val manifest = dm.loadManifest()
                 if (manifest == null) {
                     Log.w(TAG, "Could not load manifest for TTS check")
-                    _uiState.update { it.copy(isTtsAvailable = false) }
+                    _uiState.update {
+                        it.copy(
+                            isTtsAvailable = false,
+                            ttsDownloadCategory = categories.firstOrNull(),
+                            ttsVoiceName = voice.displayName,
+                        )
+                    }
                     return@launch
                 }
                 // Gate on the voice that will actually speak, not a hardcoded one:
                 // selecting VCTK while only Kokoro was downloaded used to leave the
                 // start button enabled and fail at the first instruction.
-                val categories = selectedVoiceCategories()
                 val readiness = categories.associateWith { dm.isCategoryComplete(it, manifest) }
-                val available = readiness.values.all { it }
+                val available = readiness.values.all { it } &&
+                    getTtsService().hasRequiredAssets(voice)
+                val missingCategory = if (available) {
+                    null
+                } else {
+                    readiness.entries.firstOrNull { !it.value }?.key ?: categories.firstOrNull()
+                }
                 Log.i(TAG, "TTS availability for ${selectedTtsVoice().displayName}: $readiness")
-                _uiState.update { it.copy(isTtsAvailable = available, ttsDownloadError = null) }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking TTS availability", e)
-                _uiState.update { it.copy(isTtsAvailable = false) }
-            }
-        }
-    }
-
-    fun downloadTtsEngine() {
-        if (_uiState.value.isTtsDownloading) return
-        ttsDownloadJob?.cancel()
-        ttsDownloadJob = viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isTtsDownloading = true, ttsDownloadError = null) }
-            try {
-                val dm = getDownloadManager()
-                val manifest = dm.loadManifest()
-                if (manifest == null) {
-                    _uiState.update { it.copy(isTtsDownloading = false, ttsDownloadError = "Could not load manifest") }
-                    return@launch
-                }
-
-                // Fetch whatever the selected voice needs. Kokoro's list is ordered
-                // espeak (~18MB) before the model (~158MB) so the small one lands first.
-                val categories = selectedVoiceCategories().sortedBy { it != "model_tts_espeak" }
-                val totalCategories = categories.size
-                var completedCategories = 0
-
-                for (category in categories) {
-                    if (dm.isCategoryComplete(category, manifest)) {
-                        completedCategories++
-                        continue
-                    }
-                    Log.i(TAG, "Downloading TTS category: $category")
-                    // Progress tracked globally by AssetDownloadManager's top banner
-                    val success = dm.downloadCategory(category, manifest) { _, _, _ -> }
-
-                    if (!success) {
-                        _uiState.update {
-                            it.copy(
-                                isTtsDownloading = false,
-                                ttsDownloadError = "Failed to download $category"
-                            )
-                        }
-                        return@launch
-                    }
-                    completedCategories++
-                }
-
-                Log.i(TAG, "TTS engine download complete")
                 _uiState.update {
                     it.copy(
-                        isTtsDownloading = false,
-                        isTtsAvailable = true,
-                        ttsDownloadError = null
+                        isTtsAvailable = available,
+                        ttsDownloadCategory = missingCategory,
+                        ttsVoiceName = voice.displayName,
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "TTS download failed", e)
+                Log.e(TAG, "Error checking TTS availability", e)
                 _uiState.update {
                     it.copy(
-                        isTtsDownloading = false,
-                        ttsDownloadError = e.message ?: "Download failed"
+                        isTtsAvailable = false,
+                        ttsDownloadCategory = categories.firstOrNull(),
+                        ttsVoiceName = voice.displayName,
                     )
                 }
             }

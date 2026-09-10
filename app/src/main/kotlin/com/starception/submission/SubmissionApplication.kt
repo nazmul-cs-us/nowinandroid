@@ -231,6 +231,18 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                                 .getInt("selected_speaker_id", 0)
                                 .coerceIn(0, (selectedVoice.totalSpeakers - 1).coerceAtLeast(0))
 
+                            // A partial optional voice download must never be handed to Sherpa's
+                            // native constructor. The relevant screen exposes its download card;
+                            // meanwhile the authentic dua recording can play without a spoken
+                            // English track announcement.
+                            if (!fortressTtsService.hasRequiredAssets(selectedVoice)) {
+                                Log.w(
+                                    "DuaAutoPlay",
+                                    "Voice package incomplete; skipping track announcement",
+                                )
+                                return@withTimeoutOrNull
+                            }
+
                             fortressTtsService.setVoice(selectedVoice)
                             val done = kotlinx.coroutines.CompletableDeferred<Unit>()
                             val started = fortressTtsService.speak(

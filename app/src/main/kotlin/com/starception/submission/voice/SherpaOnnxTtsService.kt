@@ -63,6 +63,15 @@ class SherpaOnnxTtsService @Inject constructor(
         private const val TAG = "SherpaOnnxTtsService"
         private const val DEFAULT_SPEAKER_ID = 0
         private const val DEFAULT_SPEED = 1.0f
+        private val KOKORO_REQUIRED_DATA_FILES = listOf(
+            "phontab",
+            "phonindex",
+            "phondata",
+            "intonations",
+            "en_dict",
+            "lang/gmw/en",
+            "lang/gmw/en-US",
+        )
         private val INFERENCE_THREADS = Runtime.getRuntime()
             .availableProcessors()
             .coerceIn(2, 4)
@@ -120,6 +129,26 @@ class SherpaOnnxTtsService @Inject constructor(
     private var isInitialized = false
     private var isInitializing = false
     private var currentVoice: TtsVoice = TtsVoice.KOKORO_EN
+
+    /**
+     * Checks the files that native Sherpa actually needs, rather than trusting that one model
+     * file exists. Passing a partial Kokoro/eSpeak installation to OfflineTts terminates the
+     * whole process in native code, so callers use this to show their missing-content UI first.
+     */
+    fun hasRequiredAssets(voice: TtsVoice = currentVoice): Boolean =
+        requiredCdnAssets(voice).all(assetRepository::isAvailable)
+
+    private fun requiredCdnAssets(voice: TtsVoice): List<String> = buildList {
+        val root = "models/tts/"
+        add(root + voice.modelFile)
+        add(root + voice.tokensFile)
+        voice.voicesFile.takeIf(String::isNotEmpty)?.let { add(root + it) }
+        voice.lexiconFile.takeIf(String::isNotEmpty)?.let { add(root + it) }
+        if (voice.modelType == TtsModelType.KOKORO) {
+            val dataRoot = root + voice.dataDir.trimEnd('/') + "/"
+            KOKORO_REQUIRED_DATA_FILES.forEach { add(dataRoot + it) }
+        }
+    }
 
     // Pre-generated audio cache (key: text hash, value: samples + sample rate)
     // Cache is persisted to disk for survival across app restarts
@@ -252,6 +281,38 @@ class SherpaOnnxTtsService @Inject constructor(
                     return@withContext false
                 }
 
+                // Sherpa's native constructor does not safely reject an incomplete eSpeak
+                // directory: it logs the missing file and then dereferences null. Validate the
+                // exact runtime directory before crossing the JNI boundary.
+                if (currentVoice.modelType == TtsModelType.KOKORO) {
+                    val extractedDataDir = dataDir
+                        ?.takeIf(String::isNotEmpty)
+                        ?.let(::File)
+                    val missingDataFiles = KOKORO_REQUIRED_DATA_FILES.filter { relativePath ->
+                        val file = extractedDataDir?.let { java.io.File(it, relativePath) }
+                        file == null || !file.isFile || file.length() == 0L
+                    }
+                    if (missingDataFiles.isNotEmpty()) {
+                        Log.e(
+                            TAG,
+                            "Kokoro data validation failed; missing ${missingDataFiles.joinToString()}",
+                        )
+                        isInitializing = false
+                        return@withContext false
+                    }
+                }
+
+                if (currentVoice.modelType == TtsModelType.VITS) {
+                    val lexiconFile = lexiconPath
+                        ?.takeIf(String::isNotEmpty)
+                        ?.let(::File)
+                    if (lexiconFile == null || !lexiconFile.isFile || lexiconFile.length() == 0L) {
+                        Log.e(TAG, "VITS lexicon validation failed")
+                        isInitializing = false
+                        return@withContext false
+                    }
+                }
+
                 // Validate voices file for Kokoro (required, ~4MB)
                 if (currentVoice.modelType == TtsModelType.KOKORO && !voicesPath.isNullOrEmpty()) {
                     val voicesFile = java.io.File(voicesPath)
@@ -274,6 +335,10 @@ class SherpaOnnxTtsService @Inject constructor(
                             voices = voicesPath ?: "",
                             tokens = tokensPath,
                             dataDir = dataDir ?: "",
+                            // Sherpa 1.12.x defers eSpeak voice selection until generate().
+                            // Leaving this blank initializes successfully but native-aborts on
+                            // the first sentence with "Failed to set eSpeak-ng voice".
+                            lang = "en-us",
                             lengthScale = 1.0f
                         )
                         OfflineTtsModelConfig(
@@ -1231,12 +1296,12 @@ class SherpaOnnxTtsService @Inject constructor(
         // Validate existing marker - if directory only has .extracted and no real files,
         // the marker is stale (created when no source files were available)
         if (markerFile.exists()) {
-            val realFiles = outputDir.listFiles { f -> f.name != ".extracted" }
-            if (realFiles != null && realFiles.isNotEmpty()) {
+            if (isExtractedDataDirUsable(outputDir)) {
                 return outputDir.absolutePath
             }
-            // Stale marker - directory is empty, delete and re-extract
-            Log.w(TAG, "Stale .extracted marker found in empty dir: $assetDir, re-extracting...")
+            // A prior interrupted/partial download could leave both real files and the marker.
+            // Preserve the downloaded CDN source and repair only this derived extraction cache.
+            Log.w(TAG, "Incomplete extracted data directory: $assetDir, repairing...")
             markerFile.delete()
         }
 
@@ -1284,13 +1349,13 @@ class SherpaOnnxTtsService @Inject constructor(
                 }
             }
 
-            // Only create marker if files were actually extracted
-            if (extractedCount > 0) {
+            // Only trust the marker when every file required by native initialization exists.
+            if (extractedCount > 0 && isExtractedDataDirUsable(outputDir)) {
                 markerFile.createNewFile()
                 Log.i(TAG, "Extracted directory: $assetDir ($extractedCount files) -> ${outputDir.absolutePath}")
                 outputDir.absolutePath
             } else {
-                Log.e(TAG, "No files found to extract for directory: $assetDir (CDN not downloaded yet?)")
+                Log.e(TAG, "Required files are missing from directory: $assetDir")
                 null
             }
         } catch (e: Exception) {
@@ -1323,6 +1388,14 @@ class SherpaOnnxTtsService @Inject constructor(
         Log.d(TAG, "Copied $count files from ${srcDir.name} to ${destDir.absolutePath}")
         return count
     }
+
+    private fun isExtractedDataDirUsable(directory: File): Boolean =
+        when (currentVoice.modelType) {
+            TtsModelType.KOKORO -> KOKORO_REQUIRED_DATA_FILES.all { relativePath ->
+                File(directory, relativePath).let { it.isFile && it.length() > 0L }
+            }
+            TtsModelType.VITS -> true
+        }
 
     private fun extractAssetDirRecursive(assetPath: String, outputDir: File) {
         outputDir.mkdirs()

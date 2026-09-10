@@ -1014,10 +1014,11 @@ fun SurahDetailScreen(
                     },
                     onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
                     onCycleAlignment = {
-                        // Cycle through: start -> center -> end -> start
+                        // Cycle through every alignment exposed by the reading controls.
                         val nextAlignment = when (textAlignment) {
                             "start" -> "center"
                             "center" -> "end"
+                            "end" -> "justify"
                             else -> "start"
                         }
                         viewModel.changeTextAlignment(nextAlignment)
@@ -1561,6 +1562,7 @@ fun SurahDetailScreen(
                             "start" -> TextAlign.Start
                             "center" -> TextAlign.Center
                             "end" -> TextAlign.End
+                            "justify" -> TextAlign.Justify
                             else -> TextAlign.Center
                         },
                         maxLines = 2,
@@ -1631,15 +1633,16 @@ fun SurahDetailScreen(
                             Triple(Icons.Default.FormatAlignLeft, "Left", "start"),
                             Triple(Icons.Default.FormatAlignCenter, "Center", "center"),
                             Triple(Icons.Default.FormatAlignRight, "Right", "end"),
+                            Triple(Icons.Default.FormatAlignJustify, "Justified", "justify"),
                         )
-                        opts.forEachIndexed { i, (icon, _, value) ->
+                        opts.forEachIndexed { i, (icon, label, value) ->
                             SegmentedButton(
                                 selected = textAlignment == value,
                                 onClick = { viewModel.changeTextAlignment(value) },
                                 shape = SegmentedButtonDefaults.itemShape(index = i, count = opts.size),
                                 icon = {},
                             ) {
-                                Icon(icon, contentDescription = value, modifier = Modifier.size(18.dp))
+                                Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -8036,6 +8039,7 @@ private fun AyahTrackItem(
             val textAlign = when (textAlignment) {
                 "center" -> androidx.compose.ui.text.style.TextAlign.Center
                 "end" -> androidx.compose.ui.text.style.TextAlign.End
+                "justify" -> androidx.compose.ui.text.style.TextAlign.Justify
                 else -> androidx.compose.ui.text.style.TextAlign.Start
             }
 
@@ -8284,6 +8288,13 @@ private fun FloatingActionToolbar(
                         contentDescription = "Align text to end",
                         selected = textAlignment == "end",
                         onClick = { onSetAlignment("end") }
+                    )
+
+                    FloatingToolbarButton(
+                        icon = Icons.Default.FormatAlignJustify,
+                        contentDescription = "Justify text",
+                        selected = textAlignment == "justify",
+                        onClick = { onSetAlignment("justify") }
                     )
 
                     // Toggle translation visibility

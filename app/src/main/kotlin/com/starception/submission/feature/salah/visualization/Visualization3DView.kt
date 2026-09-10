@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -59,6 +58,7 @@ import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Scale
 import io.github.sceneview.math.Size
+import io.github.sceneview.node.MeshNode
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
@@ -979,9 +979,68 @@ private data class ShapeVolumeSpec(
 private class FigureMesh(
     val vertexBuffer: VertexBuffer,
     val indexBuffer: IndexBuffer,
-    val boundingBox: Box,
+    var boundingBox: Box,
+    val vertexCount: Int,
     val indexCount: Int,
 )
+
+private data class FigureMeshData(
+    val positionBuffer: ByteBuffer,
+    val colorBuffer: ByteBuffer,
+    val indexBuffer: ByteBuffer,
+    val boundingBox: Box,
+    val vertexCount: Int,
+    val indexCount: Int,
+)
+
+/**
+ * Owns the custom figure buffers and releases them only after the renderable has been
+ * detached and destroyed. Filament processes these commands in order on its render thread.
+ *
+ * Keeping this ownership on the node is important: disposing the buffers from a sibling
+ * Compose effect can run before SceneView disposes the old [MeshNode]. During an animated
+ * pose transition that allowed the render thread to read already-destroyed buffers.
+ */
+private class OwnedFigureMeshNode(
+    private val owningEngine: Engine,
+    private val mesh: FigureMesh,
+    material: MaterialInstance,
+) : MeshNode(
+    engine = owningEngine,
+    primitiveType = RenderableManager.PrimitiveType.TRIANGLES,
+    vertexBuffer = mesh.vertexBuffer,
+    indexBuffer = mesh.indexBuffer,
+    boundingBox = mesh.boundingBox,
+    materialInstance = material,
+) {
+    private var resourcesDestroyed = false
+
+    fun updateGeometry(specs: List<FigurePartSpec>) {
+        if (resourcesDestroyed) return
+
+        val data = buildFigureMeshData(specs)
+        check(data.vertexCount == mesh.vertexCount && data.indexCount == mesh.indexCount) {
+            "Animated Salah figure topology changed unexpectedly"
+        }
+
+        // Filament supports streaming new data into an existing vertex buffer. Reusing the
+        // allocation avoids creating and retiring a complete GPU mesh on every animation frame.
+        mesh.vertexBuffer.setBufferAt(owningEngine, 0, data.positionBuffer)
+        mesh.vertexBuffer.setBufferAt(owningEngine, 1, data.colorBuffer)
+        mesh.boundingBox = data.boundingBox
+        renderableManager.setAxisAlignedBoundingBox(renderableInstance, data.boundingBox)
+    }
+
+    override fun destroy() {
+        if (resourcesDestroyed) return
+        resourcesDestroyed = true
+
+        // Queue destruction of the renderable first so it no longer references its buffers.
+        super.destroy()
+        owningEngine.destroyVertexBuffer(mesh.vertexBuffer)
+        owningEngine.destroyIndexBuffer(mesh.indexBuffer)
+    }
+}
 
 @Composable
 private fun SceneScope.FigureMeshNode(
@@ -989,24 +1048,51 @@ private fun SceneScope.FigureMeshNode(
     specs: List<FigurePartSpec>,
     material: MaterialInstance,
 ) {
-    // Rebuild the mesh only when the pose (specs) changes; dispose the GPU buffers when it does.
-    val mesh = remember(specs) { buildFigureMesh(engine, specs) }
-    DisposableEffect(mesh) {
-        onDispose {
-            engine.destroyVertexBuffer(mesh.vertexBuffer)
-            engine.destroyIndexBuffer(mesh.indexBuffer)
-        }
+    // Allocate one mesh for the lifetime of this figure, then stream animated vertices into it.
+    // Rebuilding a native Filament mesh for every Compose animation frame caused an 800 MB+
+    // memory spike and eventually aborted Filament's render thread on physical devices.
+    val node = remember(engine, material) {
+        val mesh = buildFigureMesh(engine, specs)
+        OwnedFigureMeshNode(
+            owningEngine = engine,
+            mesh = mesh,
+            material = material,
+        )
     }
-    MeshNode(
-        RenderableManager.PrimitiveType.TRIANGLES,
-        mesh.vertexBuffer,
-        mesh.indexBuffer,
-        mesh.boundingBox,
-        material,
-    )
+    LaunchedEffect(node, specs) {
+        node.updateGeometry(specs)
+    }
+    NodeLifecycle(node, content = null)
 }
 
 private fun buildFigureMesh(engine: Engine, specs: List<FigurePartSpec>): FigureMesh {
+    val data = buildFigureMeshData(specs)
+
+    val vertexBuffer = VertexBuffer.Builder()
+        .bufferCount(2)
+        .vertexCount(data.vertexCount)
+        .attribute(VertexBuffer.VertexAttribute.POSITION, 0, VertexBuffer.AttributeType.FLOAT3, 0, 12)
+        .attribute(VertexBuffer.VertexAttribute.COLOR, 1, VertexBuffer.AttributeType.FLOAT4, 0, 16)
+        .build(engine)
+    vertexBuffer.setBufferAt(engine, 0, data.positionBuffer)
+    vertexBuffer.setBufferAt(engine, 1, data.colorBuffer)
+
+    val indexBuffer = IndexBuffer.Builder()
+        .indexCount(data.indexCount)
+        .bufferType(IndexBuffer.Builder.IndexType.UINT)
+        .build(engine)
+    indexBuffer.setBuffer(engine, data.indexBuffer)
+
+    return FigureMesh(
+        vertexBuffer = vertexBuffer,
+        indexBuffer = indexBuffer,
+        boundingBox = data.boundingBox,
+        vertexCount = data.vertexCount,
+        indexCount = data.indexCount,
+    )
+}
+
+private fun buildFigureMeshData(specs: List<FigurePartSpec>): FigureMeshData {
     val positions = ArrayList<Float>(16384)
     val colors = ArrayList<Float>(16384)
     val indices = ArrayList<Int>(32768)
@@ -1042,21 +1128,6 @@ private fun buildFigureMesh(engine: Engine, specs: List<FigurePartSpec>): Figure
     indices.forEach { indexBufferData.putInt(it) }
     indexBufferData.flip()
 
-    val vertexBuffer = VertexBuffer.Builder()
-        .bufferCount(2)
-        .vertexCount(positions.size / 3)
-        .attribute(VertexBuffer.VertexAttribute.POSITION, 0, VertexBuffer.AttributeType.FLOAT3, 0, 12)
-        .attribute(VertexBuffer.VertexAttribute.COLOR, 1, VertexBuffer.AttributeType.FLOAT4, 0, 16)
-        .build(engine)
-    vertexBuffer.setBufferAt(engine, 0, positionBuffer)
-    vertexBuffer.setBufferAt(engine, 1, colorBuffer)
-
-    val indexBuffer = IndexBuffer.Builder()
-        .indexCount(indices.size)
-        .bufferType(IndexBuffer.Builder.IndexType.UINT)
-        .build(engine)
-    indexBuffer.setBuffer(engine, indexBufferData)
-
     var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE; var minZ = Float.MAX_VALUE
     var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE; var maxZ = -Float.MAX_VALUE
     var i = 0
@@ -1070,11 +1141,21 @@ private fun buildFigureMesh(engine: Engine, specs: List<FigurePartSpec>): Figure
         if (z > maxZ) maxZ = z
         i += 3
     }
-    val box = Box(
-        (minX + maxX) * 0.5f, (minY + maxY) * 0.5f, (minZ + maxZ) * 0.5f,
-        (maxX - minX) * 0.5f + 0.02f, (maxY - minY) * 0.5f + 0.02f, (maxZ - minZ) * 0.5f + 0.02f,
+    return FigureMeshData(
+        positionBuffer = positionBuffer,
+        colorBuffer = colorBuffer,
+        indexBuffer = indexBufferData,
+        boundingBox = Box(
+            (minX + maxX) * 0.5f,
+            (minY + maxY) * 0.5f,
+            (minZ + maxZ) * 0.5f,
+            (maxX - minX) * 0.5f + 0.02f,
+            (maxY - minY) * 0.5f + 0.02f,
+            (maxZ - minZ) * 0.5f + 0.02f,
+        ),
+        vertexCount = positions.size / 3,
+        indexCount = indices.size,
     )
-    return FigureMesh(vertexBuffer, indexBuffer, box, indices.size)
 }
 
 /**

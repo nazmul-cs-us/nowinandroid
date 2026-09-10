@@ -3,6 +3,7 @@ package com.starception.submission.feature.salah.visualization
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +43,10 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.ui.ChapterAudioController
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.dua.getArabicFontFamilyForDua
 
 /**
@@ -55,6 +61,11 @@ fun TwoRakahDuaPanel(
     catalog: TwoRakahDuaCatalog,
     modifier: Modifier = Modifier,
     onPauseSample: () -> Unit = {},
+    isVoiceEngineAvailable: Boolean = true,
+    voiceDownloadCategory: String? = null,
+    voiceResourceName: String = "Offline Voice",
+    downloadManager: AssetDownloadManager? = null,
+    onVoiceDownloadComplete: () -> Unit = {},
 ) {
     if (state.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE) return
 
@@ -127,6 +138,19 @@ fun TwoRakahDuaPanel(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (!isVoiceEngineAvailable && voiceDownloadCategory != null && downloadManager != null) {
+                key(voiceDownloadCategory) {
+                    MissingContentCard(
+                        resourceName = "$voiceResourceName Voice",
+                        category = voiceDownloadCategory,
+                        description = "Download the offline voice package for spoken prayer-step labels. The recorded dua can still play without it.",
+                        downloadManager = downloadManager,
+                        onDownloadComplete = onVoiceDownloadComplete,
+                        modifier = Modifier.padding(horizontal = 0.dp),
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -138,11 +162,12 @@ fun TwoRakahDuaPanel(
                     color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = NiaIcons.MenuBook,
+                        Image(
+                            painter = painterResource(
+                                checkNotNull(topicIconResFor("Prayer")),
+                            ),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(21.dp),
+                            modifier = Modifier.size(34.dp),
                         )
                     }
                 }

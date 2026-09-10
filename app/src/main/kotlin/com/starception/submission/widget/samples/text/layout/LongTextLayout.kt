@@ -326,7 +326,9 @@ private fun TextStack(
           text = data.text,
           size = bodySize,
           color = GlanceTheme.colors.onSurface,
-          weight = WidgetFontWeight.RegularRagged,
+          // The regular RemoteViews layout enables inter-word justification for the
+          // reminder's multi-line dua/hadith body. Headers keep their existing alignment.
+          weight = WidgetFontWeight.Regular,
           // The whole point of the scrolling container: let it run.
           maxLines = 100,
         )
@@ -335,9 +337,8 @@ private fun TextStack(
           Column(
             modifier = GlanceModifier
               .fillMaxWidth()
-              // Match the card itself so the transparent Arabic bitmap reads as native
-              // widget text instead of a separate inset panel.
-              .background(GlanceTheme.colors.widgetBackground)
+              // Do not paint a container here. The Arabic bitmap has an alpha channel and
+              // should reveal the same widget surface/gradient as the surrounding hadith.
               .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
           ) {

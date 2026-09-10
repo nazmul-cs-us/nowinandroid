@@ -74,6 +74,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -113,6 +114,8 @@ import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.MissingContentCard
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import java.text.SimpleDateFormat
@@ -135,6 +138,7 @@ fun SalahDataCollectionScreen(
     val allSamples by viewModel.allSamples.collectAsState()
     val fileQuality by viewModel.fileQuality.collectAsState()
     val deployedModel by viewModel.deployedModel.collectAsState()
+    val assetDownloadManager = remember(viewModel) { viewModel.assetDownloadManager() }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var showDeleteFileDialog by remember { mutableStateOf<String?>(null) }
     var showVisualization by remember { mutableStateOf(false) }
@@ -262,6 +266,11 @@ fun SalahDataCollectionScreen(
                             allSamples = allSamples,
                             vizState = vizState,
                             twoRakahDuas = twoRakahDuas,
+                            isVoiceEngineAvailable = uiState.isTtsAvailable,
+                            voiceDownloadCategory = uiState.ttsDownloadCategory,
+                            voiceResourceName = uiState.ttsVoiceName,
+                            downloadManager = assetDownloadManager,
+                            onVoiceDownloadComplete = viewModel::checkTtsAvailability,
                             showVisualization = showVisualization,
                             onToggleVisualization = {
                                 showVisualization = it
@@ -342,6 +351,11 @@ fun SalahDataCollectionScreen(
                         allSamples = allSamples,
                         vizState = vizState,
                         twoRakahDuas = twoRakahDuas,
+                        isVoiceEngineAvailable = uiState.isTtsAvailable,
+                        voiceDownloadCategory = uiState.ttsDownloadCategory,
+                        voiceResourceName = uiState.ttsVoiceName,
+                        downloadManager = assetDownloadManager,
+                        onVoiceDownloadComplete = viewModel::checkTtsAvailability,
                         showVisualization = showVisualization,
                         onToggleVisualization = {
                             showVisualization = it
@@ -835,63 +849,16 @@ private fun GuidedRecordingCard(
                         lineHeight = 16.sp,
                     )
 
-                    // TTS Engine Download Section — flat editorial rows, no
-                    // nested box; the tonal button carries the action.
-                    if (!uiState.isTtsAvailable) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Voice-guided recording needs the Kokoro TTS engine (~175 MB, one-time download).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
+                    if (!uiState.isTtsAvailable && uiState.ttsDownloadCategory != null) {
+                        key(uiState.ttsDownloadCategory) {
+                            MissingContentCard(
+                                resourceName = "${uiState.ttsVoiceName} Voice",
+                                category = uiState.ttsDownloadCategory,
+                                description = "Download the offline voice package for voice-guided salah recording.",
+                                downloadManager = viewModel.assetDownloadManager(),
+                                onDownloadComplete = viewModel::checkTtsAvailability,
+                                modifier = Modifier.padding(horizontal = 0.dp),
                             )
-
-                            if (uiState.isTtsDownloading) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                    Text(
-                                        text = "Downloading… pull down to see progress",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            } else {
-                                uiState.ttsDownloadError?.let { error ->
-                                    Text(
-                                        text = error,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                                NiaOutlinedButton(
-                                    onClick = {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        viewModel.downloadTtsEngine()
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    FlaticonIcon(
-                                        glyph = FlaticonIcons.DOWNLOAD,
-                                        contentDescription = null,
-                                        fontSize = 17.sp,
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (uiState.ttsDownloadError != null) "Retry Download (~175 MB)" else "Download Voice Engine",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            }
                         }
                     }
 
@@ -3433,6 +3400,11 @@ private fun Visualization3DCard(
     allSamples: List<SalahDataSample>,
     vizState: VisualizationState,
     twoRakahDuas: TwoRakahDuaCatalog,
+    isVoiceEngineAvailable: Boolean,
+    voiceDownloadCategory: String?,
+    voiceResourceName: String,
+    downloadManager: AssetDownloadManager,
+    onVoiceDownloadComplete: () -> Unit,
     showVisualization: Boolean,
     onToggleVisualization: (Boolean) -> Unit,
     onVizStateChange: (VisualizationState) -> Unit,
@@ -3669,6 +3641,11 @@ private fun Visualization3DCard(
                                 TwoRakahDuaPanel(
                                     state = vizState,
                                     catalog = twoRakahDuas,
+                                    isVoiceEngineAvailable = isVoiceEngineAvailable,
+                                    voiceDownloadCategory = voiceDownloadCategory,
+                                    voiceResourceName = voiceResourceName,
+                                    downloadManager = downloadManager,
+                                    onVoiceDownloadComplete = onVoiceDownloadComplete,
                                     onPauseSample = {
                                         onVizStateChange(vizState.copy(isTwoRakahPlaying = false))
                                     },
@@ -3759,6 +3736,11 @@ private fun Visualization3DCard(
                         TwoRakahDuaPanel(
                             state = vizState,
                             catalog = twoRakahDuas,
+                            isVoiceEngineAvailable = isVoiceEngineAvailable,
+                            voiceDownloadCategory = voiceDownloadCategory,
+                            voiceResourceName = voiceResourceName,
+                            downloadManager = downloadManager,
+                            onVoiceDownloadComplete = onVoiceDownloadComplete,
                             onPauseSample = {
                                 onVizStateChange(vizState.copy(isTwoRakahPlaying = false))
                             },

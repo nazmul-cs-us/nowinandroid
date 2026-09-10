@@ -59,11 +59,14 @@ fun MissingContentCard(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var downloadState by remember { mutableStateOf<DownloadCardState>(DownloadCardState.Idle) }
-    var categorySize by remember { mutableLongStateOf(0L) }
+    var downloadState by remember(category) {
+        mutableStateOf<DownloadCardState>(DownloadCardState.Idle)
+    }
+    var categorySize by remember(category) { mutableLongStateOf(0L) }
 
     // Load manifest to get size info
     LaunchedEffect(category) {
+        categorySize = 0L
         withContext(Dispatchers.IO) {
             try {
                 val manifest = downloadManager.loadManifest()
