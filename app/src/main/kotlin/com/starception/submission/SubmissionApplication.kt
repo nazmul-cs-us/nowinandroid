@@ -36,8 +36,11 @@ import com.starception.submission.ui.search.InMemorySearchService
 import com.starception.submission.util.PrayerNotificationManager
 import com.starception.submission.prayer.util.FileLogger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -252,6 +255,8 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                             )
                             if (started) done.await() // speak() invokes onComplete itself on failure
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.w("DuaAutoPlay", "TTS announcement failed, playing audio directly", e)
                     }
@@ -259,11 +264,18 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
 
                 com.starception.submission.core.ui.ChapterAudioController.playbackDelegate =
                     object : com.starception.submission.core.ui.ChapterAudioController.PlaybackDelegate {
-                        override fun play(url: String, title: String) {
-                            delegateScope.launch {
+                        private var pendingPlayJob: Job? = null
+                        private var playGeneration = 0L
+
+                        override fun play(url: String, title: String, announceTitle: Boolean) {
+                            val generation = ++playGeneration
+                            pendingPlayJob?.cancel()
+                            pendingPlayJob = delegateScope.launch {
                                 val source = runCatching {
                                     audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
                                 }.getOrNull() ?: url
+                                ensureActive()
+                                if (generation != playGeneration) return@launch
                                 // Resolve the Interests topic for THIS track from the news DB —
                                 // fortress news titles are exactly "Chapter: Dua N", matching the
                                 // playback title — so the subtitle shows the topic on every entry
@@ -288,7 +300,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                                 }
                                 // Announce after the (possibly slow) download resolve so
                                 // the spoken title leads straight into the audio.
-                                announceFortressTrack(title)
+                                if (announceTitle) announceFortressTrack(title)
+                                ensureActive()
+                                if (generation != playGeneration) return@launch
                                 // Mirror the mini-bar: include the Interests topic name on
                                 // the notification's subtitle line when the Dua screen set it.
                                 val notifTopic = com.starception.submission.core.ui
@@ -309,6 +323,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                         }
                         override fun seekTo(positionMs: Int) { /* seek from bar not wired for service yet */ }
                         override fun stop() {
+                            playGeneration += 1
+                            pendingPlayJob?.cancel()
+                            pendingPlayJob = null
                             com.starception.submission.services.ChapterRecitationService.stop(appCtx)
                         }
                     }

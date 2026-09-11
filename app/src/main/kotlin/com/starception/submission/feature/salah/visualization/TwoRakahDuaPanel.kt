@@ -34,8 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +50,11 @@ import com.starception.submission.core.ui.ChapterAudioController
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.dua.getArabicFontFamilyForDua
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 
 /**
  * The prayer words paired with the currently animated phase.
@@ -66,6 +73,7 @@ fun TwoRakahDuaPanel(
     voiceResourceName: String = "Offline Voice",
     downloadManager: AssetDownloadManager? = null,
     onVoiceDownloadComplete: () -> Unit = {},
+    glassBackdrop: Backdrop? = null,
 ) {
     if (state.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE) return
 
@@ -87,6 +95,26 @@ fun TwoRakahDuaPanel(
             .getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
     }
     val arabicFont = remember(selectedFont) { getArabicFontFamilyForDua(selectedFont) }
+    val density = LocalDensity.current
+    val panelShape = RoundedCornerShape(20.dp)
+    val isGlass = glassBackdrop != null
+    val accentColor = if (isGlass) Color(0xFF62E2C2) else MaterialTheme.colorScheme.primary
+    val primaryContentColor = if (isGlass) {
+        Color(0xFFF1F7F4)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val secondaryContentColor = if (isGlass) {
+        Color(0xFFD2E0DA)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val mutedContentColor = if (isGlass) {
+        Color(0xFFA9BAB3)
+    } else {
+        MaterialTheme.colorScheme.outline
+    }
+    val glassSurfaceColor = Color(0xFF111A1B).copy(alpha = 0.34f)
 
     fun playSelectedDuaFromStart() {
         val dua = selectedDua ?: return
@@ -95,7 +123,10 @@ fun TwoRakahDuaPanel(
         ChapterAudioController.currentTitle = playbackTitle
         ChapterAudioController.currentTopic = "Fortress of the Muslim"
         ChapterAudioController.playlistTitles = listOf(playbackTitle)
-        ChapterAudioController.playFromStart(url)
+        // The pose label is already visible in the simulator. Start the authentic Arabic
+        // invocation directly; a generated English track announcement would delay it and make
+        // the recitation appear to belong to the following movement.
+        ChapterAudioController.playFromStart(url, announceTitle = false)
     }
 
     // Starting the prayer sample now starts the authentic recording for its current phase.
@@ -126,13 +157,42 @@ fun TwoRakahDuaPanel(
         }
     }
 
-    Surface(
-        modifier = modifier
+    val panelModifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring()),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            .animateContentSize(animationSpec = spring())
+            .then(
+                if (glassBackdrop != null) {
+                    Modifier.drawBackdrop(
+                        backdrop = glassBackdrop,
+                        shape = { panelShape },
+                        effects = {
+                            vibrancy()
+                            blur(with(density) { 8.dp.toPx() })
+                            lens(
+                                with(density) { 6.dp.toPx() },
+                                with(density) { 12.dp.toPx() },
+                            )
+                        },
+                        onDrawSurface = { drawRect(glassSurfaceColor) },
+                    )
+                } else {
+                    Modifier
+                },
+            )
+
+    Surface(
+        modifier = panelModifier,
+        shape = panelShape,
+        color = if (glassBackdrop == null) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            Color.Transparent
+        },
+        border = BorderStroke(
+            1.dp,
+            if (isGlass) Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        contentColor = primaryContentColor,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -159,7 +219,11 @@ fun TwoRakahDuaPanel(
                 Surface(
                     modifier = Modifier.size(42.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = if (isGlass) {
+                        Color.White.copy(alpha = 0.14f)
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Image(
@@ -175,7 +239,7 @@ fun TwoRakahDuaPanel(
                     Text(
                         text = "RAK'AH ${step.rakah} · ${step.label.uppercase()}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = accentColor,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                     )
@@ -183,7 +247,7 @@ fun TwoRakahDuaPanel(
                         text = selectedDua?.chapterTitle
                             ?: if (chapterId != null) "Fortress of the Muslim" else "Prayer guidance",
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = primaryContentColor,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -202,6 +266,7 @@ fun TwoRakahDuaPanel(
                         if (isThisAudioLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(21.dp),
+                                color = accentColor,
                                 strokeWidth = 2.dp,
                             )
                         } else {
@@ -216,7 +281,7 @@ fun TwoRakahDuaPanel(
                                 } else {
                                     "Play dua recitation"
                                 },
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = accentColor,
                             )
                         }
                     }
@@ -224,13 +289,17 @@ fun TwoRakahDuaPanel(
                 if (duas.isNotEmpty()) {
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        color = if (isGlass) {
+                            Color.White.copy(alpha = 0.12f)
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        },
                     ) {
                         Text(
                             text = "${safeIndex + 1} / ${duas.size}",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            color = primaryContentColor,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -242,12 +311,12 @@ fun TwoRakahDuaPanel(
                     Text(
                         text = step.guidance.orEmpty(),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondaryContentColor,
                     )
                     Text(
                         text = "This movement has no dedicated Fortress chapter.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = mutedContentColor,
                     )
                 }
 
@@ -257,11 +326,15 @@ fun TwoRakahDuaPanel(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = accentColor,
+                            strokeWidth = 2.dp,
+                        )
                         Text(
                             text = "Loading Fortress supplications…",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = secondaryContentColor,
                         )
                     }
                 }
@@ -270,7 +343,7 @@ fun TwoRakahDuaPanel(
                     Text(
                         text = catalog.errorMessage ?: "No supplication was found for this phase.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
+                        color = if (isGlass) Color(0xFFFFB4AB) else MaterialTheme.colorScheme.error,
                     )
                 }
 
@@ -283,7 +356,7 @@ fun TwoRakahDuaPanel(
                             Text(
                                 text = "Choose one authentic alternative",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = secondaryContentColor,
                                 modifier = Modifier.weight(1f),
                             )
                             IconButton(
@@ -319,7 +392,7 @@ fun TwoRakahDuaPanel(
                         Text(
                             text = instruction,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = if (isGlass) Color(0xFFFFD58A) else MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -329,7 +402,11 @@ fun TwoRakahDuaPanel(
                             selectedDua.arabic?.takeIf(String::isNotBlank)?.let { arabic ->
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                    color = if (isGlass) {
+                                        Color.Black.copy(alpha = 0.20f)
+                                    } else {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                    },
                                 ) {
                                     Text(
                                         text = arabic,
@@ -343,7 +420,7 @@ fun TwoRakahDuaPanel(
                                             textAlign = TextAlign.End,
                                             textDirection = TextDirection.Rtl,
                                         ),
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        color = primaryContentColor,
                                     )
                                 }
                             }
@@ -351,7 +428,7 @@ fun TwoRakahDuaPanel(
                                 Text(
                                     text = transliteration,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = primaryContentColor,
                                     fontStyle = FontStyle.Italic,
                                 )
                             }
@@ -359,7 +436,7 @@ fun TwoRakahDuaPanel(
                                 Text(
                                     text = translation,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = secondaryContentColor,
                                 )
                             }
                         }
@@ -372,13 +449,13 @@ fun TwoRakahDuaPanel(
                         Text(
                             text = "Fortress of the Muslim · Chapter $chapterId",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
+                            color = mutedContentColor,
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
                             text = "Dua ${selectedDua.position}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
+                            color = mutedContentColor,
                         )
                     }
                 }

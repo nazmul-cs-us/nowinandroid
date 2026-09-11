@@ -86,7 +86,7 @@ object ChapterAudioController {
     var playbackDelegate: PlaybackDelegate? = null
 
     interface PlaybackDelegate {
-        fun play(url: String, title: String)
+        fun play(url: String, title: String, announceTitle: Boolean = true)
         fun togglePlayPause()
         fun seekTo(positionMs: Int)
         fun stop()
@@ -104,7 +104,7 @@ object ChapterAudioController {
             } else {
                 currentUrl = url
                 loadingUrl = url
-                delegate.play(url, currentTitle.orEmpty())
+                delegate.play(url, currentTitle.orEmpty(), announceTitle = true)
             }
             return
         }
@@ -147,14 +147,14 @@ object ChapterAudioController {
     }
 
     /** Starts [url] from the beginning even when it is the currently loaded clip. */
-    fun playFromStart(url: String) {
+    fun playFromStart(url: String, announceTitle: Boolean = true) {
         resolveJob?.cancel()
         resolveJob = null
         stopPlayback()
         currentUrl = url
         loadingUrl = url
         playbackDelegate?.let { delegate ->
-            delegate.play(url, currentTitle.orEmpty())
+            delegate.play(url, currentTitle.orEmpty(), announceTitle)
             return
         }
         val resolver = localAudioResolver

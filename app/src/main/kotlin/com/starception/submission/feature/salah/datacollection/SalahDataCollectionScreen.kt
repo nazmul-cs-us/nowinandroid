@@ -100,6 +100,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.starception.submission.feature.salah.visualization.CurrentSampleCard
 import com.starception.submission.feature.salah.visualization.DataQualitySummary
 import com.starception.submission.feature.salah.visualization.VisualizationModePicker
@@ -3701,6 +3703,7 @@ private fun Visualization3DCard(
                 decorFitsSystemWindows = false,
             ),
         ) {
+            val duaGlassBackdrop = rememberLayerBackdrop()
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -3711,7 +3714,9 @@ private fun Visualization3DCard(
                     state = vizState,
                     onStateChange = onVizStateChange,
                     onPlaybackTick = onPlaybackTick,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .layerBackdrop(duaGlassBackdrop),
                     isFullscreen = true,
                     onFullscreenChange = onFullscreenChange,
                 )
@@ -3741,6 +3746,7 @@ private fun Visualization3DCard(
                             voiceResourceName = voiceResourceName,
                             downloadManager = downloadManager,
                             onVoiceDownloadComplete = onVoiceDownloadComplete,
+                            glassBackdrop = duaGlassBackdrop,
                             onPauseSample = {
                                 onVizStateChange(vizState.copy(isTwoRakahPlaying = false))
                             },
