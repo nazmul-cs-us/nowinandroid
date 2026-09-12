@@ -39,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -605,7 +604,7 @@ private fun BottomActionBar(
                     )
                 } else {
                     Text(
-                        text = "Get Started",
+                        text = "Continue",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -613,7 +612,8 @@ private fun BottomActionBar(
             }
         }
 
-        // Continue/Skip button
+        // Required content must be present before the app can continue. If a download fails,
+        // pressing Continue retries only the files that are still missing.
         if (requiredComplete) {
             NiaOutlinedButton(
                 onClick = onContinue,
@@ -625,17 +625,6 @@ private fun BottomActionBar(
                     text = "Continue",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                )
-            }
-        } else {
-            TextButton(
-                onClick = onContinue,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "Skip for now",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

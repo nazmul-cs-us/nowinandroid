@@ -189,17 +189,30 @@ class AssetDownloadViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                val failedCategories = mutableListOf<String>()
                 for (category in requiredCategories) {
                     if (downloadManager.isCategoryComplete(category, m)) continue
 
-                    downloadManager.downloadCategory(category, m) { progress, downloaded, total ->
+                    val completed = downloadManager.downloadCategory(category, m) { _, _, _ ->
                         viewModelScope.launch {
                             refreshCategoryStates()
                         }
                     }
+                    if (!completed) failedCategories += formatCategoryName(category)
                 }
                 isCurrentlyDownloading = false
                 refreshCategoryStates()
+
+                if (failedCategories.isNotEmpty()) {
+                    val message = "Could not download: ${failedCategories.joinToString()}. Tap Continue to retry."
+                    Log.e(TAG, message)
+                    val current = _screenState.value
+                    if (current is DownloadScreenState.NeedsDownload) {
+                        _screenState.value = current.copy(error = message)
+                    }
+                    return@launch
+                }
+
                 Log.i(TAG, "Required downloads complete")
 
                 // Regenerate news.db from CDN-downloaded source databases
@@ -217,6 +230,7 @@ class AssetDownloadViewModel @Inject constructor(
                 } catch (e: Exception) {
                     Log.e(TAG, "Error regenerating news.db after download", e)
                 }
+                _screenState.value = DownloadScreenState.AllReady
             } catch (e: Exception) {
                 Log.e(TAG, "Download error", e)
                 isCurrentlyDownloading = false

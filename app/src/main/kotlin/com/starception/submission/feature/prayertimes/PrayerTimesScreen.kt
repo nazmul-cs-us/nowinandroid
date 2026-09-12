@@ -1094,6 +1094,18 @@ fun PrayerTimesScreen(
     } else {
         null // Not needed on older Android versions
     }
+
+    var activityPermissionRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(activityRecognitionPermissionState?.status) {
+        val permissionState = activityRecognitionPermissionState ?: return@LaunchedEffect
+        if (
+            permissionState.status is com.google.accompanist.permissions.PermissionStatus.Denied &&
+            !activityPermissionRequested
+        ) {
+            activityPermissionRequested = true
+            permissionState.launchPermissionRequest()
+        }
+    }
     
     // Storage/Media audio permission for Quran playback from SD card
     // This will be requested only when user tries to play Quran audio

@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +38,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.PaddingValues
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 
 /**
  * Islamic Salah (Prayer) Dashboard Screen
@@ -163,10 +164,11 @@ private fun SalahTopBar(
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
+                FlaticonIcon(
+                    glyph = FlaticonIcons.SETTINGS,
                     contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    fontSize = 24.sp,
                 )
             }
         }

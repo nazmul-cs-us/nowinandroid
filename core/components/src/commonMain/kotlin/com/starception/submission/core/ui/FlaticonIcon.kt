@@ -74,7 +74,7 @@ object FlaticonIcons {
     const val QUIZ = "\ufafa"
     const val REFRESH = "\ufb34"
     const val SCHOOL = "\ufba1"
-    const val SETTINGS = "\ufbd1"
+    const val SETTINGS = "\ufbd2"
     const val SHARE = "\ufbd5"
     const val DIFFICULTY = "\ufc13"
     const val SPEED = "\ufc89"

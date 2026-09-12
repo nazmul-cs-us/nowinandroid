@@ -99,6 +99,7 @@ import com.starception.submission.R
 import com.starception.submission.core.data.model.RecentSearchQuery
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
@@ -348,6 +349,12 @@ fun AppTopSearchBar(
             val settings = root.findViewById<MaterialButton>(R.id.settings_button)
             val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
 
+            settings.icon = null
+            settings.text = FlaticonIcons.SETTINGS
+            settings.typeface = ResourcesCompat.getFont(ctx, R.font.flaticon_uicons_rounded_regular)
+            settings.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            settings.includeFontPadding = false
+
             root.background = ColorDrawable(Color.TRANSPARENT)
             appBar.background = ColorDrawable(Color.TRANSPARENT)
             appBar.backgroundTintList = null
@@ -562,7 +569,7 @@ fun AppTopSearchBar(
                 leading.iconSize = (34f * density).toInt()
                 leading.iconTint = ColorStateList.valueOf(titleColor)
             }
-            settings.iconTint = ColorStateList.valueOf(titleColor)
+            settings.setTextColor(titleColor)
             searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
             for (i in 0 until searchBar.menu.size()) {
                 searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
