@@ -219,12 +219,20 @@ fun Visualization3DView(
     val renderer = rememberRenderer(engine)
     val dualFigure = state.predictions != null &&
         state.posePlaybackSource == PosePlaybackSource.RECORDED
-    val cameraFrame = remember(state.mode, dualFigure) {
-        cameraFrame(state.mode, dualFigure)
+    val compactPrayerViewport = !isFullscreen &&
+        state.mode == VisualizationMode.PHONE_MODEL &&
+        state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
+    val cameraFrame = remember(state.mode, dualFigure, compactPrayerViewport) {
+        cameraFrame(state.mode, dualFigure, compactPrayerViewport)
     }
     // The manipulator owns the camera transform every frame. Build both from the same
     // frame so its first update cannot snap the camera back to SceneView's generic default.
-    val cameraNode = key(state.mode, dualFigure, state.cameraResetToken) {
+    val cameraNode = key(
+        state.mode,
+        dualFigure,
+        compactPrayerViewport,
+        state.cameraResetToken,
+    ) {
         rememberCameraNode(engine) {
             lookAt(
                 eye = cameraFrame.eye,
@@ -234,7 +242,12 @@ fun Visualization3DView(
             setExposure(5.6f, 1f / 100f, 180f)
         }
     }
-    val cameraManipulator = key(state.mode, dualFigure, state.cameraResetToken) {
+    val cameraManipulator = key(
+        state.mode,
+        dualFigure,
+        compactPrayerViewport,
+        state.cameraResetToken,
+    ) {
         rememberCameraManipulator(
             orbitHomePosition = cameraFrame.eye,
             targetPosition = cameraFrame.target,
@@ -503,11 +516,23 @@ fun Visualization3DView(
     }
 }
 
-private fun cameraFrame(mode: VisualizationMode, dualFigure: Boolean): CameraFrame = when (mode) {
+private fun cameraFrame(
+    mode: VisualizationMode,
+    dualFigure: Boolean,
+    compactPrayerViewport: Boolean = false,
+): CameraFrame = when (mode) {
     VisualizationMode.PHONE_MODEL -> if (dualFigure) {
         CameraFrame(
             eye = Position(2.75f, 1.85f, 4.25f),
             target = Position(0f, 0.8f, 0f),
+        )
+    } else if (compactPrayerViewport) {
+        // The embedded prayer sample shares its card with the invocation and playback deck.
+        // Pull the camera back so standing through sujood stays fully framed in the shorter
+        // viewport instead of disappearing behind adjacent guidance.
+        CameraFrame(
+            eye = Position(1.55f, 1.38f, 3.35f),
+            target = Position(0f, 0.74f, 0f),
         )
     } else {
         CameraFrame(

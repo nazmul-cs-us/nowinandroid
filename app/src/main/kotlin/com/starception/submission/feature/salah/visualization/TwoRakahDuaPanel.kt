@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
@@ -74,6 +75,7 @@ fun TwoRakahDuaPanel(
     downloadManager: AssetDownloadManager? = null,
     onVoiceDownloadComplete: () -> Unit = {},
     glassBackdrop: Backdrop? = null,
+    compact: Boolean = false,
 ) {
     if (state.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE) return
 
@@ -115,6 +117,13 @@ fun TwoRakahDuaPanel(
         MaterialTheme.colorScheme.outline
     }
     val glassSurfaceColor = Color(0xFF111A1B).copy(alpha = 0.34f)
+    val chapterTitle = selectedDua?.chapterTitle
+        ?: if (chapterId != null) "Fortress of the Muslim" else "Prayer guidance"
+    val displayedChapterTitle = if (compact) {
+        chapterTitle.substringBefore(" (").ifBlank { chapterTitle }
+    } else {
+        chapterTitle
+    }
 
     fun playSelectedDuaFromStart() {
         val dua = selectedDua ?: return
@@ -195,8 +204,8 @@ fun TwoRakahDuaPanel(
         contentColor = primaryContentColor,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(if (compact) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
             if (!isVoiceEngineAvailable && voiceDownloadCategory != null && downloadManager != null) {
                 key(voiceDownloadCategory) {
@@ -214,10 +223,10 @@ fun TwoRakahDuaPanel(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
             ) {
                 Surface(
-                    modifier = Modifier.size(42.dp),
+                    modifier = Modifier.size(if (compact) 36.dp else 42.dp),
                     shape = CircleShape,
                     color = if (isGlass) {
                         Color.White.copy(alpha = 0.14f)
@@ -231,7 +240,7 @@ fun TwoRakahDuaPanel(
                                 checkNotNull(topicIconResFor("Prayer")),
                             ),
                             contentDescription = null,
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(if (compact) 28.dp else 34.dp),
                         )
                     }
                 }
@@ -244,11 +253,12 @@ fun TwoRakahDuaPanel(
                         letterSpacing = 0.8.sp,
                     )
                     Text(
-                        text = selectedDua?.chapterTitle
-                            ?: if (chapterId != null) "Fortress of the Muslim" else "Prayer guidance",
+                        text = displayedChapterTitle,
                         style = MaterialTheme.typography.titleSmall,
                         color = primaryContentColor,
                         fontWeight = FontWeight.Bold,
+                        maxLines = if (compact) 2 else Int.MAX_VALUE,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (audioUrl != null) {
@@ -261,7 +271,7 @@ fun TwoRakahDuaPanel(
                                 playSelectedDuaFromStart()
                             }
                         },
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(if (compact) 36.dp else 40.dp),
                     ) {
                         if (isThisAudioLoading) {
                             CircularProgressIndicator(
@@ -286,7 +296,7 @@ fun TwoRakahDuaPanel(
                         }
                     }
                 }
-                if (duas.isNotEmpty()) {
+                if (!compact && duas.isNotEmpty()) {
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = if (isGlass) {
@@ -354,18 +364,43 @@ fun TwoRakahDuaPanel(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Choose one authentic alternative",
+                                text = if (compact) {
+                                    "Choose an alternative"
+                                } else {
+                                    "Choose one authentic alternative"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = secondaryContentColor,
                                 modifier = Modifier.weight(1f),
                             )
+                            if (compact) {
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isGlass) {
+                                        Color.White.copy(alpha = 0.12f)
+                                    } else {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    },
+                                ) {
+                                    Text(
+                                        text = "${safeIndex + 1}/${duas.size}",
+                                        modifier = Modifier.padding(
+                                            horizontal = 8.dp,
+                                            vertical = 4.dp,
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = primaryContentColor,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
                             IconButton(
                                 onClick = {
                                     onPauseSample()
                                     selectedIndex = (safeIndex - 1 + duas.size) % duas.size
                                 },
                                 enabled = !isThisAudioLoading && !isThisAudioPlaying,
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(if (compact) 32.dp else 36.dp),
                             ) {
                                 Icon(
                                     imageVector = NiaIcons.ChevronLeft,
@@ -378,7 +413,7 @@ fun TwoRakahDuaPanel(
                                     selectedIndex = (safeIndex + 1) % duas.size
                                 },
                                 enabled = !isThisAudioLoading && !isThisAudioPlaying,
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(if (compact) 32.dp else 36.dp),
                             ) {
                                 Icon(
                                     imageVector = NiaIcons.ChevronRight,
@@ -412,11 +447,14 @@ fun TwoRakahDuaPanel(
                                         text = arabic,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                            .padding(
+                                                horizontal = if (compact) 12.dp else 14.dp,
+                                                vertical = if (compact) 9.dp else 12.dp,
+                                            ),
                                         style = MaterialTheme.typography.bodyLarge.copy(
                                             fontFamily = arabicFont,
-                                            fontSize = 26.sp,
-                                            lineHeight = 40.sp,
+                                            fontSize = if (compact) 23.sp else 26.sp,
+                                            lineHeight = if (compact) 34.sp else 40.sp,
                                             textAlign = TextAlign.End,
                                             textDirection = TextDirection.Rtl,
                                         ),

@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -3398,6 +3399,169 @@ private fun DataFileItem(
 // ============================================
 
 @Composable
+private fun EmbeddedPrayerSampleStage(
+    samples: List<SalahDataSample>,
+    state: VisualizationState,
+    onStateChange: (VisualizationState) -> Unit,
+    onPlaybackTick: ((Int, SalahPosture?, Float, Float, Float, Float, Boolean) -> Unit)?,
+    onFullscreenChange: (Boolean) -> Unit,
+    catalog: TwoRakahDuaCatalog,
+    isVoiceEngineAvailable: Boolean,
+    voiceDownloadCategory: String?,
+    voiceResourceName: String,
+    downloadManager: AssetDownloadManager,
+    onVoiceDownloadComplete: () -> Unit,
+) {
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
+    val duaScrollState = rememberScrollState()
+    val duaGlassBackdrop = rememberLayerBackdrop()
+
+    // A new phase starts at the beginning of its invocation instead of retaining the scroll
+    // position from a longer dua in the preceding phase.
+    LaunchedEffect(state.sampleRakahCount, state.twoRakahStepIndex) {
+        duaScrollState.scrollTo(0)
+    }
+
+    val stageShape = RoundedCornerShape(22.dp)
+
+    @Composable
+    fun PoseViewport(modifier: Modifier) {
+        Visualization3DView(
+            samples = samples,
+            state = state,
+            onStateChange = onStateChange,
+            onPlaybackTick = onPlaybackTick,
+            modifier = modifier,
+            onFullscreenChange = onFullscreenChange,
+        )
+    }
+
+    @Composable
+    fun DuaViewport(modifier: Modifier) {
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(20.dp))
+                .verticalScroll(duaScrollState),
+        ) {
+            TwoRakahDuaPanel(
+                state = state,
+                catalog = catalog,
+                isVoiceEngineAvailable = isVoiceEngineAvailable,
+                voiceDownloadCategory = voiceDownloadCategory,
+                voiceResourceName = voiceResourceName,
+                downloadManager = downloadManager,
+                onVoiceDownloadComplete = onVoiceDownloadComplete,
+                glassBackdrop = duaGlassBackdrop,
+                compact = true,
+                onPauseSample = {
+                    onStateChange(state.copy(isTwoRakahPlaying = false))
+                },
+            )
+        }
+    }
+
+    @Composable
+    fun PlaybackViewport(modifier: Modifier) {
+        Box(modifier = modifier) {
+            VisualizationPlaybackDeck(
+                state = state,
+                onStateChange = onStateChange,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (isLandscape) 460.dp else 700.dp),
+        shape = stageShape,
+        color = Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color(0xFF62E2C2).copy(alpha = 0.18f),
+        ),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Give the embedded glass a real backdrop even though its reserved pane does not
+            // overlap the humanoid. This preserves the liquid refraction and vibrancy without
+            // sacrificing the figure's visibility.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF184039),
+                                Color(0xFF10191B),
+                                Color(0xFF080D10),
+                            ),
+                            radius = 1_100f,
+                        ),
+                    )
+                    .layerBackdrop(duaGlassBackdrop),
+            )
+
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(0.56f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        PoseViewport(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                        )
+                        PlaybackViewport(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(132.dp),
+                        )
+                    }
+                    DuaViewport(
+                        modifier = Modifier
+                            .weight(0.44f)
+                            .fillMaxHeight(),
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PoseViewport(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    )
+                    DuaViewport(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp),
+                    )
+                    PlaybackViewport(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(136.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun Visualization3DCard(
     allSamples: List<SalahDataSample>,
     vizState: VisualizationState,
@@ -3600,58 +3764,58 @@ private fun Visualization3DCard(
 
                         // 3D View
                         if (!isFullscreen) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(520.dp)
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .background(Color(0xFF080D10))
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFF62E2C2).copy(alpha = 0.18f),
-                                        shape = RoundedCornerShape(22.dp),
-                                    ),
+                            if (
+                                vizState.posePlaybackSource ==
+                                PosePlaybackSource.TWO_RAKAH_SAMPLE
                             ) {
-                                Visualization3DView(
+                                EmbeddedPrayerSampleStage(
                                     samples = allSamples,
                                     state = vizState,
                                     onStateChange = onVizStateChange,
                                     onPlaybackTick = onPlaybackTick,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(bottom = 138.dp),
                                     onFullscreenChange = onFullscreenChange,
-                                )
-
-                                if (
-                                    vizState.totalSamples > 0 ||
-                                    vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
-                                ) {
-                                    VisualizationPlaybackDeck(
-                                        state = vizState,
-                                        onStateChange = onVizStateChange,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .padding(10.dp),
-                                    )
-                                }
-                            }
-
-                            if (vizState.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                TwoRakahDuaPanel(
-                                    state = vizState,
                                     catalog = twoRakahDuas,
                                     isVoiceEngineAvailable = isVoiceEngineAvailable,
                                     voiceDownloadCategory = voiceDownloadCategory,
                                     voiceResourceName = voiceResourceName,
                                     downloadManager = downloadManager,
                                     onVoiceDownloadComplete = onVoiceDownloadComplete,
-                                    onPauseSample = {
-                                        onVizStateChange(vizState.copy(isTwoRakahPlaying = false))
-                                    },
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(520.dp)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .background(Color(0xFF080D10))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFF62E2C2).copy(alpha = 0.18f),
+                                            shape = RoundedCornerShape(22.dp),
+                                        ),
+                                ) {
+                                    Visualization3DView(
+                                        samples = allSamples,
+                                        state = vizState,
+                                        onStateChange = onVizStateChange,
+                                        onPlaybackTick = onPlaybackTick,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(bottom = 138.dp),
+                                        onFullscreenChange = onFullscreenChange,
+                                    )
+
+                                    if (vizState.totalSamples > 0) {
+                                        VisualizationPlaybackDeck(
+                                            state = vizState,
+                                            onStateChange = onVizStateChange,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .fillMaxWidth()
+                                                .padding(10.dp),
+                                        )
+                                    }
+                                }
                             }
                         } else {
                             // Keep the card's layout stable while the Filament surface is
