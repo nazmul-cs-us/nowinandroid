@@ -66,6 +66,8 @@ internal data class WidgetPrayer(
     val weatherFrames: List<Bitmap> = emptyList(),
     /** Rounded degrees for that same hour, e.g. "38°"; null when unknown. */
     val temperature: String? = null,
+    /** Compact Open-Meteo condition label for the detailed widget header. */
+    val weatherSummary: String? = null,
 )
 
 /** The next solar event shown beside the refresh action in the detailed widget header. */
@@ -108,6 +110,12 @@ internal sealed interface PrayerWidgetState {
         val windowProgress: Float?,
         /** A source-backed devotional reading for the tall dashboard widget. */
         val reminder: DailyReminder,
+        /** Solar/prayer-derived palette for the animated foliage decorating tall cards. */
+        val dayPhase: WidgetDayPhase,
+        val daylightLabel: String,
+        val nightLabel: String,
+        /** Local wall-clock position from midnight (0f) to the next midnight (1f). */
+        val timeOfDayProgress: Float,
     ) : PrayerWidgetState
 }
 
@@ -218,6 +226,7 @@ private suspend fun loadPrayerWeather(
                 icon = WidgetMeteocons.forWeather(context, forecast.weatherCode, isDay),
                 frames = WidgetMeteocons.animationFrames(context, forecast.weatherCode, isDay),
                 temperature = "${forecast.temperatureCelsius.roundToInt()}°",
+                summary = forecast.weatherCode.widgetWeatherSummary(),
             )
         }
     }
@@ -261,7 +270,20 @@ private data class WidgetWeather(
     val icon: Bitmap?,
     val frames: List<Bitmap>,
     val temperature: String,
+    val summary: String,
 )
+
+private fun Int.widgetWeatherSummary(): String = when (this) {
+    0 -> "Clear sky"
+    1, 2 -> "Partly cloudy"
+    3 -> "Overcast"
+    45, 48 -> "Foggy"
+    in 51..57 -> "Drizzle"
+    in 61..67, in 80..82 -> "Rain"
+    in 71..77, 85, 86 -> "Snow"
+    in 95..99 -> "Thunderstorms"
+    else -> "Cloudy"
+}
 
 private suspend fun recalculateForDate(
     repository: PrayerSettingsRepository,
@@ -342,6 +364,7 @@ private fun DayPrayerTimes.toWidgetState(
             weatherIcon = weather[prayer.name]?.icon,
             weatherFrames = weather[prayer.name]?.frames.orEmpty(),
             temperature = weather[prayer.name]?.temperature,
+            weatherSummary = weather[prayer.name]?.summary,
         )
     }
     val next = prayers.firstOrNull { it.isNext } ?: prayers.first()
@@ -368,6 +391,8 @@ private fun DayPrayerTimes.toWidgetState(
             solarEventWithoutArtwork.isSunset,
         ),
     )
+    val daylightMinutes = Duration.between(sunrise, maghrib).toMinutes().coerceAtLeast(0L)
+    val nightMinutes = (Duration.ofDays(1).toMinutes() - daylightMinutes).coerceAtLeast(0L)
 
     return PrayerWidgetState.Available(
         place = location.shortLabel(),
@@ -379,18 +404,41 @@ private fun DayPrayerTimes.toWidgetState(
         insight = insight,
         windowProgress = prayerWindowProgress(this, now),
         reminder = reminder,
+        dayPhase = widgetDayPhase(now),
+        daylightLabel = "Daylight ${durationLabel(daylightMinutes)}",
+        nightLabel = "Night ${durationLabel(nightMinutes)}",
+        timeOfDayProgress = now.toSecondOfDay() / Duration.ofDays(1).seconds.toFloat(),
     )
 }
 
-/** English weekday and Umm al-Qura date used beneath the widget's location header. */
+/**
+ * Uses today's calculated solar anchors rather than fixed clock hours, so the foliage
+ * follows local seasons and latitude. The palette changes on normal widget refreshes and
+ * prayer-boundary refreshes while the launcher-side sway continues between updates.
+ */
+private fun DayPrayerTimes.widgetDayPhase(now: LocalTime): WidgetDayPhase = when {
+    now < fajr -> WidgetDayPhase.NIGHT
+    now < sunrise.plusHours(1) -> WidgetDayPhase.DAWN
+    now < asr -> WidgetDayPhase.DAY
+    now < maghrib -> WidgetDayPhase.AFTERNOON
+    now < isha -> WidgetDayPhase.SUNSET
+    else -> WidgetDayPhase.NIGHT
+}
+
+private fun durationLabel(minutes: Long): String {
+    val hours = minutes / 60
+    val remainder = minutes % 60
+    return if (remainder == 0L) "${hours}h" else "${hours}h ${remainder}m"
+}
+
+/** Compact Gregorian and Umm al-Qura dates used beneath the widget's location header. */
 private fun hijriDateLabel(date: LocalDate): String = runCatching {
-    DateTimeFormatter
-        // Keep the Islamic calendar, but make its weekday, month and era readable in
-        // English regardless of the device language (for example,
-        // "Saturday, 9 Rabiʻ I 1448 AH").
-        .ofPattern("EEEE, d MMMM yyyy 'AH'", Locale.ENGLISH)
+    val gregorian = date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH))
+    val hijri = DateTimeFormatter
+        .ofPattern("d MMMM yyyy", Locale.ENGLISH)
         .withChronology(HijrahChronology.INSTANCE)
         .format(date)
+    "$gregorian  •  $hijri"
 }.getOrElse {
     date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH))
 }
