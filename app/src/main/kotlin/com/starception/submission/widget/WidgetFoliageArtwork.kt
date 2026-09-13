@@ -282,7 +282,7 @@ internal object WidgetFoliageArtwork {
             0f,
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = vein
-                alpha = 82
+                this.alpha = 82
                 strokeWidth = 1.1f
                 strokeCap = Paint.Cap.ROUND
             },
