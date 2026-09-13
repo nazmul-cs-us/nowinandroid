@@ -37,5 +37,6 @@
   <color name="prayer_widget_accent">#FF445E91</color>
   <color name="prayer_widget_card">#FFDCE2F9</color>
   <color name="prayer_widget_on_card">#FF141B2C</color>
+  <color name="prayer_widget_hero">#FF0B4D43</color>
+  <color name="prayer_widget_on_hero">#FFFFFFFF</color>
 </resources>
-

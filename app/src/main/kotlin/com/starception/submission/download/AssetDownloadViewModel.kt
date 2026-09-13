@@ -193,9 +193,9 @@ class AssetDownloadViewModel @Inject constructor(
                 for (category in requiredCategories) {
                     if (downloadManager.isCategoryComplete(category, m)) continue
 
-                    val completed = downloadManager.downloadCategory(category, m) { _, _, _ ->
+                    val completed = downloadManager.downloadCategory(category, m) { progress, downloaded, _ ->
                         viewModelScope.launch {
-                            refreshCategoryStates()
+                            updateCategoryProgress(category, progress, downloaded)
                         }
                     }
                     if (!completed) failedCategories += formatCategoryName(category)
@@ -293,6 +293,36 @@ class AssetDownloadViewModel @Inject constructor(
         if (current is DownloadScreenState.NeedsDownload) {
             _screenState.value = current.copy(isDownloading = downloading)
         }
+    }
+
+    private fun updateCategoryProgress(
+        categoryKey: String,
+        progress: Float,
+        downloadedSize: Long,
+    ) {
+        val current = _screenState.value as? DownloadScreenState.NeedsDownload ?: return
+        val categories = current.categories.map { category ->
+            if (category.categoryKey == categoryKey) {
+                category.copy(
+                    downloadedSize = downloadedSize,
+                    isDownloading = true,
+                    progress = progress,
+                )
+            } else {
+                category
+            }
+        }
+        val requiredDownloaded = categories.filter { it.required }.sumOf { it.downloadedSize }
+        val overallProgress = if (current.totalRequiredSize > 0L) {
+            requiredDownloaded.toFloat() / current.totalRequiredSize
+        } else {
+            1f
+        }
+        _screenState.value = current.copy(
+            categories = categories,
+            overallProgress = overallProgress.coerceIn(0f, 1f),
+            isDownloading = true,
+        )
     }
 
     companion object {

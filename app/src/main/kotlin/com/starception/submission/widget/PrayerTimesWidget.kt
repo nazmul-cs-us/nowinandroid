@@ -17,6 +17,7 @@
 package com.starception.submission.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -44,6 +45,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
+import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
 import androidx.glance.action.clickable
 import android.widget.RemoteViews
 import androidx.glance.appwidget.AndroidRemoteViews
@@ -84,6 +86,13 @@ import com.starception.submission.R
 
 /** Matches the ported layouts' own widgetPadding so the two sit consistently. */
 private val WIDGET_PADDING = 16.dp
+private val ReferenceWidgetBackground = ColorProvider(Color(0xFFFFFCF8))
+private val ReferenceForest = ColorProvider(Color(0xFF0B4D43))
+private val ReferenceForestOn = ColorProvider(Color(0xFFFFFFFF))
+private val ReferenceSurface = ColorProvider(Color(0xFFF6FAF5))
+private val ReferenceInk = ColorProvider(Color(0xFF18352E))
+private val ReferenceMuted = ColorProvider(Color(0xFF60746C))
+private val ReferenceActive = ColorProvider(Color(0xFFD8EBDD))
 
 // The header icons are 24dp and vertically centered in the refresh button's 48dp touch
 // target. Four dp above that target plus its 12dp internal inset puts the first visible
@@ -152,7 +161,7 @@ private val FULL_SCHEDULE_MIN_HEIGHT = 300.dp
  * their own sections. Below this height those sections would have to clip, so the
  * existing compact reflows remain in use instead.
  */
-private val REFERENCE_LAYOUT_MIN_HEIGHT = 367.dp
+private val REFERENCE_LAYOUT_MIN_HEIGHT = 390.dp
 private val REFERENCE_LAYOUT_MIN_WIDTH = 280.dp
 private val REFERENCE_MEDIUM_MIN_HEIGHT = 180.dp
 private val REFERENCE_COMPACT_MIN_HEIGHT = 130.dp
@@ -223,7 +232,12 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
         val themeSource = loadWidgetThemeSource(context)
 
         provideContent {
-            StarceptionWidgetTheme(themeSource) {
+            StarceptionWidgetTheme(
+                source = themeSource,
+                // This editorial widget intentionally follows the supplied light artwork
+                // rather than the launcher wallpaper's dynamic palette.
+                backgroundColor = ReferenceWidgetBackground,
+            ) {
                 when (state) {
                     PrayerWidgetState.Unavailable -> {
                         val size = hostReportedWidgetSize(context, id) ?: LocalSize.current
@@ -643,7 +657,7 @@ private fun TitledSurface(
                 CircleIconButton(
                     imageProvider = ImageProvider(R.drawable.sample_refresh_icon),
                     contentDescription = "Refresh prayer times",
-                    contentColor = GlanceTheme.colors.secondary,
+                    contentColor = if (detailedHeader) ReferenceInk else GlanceTheme.colors.secondary,
                     backgroundColor = null,
                     onClick = actionRunCallback<RefreshPrayerWidgetAction>(),
                 )
@@ -656,7 +670,7 @@ private fun TitledSurface(
     }
 }
 
-/** Location/date and next-solar-event groups arranged like the supplied reference. */
+/** Location/date and weather groups arranged like the supplied reference. */
 @Composable
 private fun androidx.glance.layout.RowScope.ReferenceHeader(
     state: PrayerWidgetState.Available,
@@ -664,7 +678,7 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
     Image(
         provider = ImageProvider(R.drawable.ic_flaticon_location_marker),
         contentDescription = null,
-        colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+        colorFilter = ColorFilter.tint(ReferenceForest),
         modifier = GlanceModifier.size(24.dp),
     )
     Spacer(modifier = GlanceModifier.width(7.dp))
@@ -672,13 +686,13 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         WidgetText(
             text = state.place,
             size = 15.sp,
-            color = GlanceTheme.colors.onSurface,
+            color = ReferenceInk,
             weight = WidgetFontWeight.Medium,
         )
         WidgetText(
             text = state.dateLabel,
             size = 10.5.sp,
-            color = GlanceTheme.colors.onSurfaceVariant,
+            color = ReferenceMuted,
             weight = WidgetFontWeight.Regular,
         )
     }
@@ -691,21 +705,29 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         modifier = GlanceModifier.wrapContentWidth(),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        AnimatedSolarMeteocon(event = state.solarEvent, size = 28.dp)
+        if (state.nextPrayer.weatherIcon != null) {
+            AnimatedMeteocon(prayer = state.nextPrayer, size = 28.dp)
+        } else {
+            AnimatedSolarMeteocon(event = state.solarEvent, size = 28.dp)
+        }
         Spacer(modifier = GlanceModifier.width(5.dp))
         Column(modifier = GlanceModifier.wrapContentWidth()) {
             WidgetText(
-                text = state.solarEvent.label,
+                text = state.nextPrayer.temperature ?: state.solarEvent.label,
                 size = 9.5.sp,
-                color = GlanceTheme.colors.onSurfaceVariant,
-                weight = WidgetFontWeight.Regular,
+                color = ReferenceInk,
+                weight = WidgetFontWeight.Medium,
                 modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
             )
             WidgetText(
-                text = state.solarEvent.time,
-                size = 13.sp,
-                color = GlanceTheme.colors.onSurface,
-                weight = WidgetFontWeight.Bold,
+                text = if (state.nextPrayer.weatherIcon != null) {
+                    "At ${state.nextPrayer.name}"
+                } else {
+                    state.solarEvent.time
+                },
+                size = 9.5.sp,
+                color = ReferenceMuted,
+                weight = WidgetFontWeight.Regular,
                 modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
             )
         }
@@ -1363,49 +1385,303 @@ private fun ReferenceFullPrayerContent(
     state: PrayerWidgetState.Available,
     contentSize: DpSize,
 ) {
-    // The full reference hierarchy needs 367dp for its fixed sections and five readable
-    // rows. Smaller hosts use the medium reflow so Isha can never be pushed past the
-    // launcher's clip bounds by cell margins or host-specific RemoteViews measurement.
-    val heroHeight = 98.dp
+    // The tall layout preserves all three reference sections. Its devotional panel takes
+    // the remaining height, so it can grow with launcher row spans without making prayer
+    // times or text smaller.
+    val heroHeight = 112.dp
     val sectionGap = 8.dp
-    val nextHeight = 54.dp
-    val panelTopPadding = 8f
-    val panelHeaderHeight = 24f
-    val fixedHeight = heroHeight.value +
-        sectionGap.value +
-        nextHeight.value +
-        sectionGap.value +
-        panelTopPadding +
-        panelHeaderHeight +
-        5f +
-        (state.prayers.size - 1).coerceAtLeast(0)
-    val scheduleRowHeight = ((contentSize.height.value - fixedHeight) /
-        state.prayers.size.coerceAtLeast(1))
-        .coerceAtLeast(30f)
-        .dp
+    val scheduleHeight = 142.dp
 
     Column(modifier = GlanceModifier.fillMaxSize()) {
-        ReferenceCurrentPrayerHero(
+        ReferencePrayerHero(
             state = state,
-            width = contentSize.width,
             height = heroHeight,
-            compact = false,
         )
         Spacer(modifier = GlanceModifier.height(sectionGap))
-        NextPrayerBanner(
+        ReferencePrayerTimeline(
             state = state,
-            compact = false,
-            showWeatherIcon = true,
-            height = nextHeight,
+            height = scheduleHeight,
         )
         Spacer(modifier = GlanceModifier.height(sectionGap))
-        ReferencePrayerSchedulePanel(
+        ReferenceDevotionalPanel(
             state = state,
-            rowHeight = scheduleRowHeight,
-            compact = false,
+            modifier = GlanceModifier.defaultWeight(),
         )
     }
 }
+
+/** Current/next-prayer card with the live mosque illustration as its visual anchor. */
+@Composable
+private fun ReferencePrayerHero(
+    state: PrayerWidgetState.Available,
+    height: Dp,
+) {
+    val currentName = state.currentPrayerName()
+    val elapsed = state.insight?.elapsed.orEmpty()
+    val countdown = state.countdown
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(height)
+            .background(ReferenceForest)
+            .cornerRadius(24.dp)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+    ) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            WidgetText(
+                text = elapsed.ifBlank { "Current prayer: $currentName" },
+                size = 10.sp,
+                color = ReferenceForestOn,
+                weight = WidgetFontWeight.Medium,
+            )
+            Spacer(modifier = GlanceModifier.height(3.dp))
+            WidgetText(
+                text = state.nextPrayer.name,
+                size = 28.sp,
+                color = ReferenceForestOn,
+                weight = WidgetFontWeight.Bold,
+            )
+            WidgetText(
+                text = countdown,
+                size = 17.sp,
+                color = ReferenceForestOn,
+                weight = WidgetFontWeight.Bold,
+            )
+            Spacer(modifier = GlanceModifier.height(4.dp))
+            WidgetText(
+                text = "A moment to pause and turn to Allah.",
+                size = 9.5.sp,
+                color = ReferenceForestOn,
+                weight = WidgetFontWeight.Regular,
+            )
+        }
+        Spacer(modifier = GlanceModifier.width(10.dp))
+        Image(
+            provider = ImageProvider(state.nextPrayer.heroArtwork()),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = GlanceModifier
+                .width(94.dp)
+                .height(88.dp)
+                .cornerRadius(44.dp),
+        )
+    }
+}
+
+/** Five-prayer overview with the active prayer given a distinct, expanded surface. */
+@Composable
+private fun ReferencePrayerTimeline(
+    state: PrayerWidgetState.Available,
+    height: Dp,
+) {
+    val currentName = state.currentPrayerName()
+    Column(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(height)
+            .background(ReferenceSurface)
+            .cornerRadius(22.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Vertical.CenterVertically,
+        ) {
+            WidgetText(
+                text = "Today's Prayers",
+                size = 15.sp,
+                color = ReferenceInk,
+                weight = WidgetFontWeight.Bold,
+                modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+            )
+            WidgetText(
+                text = "View schedule",
+                size = 9.5.sp,
+                color = ReferenceForest,
+                weight = WidgetFontWeight.Medium,
+                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+            )
+        }
+        Spacer(modifier = GlanceModifier.height(5.dp))
+        Row(
+            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+            verticalAlignment = Alignment.Vertical.CenterVertically,
+        ) {
+            state.prayers.forEach { prayer ->
+                val active = prayer.name.equals(currentName, ignoreCase = true)
+                val cellModifier = GlanceModifier
+                    .defaultWeight()
+                    .height(86.dp)
+                    .then(
+                        if (active) {
+                            GlanceModifier
+                                .background(ReferenceActive)
+                                .cornerRadius(16.dp)
+                                .padding(vertical = 5.dp)
+                        } else {
+                            GlanceModifier.padding(vertical = 5.dp)
+                        },
+                    )
+                Column(
+                    modifier = cellModifier,
+                    verticalAlignment = Alignment.Vertical.CenterVertically,
+                    horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = GlanceModifier
+                            .size(if (active) 11.dp else 7.dp)
+                            .background(
+                                when {
+                                    active -> ReferenceForest
+                                    prayer.isPast -> ReferenceMuted
+                                    else -> ReferenceForest
+                                },
+                            )
+                            .cornerRadius(8.dp),
+                    ) {}
+                    Spacer(modifier = GlanceModifier.height(4.dp))
+                    WidgetText(
+                    text = prayer.name,
+                    size = 10.sp,
+                    color = ReferenceInk,
+                        weight = if (active) WidgetFontWeight.Bold else WidgetFontWeight.Medium,
+                        align = WidgetTextAlign.Center,
+                        modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
+                    )
+                    WidgetText(
+                        text = prayer.time,
+                        size = 9.sp,
+                        color = if (active) {
+                            ReferenceInk
+                        } else {
+                            ReferenceMuted
+                        },
+                        weight = WidgetFontWeight.Medium,
+                        align = WidgetTextAlign.Center,
+                        modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .cornerRadius(3.dp),
+        ) {
+            Box(
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .fillMaxSize()
+                    .background(ReferenceActive)
+                    .cornerRadius(3.dp),
+            ) {}
+            Box(
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .fillMaxSize()
+                    .background(ReferenceMuted)
+                    .cornerRadius(3.dp),
+            ) {}
+        }
+    }
+}
+
+/** A source-backed dua or hadith panel, linked to its full in-app reading. */
+@Composable
+private fun ReferenceDevotionalPanel(
+    state: PrayerWidgetState.Available,
+    modifier: GlanceModifier,
+) {
+    val context = LocalContext.current
+    val reminder = state.reminder
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(ReferenceSurface)
+            .cornerRadius(22.dp)
+            .clickable(reminder.openAction(context))
+            .padding(end = 12.dp),
+        verticalAlignment = Alignment.Vertical.CenterVertically,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.insight_quran),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = GlanceModifier
+                .width(78.dp)
+                .height(112.dp)
+                .cornerRadius(22.dp),
+        )
+        Spacer(modifier = GlanceModifier.width(10.dp))
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                WidgetText(
+                    text = "Dua & Hadith",
+                    size = 13.sp,
+                    color = ReferenceInk,
+                    weight = WidgetFontWeight.Bold,
+                    modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+                )
+                WidgetText(
+                    text = reminder.caption,
+                    size = 8.5.sp,
+                    color = ReferenceForest,
+                    weight = WidgetFontWeight.Medium,
+                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                )
+            }
+            reminder.arabic?.let { arabic ->
+                Spacer(modifier = GlanceModifier.height(3.dp))
+                WidgetText(
+                    text = arabic,
+                    size = 15.sp,
+                    color = ReferenceForest,
+                    weight = arabicFontFor(context),
+                    maxLines = 1,
+                    align = WidgetTextAlign.End,
+                )
+            }
+            WidgetText(
+                text = reminder.text,
+                size = 10.5.sp,
+                color = ReferenceInk,
+                weight = WidgetFontWeight.Regular,
+                maxLines = 2,
+            )
+            Spacer(modifier = GlanceModifier.height(3.dp))
+            WidgetText(
+                text = listOfNotNull(reminder.sourceName, reminder.sourceDetail).joinToString(" - "),
+                size = 9.sp,
+                color = ReferenceMuted,
+                weight = WidgetFontWeight.Medium,
+            )
+        }
+    }
+}
+
+private fun WidgetPrayer.heroArtwork(): Int = when (name) {
+    "Fajr" -> R.drawable.prayer_insight_fajr
+    "Dhuhr" -> R.drawable.prayer_insight_dhuhr
+    "Asr" -> R.drawable.prayer_insight_asr
+    "Maghrib" -> R.drawable.prayer_insight_maghrib
+    else -> R.drawable.prayer_insight_isha
+}
+
+private fun DailyReminder.openAction(context: Context) = target?.let { target ->
+    actionStartIntent(
+        WidgetNavigationBus.put(
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            target,
+        ),
+    )
+} ?: actionStartActivity<MainActivity>()
 
 /**
  * Mid-height reference hierarchy.

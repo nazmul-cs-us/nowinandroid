@@ -106,6 +106,8 @@ internal sealed interface PrayerWidgetState {
          * "Prayer now" tile draws its timeline from.
          */
         val windowProgress: Float?,
+        /** A source-backed devotional reading for the tall dashboard widget. */
+        val reminder: DailyReminder,
     ) : PrayerWidgetState
 }
 
@@ -163,6 +165,7 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         insight = prayerTimes.toInsight(repository),
         now = now,
         tomorrowSunrise = tomorrowSunrise,
+        reminder = DailyReminderRepository.load(context, offset = 0),
     )
 }
 
@@ -324,6 +327,7 @@ private fun DayPrayerTimes.toWidgetState(
     insight: PrayerInsight?,
     now: LocalTime,
     tomorrowSunrise: LocalTime?,
+    reminder: DailyReminder,
 ): PrayerWidgetState.Available {
     val formatter = timeFormatter(context)
 
@@ -374,6 +378,7 @@ private fun DayPrayerTimes.toWidgetState(
         prayers = prayers,
         insight = insight,
         windowProgress = prayerWindowProgress(this, now),
+        reminder = reminder,
     )
 }
 

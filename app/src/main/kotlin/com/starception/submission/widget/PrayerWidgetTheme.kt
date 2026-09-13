@@ -93,6 +93,7 @@ internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
 internal fun StarceptionWidgetTheme(
     source: WidgetThemeSource,
     drawRectangularBackground: Boolean = true,
+    backgroundColor: ColorProvider? = null,
     content: @Composable () -> Unit,
 ) {
     val userData by source.repository.userData.collectAsState(initial = source.initial)
@@ -155,7 +156,10 @@ internal fun StarceptionWidgetTheme(
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
-                        .themedWidgetBackground()
+                        .then(
+                            backgroundColor?.let { color -> GlanceModifier.background(color) }
+                                ?: GlanceModifier.themedWidgetBackground(),
+                        )
                         .cornerRadius(24.dp),
                 ) {
                     content()
