@@ -58,12 +58,6 @@ internal data class WidgetPrayer(
     val isPast: Boolean,
     /** Meteocon for the forecast hour nearest this prayer; null when unknown. */
     val weatherIcon: Bitmap? = null,
-    /**
-     * Optimized frames of the same Meteocon for launcher-side ViewFlipper playback.
-     * Rendering is cached by weather resource, so prayers with the same forecast reuse
-     * the same Bitmap instances in RemoteViews' shared bitmap cache.
-     */
-    val weatherFrames: List<Bitmap> = emptyList(),
     /** Rounded degrees for that same hour, e.g. "38°"; null when unknown. */
     val temperature: String? = null,
     /** Compact Open-Meteo condition label for the detailed widget header. */
@@ -77,7 +71,6 @@ internal data class WidgetSolarEvent(
     val isSunset: Boolean,
     /** Dedicated Meteocons Fill artwork; it keeps its original multicolour palette. */
     val icon: Bitmap? = null,
-    val frames: List<Bitmap> = emptyList(),
 )
 
 internal sealed interface PrayerWidgetState {
@@ -224,7 +217,6 @@ private suspend fun loadPrayerWeather(
 
             WidgetWeather(
                 icon = WidgetMeteocons.forWeather(context, forecast.weatherCode, isDay),
-                frames = WidgetMeteocons.animationFrames(context, forecast.weatherCode, isDay),
                 temperature = "${forecast.temperatureCelsius.roundToInt()}°",
                 summary = forecast.weatherCode.widgetWeatherSummary(),
             )
@@ -268,7 +260,6 @@ internal data class PrayerInsight(
 
 private data class WidgetWeather(
     val icon: Bitmap?,
-    val frames: List<Bitmap>,
     val temperature: String,
     val summary: String,
 )
@@ -362,7 +353,6 @@ private fun DayPrayerTimes.toWidgetState(
             // Fajr rolling over, so it must not be dimmed as past.
             isPast = !prayer.isNext && prayer.time.isBefore(now),
             weatherIcon = weather[prayer.name]?.icon,
-            weatherFrames = weather[prayer.name]?.frames.orEmpty(),
             temperature = weather[prayer.name]?.temperature,
             weatherSummary = weather[prayer.name]?.summary,
         )
@@ -386,10 +376,6 @@ private fun DayPrayerTimes.toWidgetState(
     }
     val solarEvent = solarEventWithoutArtwork.copy(
         icon = WidgetMeteocons.forSolarEvent(context, solarEventWithoutArtwork.isSunset),
-        frames = WidgetMeteocons.solarAnimationFrames(
-            context,
-            solarEventWithoutArtwork.isSunset,
-        ),
     )
     val daylightMinutes = Duration.between(sunrise, maghrib).toMinutes().coerceAtLeast(0L)
     val nightMinutes = (Duration.ofDays(1).toMinutes() - daylightMinutes).coerceAtLeast(0L)

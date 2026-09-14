@@ -84,8 +84,8 @@ import androidx.glance.color.ColorProvider as DayNightColorProvider
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 
-/** Matches the ported layouts' own widgetPadding so the two sit consistently. */
-private val WIDGET_PADDING = 16.dp
+/** The reference keeps its inner cards close to the outer shell: roughly 2% per side. */
+private val WIDGET_PADDING = 8.dp
 private val ReferenceWidgetBackground = ColorProvider(Color(0xFFFFFCF8))
 private val ReferenceForest = ColorProvider(Color(0xFF0B4D43))
 private val ReferenceForestOn = ColorProvider(Color(0xFFFFFFFF))
@@ -95,18 +95,21 @@ private val ReferenceMuted = ColorProvider(Color(0xFF60746C))
 private val ReferenceQuote = ColorProvider(Color(0xFF24463D))
 private val ReferenceQuoteMark = ColorProvider(Color(0xFFA9A08D))
 private val ReferenceHeaderPill = ColorProvider(Color(0xFFF0F2F5))
+private val ReferenceTopHeaderPill = ColorProvider(Color(0xFFF0F1F7))
+private val ReferenceTopHeaderInk = ColorProvider(Color(0xFF0A174E))
+private val ReferenceTopHeaderMuted = ColorProvider(Color(0xFF535979))
 private val ReferencePinSurface = ColorProvider(Color(0xFFE4EFEA))
 private val ReferenceSun = ColorProvider(Color(0xFFF5B83D))
 private val ReferenceWarm = ColorProvider(Color(0xFFF08B61))
 private val ReferenceTwilight = ColorProvider(Color(0xFF7379B9))
 private val ReferenceNight = ColorProvider(Color(0xFF263F87))
 
-// The header icons are 24dp and vertically centered in the refresh button's 48dp touch
-// target. Four dp above that target plus its 12dp internal inset puts the first visible
-// pixel at the same 16dp edge used on the other three sides. The hero below sizes itself
-// against the remaining height, so this must stay in sync with the title row.
-private val HEADER_TOUCH_TARGET_TOP_PADDING = 2.dp
-private val TITLE_BAR_HEIGHT = 46.dp
+// The 35dp pin plus the measured top/bottom breathing room yields a 49dp visible row;
+// Scaffold contributes the remaining title-bar clearance. Keep the 58dp height budget
+// synchronized so the hero begins immediately below it.
+private val HEADER_TOUCH_TARGET_TOP_PADDING = 8.dp
+private val HEADER_TOUCH_TARGET_BOTTOM_PADDING = 6.dp
+private val TITLE_BAR_HEIGHT = 58.dp
 
 // Titled layouts finish with an inset card (the next-prayer or timetable surface). Its
 // final row contributes its own visual clearance, so a full 16dp outer bottom inset would
@@ -127,8 +130,8 @@ private val GROUP_GAP_MIN = 10.dp
 /**
  * Narrowest drawable width the title bar is worth showing at.
  *
- * Its fixed furniture is the start padding (16dp), the pin (22dp), the gap after it (8dp),
- * the refresh target (48dp) and the end padding (4dp) — 98dp before a single character of
+ * Its fixed furniture is the start inset, pin, gap, refresh target and end inset — about
+ * 100dp before a single character of
  * the place name. Below roughly 200dp the name has less room than the chrome around it,
  * and the bare surface makes better use of the card.
  *
@@ -389,11 +392,8 @@ class PrayerTimesFullWidget : BasePrayerTimesWidget()
 @Composable
 private fun BareSurface(
     verticalAlignment: Alignment.Vertical = Alignment.Vertical.CenterVertically,
-    // 16dp on every side, matching TextWithImageLayoutDimensions.widgetPadding in the
-    // ported layouts — "padding that visually appears between the widget outline and
-    // anything inside". These surfaces sit next to those on the same home screen, and
-    // the previous 14dp horizontal against 12dp vertical read as an uneven border gap
-    // beside them.
+    // The supplied prayer reference uses a much tighter shell inset than the sample
+    // widgets: about 2% of its width, which resolves to 8dp at this footprint.
     padding: androidx.compose.ui.unit.Dp = WIDGET_PADDING,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -634,9 +634,10 @@ private fun TitledSurface(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .padding(
-                        start = WIDGET_PADDING,
-                        end = 4.dp,
+                        start = 12.dp,
+                        end = 8.dp,
                         top = HEADER_TOUCH_TARGET_TOP_PADDING,
+                        bottom = HEADER_TOUCH_TARGET_BOTTOM_PADDING,
                     ),
                 verticalAlignment = Alignment.Vertical.CenterVertically,
             ) {
@@ -664,8 +665,8 @@ private fun TitledSurface(
                 if (detailedHeader) {
                     Box(
                         modifier = GlanceModifier
-                            .size(34.dp)
-                            .background(ReferenceHeaderPill)
+                            .size(33.dp)
+                            .background(ReferenceTopHeaderPill)
                             .cornerRadius(17.dp)
                             .clickable(actionRunCallback<RefreshPrayerWidgetAction>()),
                         contentAlignment = Alignment.Center,
@@ -673,8 +674,8 @@ private fun TitledSurface(
                         Image(
                             provider = ImageProvider(R.drawable.sample_refresh_icon),
                             contentDescription = "Refresh prayer times",
-                            colorFilter = ColorFilter.tint(ReferenceInk),
-                            modifier = GlanceModifier.size(19.dp),
+                            colorFilter = ColorFilter.tint(ReferenceTopHeaderInk),
+                            modifier = GlanceModifier.size(22.dp),
                         )
                     }
                 } else {
@@ -702,30 +703,30 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
 ) {
     Box(
         modifier = GlanceModifier
-            .size(36.dp)
+            .size(35.dp)
             .background(ReferencePinSurface)
             .cornerRadius(18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            provider = ImageProvider(R.drawable.ic_flaticon_location_marker),
+            provider = ImageProvider(R.drawable.ic_location_pin),
             contentDescription = null,
             colorFilter = ColorFilter.tint(ReferenceForest),
             modifier = GlanceModifier.size(21.dp),
         )
     }
-    Spacer(modifier = GlanceModifier.width(7.dp))
+    Spacer(modifier = GlanceModifier.width(9.dp))
     Column(modifier = GlanceModifier.defaultWeight()) {
         WidgetText(
             text = state.place,
-            size = 15.sp,
-            color = ReferenceInk,
+            size = 13.sp,
+            color = ReferenceTopHeaderInk,
             weight = WidgetFontWeight.Medium,
         )
         WidgetText(
             text = state.dateLabel,
-            size = 9.5.sp,
-            color = ReferenceMuted,
+            size = 8.5.sp,
+            color = ReferenceTopHeaderMuted,
             weight = WidgetFontWeight.Regular,
         )
     }
@@ -736,25 +737,29 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
     // title row shorter than TITLE_BAR_HEIGHT, leaving a false extra inset at the bottom.
     Row(
         modifier = GlanceModifier
-            .wrapContentWidth()
-            .background(ReferenceHeaderPill)
-            .cornerRadius(18.dp)
-            .padding(horizontal = 7.dp, vertical = 2.dp),
+            .width(100.dp)
+            .height(36.dp)
+            .background(
+                imageProvider = ImageProvider(R.drawable.widget_weather_pill_background),
+                contentScale = ContentScale.FillBounds,
+            )
+            .cornerRadius(19.dp)
+            .padding(start = 9.dp, end = 9.dp, bottom = 1.dp),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
         if (state.nextPrayer.weatherIcon != null) {
-            AnimatedMeteocon(prayer = state.nextPrayer, size = 28.dp)
+            StaticMeteocon(prayer = state.nextPrayer, size = 28.dp)
         } else {
-            AnimatedSolarMeteocon(event = state.solarEvent, size = 28.dp)
+            StaticSolarMeteocon(event = state.solarEvent, size = 28.dp)
         }
-        Spacer(modifier = GlanceModifier.width(5.dp))
-        Column(modifier = GlanceModifier.wrapContentWidth()) {
+        Spacer(modifier = GlanceModifier.width(4.dp))
+        Column(modifier = GlanceModifier.width(50.dp)) {
             WidgetText(
                 text = state.nextPrayer.temperature ?: state.solarEvent.label,
-                size = 9.5.sp,
-                color = ReferenceInk,
-                weight = WidgetFontWeight.Medium,
-                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                size = 13.sp,
+                color = ReferenceTopHeaderInk,
+                weight = WidgetFontWeight.Bold,
+                modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
             )
             WidgetText(
                 text = if (state.nextPrayer.weatherIcon != null) {
@@ -762,10 +767,11 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
                 } else {
                     state.solarEvent.time
                 },
-                size = 9.5.sp,
-                color = ReferenceMuted,
-                weight = WidgetFontWeight.Regular,
-                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                size = 8.5.sp,
+                color = ReferenceTopHeaderInk,
+                weight = WidgetFontWeight.Medium,
+                align = WidgetTextAlign.End,
+                modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
             )
         }
     }
@@ -1254,7 +1260,7 @@ private fun NextPrayerStripContent(
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
         if (fitsWithIcon) {
-            AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
+            StaticMeteocon(prayer = state.nextPrayer, size = 20.dp)
             Spacer(modifier = GlanceModifier.width(8.dp))
         }
         Column(modifier = GlanceModifier.defaultWeight()) {
@@ -1339,7 +1345,7 @@ private fun DayStripContent(
                     .padding(horizontal = 1.dp, vertical = 2.dp),
                 horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
             ) {
-                if (showIcons && (prayer.weatherIcon != null || prayer.weatherFrames.isNotEmpty())) {
+                if (showIcons && prayer.weatherIcon != null) {
                     Box(
                         modifier = GlanceModifier
                             .size(30.dp)
@@ -1347,7 +1353,7 @@ private fun DayStripContent(
                             .cornerRadius(15.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        AnimatedMeteocon(prayer = prayer, size = 23.dp)
+                        StaticMeteocon(prayer = prayer, size = 23.dp)
                     }
                     Spacer(modifier = GlanceModifier.height(2.dp))
                 }
@@ -1422,7 +1428,7 @@ private fun ReferenceFullPrayerContent(
     // The tall layout preserves all three reference sections. Its devotional panel takes
     // the remaining height, so it can grow with launcher row spans without making prayer
     // times or text smaller.
-    val heroHeight = 128.dp
+    val heroHeight = 132.dp
     val sectionGap = 6.dp
     val scheduleHeight = 142.dp
 
@@ -1456,14 +1462,14 @@ private fun ReferencePrayerHero(
     val currentName = state.currentPrayerName()
     val elapsed = state.insight?.elapsed.orEmpty()
     val leftWidth = (width * 0.38f).coerceIn(116.dp, 154.dp)
-    val rightWidth = (width * 0.19f).coerceIn(56.dp, 76.dp)
+    val rightWidth = (width * 0.13f).coerceIn(46.dp, 52.dp)
     val compact = width < 330.dp
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(height)
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_hero_v3),
+                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_hero_v4),
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(24.dp),
@@ -1476,21 +1482,26 @@ private fun ReferencePrayerHero(
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(horizontal = 17.dp, vertical = 10.dp),
+                .padding(start = 14.dp, top = 6.dp, end = 7.dp, bottom = 6.dp),
             verticalAlignment = Alignment.Vertical.Top,
         ) {
-            Column(modifier = GlanceModifier.width(leftWidth)) {
+            Column(modifier = GlanceModifier.width(leftWidth).padding(top = 9.dp)) {
                 WidgetText(
                     text = elapsed.ifBlank { "Since $currentName" },
                     size = 9.5.sp,
                     color = ReferenceHeroText,
                     weight = WidgetFontWeight.SerifRegular,
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(start = 4.dp),
                 )
-                Spacer(modifier = GlanceModifier.height(3.dp))
+                Spacer(modifier = GlanceModifier.height(4.dp))
                 Row(
-                    modifier = GlanceModifier.width(64.dp).height(4.dp),
+                    modifier = GlanceModifier.width(68.dp).height(4.dp),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
                 ) {
+                    Spacer(modifier = GlanceModifier.width(4.dp))
                     Box(
                         modifier = GlanceModifier
                             .defaultWeight()
@@ -1506,15 +1517,19 @@ private fun ReferencePrayerHero(
                             .cornerRadius(2.dp),
                     ) {}
                 }
-                Spacer(modifier = GlanceModifier.height(4.dp))
+                Spacer(modifier = GlanceModifier.height(2.dp))
                 WidgetText(
                     text = state.nextPrayer.name,
                     size = if (compact) 28.sp else 32.sp,
                     color = ReferenceHeroText,
                     weight = WidgetFontWeight.SerifBold,
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(start = 3.dp),
                 )
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth(),
+                    modifier = GlanceModifier.fillMaxWidth().padding(start = 3.dp),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
                 ) {
                     WidgetText(
@@ -1532,15 +1547,15 @@ private fun ReferencePrayerHero(
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
                 }
-                Spacer(modifier = GlanceModifier.height(2.dp))
+                Spacer(modifier = GlanceModifier.height(5.dp))
                 Box(
                     modifier = GlanceModifier
-                        .width(122.dp)
+                        .width(117.dp)
                         .height(1.dp)
                         .background(ReferenceHeroText)
                         .cornerRadius(1.dp),
                 ) {}
-                Spacer(modifier = GlanceModifier.height(3.dp))
+                Spacer(modifier = GlanceModifier.height(4.dp))
                 WidgetText(
                     text = "A moment to pause, be grateful,\nand turn to Allah.",
                     size = if (compact) 7.sp else 7.5.sp,
@@ -1552,18 +1567,17 @@ private fun ReferencePrayerHero(
             Spacer(modifier = GlanceModifier.defaultWeight())
             Column(
                 modifier = GlanceModifier
-                    .width(rightWidth)
-                    .padding(start = 5.dp, end = 2.dp),
+                    .width(rightWidth),
             ) {
                 Image(
                     provider = ImageProvider(R.drawable.widget_quote_mark),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(ReferenceQuoteMark),
-                    modifier = GlanceModifier.size(18.dp),
+                    modifier = GlanceModifier.size(16.dp),
                 )
                 WidgetText(
                     text = "And establish\nprayer for My\nremembrance.",
-                    size = if (compact) 7.5.sp else 8.5.sp,
+                    size = if (compact) 7.sp else 7.5.sp,
                     color = ReferenceQuote,
                     weight = WidgetFontWeight.Medium,
                     maxLines = 3,
@@ -1571,8 +1585,8 @@ private fun ReferencePrayerHero(
                 Spacer(modifier = GlanceModifier.height(2.dp))
                 WidgetText(
                     text = "— Taha 20:14",
-                    size = 7.5.sp,
-                    color = ReferenceMuted,
+                    size = 6.5.sp,
+                    color = ReferenceQuote,
                     weight = WidgetFontWeight.Regular,
                 )
             }
@@ -2236,7 +2250,7 @@ private fun ReferencePrayerSchedulePanel(
                 modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
             )
             Spacer(modifier = GlanceModifier.width(5.dp))
-            AnimatedMeteocon(
+            StaticMeteocon(
                 prayer = state.nextPrayer,
                 size = if (compact) 17.dp else 19.dp,
             )
@@ -2495,7 +2509,7 @@ private fun NextPrayerBanner(
                     .cornerRadius(if (compact) 16.dp else 19.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                AnimatedMeteocon(
+                StaticMeteocon(
                     prayer = state.nextPrayer,
                     size = if (compact) 20.dp else 24.dp,
                 )
@@ -2688,7 +2702,7 @@ private fun PrayerScheduleList(
                     verticalAlignment = Alignment.Vertical.CenterVertically,
                 ) {
                     if (showWeatherIcons) {
-                        AnimatedMeteocon(
+                        StaticMeteocon(
                             prayer = prayer,
                             size = if (compact) 20.dp else 24.dp,
                         )
@@ -2913,7 +2927,7 @@ private fun ColumnScope.PrayerHeroContent(
             )
         }
         Spacer(modifier = GlanceModifier.defaultWeight())
-        AnimatedMeteocon(prayer = state.nextPrayer, size = 20.dp)
+        StaticMeteocon(prayer = state.nextPrayer, size = 20.dp)
     }
 
     // The hero ends on its largest line, so retain a little optical clearance inside the
@@ -2994,108 +3008,47 @@ private fun AnimatedFoliage(
 
 
 /**
- * The next prayer's Meteocon, animated.
+ * The next prayer's static Meteocon.
  *
- * Glance has no animation of its own — its output is RemoteViews, which the launcher
- * inflates in its own process with no frame loop to drive. ViewFlipper is the one
- * animating widget on the RemoteViews allowlist: given autoStart and a flipInterval it
- * advances its children by itself, so handing it rasterised Lottie frames is what makes
- * a Meteocon actually move on the home screen.
- *
- * Falls back to the still bitmap whenever frames are missing, so a failed render costs
- * the motion rather than the icon.
+ * Weather changes still arrive with normal widget refreshes, but the icon itself remains
+ * motionless so it does not compete with the hero or the intentionally subtle foliage.
  */
 @Composable
-private fun AnimatedMeteocon(
+private fun StaticMeteocon(
     prayer: WidgetPrayer,
     size: androidx.compose.ui.unit.Dp,
 ) {
-    AnimatedMeteoconFrames(
+    StaticMeteoconBitmap(
         still = prayer.weatherIcon,
-        frames = prayer.weatherFrames,
         size = size,
-        layout = R.layout.widget_meteocon_flipper,
-        frameViewIds = WEATHER_FRAME_VIEW_IDS,
     )
 }
 
 /** Meteocons Fill solar artwork is already coloured, so it must never receive a tint. */
 @Composable
-private fun AnimatedSolarMeteocon(
+private fun StaticSolarMeteocon(
     event: WidgetSolarEvent,
     size: androidx.compose.ui.unit.Dp,
 ) {
-    AnimatedMeteoconFrames(
+    StaticMeteoconBitmap(
         still = event.icon,
-        frames = event.frames,
         size = size,
-        layout = R.layout.widget_solar_meteocon_flipper,
-        frameViewIds = SOLAR_FRAME_VIEW_IDS,
     )
 }
 
 @Composable
-private fun AnimatedMeteoconFrames(
+private fun StaticMeteoconBitmap(
     still: Bitmap?,
-    frames: List<Bitmap>,
     size: androidx.compose.ui.unit.Dp,
-    @LayoutRes layout: Int,
-    frameViewIds: IntArray,
 ) {
-    val context = LocalContext.current
-
-    if (frames.size < 2) {
-        still?.let { bitmap ->
-            Image(
-                provider = ImageProvider(bitmap),
-                contentDescription = null,
-                modifier = GlanceModifier.size(size),
-            )
-        }
-        return
+    still?.let {
+        Image(
+            provider = ImageProvider(it),
+            contentDescription = null,
+            modifier = GlanceModifier.size(size),
+        )
     }
-
-    val remoteViews = RemoteViews(
-        context.packageName,
-        layout,
-    ).apply {
-        frameViewIds.forEachIndexed { index, viewId ->
-            // The layout has a fixed number of children; cycle the available frames over
-            // them so a short render still fills every slot rather than leaving blanks
-            // that would read as a stutter.
-            setImageViewBitmap(viewId, frames[index % frames.size])
-        }
-    }
-
-    AndroidRemoteViews(
-        remoteViews = remoteViews,
-        modifier = GlanceModifier.size(size),
-    )
 }
-
-private val METEOCON_FRAME_VIEW_IDS = intArrayOf(
-    R.id.meteocon_frame_0,
-    R.id.meteocon_frame_1,
-    R.id.meteocon_frame_2,
-    R.id.meteocon_frame_3,
-    R.id.meteocon_frame_4,
-    R.id.meteocon_frame_5,
-    R.id.meteocon_frame_6,
-    R.id.meteocon_frame_7,
-    R.id.meteocon_frame_8,
-    R.id.meteocon_frame_9,
-    R.id.meteocon_frame_10,
-    R.id.meteocon_frame_11,
-    R.id.meteocon_frame_12,
-    R.id.meteocon_frame_13,
-    R.id.meteocon_frame_14,
-    R.id.meteocon_frame_15,
-    R.id.meteocon_frame_16,
-    R.id.meteocon_frame_17,
-)
-
-private val SOLAR_FRAME_VIEW_IDS = METEOCON_FRAME_VIEW_IDS.copyOfRange(0, 12)
-private val WEATHER_FRAME_VIEW_IDS = METEOCON_FRAME_VIEW_IDS.copyOfRange(0, 18)
 
 private val FOLIAGE_FRAME_VIEW_IDS = intArrayOf(
     R.id.foliage_frame_0,

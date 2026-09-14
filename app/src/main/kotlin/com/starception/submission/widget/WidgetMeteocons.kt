@@ -18,22 +18,22 @@ package com.starception.submission.widget
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.util.Log
+import androidx.annotation.DrawableRes
 import androidx.annotation.RawRes
 import com.airbnb.lottie.LottieCompositionFactory
 import com.airbnb.lottie.LottieDrawable
 import com.starception.submission.R
 
 /**
- * Turns the app's animated Meteocons into still bitmaps a widget can show.
+ * Supplies static weather artwork a widget can show.
  *
- * A widget's content is RemoteViews, drawn by the launcher's process from a serialised
- * description — there is no Lottie there and no frame loop to drive it, so the animated
- * icon used on the prayer screen cannot be reused directly. Rasterising one frame is the
- * only way to keep the same artwork and the same weather-code mapping in both places
- * rather than maintaining a second, divergent set of static icons.
+ * The compact header deliberately uses the bundled Flaticon PNG family. Its broad,
+ * rounded shapes remain legible at 24dp and visually match the supplied reference more
+ * closely than a frozen frame from the screen's line-based Meteocon animation.
  *
  * The frame is taken partway into the loop instead of at 0, because Meteocons open on a
  * near-empty canvas (clouds drift in, rain has not fallen yet) and frame 0 reads as a
@@ -84,8 +84,10 @@ internal object WidgetMeteocons {
      */
     @Synchronized
     fun forWeather(context: Context, weatherCode: Int, isDay: Boolean): Bitmap? {
-        val resource = meteoconResource(weatherCode, isDay)
-        return cache.getOrPut(resource) { render(context, resource) }
+        val resource = staticWeatherResource(weatherCode, isDay)
+        return cache.getOrPut(resource) {
+            BitmapFactory.decodeResource(context.resources, resource)
+        }
     }
 
     /**
@@ -231,6 +233,22 @@ internal object WidgetMeteocons {
     private fun Bitmap.trimTransparentBorder(): Bitmap {
         val box = opaqueBounds() ?: return this
         return Bitmap.createBitmap(this, box.left, box.top, box.width(), box.height())
+    }
+
+    /** Static, rounded weather artwork used by the reference-style widget header. */
+    @DrawableRes
+    private fun staticWeatherResource(weatherCode: Int, isDay: Boolean): Int = when (weatherCode) {
+        0 -> if (isDay) R.drawable.flaticon_weather_clear else R.drawable.flaticon_weather_moon
+        1, 2 -> if (isDay) {
+            R.drawable.flaticon_weather_partly_cloudy
+        } else {
+            R.drawable.flaticon_weather_moon
+        }
+        3, 45, 48 -> R.drawable.flaticon_weather_cloudy
+        in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
+        in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
+        in 95..99 -> R.drawable.flaticon_weather_storm
+        else -> R.drawable.flaticon_weather_cloudy
     }
 
     @RawRes

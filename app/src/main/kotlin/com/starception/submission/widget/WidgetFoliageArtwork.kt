@@ -56,6 +56,8 @@ internal object WidgetFoliageArtwork {
     // memory ceiling even when two decorated cards are present.
     private const val BITMAP_WIDTH = 320
     private const val BITMAP_HEIGHT = 128
+    private const val HERO_BITMAP_WIDTH = 480
+    private const val HERO_BITMAP_HEIGHT = 192
     private const val LOGICAL_WIDTH = 640
     private const val LOGICAL_HEIGHT = 256
 
@@ -74,11 +76,23 @@ internal object WidgetFoliageArtwork {
         placement: WidgetFoliagePlacement,
         frame: Int,
     ): Bitmap {
-        val bitmap = Bitmap.createBitmap(BITMAP_WIDTH, BITMAP_HEIGHT, Bitmap.Config.ARGB_8888)
+        // The hero leaves are large focal elements, so give only that placement a denser
+        // raster. The smaller edge decorations retain the lighter bitmap budget.
+        val bitmapWidth = if (placement == WidgetFoliagePlacement.HERO_RIGHT) {
+            HERO_BITMAP_WIDTH
+        } else {
+            BITMAP_WIDTH
+        }
+        val bitmapHeight = if (placement == WidgetFoliagePlacement.HERO_RIGHT) {
+            HERO_BITMAP_HEIGHT
+        } else {
+            BITMAP_HEIGHT
+        }
+        val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.scale(
-            BITMAP_WIDTH.toFloat() / LOGICAL_WIDTH,
-            BITMAP_HEIGHT.toFloat() / LOGICAL_HEIGHT,
+            bitmapWidth.toFloat() / LOGICAL_WIDTH,
+            bitmapHeight.toFloat() / LOGICAL_HEIGHT,
         )
         val palette = paletteFor(phase)
         val cycle = frame.toDouble() / FRAME_COUNT.toDouble() * PI * 2.0
@@ -124,7 +138,7 @@ internal object WidgetFoliageArtwork {
         secondarySway: Float,
         palette: FoliagePalette,
     ) {
-        val rootX = 592f
+        val rootX = 626f
         val rootY = LOGICAL_HEIGHT + 5f
         val stemPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.stem
@@ -134,11 +148,11 @@ internal object WidgetFoliageArtwork {
             strokeCap = Paint.Cap.ROUND
         }
         val bases = listOf(
-            574f to 235f,
-            580f to 220f,
-            588f to 207f,
-            597f to 198f,
-            605f to 222f,
+            608f to 251f,
+            614f to 232f,
+            624f to 238f,
+            631f to 214f,
+            639f to 236f,
         )
         bases.forEachIndexed { index, (baseX, baseY) ->
             canvas.drawPath(
@@ -157,11 +171,13 @@ internal object WidgetFoliageArtwork {
             )
         }
         val leaves = listOf(
-            LeafSpec(574f, 235f, 104f, 25f, -155f, palette.highlight),
-            LeafSpec(580f, 220f, 100f, 25f, -134f, palette.primary),
-            LeafSpec(588f, 207f, 95f, 25f, -110f, palette.deep),
-            LeafSpec(597f, 198f, 92f, 25f, -91f, palette.secondary),
-            LeafSpec(605f, 222f, 80f, 23f, -63f, palette.primary),
+            // Keep the low, left-facing leaf beneath the citation. Its broader predecessor
+            // crossed behind "Taha 20:14" once the artwork was scaled by the launcher.
+            LeafSpec(608f, 251f, 88f, 25f, -158f, palette.highlight),
+            LeafSpec(614f, 232f, 90f, 25f, -134f, palette.primary),
+            LeafSpec(624f, 238f, 74f, 24f, -110f, palette.deep),
+            LeafSpec(631f, 214f, 82f, 25f, -91f, palette.secondary),
+            LeafSpec(639f, 236f, 72f, 23f, -63f, palette.primary),
         )
         leaves.forEachIndexed { index, leaf ->
             drawLeaf(
@@ -171,7 +187,8 @@ internal object WidgetFoliageArtwork {
                         secondarySway * (0.10f + index * 0.025f),
                 ),
                 vein = palette.vein,
-                alpha = 202,
+                alpha = 220,
+                veinAlpha = 116,
             )
         }
     }
@@ -230,6 +247,7 @@ internal object WidgetFoliageArtwork {
         spec: LeafSpec,
         vein: Int,
         alpha: Int = 172,
+        veinAlpha: Int = 82,
     ) {
         canvas.save()
         canvas.translate(spec.x, spec.y)
@@ -282,7 +300,7 @@ internal object WidgetFoliageArtwork {
             0f,
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = vein
-                this.alpha = 82
+                this.alpha = veinAlpha
                 strokeWidth = 1.1f
                 strokeCap = Paint.Cap.ROUND
             },
