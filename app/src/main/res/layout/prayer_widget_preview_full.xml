@@ -93,14 +93,41 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/ubuntu_sans"
-                android:includeFontPadding="false"
-                android:text="2h 9m since Dhuhr"
-                android:textColor="@color/prayer_widget_on_hero"
-                android:textSize="10sp" />
+                android:gravity="bottom"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/ubuntu_sans"
+                    android:includeFontPadding="false"
+                    android:text="2h 9m"
+                    android:textColor="@color/prayer_widget_on_hero"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/ubuntu_sans"
+                    android:includeFontPadding="false"
+                    android:text=" since "
+                    android:textColor="@color/prayer_widget_on_hero"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/ubuntu_sans"
+                    android:includeFontPadding="false"
+                    android:text="Dhuhr"
+                    android:textColor="@color/prayer_widget_on_hero"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
@@ -110,7 +137,7 @@
                 android:includeFontPadding="false"
                 android:text="Maghrib"
                 android:textColor="@color/prayer_widget_on_hero"
-                android:textSize="28sp"
+                android:textSize="36sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -120,18 +147,9 @@
                 android:includeFontPadding="false"
                 android:text="in 2h 17m"
                 android:textColor="@color/prayer_widget_on_hero"
-                android:textSize="17sp"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/ubuntu_sans"
-                android:includeFontPadding="false"
-                android:text="A moment to pause and turn to Allah."
-                android:textColor="@color/prayer_widget_on_hero"
-                android:textSize="9sp" />
         </LinearLayout>
 
         <ImageView
@@ -146,7 +164,7 @@
         android:layout_width="match_parent"
         android:layout_height="142dp"
         android:layout_marginTop="8dp"
-        android:background="@drawable/prayer_widget_card_background"
+        android:background="@drawable/prayer_widget_reference_panel_v2"
         android:orientation="vertical"
         android:paddingHorizontal="10dp"
         android:paddingVertical="8dp">
@@ -156,6 +174,12 @@
             android:layout_height="22dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
+
+            <View
+                android:layout_width="4dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="6dp"
+                android:background="@color/prayer_widget_accent" />
 
             <TextView
                 android:layout_width="0dp"
@@ -170,11 +194,17 @@
 
             <TextView
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="24dp"
+                android:background="@drawable/prayer_widget_preview_header_pill"
+                android:drawableStart="@drawable/calendar_month_24"
+                android:drawablePadding="4dp"
+                android:drawableTint="@color/prayer_widget_on_background"
                 android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
                 android:includeFontPadding="false"
-                android:text="View schedule"
-                android:textColor="@color/prayer_widget_accent"
+                android:paddingHorizontal="8dp"
+                android:text="View Calendar  ›"
+                android:textColor="@color/prayer_widget_on_background"
                 android:textSize="9sp" />
         </LinearLayout>
 

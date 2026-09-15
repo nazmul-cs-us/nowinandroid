@@ -56,6 +56,8 @@ internal data class WidgetPrayer(
     val time: String,
     val isNext: Boolean,
     val isPast: Boolean,
+    /** Short status used by the reference timeline, e.g. "18m ago" or "in 2h 10m". */
+    val relativeLabel: String? = null,
     /** Meteocon for the forecast hour nearest this prayer; null when unknown. */
     val weatherIcon: Bitmap? = null,
     /** Rounded degrees for that same hour, e.g. "38°"; null when unknown. */
@@ -345,13 +347,26 @@ private fun DayPrayerTimes.toWidgetState(
     val formatter = timeFormatter(context)
 
     val prayers = getActualPrayers().map { prayer ->
+        val isPast = !prayer.isNext && prayer.time.isBefore(now)
+        val minutesSince = if (isPast) {
+            Duration.between(prayer.time, now).toMinutes().coerceAtLeast(0L)
+        } else {
+            0L
+        }
         WidgetPrayer(
             name = prayer.name,
             time = prayer.time.format(formatter),
             isNext = prayer.isNext,
             // A prayer that is "next" while already behind the clock is tomorrow's
             // Fajr rolling over, so it must not be dimmed as past.
-            isPast = !prayer.isNext && prayer.time.isBefore(now),
+            isPast = isPast,
+            relativeLabel = when {
+                prayer.isNext -> countdownTo(prayer.time, now)
+                // Recent prayers keep a useful elapsed label. Older completed prayers
+                // use the reference's compact check treatment instead.
+                isPast && minutesSince <= 150L -> "${durationLabel(minutesSince)} ago"
+                else -> null
+            },
             weatherIcon = weather[prayer.name]?.icon,
             temperature = weather[prayer.name]?.temperature,
             weatherSummary = weather[prayer.name]?.summary,

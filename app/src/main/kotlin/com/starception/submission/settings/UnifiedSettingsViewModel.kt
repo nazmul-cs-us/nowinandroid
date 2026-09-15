@@ -30,6 +30,8 @@ import com.starception.submission.settings.components.TtsTestState
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.TTS_VOICE_SAMPLE_TEXT
 import com.starception.submission.widget.PrayerWidgetUpdater
+import com.starception.submission.widget.WidgetAppearancePreferences
+import com.starception.submission.widget.WidgetAppearanceSettings
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetDownloadViewModel
 import com.starception.submission.download.CategoryDownloadState
@@ -95,6 +97,13 @@ class UnifiedSettingsViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = ThemeSettingsState()
         )
+
+    // One global appearance policy is consumed by every Glance widget.
+    private val _widgetAppearanceSettings = MutableStateFlow(
+        WidgetAppearancePreferences.read(context),
+    )
+    val widgetAppearanceSettings: StateFlow<WidgetAppearanceSettings> =
+        _widgetAppearanceSettings.asStateFlow()
 
     // Prayer settings
     private val _prayerSettings = MutableStateFlow(PrayerSettings())
@@ -266,6 +275,15 @@ class UnifiedSettingsViewModel @Inject constructor(
             userDataRepository.setDynamicColorPreference(useDynamicColor)
             PrayerWidgetUpdater.refresh(context)
         }
+    }
+
+    fun updateWidgetAppearanceSettings(settings: WidgetAppearanceSettings) {
+        val normalized = settings.copy(
+            backgroundOpacity = settings.backgroundOpacity.coerceIn(0f, 1f),
+        )
+        _widgetAppearanceSettings.value = normalized
+        WidgetAppearancePreferences.write(context, normalized)
+        PrayerWidgetUpdater.refresh(context)
     }
 
     // Prayer settings updates

@@ -90,6 +90,7 @@ import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.TtsSettingsSection
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.VoiceSettingsSection
+import com.starception.submission.settings.components.WidgetSettingsSection
 import androidx.compose.material.icons.outlined.Storage
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
@@ -101,6 +102,7 @@ fun UnifiedSettingsScreen(
     viewModel: UnifiedSettingsViewModel = hiltViewModel()
 ) {
     val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
+    val widgetAppearanceSettings by viewModel.widgetAppearanceSettings.collectAsStateWithLifecycle()
     val prayerSettings by viewModel.prayerSettings.collectAsStateWithLifecycle()
     val expandedSections by viewModel.expandedSections.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
@@ -123,15 +125,16 @@ fun UnifiedSettingsScreen(
     val sectionItemIndices = remember(contentCategories.isNotEmpty()) {
         buildMap {
             put("appearance", 2)
-            put("prayer", 3)
-            put("notifications", 4)
-            put("traveldua", 5)
-            put("voice", 7)
-            put("tts", 8)
-            put("salah", 9)
-            put("content", 11)
-            put("about", if (contentCategories.isNotEmpty()) 12 else 11)
-            put("developer", if (contentCategories.isNotEmpty()) 13 else 12)
+            put("widget", 3)
+            put("prayer", 4)
+            put("notifications", 5)
+            put("traveldua", 6)
+            put("voice", 8)
+            put("tts", 9)
+            put("salah", 10)
+            put("content", 12)
+            put("about", if (contentCategories.isNotEmpty()) 13 else 12)
+            put("developer", if (contentCategories.isNotEmpty()) 14 else 13)
         }
     }
     var skipInitialExpandScroll by remember { mutableStateOf(true) }
@@ -299,6 +302,22 @@ fun UnifiedSettingsScreen(
                             },
                         )
                         AppIconSection(modifier = Modifier.padding(top = 20.dp))
+                    }
+                }
+
+                // Widget Section
+                item {
+                    SettingsSection(
+                        title = "Widgets",
+                        subtitle = "Background, opacity & colors",
+                        iconGlyph = FlaticonIcons.QUICK_ACTION,
+                        isExpanded = expandedSections.contains("widget"),
+                        onToggleExpanded = { viewModel.toggleSection("widget") },
+                    ) {
+                        WidgetSettingsSection(
+                            settings = widgetAppearanceSettings,
+                            onSettingsChanged = viewModel::updateWidgetAppearanceSettings,
+                        )
                     }
                 }
 

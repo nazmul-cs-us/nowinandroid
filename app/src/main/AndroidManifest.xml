@@ -213,14 +213,19 @@
              the screen is off and the card would otherwise be stale exactly when the
              user first looks at it.
 
-             Not exported: the alarm PendingIntent and the USER_PRESENT broadcast are
-             both delivered by the system, neither needs another app to reach it. -->
+             CONFIGURATION_CHANGED and WALLPAPER_CHANGED also redraw every widget so global
+             "Match phone setting" and Dynamic color choices track the system immediately.
+
+             Not exported: the alarm PendingIntent and broadcasts are all delivered by the
+             system; no other app needs to reach this receiver. -->
         <receiver
             android:name=".widget.PrayerWidgetRefreshReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+                <action android:name="android.intent.action.WALLPAPER_CHANGED" />
             </intent-filter>
         </receiver>
 

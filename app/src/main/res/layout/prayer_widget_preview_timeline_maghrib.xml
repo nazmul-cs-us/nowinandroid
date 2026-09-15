@@ -1,1 +1,46 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/prayer_widget_preview_timeline_active" android:gravity="center" android:orientation="vertical"><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Maghrib" android:textColor="@color/prayer_widget_on_card" android:textSize="10sp" android:textStyle="bold" /><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="6:34" android:textColor="@color/prayer_widget_on_card" android:textSize="9sp" /></LinearLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:background="@drawable/prayer_widget_preview_timeline_active"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingVertical="2dp">
+
+    <ImageView
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/prayer_insight_maghrib" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="Maghrib"
+        android:textColor="@color/prayer_widget_on_hero"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:text="6:34 PM"
+        android:textColor="@color/prayer_widget_on_hero"
+        android:textSize="9sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="15dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/prayer_widget_preview_status_active"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingHorizontal="5dp"
+        android:text="in 2h 17m"
+        android:textColor="@color/prayer_widget_on_hero"
+        android:textSize="7sp" />
+</LinearLayout>
