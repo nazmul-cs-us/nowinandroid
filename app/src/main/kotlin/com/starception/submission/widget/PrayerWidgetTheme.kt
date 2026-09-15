@@ -86,6 +86,16 @@ private val LocalCookieWidgetGradient = staticCompositionLocalOf<ImageProvider> 
     error("Cookie widget gradient was not provided")
 }
 internal val LocalWidgetAppearance = staticCompositionLocalOf { WidgetAppearanceSettings() }
+internal data class TransparentWidgetForeground(
+    val primary: ColorProvider,
+    val secondary: ColorProvider,
+)
+internal val LocalTransparentWidgetForeground = staticCompositionLocalOf {
+    TransparentWidgetForeground(
+        primary = ColorProvider(Color.White),
+        secondary = ColorProvider(Color(0xFFE2E7F1)),
+    )
+}
 
 /** Transparent Scaffold paint lets the shared gradient below remain visible. */
 internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
@@ -120,6 +130,10 @@ internal fun StarceptionWidgetTheme(
         WidgetColorMode.LIGHT -> false
         WidgetColorMode.DARK -> true
     }
+    val transparentForeground = TransparentWidgetForeground(
+        primary = ColorProvider(Color(0xFFFFFFFF)),
+        secondary = ColorProvider(Color(0xFFFFFFFF)),
+    )
     val useWallpaperColors = source.appearance.backgroundType ==
         WidgetBackgroundType.DYNAMIC_COLOR
     val scheme = niaColorScheme(
@@ -222,6 +236,7 @@ internal fun StarceptionWidgetTheme(
             LocalWidgetGradient provides ImageProvider(gradient),
             LocalCookieWidgetGradient provides ImageProvider(cookieGradient),
             LocalWidgetAppearance provides source.appearance,
+            LocalTransparentWidgetForeground provides transparentForeground,
         ) {
             if (drawRectangularBackground) {
                 // This must be a separate RemoteViews layer. Scaffold paints its own

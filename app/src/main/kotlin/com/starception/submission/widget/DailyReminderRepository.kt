@@ -59,6 +59,8 @@ internal data class DailyReminder(
      * the widget's size, which this layer cannot see.
      */
     val arabic: String? = null,
+    /** Latin-script pronunciation shown between Arabic and translation when available. */
+    val transliteration: String? = null,
 )
 
 /**
@@ -306,6 +308,9 @@ internal object DailyReminderRepository {
                 // short, stable and is the same label the user sees elsewhere in the app.
                 sourceDetail = topicFor(dua.chapterTitle),
                 arabic = dua.arabic?.let(::reflow)?.takeIf { it.isNotBlank() },
+                transliteration = dua.transliteration
+                    ?.let(::reflow)
+                    ?.takeIf { it.isNotBlank() },
                 target = WidgetNavigationTarget.Dua(
                     // "{Chapter}: Dua N", which is the contract DuaDetailScreen documents
                     // and detects with `title.contains(": Dua ")`. Sent as a bare chapter

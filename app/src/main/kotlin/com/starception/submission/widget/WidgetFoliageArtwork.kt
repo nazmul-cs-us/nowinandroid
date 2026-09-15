@@ -39,6 +39,8 @@ internal enum class WidgetFoliagePlacement {
     BOTH,
     RIGHT,
     HERO_RIGHT,
+    TIMELINE_LEFT,
+    DEVOTIONAL_RIGHT,
 }
 
 /**
@@ -99,36 +101,141 @@ internal object WidgetFoliageArtwork {
         val mainSway = (sin(cycle) * 2.25).toFloat()
         val secondarySway = (sin(cycle + PI / 2.0) * 1.35).toFloat()
 
-        if (placement == WidgetFoliagePlacement.BOTH) {
-            drawPlant(
+        when (placement) {
+            WidgetFoliagePlacement.HERO_RIGHT -> drawHeroPlant(
                 canvas = canvas,
-                rootX = -8f,
-                rootY = LOGICAL_HEIGHT + 5f,
-                mirrored = false,
+                sway = -secondarySway,
+                secondarySway = -mainSway,
+                palette = palette,
+            )
+
+            WidgetFoliagePlacement.TIMELINE_LEFT -> drawTimelinePlant(
+                canvas = canvas,
                 sway = mainSway,
                 secondarySway = secondarySway,
                 palette = palette,
             )
-        }
-        if (placement == WidgetFoliagePlacement.HERO_RIGHT) {
-            drawHeroPlant(
+
+            WidgetFoliagePlacement.DEVOTIONAL_RIGHT -> drawDevotionalPlant(
                 canvas = canvas,
                 sway = -secondarySway,
                 secondarySway = -mainSway,
                 palette = palette,
             )
-        } else {
-            drawPlant(
-                canvas = canvas,
-                rootX = LOGICAL_WIDTH + 24f,
-                rootY = LOGICAL_HEIGHT + 4f,
-                mirrored = true,
-                sway = -secondarySway,
-                secondarySway = -mainSway,
-                palette = palette,
-            )
+
+            WidgetFoliagePlacement.BOTH,
+            WidgetFoliagePlacement.RIGHT,
+            -> {
+                if (placement == WidgetFoliagePlacement.BOTH) {
+                    drawPlant(
+                        canvas = canvas,
+                        rootX = -8f,
+                        rootY = LOGICAL_HEIGHT + 5f,
+                        mirrored = false,
+                        sway = mainSway,
+                        secondarySway = secondarySway,
+                        palette = palette,
+                    )
+                }
+                drawPlant(
+                    canvas = canvas,
+                    rootX = LOGICAL_WIDTH + 24f,
+                    rootY = LOGICAL_HEIGHT + 4f,
+                    mirrored = true,
+                    sway = -secondarySway,
+                    secondarySway = -mainSway,
+                    palette = palette,
+                )
+            }
         }
         return bitmap
+    }
+
+    /** Tall leaves at the devotional card's right edge, behind its bookmark action. */
+    private fun drawDevotionalPlant(
+        canvas: Canvas,
+        sway: Float,
+        secondarySway: Float,
+        palette: FoliagePalette,
+    ) {
+        val rootX = 654f
+        val rootY = LOGICAL_HEIGHT + 8f
+        val stems = listOf(
+            605f to 224f,
+            617f to 183f,
+            630f to 139f,
+            640f to 93f,
+            649f to 52f,
+        )
+        val stemPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.stem
+            alpha = 150
+            style = Paint.Style.STROKE
+            strokeWidth = 3.1f
+            strokeCap = Paint.Cap.ROUND
+        }
+        stems.forEachIndexed { index, (baseX, baseY) ->
+            canvas.drawPath(
+                Path().apply {
+                    moveTo(rootX, rootY)
+                    cubicTo(
+                        rootX - 8f - index * 3f,
+                        232f,
+                        baseX + 8f,
+                        baseY + 18f,
+                        baseX,
+                        baseY,
+                    )
+                },
+                stemPaint,
+            )
+        }
+        val leaves = listOf(
+            LeafSpec(605f, 224f, 92f, 30f, -158f, palette.highlight),
+            LeafSpec(617f, 183f, 104f, 33f, -143f, palette.primary),
+            LeafSpec(630f, 139f, 108f, 34f, -128f, palette.deep),
+            LeafSpec(640f, 93f, 102f, 32f, -113f, palette.secondary),
+            LeafSpec(649f, 52f, 90f, 29f, -99f, palette.primary),
+        )
+        leaves.forEachIndexed { index, leaf ->
+            drawLeaf(
+                canvas = canvas,
+                spec = leaf.copy(
+                    angle = leaf.angle + sway * 0.22f +
+                        secondarySway * (0.08f + index * 0.025f),
+                ),
+                vein = palette.vein,
+                alpha = 210,
+                veinAlpha = 104,
+            )
+        }
+    }
+
+    /** Broad leaves cropped by the lower-left edge, matching the supplied prayer panel. */
+    private fun drawTimelinePlant(
+        canvas: Canvas,
+        sway: Float,
+        secondarySway: Float,
+        palette: FoliagePalette,
+    ) {
+        val vein = palette.vein
+        val leaves = listOf(
+            LeafSpec(-20f, 270f, 110f, 34f, -78f, palette.deep),
+            LeafSpec(-24f, 254f, 105f, 36f, -62f, palette.primary),
+            LeafSpec(-28f, 238f, 90f, 30f, -42f, palette.secondary),
+            LeafSpec(-18f, 215f, 88f, 29f, -82f, palette.highlight),
+        )
+        leaves.forEachIndexed { index, leaf ->
+            drawLeaf(
+                canvas = canvas,
+                spec = leaf.copy(
+                    angle = leaf.angle + sway * 0.16f + secondarySway * (0.05f + index * 0.02f),
+                ),
+                vein = vein,
+                alpha = 170,
+                veinAlpha = 62,
+            )
+        }
     }
 
     /** Larger, fewer eucalyptus leaves matching the hero's botanical quote panel. */

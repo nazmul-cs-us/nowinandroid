@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transparent-widget header text: dark halo keeps white type readable on any wallpaper. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:fallbackLineSpacing="false"
+    android:fontFamily="@font/ubuntu_sans_medium"
+    android:includeFontPadding="false"
+    android:shadowColor="#E6000000"
+    android:shadowDx="0"
+    android:shadowDy="1"
+    android:shadowRadius="2" />

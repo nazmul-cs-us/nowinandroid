@@ -68,6 +68,7 @@ import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -419,6 +420,23 @@ private fun CompactPrayerSurface(
     contentSize: DpSize,
 ) {
     val context = LocalContext.current
+    val transparentHeader = !LocalWidgetAppearance.current.showBackground
+    val transparentForeground = LocalTransparentWidgetForeground.current
+    val headerInk = if (transparentHeader) {
+        transparentForeground.primary
+    } else {
+        GlanceTheme.colors.onSurface
+    }
+    val headerIcon = if (transparentHeader) {
+        transparentForeground.primary
+    } else {
+        GlanceTheme.colors.primary
+    }
+    val headerAction = if (transparentHeader) {
+        transparentForeground.secondary
+    } else {
+        GlanceTheme.colors.secondary
+    }
     val width = contentSize.width.value
     val wide = width >= 230f
     val headerTitle = state.place
@@ -458,22 +476,26 @@ private fun CompactPrayerSurface(
                 Image(
                     provider = ImageProvider(R.drawable.ic_flaticon_location_marker),
                     contentDescription = null,
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+                    colorFilter = ColorFilter.tint(headerIcon),
                     modifier = GlanceModifier.size(22.dp),
                 )
                 Spacer(modifier = GlanceModifier.width(8.dp))
                 WidgetText(
                     text = headerTitle,
                     size = titleSize.sp,
-                    color = GlanceTheme.colors.onSurface,
-                    weight = WidgetFontWeight.Medium,
+                    color = headerInk,
+                    weight = if (transparentHeader) {
+                        WidgetFontWeight.ShadowBold
+                    } else {
+                        WidgetFontWeight.Medium
+                    },
                     modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
                 )
                 Spacer(modifier = GlanceModifier.width(8.dp))
                 Image(
                     provider = ImageProvider(R.drawable.sample_refresh_icon),
                     contentDescription = "Refresh prayer times",
-                    colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary),
+                    colorFilter = ColorFilter.tint(headerAction),
                     modifier = GlanceModifier
                         .size(24.dp)
                         .clickable(actionRunCallback<RefreshPrayerWidgetAction>()),
@@ -611,6 +633,24 @@ private fun TitledSurface(
             .padding(bottom = TITLED_WIDGET_BOTTOM_PADDING)
             .clickable(actionStartActivity<MainActivity>()),
         titleBar = {
+            val appearance = LocalWidgetAppearance.current
+            val transparentHeader = !appearance.showBackground
+            val transparentForeground = LocalTransparentWidgetForeground.current
+            val headerInk = if (transparentHeader) {
+                transparentForeground.primary
+            } else {
+                GlanceTheme.colors.onSurface
+            }
+            val headerIcon = if (transparentHeader) {
+                transparentForeground.primary
+            } else {
+                GlanceTheme.colors.primary
+            }
+            val headerAction = if (transparentHeader) {
+                transparentForeground.secondary
+            } else {
+                GlanceTheme.colors.secondary
+            }
             // Glance's own TitleBar is not used here, and only for one reason: its title
             // is a Glance Text, which cannot carry the bundled Ubuntu Sans (see
             // widget_text_regular.xml). Leaving it in place put the place name in the
@@ -649,15 +689,19 @@ private fun TitledSurface(
                     Image(
                         provider = ImageProvider(R.drawable.ic_flaticon_location_marker),
                         contentDescription = null,
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+                        colorFilter = ColorFilter.tint(headerIcon),
                         modifier = GlanceModifier.size(22.dp),
                     )
                     Spacer(modifier = GlanceModifier.width(8.dp))
                     WidgetText(
                         text = state.place,
                         size = 15.sp,
-                        color = GlanceTheme.colors.onSurface,
-                        weight = WidgetFontWeight.Medium,
+                        color = headerInk,
+                        weight = if (transparentHeader) {
+                            WidgetFontWeight.ShadowBold
+                        } else {
+                            WidgetFontWeight.Medium
+                        },
                         modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
                     )
                 }
@@ -665,13 +709,14 @@ private fun TitledSurface(
                 // secondary tint — so the prayer card's header and the sample cards'
                 // headers stay indistinguishable.
                 if (detailedHeader) {
-                    val dynamicHeader = LocalWidgetAppearance.current.backgroundType ==
+                    val dynamicHeader = appearance.backgroundType ==
                         WidgetBackgroundType.DYNAMIC_COLOR
+                    val themePaintedHeader = dynamicHeader || transparentHeader
                     Box(
                         modifier = GlanceModifier
                             .size(33.dp)
                             .background(
-                                if (dynamicHeader) {
+                                if (themePaintedHeader) {
                                     GlanceTheme.colors.surfaceVariant
                                 } else {
                                     ReferenceTopHeaderPill
@@ -685,7 +730,9 @@ private fun TitledSurface(
                             provider = ImageProvider(R.drawable.sample_refresh_icon),
                             contentDescription = "Refresh prayer times",
                             colorFilter = ColorFilter.tint(
-                                if (dynamicHeader) {
+                                if (transparentHeader) {
+                                    transparentForeground.primary
+                                } else if (dynamicHeader) {
                                     GlanceTheme.colors.onSurface
                                 } else {
                                     ReferenceTopHeaderInk
@@ -698,7 +745,7 @@ private fun TitledSurface(
                     CircleIconButton(
                         imageProvider = ImageProvider(R.drawable.sample_refresh_icon),
                         contentDescription = "Refresh prayer times",
-                        contentColor = GlanceTheme.colors.secondary,
+                        contentColor = headerAction,
                         backgroundColor = null,
                         onClick = actionRunCallback<RefreshPrayerWidgetAction>(),
                     )
@@ -717,11 +764,25 @@ private fun TitledSurface(
 private fun androidx.glance.layout.RowScope.ReferenceHeader(
     state: PrayerWidgetState.Available,
 ) {
-    val dynamicHeader = LocalWidgetAppearance.current.backgroundType ==
+    val appearance = LocalWidgetAppearance.current
+    val transparentHeader = !appearance.showBackground
+    val transparentForeground = LocalTransparentWidgetForeground.current
+    val dynamicHeader = appearance.backgroundType ==
         WidgetBackgroundType.DYNAMIC_COLOR
-    val accent = if (dynamicHeader) GlanceTheme.colors.primary else ReferenceForest
-    val titleColor = if (dynamicHeader) GlanceTheme.colors.onSurface else ReferenceTopHeaderInk
-    val subtitleColor = if (dynamicHeader) {
+    val themePaintedHeader = dynamicHeader || transparentHeader
+    val accent = when {
+        transparentHeader -> transparentForeground.primary
+        dynamicHeader -> GlanceTheme.colors.primary
+        else -> ReferenceForest
+    }
+    val titleColor = when {
+        transparentHeader -> transparentForeground.primary
+        dynamicHeader -> GlanceTheme.colors.onSurface
+        else -> ReferenceTopHeaderInk
+    }
+    val subtitleColor = if (transparentHeader) {
+        transparentForeground.secondary
+    } else if (dynamicHeader) {
         GlanceTheme.colors.onSurfaceVariant
     } else {
         ReferenceTopHeaderMuted
@@ -730,7 +791,11 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         modifier = GlanceModifier
             .size(35.dp)
             .background(
-                if (dynamicHeader) GlanceTheme.colors.primaryContainer else ReferencePinSurface,
+                if (themePaintedHeader) {
+                    GlanceTheme.colors.primaryContainer
+                } else {
+                    ReferencePinSurface
+                },
             )
             .cornerRadius(18.dp),
         contentAlignment = Alignment.Center,
@@ -748,13 +813,21 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
             text = state.place,
             size = 13.sp,
             color = titleColor,
-            weight = WidgetFontWeight.Medium,
+            weight = if (transparentHeader) {
+                WidgetFontWeight.ShadowBold
+            } else {
+                WidgetFontWeight.Medium
+            },
         )
         WidgetText(
             text = state.dateLabel,
             size = 8.5.sp,
             color = subtitleColor,
-            weight = WidgetFontWeight.Regular,
+            weight = if (transparentHeader) {
+                WidgetFontWeight.ShadowMedium
+            } else {
+                WidgetFontWeight.Regular
+            },
         )
     }
     Spacer(modifier = GlanceModifier.width(8.dp))
@@ -767,7 +840,7 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
             .width(100.dp)
             .height(36.dp)
             .then(
-                if (dynamicHeader) {
+                if (themePaintedHeader) {
                     GlanceModifier.background(GlanceTheme.colors.surfaceVariant)
                 } else {
                     GlanceModifier.background(
@@ -791,7 +864,11 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
                 text = state.nextPrayer.temperature ?: state.solarEvent.label,
                 size = 13.sp,
                 color = titleColor,
-                weight = WidgetFontWeight.Bold,
+                weight = if (transparentHeader) {
+                    WidgetFontWeight.ShadowBold
+                } else {
+                    WidgetFontWeight.Bold
+                },
                 modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
             )
             WidgetText(
@@ -802,7 +879,11 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
                 },
                 size = 8.5.sp,
                 color = titleColor,
-                weight = WidgetFontWeight.Medium,
+                weight = if (transparentHeader) {
+                    WidgetFontWeight.ShadowMedium
+                } else {
+                    WidgetFontWeight.Medium
+                },
                 align = WidgetTextAlign.End,
                 modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
             )
@@ -934,6 +1015,10 @@ internal enum class WidgetFontWeight(@LayoutRes val layout: Int) {
     RegularRagged(R.layout.widget_text_regular_ragged),
     Medium(R.layout.widget_text_medium),
     Bold(R.layout.widget_text_bold),
+    /** White-on-wallpaper header faces with a dark halo for mixed light/dark imagery. */
+    ShadowRegular(R.layout.widget_text_shadow_regular),
+    ShadowMedium(R.layout.widget_text_shadow_medium),
+    ShadowBold(R.layout.widget_text_shadow_bold),
     SerifRegular(R.layout.widget_text_serif_regular),
     SerifBold(R.layout.widget_text_serif_bold),
     SerifItalic(R.layout.widget_text_serif_italic),
@@ -1538,14 +1623,14 @@ private fun ReferencePrayerHero(
                     elapsedDuration?.let { duration ->
                         WidgetText(
                             text = duration,
-                            size = if (compact) 14.5.sp else 15.5.sp,
+                            size = if (compact) 18.sp else 21.5.sp,
                             color = ReferenceHeroText,
                             weight = WidgetFontWeight.SerifBold,
                             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                         )
                         WidgetText(
                             text = " since ",
-                            size = if (compact) 9.5.sp else 10.5.sp,
+                            size = if (compact) 10.5.sp else 12.5.sp,
                             color = ReferenceHeroText,
                             weight = WidgetFontWeight.SerifRegular,
                             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -1553,7 +1638,7 @@ private fun ReferencePrayerHero(
                     }
                     WidgetText(
                         text = elapsedPrayer,
-                        size = if (compact) 13.5.sp else 14.5.sp,
+                        size = if (compact) 16.5.sp else 19.5.sp,
                         color = ReferenceHeroText,
                         weight = WidgetFontWeight.SerifBold,
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -1583,7 +1668,7 @@ private fun ReferencePrayerHero(
                 Spacer(modifier = GlanceModifier.height(3.dp))
                 WidgetText(
                     text = state.nextPrayer.name,
-                    size = if (compact) 33.sp else 36.sp,
+                    size = if (compact) 32.sp else 36.sp,
                     color = ReferenceHeroText,
                     weight = WidgetFontWeight.SerifBold,
                     modifier = GlanceModifier
@@ -1597,15 +1682,15 @@ private fun ReferencePrayerHero(
                 ) {
                     WidgetText(
                         text = "in ",
-                        size = if (compact) 17.sp else 18.sp,
-                        color = ReferenceHeroText,
+                        size = if (compact) 18.sp else 20.sp,
+                        color = GlanceTheme.colors.primary,
                         weight = WidgetFontWeight.SerifRegular,
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
                     WidgetText(
                         text = state.countdown.removePrefix("in "),
-                        size = if (compact) 20.sp else 21.sp,
-                        color = ReferenceHeroText,
+                        size = if (compact) 22.sp else 24.sp,
+                        color = GlanceTheme.colors.primary,
                         weight = WidgetFontWeight.SerifBold,
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
@@ -1648,6 +1733,7 @@ private fun ReferencePrayerTimeline(
     width: Dp,
     height: Dp,
 ) {
+    val context = LocalContext.current
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -1658,14 +1744,20 @@ private fun ReferencePrayerTimeline(
             )
             .cornerRadius(22.dp),
     ) {
-        Image(
-            provider = ImageProvider(WidgetTimelineArtwork.bitmap),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = GlanceModifier.fillMaxSize(),
-        )
+        // Keep the journey line within the illustration band. Stretching this artwork
+        // over the whole panel made its lower curves cross prayer names and times.
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            Spacer(modifier = GlanceModifier.height(25.dp))
+            Image(
+                provider = ImageProvider(WidgetTimelineArtwork.bitmap),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = GlanceModifier.fillMaxWidth().height(49.dp),
+            )
+        }
         AnimatedFoliage(
             phase = state.dayPhase,
+            placement = WidgetFoliagePlacement.TIMELINE_LEFT,
             modifier = GlanceModifier.fillMaxSize(),
         )
         Column(
@@ -1737,7 +1829,12 @@ private fun ReferencePrayerTimeline(
                         .then(
                             if (active) {
                                 GlanceModifier
-                                    .background(ReferenceForest)
+                                    .background(
+                                        imageProvider = ImageProvider(
+                                            WidgetActivePrayerCardArtwork.bitmap,
+                                        ),
+                                        contentScale = ContentScale.FillBounds,
+                                    )
                                     .cornerRadius(20.dp)
                                     .padding(vertical = 3.dp)
                             } else {
@@ -1750,12 +1847,13 @@ private fun ReferencePrayerTimeline(
                         horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
                     ) {
                         Image(
-                            provider = ImageProvider(prayer.phaseArtwork()),
+                            provider = ImageProvider(
+                                WidgetPrayerPhaseArtwork.bitmap(context, prayer.phaseArtwork()),
+                            ),
                             contentDescription = null,
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = GlanceModifier
-                                .size(if (active) 40.dp else 34.dp)
-                                .cornerRadius(20.dp),
+                                .size(if (active) 42.dp else 37.dp),
                         )
                         Spacer(modifier = GlanceModifier.height(1.dp))
                         WidgetText(
@@ -1835,13 +1933,11 @@ private fun ReferencePrayerStatus(prayer: WidgetPrayer) {
                     .cornerRadius(9.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                WidgetText(
-                    text = "✓",
-                    size = 10.sp,
-                    color = ReferenceForest,
-                    weight = WidgetFontWeight.Bold,
-                    align = WidgetTextAlign.Center,
-                    modifier = GlanceModifier.size(18.dp),
+                Image(
+                    provider = ImageProvider(R.drawable.widget_verified),
+                    contentDescription = "Prayer completed",
+                    colorFilter = ColorFilter.tint(ReferenceForest),
+                    modifier = GlanceModifier.size(12.dp),
                 )
             }
         }
@@ -1872,56 +1968,81 @@ private fun ReferenceDaylightBar(
     state: PrayerWidgetState.Available,
     width: Dp,
 ) {
-    val labelWidth = if (width >= 340.dp) 78.dp else 66.dp
-    val trackWidth = (width - (labelWidth * 2) - 10.dp).coerceAtLeast(72.dp)
-    val markerOffset = (trackWidth - 4.dp) * state.timeOfDayProgress.coerceIn(0f, 1f)
+    val daylightLabelWidth = if (width >= 340.dp) 80.dp else 70.dp
+    val nightLabelWidth = if (width >= 340.dp) 70.dp else 62.dp
+    val trackWidth = (width - daylightLabelWidth - nightLabelWidth - 8.dp)
+        .coerceAtLeast(72.dp)
+    val markerWidth = 5.dp
+    val markerOffset = (trackWidth - markerWidth) * state.timeOfDayProgress.coerceIn(0f, 1f)
     Row(
-        modifier = GlanceModifier.fillMaxWidth().height(14.dp),
+        modifier = GlanceModifier.fillMaxWidth().height(16.dp),
         verticalAlignment = Alignment.Vertical.CenterVertically,
     ) {
-        WidgetText(
-            text = "☀ ${state.daylightLabel}",
-            size = 7.5.sp,
-            color = ReferenceInk,
-            weight = WidgetFontWeight.Medium,
-            modifier = GlanceModifier.width(labelWidth).wrapContentHeight(),
-        )
-        Box(modifier = GlanceModifier.width(trackWidth).height(12.dp)) {
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .padding(top = 3.dp)
-                    .cornerRadius(4.dp),
-            ) {
-                listOf(ReferenceSun, ReferenceWarm, ReferenceTwilight, ReferenceNight).forEach {
-                    color ->
-                    Box(
-                        modifier = GlanceModifier
-                            .defaultWeight()
-                            .fillMaxSize()
-                            .background(color),
-                    ) {}
-                }
-            }
-            Box(
-                modifier = GlanceModifier
-                    .padding(start = markerOffset)
-                    .width(4.dp)
-                    .height(12.dp)
-                    .background(ReferenceForest)
-                    .cornerRadius(3.dp),
-            ) {}
+        Row(
+            modifier = GlanceModifier.width(daylightLabelWidth).height(16.dp),
+            verticalAlignment = Alignment.Vertical.CenterVertically,
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.flaticon_weather_clear),
+                contentDescription = null,
+                modifier = GlanceModifier.size(14.dp),
+            )
+            Spacer(modifier = GlanceModifier.width(2.dp))
+            WidgetText(
+                text = state.daylightLabel,
+                size = 7.5.sp,
+                color = ReferenceInk,
+                weight = WidgetFontWeight.Medium,
+                modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+            )
         }
-        Spacer(modifier = GlanceModifier.width(10.dp))
-        WidgetText(
-            text = "☾ ${state.nightLabel}",
-            size = 7.5.sp,
-            color = ReferenceInk,
-            weight = WidgetFontWeight.Medium,
-            align = WidgetTextAlign.End,
-            modifier = GlanceModifier.width(labelWidth).wrapContentHeight(),
-        )
+        Spacer(modifier = GlanceModifier.width(4.dp))
+        Box(
+            modifier = GlanceModifier.width(trackWidth).height(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                provider = ImageProvider(WidgetDaylightBarArtwork.bitmap),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = GlanceModifier.fillMaxWidth().height(6.dp),
+            )
+            Row(
+                modifier = GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                Spacer(modifier = GlanceModifier.width(markerOffset))
+                Box(
+                    modifier = GlanceModifier
+                        .width(markerWidth)
+                        .height(14.dp)
+                        .background(ReferenceForest)
+                        .cornerRadius(3.dp),
+                ) {}
+                Spacer(modifier = GlanceModifier.defaultWeight())
+            }
+        }
+        Spacer(modifier = GlanceModifier.width(4.dp))
+        Row(
+            modifier = GlanceModifier.width(nightLabelWidth).height(16.dp),
+            verticalAlignment = Alignment.Vertical.CenterVertically,
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.widget_night_crescent),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(ReferenceNight),
+                modifier = GlanceModifier.size(14.dp),
+            )
+            Spacer(modifier = GlanceModifier.width(2.dp))
+            WidgetText(
+                text = state.nightLabel,
+                size = 7.5.sp,
+                color = ReferenceInk,
+                weight = WidgetFontWeight.Medium,
+                align = WidgetTextAlign.End,
+                modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+            )
+        }
     }
 }
 
@@ -1933,11 +2054,16 @@ private fun ReferenceDevotionalPanel(
 ) {
     val context = LocalContext.current
     val reminder = state.reminder
+    val prayerContext = state.prayers
+        .lastOrNull { it.isPast }
+        ?.name
+        ?.let { "After $it" }
+        ?: "Daily"
     Box(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_panel_v2),
+                imageProvider = ImageProvider(R.drawable.prayer_widget_devotional_panel),
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(22.dp)
@@ -1945,7 +2071,7 @@ private fun ReferenceDevotionalPanel(
     ) {
         AnimatedFoliage(
             phase = state.dayPhase,
-            placement = WidgetFoliagePlacement.RIGHT,
+            placement = WidgetFoliagePlacement.DEVOTIONAL_RIGHT,
             modifier = GlanceModifier.fillMaxSize(),
         )
         Row(
@@ -1954,8 +2080,8 @@ private fun ReferenceDevotionalPanel(
         ) {
             Box(
                 modifier = GlanceModifier
-                    .width(78.dp)
-                    .height(116.dp),
+                    .width(84.dp)
+                    .fillMaxHeight(),
             ) {
                 Image(
                     provider = ImageProvider(R.drawable.prayer_widget_devotional_lantern_v2),
@@ -1983,8 +2109,13 @@ private fun ReferenceDevotionalPanel(
                     ) {}
                 }
             }
-            Spacer(modifier = GlanceModifier.width(10.dp))
-            Column(modifier = GlanceModifier.defaultWeight()) {
+            Spacer(modifier = GlanceModifier.width(12.dp))
+            Column(
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .fillMaxHeight()
+                    .padding(vertical = 6.dp),
+            ) {
                 Row(
                     modifier = GlanceModifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -2002,41 +2133,85 @@ private fun ReferenceDevotionalPanel(
                         size = 13.sp,
                         color = ReferenceInk,
                         weight = WidgetFontWeight.Bold,
-                        modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-                    )
-                    WidgetText(
-                        text = "See more  ›",
-                        size = 8.5.sp,
-                        color = ReferenceForest,
-                        weight = WidgetFontWeight.Medium,
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
+                    Spacer(modifier = GlanceModifier.width(7.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .wrapContentWidth()
+                            .background(ReferencePinSurface)
+                            .cornerRadius(10.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        WidgetText(
+                            text = prayerContext,
+                            size = 7.sp,
+                            color = ReferenceForest,
+                            weight = WidgetFontWeight.Medium,
+                            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                        )
+                    }
+                    Spacer(modifier = GlanceModifier.defaultWeight())
+                    Box(
+                        modifier = GlanceModifier
+                            .wrapContentWidth()
+                            .background(ReferenceHeaderPill)
+                            .cornerRadius(14.dp)
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        WidgetText(
+                            text = "See more  ›",
+                            size = 8.sp,
+                            color = ReferenceTopHeaderInk,
+                            weight = WidgetFontWeight.Medium,
+                            modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                        )
+                    }
                 }
-                WidgetText(
-                    text = reminder.caption,
-                    size = 7.5.sp,
-                    color = ReferenceForest,
-                    weight = WidgetFontWeight.Medium,
-                )
                 reminder.arabic?.let { arabic ->
                     Spacer(modifier = GlanceModifier.height(2.dp))
                     WidgetText(
                         text = arabic,
-                        size = 14.sp,
+                        size = 13.sp,
                         color = ReferenceForest,
                         weight = arabicFontFor(context),
                         maxLines = 1,
                         align = WidgetTextAlign.End,
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .padding(end = 30.dp),
                     )
                 }
+                reminder.transliteration?.let { transliteration ->
+                    Spacer(modifier = GlanceModifier.height(1.dp))
+                    WidgetText(
+                        text = transliteration,
+                        size = 8.5.sp,
+                        color = ReferenceMuted,
+                        weight = WidgetFontWeight.Regular,
+                        maxLines = 2,
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .padding(end = 30.dp),
+                    )
+                }
+                Spacer(modifier = GlanceModifier.height(1.dp))
                 WidgetText(
-                    text = reminder.text,
-                    size = 9.5.sp,
-                    color = ReferenceInk,
-                    weight = WidgetFontWeight.Regular,
+                    text = "“${reminder.text}”",
+                    size = 9.sp,
+                    color = ReferenceTopHeaderInk,
+                    weight = WidgetFontWeight.Medium,
                     maxLines = 2,
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(end = 30.dp),
                 )
-                Spacer(modifier = GlanceModifier.height(2.dp))
+                Spacer(modifier = GlanceModifier.defaultWeight())
                 Row(
                     modifier = GlanceModifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -2051,8 +2226,8 @@ private fun ReferenceDevotionalPanel(
                     WidgetText(
                         text = listOfNotNull(reminder.sourceName, reminder.sourceDetail)
                             .joinToString(" · "),
-                        size = 8.sp,
-                        color = ReferenceMuted,
+                        size = 7.5.sp,
+                        color = ReferenceTopHeaderInk,
                         weight = WidgetFontWeight.Medium,
                         modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
                     )
@@ -2066,16 +2241,16 @@ private fun ReferenceDevotionalPanel(
         ) {
             Box(
                 modifier = GlanceModifier
-                    .size(28.dp)
+                    .size(32.dp)
                     .background(ReferenceWidgetBackground)
-                    .cornerRadius(14.dp),
+                    .cornerRadius(16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
                     provider = ImageProvider(R.drawable.widget_bookmark),
                     contentDescription = "Save devotional",
                     colorFilter = ColorFilter.tint(ReferenceForest),
-                    modifier = GlanceModifier.size(14.dp),
+                    modifier = GlanceModifier.size(16.dp),
                 )
             }
         }
