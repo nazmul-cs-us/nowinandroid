@@ -22,6 +22,7 @@ import android.text.format.DateFormat
 import android.util.Log
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.prayerWindowProgress
+import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.prayer.model.DayPrayerTimes
@@ -34,6 +35,10 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.time.Duration
 import java.time.LocalDate
@@ -45,6 +50,11 @@ import kotlin.math.roundToInt
 
 /** A widget update must not hang on the network; prayer times matter, weather does not. */
 private const val WEATHER_TIMEOUT_MS = 4_000L
+private const val CURRENT_WEATHER_CACHE_PREFS = "prayer_widget_current_weather"
+private const val CURRENT_WEATHER_FRESH_MS = 15 * 60 * 1_000L
+private const val CURRENT_WEATHER_STALE_MS = 6 * 60 * 60 * 1_000L
+private val currentWeatherMutex = Mutex()
+private val prayerWeatherMutex = Mutex()
 
 /**
  * Widget-side view of one prayer. Times arrive pre-formatted because a Glance
@@ -86,6 +96,8 @@ internal sealed interface PrayerWidgetState {
     data class Available(
         val place: String,
         val dateLabel: String,
+        /** Actual conditions at refresh time; never substituted with a solar event. */
+        val currentWeather: WidgetWeather?,
         val nextPrayer: WidgetPrayer,
         val countdown: String,
         val solarEvent: WidgetSolarEvent,
@@ -109,8 +121,12 @@ internal sealed interface PrayerWidgetState {
         val dayPhase: WidgetDayPhase,
         val daylightLabel: String,
         val nightLabel: String,
-        /** Local wall-clock position from midnight (0f) to the next midnight (1f). */
-        val timeOfDayProgress: Float,
+        /**
+         * Current position across the five prayer anchors, from Fajr (0f) to Isha (1f).
+         * This keeps the day/night marker spatially aligned with the prayer journey above
+         * it instead of treating noon as the centre regardless of today's prayer times.
+         */
+        val prayerTimelineProgress: Float,
     ) : PrayerWidgetState
 }
 
@@ -154,6 +170,13 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
     val timeOffsets = repository.getCalculationSettingsFromStorage().timeOffsets
     val prayerTimes = basePrayerTimes.withUserOffsets(timeOffsets)
     val now = LocalTime.now()
+    val insight = prayerTimes.toInsight(repository)
+    val actualPrayers = prayerTimes.getActualPrayers()
+    val currentPrayerName = insight?.caption
+        ?.takeIf { caption -> actualPrayers.any { it.name.equals(caption, ignoreCase = true) } }
+        ?: actualPrayers.lastOrNull { it.time <= now }?.name
+        // Before today's Fajr, the active prayer window is still last night's Isha.
+        ?: "Isha"
     val tomorrowSunrise = if (now >= prayerTimes.maghrib) {
         recalculateForDate(repository, calculator, LocalDate.now().plusDays(1))
             ?.withUserOffsets(timeOffsets)
@@ -162,13 +185,27 @@ internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState 
         null
     }
 
+    val (weatherPair, reminder) = coroutineScope {
+        val current = async { loadCurrentWeather(context, prayerTimes) }
+        val forecasts = async { loadPrayerWeather(context, prayerTimes) }
+        val devotional = async {
+            DailyReminderRepository.load(
+                context = context,
+                offset = 0,
+                prayerName = currentPrayerName,
+            )
+        }
+        (current.await() to forecasts.await()) to devotional.await()
+    }
+
     return prayerTimes.toWidgetState(
         context = context,
-        weather = loadPrayerWeather(context, prayerTimes),
-        insight = prayerTimes.toInsight(repository),
+        currentWeather = weatherPair.first,
+        weather = weatherPair.second,
+        insight = insight,
         now = now,
         tomorrowSunrise = tomorrowSunrise,
-        reminder = DailyReminderRepository.load(context, offset = 0),
+        reminder = reminder,
     )
 }
 
@@ -199,34 +236,124 @@ private fun DayPrayerTimes.withUserOffsets(offsets: PrayerTimeOffsets): DayPraye
  * forecast is unavailable. Open-Meteo responses are cached by the repository, so
  * repeated widget updates within the cache window cost nothing.
  */
+private suspend fun loadCurrentWeather(
+    context: Context,
+    prayerTimes: DayPrayerTimes,
+): WidgetWeather? = currentWeatherMutex.withLock {
+    val latitude = prayerTimes.location.latitude
+    val longitude = prayerTimes.location.longitude
+    readCachedCurrentWeather(
+        context = context,
+        latitude = latitude,
+        longitude = longitude,
+        maximumAgeMs = CURRENT_WEATHER_FRESH_MS,
+    )?.let { return@withLock it }
+
+    val live = try {
+        withTimeout(WEATHER_TIMEOUT_MS) {
+            CurrentWeatherRepository.get(latitude = latitude, longitude = longitude)
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "Widget current weather unavailable", e)
+        null
+    }
+
+    if (live != null) {
+        cacheCurrentWeather(context, latitude, longitude, live)
+        return@withLock live.toWidgetWeather(context)
+    }
+
+    // App widget processes are routinely reclaimed. A disk-backed last-known value keeps
+    // a transient provider error from turning the weather pill into unrelated solar data.
+    readCachedCurrentWeather(
+        context = context,
+        latitude = latitude,
+        longitude = longitude,
+        maximumAgeMs = CURRENT_WEATHER_STALE_MS,
+    )
+}
+
+private fun CurrentWeather.toWidgetWeather(context: Context): WidgetWeather = WidgetWeather(
+    icon = WidgetMeteocons.forWeather(context, weatherCode, isDay),
+    temperature = "${temperatureCelsius.roundToInt()}°",
+    summary = weatherCode.widgetWeatherSummary(),
+)
+
+private fun cacheCurrentWeather(
+    context: Context,
+    latitude: Double,
+    longitude: Double,
+    weather: CurrentWeather,
+) {
+    context.getSharedPreferences(CURRENT_WEATHER_CACHE_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString("latitude", latitude.toString())
+        .putString("longitude", longitude.toString())
+        .putFloat("temperature", weather.temperatureCelsius.toFloat())
+        .putInt("weather_code", weather.weatherCode)
+        .putBoolean("is_day", weather.isDay)
+        .putLong("fetched_at", System.currentTimeMillis())
+        .apply()
+}
+
+private fun readCachedCurrentWeather(
+    context: Context,
+    latitude: Double,
+    longitude: Double,
+    maximumAgeMs: Long,
+): WidgetWeather? {
+    val prefs = context.getSharedPreferences(CURRENT_WEATHER_CACHE_PREFS, Context.MODE_PRIVATE)
+    val cachedLatitude = prefs.getString("latitude", null)?.toDoubleOrNull() ?: return null
+    val cachedLongitude = prefs.getString("longitude", null)?.toDoubleOrNull() ?: return null
+    val fetchedAt = prefs.getLong("fetched_at", 0L)
+    val sameArea = kotlin.math.abs(cachedLatitude - latitude) < 0.02 &&
+        kotlin.math.abs(cachedLongitude - longitude) < 0.02
+    val age = System.currentTimeMillis() - fetchedAt
+    if (!sameArea || fetchedAt == 0L || age !in 0..maximumAgeMs) return null
+
+    val weatherCode = prefs.getInt("weather_code", Int.MIN_VALUE)
+    if (weatherCode == Int.MIN_VALUE || !prefs.contains("temperature")) return null
+    return WidgetWeather(
+        icon = WidgetMeteocons.forWeather(
+            context = context,
+            weatherCode = weatherCode,
+            isDay = prefs.getBoolean("is_day", true),
+        ),
+        temperature = "${prefs.getFloat("temperature", 0f).roundToInt()}°",
+        summary = weatherCode.widgetWeatherSummary(),
+    )
+}
+
 private suspend fun loadPrayerWeather(
     context: Context,
     prayerTimes: DayPrayerTimes,
-): Map<String, WidgetWeather> = try {
-    withTimeout(WEATHER_TIMEOUT_MS) {
-        val prayers = prayerTimes.getActualPrayers().associate { it.name to it.time }
-        CurrentWeatherRepository.getPrayerForecasts(
-            latitude = prayerTimes.location.latitude,
-            longitude = prayerTimes.location.longitude,
-            date = LocalDate.now(),
-            times = prayers,
-        ).mapValues { (_, forecast) ->
-            // Open-Meteo's hourly block carries no is_day flag, so daylight is derived
-            // from the prayer schedule itself: between sunrise and maghrib is day.
-            // Getting this wrong swaps a sun icon for a moon.
-            val isDay = forecast.dateTime.toLocalTime()
-                .let { it >= prayerTimes.sunrise && it < prayerTimes.maghrib }
+): Map<String, WidgetWeather> = prayerWeatherMutex.withLock {
+    try {
+        withTimeout(WEATHER_TIMEOUT_MS) {
+            val prayers = prayerTimes.getActualPrayers().associate { it.name to it.time }
+            CurrentWeatherRepository.getPrayerForecasts(
+                latitude = prayerTimes.location.latitude,
+                longitude = prayerTimes.location.longitude,
+                date = LocalDate.now(),
+                times = prayers,
+            ).mapValues { (_, forecast) ->
+                // Open-Meteo's hourly block carries no is_day flag, so daylight is derived
+                // from the prayer schedule itself: between sunrise and maghrib is day.
+                // Getting this wrong swaps a sun icon for a moon.
+                val isDay = forecast.dateTime.toLocalTime()
+                    .let { it >= prayerTimes.sunrise && it < prayerTimes.maghrib }
 
-            WidgetWeather(
-                icon = WidgetMeteocons.forWeather(context, forecast.weatherCode, isDay),
-                temperature = "${forecast.temperatureCelsius.roundToInt()}°",
-                summary = forecast.weatherCode.widgetWeatherSummary(),
-            )
+                WidgetWeather(
+                    icon = WidgetMeteocons.forWeather(context, forecast.weatherCode, isDay),
+                    temperature = "${forecast.temperatureCelsius.roundToInt()}°",
+                    summary = forecast.weatherCode.widgetWeatherSummary(),
+                )
+            }
         }
+    } catch (e: Exception) {
+        Log.w(TAG, "Widget weather unavailable, rendering prayer times only", e)
+        emptyMap()
     }
-} catch (e: Exception) {
-    Log.w(TAG, "Widget weather unavailable, rendering prayer times only", e)
-    emptyMap()
 }
 
 /** Mirrors the "Prayer now" tile's headline, elapsed line and next-prayer line. */
@@ -260,7 +387,7 @@ internal data class PrayerInsight(
         }
 }
 
-private data class WidgetWeather(
+internal data class WidgetWeather(
     val icon: Bitmap?,
     val temperature: String,
     val summary: String,
@@ -338,6 +465,7 @@ internal fun DayPrayerTimes.toInsight(repository: PrayerSettingsRepository): Pra
 
 private fun DayPrayerTimes.toWidgetState(
     context: Context,
+    currentWeather: WidgetWeather?,
     weather: Map<String, WidgetWeather>,
     insight: PrayerInsight?,
     now: LocalTime,
@@ -398,6 +526,7 @@ private fun DayPrayerTimes.toWidgetState(
     return PrayerWidgetState.Available(
         place = location.shortLabel(),
         dateLabel = hijriDateLabel(LocalDate.now()),
+        currentWeather = currentWeather,
         nextPrayer = next,
         countdown = countdownTo(getActualPrayers().first { it.name == next.name }.time, now),
         solarEvent = solarEvent,
@@ -408,8 +537,25 @@ private fun DayPrayerTimes.toWidgetState(
         dayPhase = widgetDayPhase(now),
         daylightLabel = "Daylight ${durationLabel(daylightMinutes)}",
         nightLabel = "Night ${durationLabel(nightMinutes)}",
-        timeOfDayProgress = now.toSecondOfDay() / Duration.ofDays(1).seconds.toFloat(),
+        prayerTimelineProgress = prayerTimelineProgress(now),
     )
+}
+
+/** Interpolates the current time between the five equally spaced prayer columns. */
+private fun DayPrayerTimes.prayerTimelineProgress(now: LocalTime): Float {
+    val prayerTimes = getActualPrayers().map { it.time }
+    if (prayerTimes.size < 2 || now <= prayerTimes.first()) return 0f
+    if (now >= prayerTimes.last()) return 1f
+
+    val previousIndex = prayerTimes.indexOfLast { it <= now }.coerceAtLeast(0)
+    val start = prayerTimes[previousIndex]
+    val end = prayerTimes[previousIndex + 1]
+    val segmentSeconds = Duration.between(start, end).seconds.coerceAtLeast(1L)
+    val elapsedSeconds = Duration.between(start, now).seconds.coerceIn(0L, segmentSeconds)
+    val segmentProgress = elapsedSeconds.toFloat() / segmentSeconds.toFloat()
+
+    return ((previousIndex + segmentProgress) / (prayerTimes.size - 1).toFloat())
+        .coerceIn(0f, 1f)
 }
 
 /**
@@ -429,7 +575,11 @@ private fun DayPrayerTimes.widgetDayPhase(now: LocalTime): WidgetDayPhase = when
 private fun durationLabel(minutes: Long): String {
     val hours = minutes / 60
     val remainder = minutes % 60
-    return if (remainder == 0L) "${hours}h" else "${hours}h ${remainder}m"
+    return when {
+        hours == 0L -> "${remainder}m"
+        remainder == 0L -> "${hours}h"
+        else -> "${hours}h ${remainder}m"
+    }
 }
 
 /** Compact Gregorian and Umm al-Qura dates used beneath the widget's location header. */

@@ -36,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -95,6 +97,9 @@ internal val LocalTransparentWidgetForeground = staticCompositionLocalOf {
         primary = ColorProvider(Color.White),
         secondary = ColorProvider(Color(0xFFE2E7F1)),
     )
+}
+internal val LocalWidgetHeroAccent = staticCompositionLocalOf {
+    ColorProvider(Color(0xFFD7E9D2))
 }
 
 /** Transparent Scaffold paint lets the shared gradient below remain visible. */
@@ -166,6 +171,10 @@ internal fun StarceptionWidgetTheme(
         surfaceContainerHigh = scheme.surfaceContainerHigh.copy(alpha = backgroundAlpha),
         surfaceContainerHighest = scheme.surfaceContainerHighest.copy(alpha = backgroundAlpha),
     )
+    // The hero uses the selected primary hue on a fixed forest photograph. Some custom
+    // themes resolve to a dark or muted primary that disappears on that surface, so lift
+    // only as far toward white as WCAG contrast requires while retaining the chosen hue.
+    val heroAccent = readableHeroAccent(scheme.primary)
     // Material's dynamic ColorScheme can be resolved through the app's overridden theme
     // context. Widget backgrounds need the raw system palette used by the launcher, or a
     // dark phone can still receive a light card. The Android 12+ system tones are the
@@ -237,6 +246,7 @@ internal fun StarceptionWidgetTheme(
             LocalCookieWidgetGradient provides ImageProvider(cookieGradient),
             LocalWidgetAppearance provides source.appearance,
             LocalTransparentWidgetForeground provides transparentForeground,
+            LocalWidgetHeroAccent provides ColorProvider(heroAccent),
         ) {
             if (drawRectangularBackground) {
                 // This must be a separate RemoteViews layer. Scaffold paints its own
@@ -272,6 +282,24 @@ internal fun GlanceModifier.themedCookieWidgetBackground(): GlanceModifier = bac
 )
 
 private fun Int.asThemeColor(): Color = if (this == 0) Color.Unspecified else Color(this)
+
+private val HERO_CONTRAST_SURFACE = Color(0xFF0B4D43)
+
+private fun readableHeroAccent(source: Color): Color {
+    val opaque = source.copy(alpha = 1f)
+    if (contrastRatio(opaque, HERO_CONTRAST_SURFACE) >= 4.5f) return opaque
+    for (step in 1..10) {
+        val candidate = lerp(opaque, Color.White, step / 10f)
+        if (contrastRatio(candidate, HERO_CONTRAST_SURFACE) >= 4.5f) return candidate
+    }
+    return Color.White
+}
+
+private fun contrastRatio(first: Color, second: Color): Float {
+    val lighter = maxOf(first.luminance(), second.luminance())
+    val darker = minOf(first.luminance(), second.luminance())
+    return (lighter + 0.05f) / (darker + 0.05f)
+}
 
 /** RemoteViews cannot carry a Compose Brush, so render the identical stops once to a tiny strip. */
 private fun createHomeGradient(

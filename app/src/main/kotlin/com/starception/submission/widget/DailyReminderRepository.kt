@@ -18,8 +18,10 @@ package com.starception.submission.widget
 
 import android.content.Context
 import android.util.Log
+import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.duadatabase.DuaCategory
 import com.starception.submission.core.duadatabase.DuaRepository
+import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.data.BukhariBooks
 import dagger.hilt.EntryPoint
@@ -90,23 +92,44 @@ internal object DailyReminderRepository {
 
     private enum class Kind { HADITH, DUA }
 
-    suspend fun load(context: Context, offset: Int): DailyReminder {
+    suspend fun load(
+        context: Context,
+        offset: Int,
+        prayerName: String? = null,
+    ): DailyReminder {
         val day = LocalDate.now().toEpochDay().toInt()
-        val index = Math.floorMod(day + offset, SEQUENCE.size)
-        val seed = day + offset
+        val prayerSeed = prayerName?.lowercase()?.hashCode() ?: 0
+        val index = Math.floorMod(day + prayerSeed + offset, SEQUENCE.size)
+        val seed = day * 31 + prayerSeed + offset
 
-        val loaded = when (SEQUENCE[index]) {
-            Kind.HADITH -> loadHadith(context, seed)
-            Kind.DUA -> loadDua(context, seed)
+        val kind = SEQUENCE[index]
+        val primary = when (kind) {
+            Kind.HADITH -> loadHadith(context, seed, prayerName)
+            Kind.DUA -> loadDua(context, seed, prayerName)
+        }
+        // The Bukhari collection is delivered on demand and may not have reached a new
+        // install yet. Preserve prayer relevance by falling back to the matching Fortress
+        // dua (or vice versa), not to an unrelated generic sentence.
+        val loaded = primary ?: when (kind) {
+            Kind.HADITH -> loadDua(context, seed, prayerName)
+            Kind.DUA -> loadHadith(context, seed, prayerName)
         }
         // A database that will not open must not blank the widget: the fallback still says
         // something true and still opens the app, it just cannot cite a source.
         return loaded ?: FALLBACK
     }
 
-    private suspend fun loadHadith(context: Context, seed: Int): DailyReminder? = try {
-        val repository = HadithRepository.getInstance(context)
-        val random = Random(seed)
+    private suspend fun loadHadith(
+        context: Context,
+        seed: Int,
+        prayerName: String?,
+    ): DailyReminder? {
+        return try {
+            val repository = HadithRepository.getInstance(context)
+            prayerName?.let { currentPrayer ->
+                loadPrayerHadith(repository, currentPrayer, seed)?.let { return it }
+            }
+            val random = Random(seed)
         // Several attempts, because a large share of Bukhari's entries are not readable on
         // their own — see [isSelfContained]. Picking the first number that comes up gave
         // the widget "Narrated Abu at-Tufail: The above mentioned Statement of `Ali.",
@@ -123,56 +146,91 @@ internal object DailyReminderRepository {
         // The first few hundred are the well-known ones on intention, faith and prayer,
         // which read better on a home screen than a ruling pulled from the middle of a
         // chapter on inheritance.
-        val candidates = List(CANDIDATE_ATTEMPTS) { random.nextInt(1, 300) }
+            val candidates = List(CANDIDATE_ATTEMPTS) { random.nextInt(1, 300) }
 
-        var found: DailyReminder? = null
-        for (number in candidates) {
-            val hadith = repository.getHadith(BUKHARI_DB, number)
-            // A lookup that fails is a database problem, not a verdict on this hadith.
-            // Moving on would make the selection depend on database health; stopping lets
-            // the caller fall through to the dua, which is honest and still deterministic.
-            if (hadith == null) break
-            val fullText = hadith.textPlain?.let(::reflow)?.takeIf { it.isNotBlank() } ?: continue
-            if (!isSelfContained(fullText)) continue
-            val (narratorTitle, bodyText) = splitNarratorTitle(fullText)
-
-            val collection = hadith.collectionName.takeIf { it.isNotBlank() } ?: "Sahih Bukhari"
-            val category = BukhariBooks.findByHadithId(number)?.nameEnglish
-            found = DailyReminder(
-                key = "hadith-$number",
-                // The narrator is the hadith's heading, not the first sentence of its
-                // body. Splitting it prevents "Narrated Abu Huraira" from appearing
-                // twice while giving Bukhari reminders the same strong hierarchy as a
-                // Fortress dua's chapter title.
-                text = bodyText,
-                // The kind, not the source. The subtitle's job is to say what the reader is
-                // looking at before they read it; "Bukhari" answers a question they had not
-                // asked yet, and a Fortress chapter title ("Invocation for when you see the
-                // first dates of the season") is a whole sentence competing with the one
-                // underneath it. The source is still carried in [target], which is where it
-                // matters — it is what the tap opens.
-                caption = "Hadith",
-                contentTitle = narratorTitle,
-                sourceName = collection,
-                sourceDetail = buildString {
-                    append("#$number")
-                    if (category != null) append(" · $category")
-                },
-                // Hadith carry their Arabic too, and a short one leaves the same empty
-                // card a short dua does. Same rule decides whether it is shown.
-                arabic = hadith.textArabic.let(::reflow).takeIf { it.isNotBlank() },
-                target = WidgetNavigationTarget.Hadith(
-                    databaseFile = BUKHARI_DB,
-                    hadithNumber = number,
-                    collectionName = collection,
-                ),
-            )
-            break
+            var found: DailyReminder? = null
+            for (number in candidates) {
+                val hadith = repository.getHadith(BUKHARI_DB, number)
+                // A lookup that fails is a database problem, not a verdict on this hadith.
+                // Moving on would make the selection depend on database health; stopping lets
+                // the caller fall through to the dua, which is honest and still deterministic.
+                if (hadith == null) break
+                found = hadith.toReminder() ?: continue
+                break
+            }
+            found
+        } catch (e: Exception) {
+            Log.w(TAG, "Bukhari hadith unavailable for the widget", e)
+            null
         }
-        found
-    } catch (e: Exception) {
-        Log.w(TAG, "Bukhari hadith unavailable for the widget", e)
-        null
+    }
+
+    /**
+     * Finds a readable narration that names the current prayer or its part of the day.
+     * The old widget sampled an unrelated Bukhari number, so an Asr card could discuss
+     * inheritance or marriage. Query order is prayer-specific and selection is stable
+     * for the day; shorter results are preferred because the widget can actually show
+     * their meaning instead of only their opening clause.
+     */
+    private suspend fun loadPrayerHadith(
+        repository: HadithRepository,
+        prayerName: String,
+        seed: Int,
+    ): DailyReminder? {
+        val candidates = prayerHadithQueries(prayerName)
+            .flatMap { query ->
+                repository.searchHadiths(
+                    query = query,
+                    collections = listOf(BUKHARI_DB),
+                    limit = 24,
+                ).map { (_, hadith) -> hadith }
+            }
+            .distinctBy(Hadith::id)
+            .filter { hadith ->
+                val text = hadith.textPlain?.let(::reflow).orEmpty()
+                isSelfContained(text) && text.length <= MAX_WIDGET_HADITH_LENGTH
+            }
+            .sortedBy { it.textPlain?.length ?: Int.MAX_VALUE }
+            .take(SHORT_HADITH_POOL_SIZE)
+
+        if (candidates.isEmpty()) return null
+        return candidates[Math.floorMod(seed, candidates.size)].toReminder()
+    }
+
+    private fun prayerHadithQueries(prayerName: String): List<String> = when (
+        prayerName.lowercase()
+    ) {
+        "fajr" -> listOf("Fajr prayer", "morning prayer")
+        "dhuhr" -> listOf("Dhuhr prayer", "midday prayer")
+        "asr" -> listOf("Asr prayer", "afternoon prayer")
+        "maghrib" -> listOf("Maghrib prayer", "sunset prayer")
+        "isha" -> listOf("Isha prayer", "night prayer")
+        else -> listOf("prayer")
+    }
+
+    private fun Hadith.toReminder(): DailyReminder? {
+        val fullText = textPlain?.let(::reflow)?.takeIf { it.isNotBlank() } ?: return null
+        if (!isSelfContained(fullText)) return null
+        val (narratorTitle, bodyText) = splitNarratorTitle(fullText)
+        val collection = collectionName.takeIf { it.isNotBlank() } ?: "Sahih Bukhari"
+        val category = BukhariBooks.findByHadithId(id)?.nameEnglish
+        return DailyReminder(
+            key = "hadith-$id",
+            text = bodyText,
+            caption = "Hadith",
+            contentTitle = narratorTitle,
+            sourceName = collection,
+            sourceDetail = buildString {
+                append("#$id")
+                if (category != null) append(" · $category")
+            },
+            arabic = textArabic.let(::reflow).takeIf { it.isNotBlank() },
+            target = WidgetNavigationTarget.Hadith(
+                databaseFile = BUKHARI_DB,
+                hadithNumber = id,
+                collectionName = collection,
+            ),
+        )
     }
 
     /**
@@ -262,11 +320,19 @@ internal object DailyReminderRepository {
     /** How many hadith to try before giving up and letting another source take the slot. */
     private const val CANDIDATE_ATTEMPTS = 12
 
-    private suspend fun loadDua(context: Context, seed: Int): DailyReminder? = try {
+    private const val MAX_WIDGET_HADITH_LENGTH = 520
+    private const val SHORT_HADITH_POOL_SIZE = 8
+
+    private suspend fun loadDua(
+        context: Context,
+        seed: Int,
+        prayerName: String?,
+    ): DailyReminder? = try {
         val repository = EntryPointAccessors
             .fromApplication(context.applicationContext, DailyReminderEntryPoint::class.java)
             .duaRepository()
-        loadSeededDua(repository, seed)
+        prayerName?.let { loadPrayerDua(repository, it, seed) }
+            ?: loadSeededDua(repository, seed)
     } catch (e: Exception) {
         Log.w(TAG, "Fortress dua unavailable for the widget", e)
         null
@@ -284,45 +350,78 @@ internal object DailyReminderRepository {
         val count = repository.getDuaCount()
         if (count <= 0) return@run null
         val id = Random(seed).nextInt(1, count + 1)
-        repository.getDuaById(id)?.let { dua ->
-            // The translation, not the Arabic: the widget's typeface is Ubuntu Sans and
-            // the card is a few lines tall, neither of which serves an Arabic text well.
-            // The detail screen this opens shows the Arabic properly.
-            val text = dua.translation
-                ?.let(::reflow)
-                ?.let(::cleanDuaText)
-                ?.takeIf { it.isNotBlank() }
-                ?: return@let null
-            DailyReminder(
-                key = "dua-${dua.id}",
-                text = text,
-                caption = "Dua",
-                contentTitle = dua.chapterTitle
-                    .let(::withoutDuaNumber)
-                    .takeIf { it.isNotBlank() },
-                sourceName = "Fortress of the Muslim",
-                // The topic, not the chapter title. A Fortress chapter is named for the
-                // occasion in full — "What to say if you see someone afflicted" — which is
-                // a sentence, not a reference, and it ellipsised in the corner it sits in.
-                // The category the app already groups these by ("Health & Sickness") is
-                // short, stable and is the same label the user sees elsewhere in the app.
-                sourceDetail = topicFor(dua.chapterTitle),
-                arabic = dua.arabic?.let(::reflow)?.takeIf { it.isNotBlank() },
-                transliteration = dua.transliteration
-                    ?.let(::reflow)
-                    ?.takeIf { it.isNotBlank() },
-                target = WidgetNavigationTarget.Dua(
-                    // "{Chapter}: Dua N", which is the contract DuaDetailScreen documents
-                    // and detects with `title.contains(": Dua ")`. Sent as a bare chapter
-                    // title the screen classified it as a Quranic dua instead, fell through
-                    // to id-matching, found nothing and opened page 1 of 291 — "Accept from
-                    // us" — rather than the dua the widget was showing.
-                    title = "${dua.chapterTitle}: Dua ${dua.position}",
-                    content = text,
-                    duaNumber = dua.position,
-                ),
-            )
+        repository.getDuaById(id)?.toReminder()
+    }
+
+    /** Curated Fortress entries whose occasion matches the active prayer window. */
+    private suspend fun loadPrayerDua(
+        repository: DuaRepository,
+        prayerName: String,
+        seed: Int,
+    ): DailyReminder? {
+        val ids = when (prayerName.lowercase()) {
+            // Accepted deeds and beneficial provision, explicitly prescribed after Fajr.
+            "fajr" -> listOf(70)
+            // Authenticated adhkar after completing an obligatory prayer. Entry 63 is the
+            // compact post-prayer dua used by the supplied design reference.
+            "dhuhr" -> listOf(63)
+            "asr" -> listOf(63, 92)
+            "maghrib" -> listOf(63, 92)
+            // A concise protection supplication prescribed before sleep.
+            "isha" -> listOf(97)
+            else -> listOf(63)
         }
+        val start = Math.floorMod(seed, ids.size)
+        repeat(ids.size) { step ->
+            repository.getDuaById(ids[(start + step) % ids.size])
+                ?.toReminder()
+                ?.let { return it }
+        }
+        return null
+    }
+
+    private fun Dua.toReminder(): DailyReminder? {
+        val fullTranslation = translation
+            ?.let(::reflow)
+            ?.let(::cleanDuaText)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        // Fortress combines the three istighfar repetitions and the reference's
+        // Allahumma anta-s-salam prayer into one record. The tall card has room for one
+        // complete invocation, so show the second one in full instead of ellipsising both.
+        val cleanTranslation = if (id == POST_PRAYER_PEACE_DUA_ID) {
+            val tail = fullTranslation.substringAfter(". O Allah", missingDelimiterValue = "")
+            if (tail.isNotBlank()) "O Allah$tail" else fullTranslation
+        } else {
+            fullTranslation
+        }
+        val displayArabic = arabic
+            ?.let(::reflow)
+            ?.let { value ->
+                if (id == POST_PRAYER_PEACE_DUA_ID) {
+                    value.substringAfter(')', missingDelimiterValue = value).trim()
+                } else {
+                    value
+                }
+            }
+            ?.takeIf { it.isNotBlank() }
+        return DailyReminder(
+            key = "dua-$id",
+            text = cleanTranslation,
+            caption = "Dua",
+            contentTitle = chapterTitle
+                .let(::withoutDuaNumber)
+                .takeIf { it.isNotBlank() },
+            sourceName = "Fortress of the Muslim",
+            sourceDetail = topicFor(chapterTitle),
+            arabic = displayArabic,
+            transliteration = transliteration?.let(::reflow)?.takeIf { it.isNotBlank() },
+            target = WidgetNavigationTarget.Dua(
+                title = "$chapterTitle: Dua $position",
+                content = cleanTranslation,
+                duaNumber = position,
+            ),
+        )
     }
 
     /** Removes display-only invocation numbering while leaving meaningful numbers intact. */
@@ -332,6 +431,9 @@ internal object DailyReminderRepository {
         .trim()
 
     private fun cleanDuaText(value: String): String = withoutDuaNumber(value)
+        // Repetition directions belong on the detail page, not inside the translation.
+        // Keeping them here made an otherwise complete two-line dua end in an ellipsis.
+        .replace(DUA_RECITATION_INSTRUCTION, "")
         // Fortress translations contain inline footnote markers such as "morning 1 and"
         // and "laziness.)2". They have no corresponding footnotes in the widget, so they
         // read like invocation numbering and should not be exposed there.
@@ -351,7 +453,12 @@ internal object DailyReminderRepository {
         option = RegexOption.IGNORE_CASE,
     )
     private val DUA_FOOTNOTE_MARKER = Regex("""(?<!\d)[1-9](?!\d)""")
+    private val DUA_RECITATION_INSTRUCTION = Regex(
+        pattern = """\s*\((?:recite|repeat|say)[^)]*\)\s*""",
+        option = RegexOption.IGNORE_CASE,
+    )
     private val MISSING_SENTENCE_SPACE = Regex("""([.):;!?])(?=[A-Za-z])""")
+    private const val POST_PRAYER_PEACE_DUA_ID = 63
 
     /**
      * The app's own topic for a Fortress chapter, matched the same way [DuaCategory] does.

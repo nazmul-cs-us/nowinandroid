@@ -84,9 +84,41 @@ internal object WidgetPrayerPhaseArtwork {
             if (canvasPixels[index]) pixels[index] = pixels[index] and 0x00FFFFFF
         }
 
-        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { output ->
+        val cleaned = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { output ->
             output.setPixels(pixels, 0, width, 0, 0, width, height)
         }
+
+        // The source exports use different amounts of surrounding canvas. Cropping to
+        // the painted alpha bounds makes a 42dp Dhuhr illustration occupy the same visual
+        // area as a 42dp Fajr illustration instead of appearing one-third smaller.
+        var minX = width
+        var minY = height
+        var maxX = -1
+        var maxY = -1
+        pixels.forEachIndexed { index, pixel ->
+            if ((pixel ushr 24 and 0xFF) > 8) {
+                val x = index % width
+                val y = index / width
+                minX = minOf(minX, x)
+                minY = minOf(minY, y)
+                maxX = maxOf(maxX, x)
+                maxY = maxOf(maxY, y)
+            }
+        }
+        if (maxX < minX || maxY < minY) return cleaned
+
+        val padding = (minOf(width, height) * 0.015f).toInt().coerceAtLeast(2)
+        val cropLeft = (minX - padding).coerceAtLeast(0)
+        val cropTop = (minY - padding).coerceAtLeast(0)
+        val cropRight = (maxX + padding + 1).coerceAtMost(width)
+        val cropBottom = (maxY + padding + 1).coerceAtMost(height)
+        return Bitmap.createBitmap(
+            cleaned,
+            cropLeft,
+            cropTop,
+            cropRight - cropLeft,
+            cropBottom - cropTop,
+        )
     }
 
     private fun isWarmWhiteCanvas(pixel: Int): Boolean {

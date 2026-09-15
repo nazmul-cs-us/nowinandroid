@@ -454,6 +454,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     fun changeArabicFont(fontName: String) {
         prefs.edit().putString("arabic_font", fontName).apply()
         _selectedArabicFont.value = fontName
+        com.starception.submission.widget.PrayerWidgetUpdater.refresh(context)
     }
 
     // Bookmark management for Duas

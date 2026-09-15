@@ -32,28 +32,39 @@ internal object WidgetTimelineArtwork {
     private fun draw(bitmap: Bitmap) {
         val canvas = Canvas(bitmap)
         val line = Path().apply {
-            moveTo(52f, 94f)
-            cubicTo(95f, 54f, 124f, 56f, 178f, 98f)
-            cubicTo(221f, 134f, 266f, 137f, 318f, 96f)
-            cubicTo(365f, 57f, 414f, 48f, 466f, 96f)
-            cubicTo(512f, 137f, 552f, 132f, 600f, 91f)
+            moveTo(34f, 118f)
+            cubicTo(70f, 42f, 99f, 42f, 126f, 120f)
+            cubicTo(164f, 174f, 207f, 39f, 250f, 120f)
+            cubicTo(292f, 175f, 344f, 34f, 386f, 116f)
+            cubicTo(430f, 174f, 480f, 43f, 518f, 120f)
+            cubicTo(551f, 164f, 581f, 73f, 608f, 108f)
         }
         canvas.drawPath(
             line,
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(200, 215, 209)
-                alpha = 210
+                color = Color.WHITE
+                alpha = 190
                 style = Paint.Style.STROKE
-                strokeWidth = 3.2f
+                strokeWidth = 7f
+                strokeCap = Paint.Cap.ROUND
+            },
+        )
+        canvas.drawPath(
+            line,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(174, 204, 194)
+                alpha = 238
+                style = Paint.Style.STROKE
+                strokeWidth = 3.8f
                 strokeCap = Paint.Cap.ROUND
             },
         )
 
         val milestones = listOf(
-            Triple(126f, 63f, Color.rgb(207, 165, 45)),
-            Triple(250f, 132f, Color.rgb(225, 126, 84)),
-            Triple(386f, 54f, Color.rgb(13, 92, 75)),
-            Triple(518f, 135f, Color.rgb(41, 112, 178)),
+            Triple(126f, 120f, Color.rgb(207, 165, 45)),
+            Triple(250f, 120f, Color.rgb(225, 126, 84)),
+            Triple(386f, 116f, Color.rgb(13, 92, 75)),
+            Triple(518f, 120f, Color.rgb(41, 112, 178)),
         )
         val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE

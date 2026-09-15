@@ -48,9 +48,9 @@ internal object WidgetDaylightBarArtwork {
                 )
             }
             Canvas(output).drawRoundRect(
-                RectF(0f, 4f, width.toFloat(), height - 4f),
-                8f,
-                8f,
+                RectF(0f, 2f, width.toFloat(), height - 2f),
+                10f,
+                10f,
                 paint,
             )
         }

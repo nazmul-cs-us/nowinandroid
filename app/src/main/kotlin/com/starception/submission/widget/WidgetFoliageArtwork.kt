@@ -98,8 +98,10 @@ internal object WidgetFoliageArtwork {
         )
         val palette = paletteFor(phase)
         val cycle = frame.toDouble() / FRAME_COUNT.toDouble() * PI * 2.0
-        val mainSway = (sin(cycle) * 2.25).toFloat()
-        val secondarySway = (sin(cycle + PI / 2.0) * 1.35).toFloat()
+        // Keep the roots fixed and move only the tips by a couple of rendered pixels.
+        // Larger swings combined with a fast cross-fade read as flashing on One UI.
+        val mainSway = (sin(cycle) * 2.4).toFloat()
+        val secondarySway = (sin(cycle + PI / 2.0) * 1.5).toFloat()
 
         when (placement) {
             WidgetFoliagePlacement.HERO_RIGHT -> drawHeroPlant(
@@ -151,25 +153,33 @@ internal object WidgetFoliageArtwork {
         return bitmap
     }
 
-    /** Tall leaves at the devotional card's right edge, behind its bookmark action. */
+    /**
+     * Restrained leaves at the devotional card's right edge.
+     *
+     * The reference keeps this decoration in the final sliver of the card and lets the
+     * pale panel artwork do most of the work. Longer, opaque leaves crossed the Arabic
+     * and transliteration once the bitmap was scaled by the launcher.
+     */
     private fun drawDevotionalPlant(
         canvas: Canvas,
         sway: Float,
         secondarySway: Float,
         palette: FoliagePalette,
     ) {
-        val rootX = 654f
+        val rootX = 660f
         val rootY = LOGICAL_HEIGHT + 8f
+        canvas.save()
+        canvas.rotate(sway * 0.82f, rootX, rootY)
         val stems = listOf(
-            605f to 224f,
-            617f to 183f,
-            630f to 139f,
-            640f to 93f,
-            649f to 52f,
+            625f to 229f,
+            637f to 198f,
+            644f to 164f,
+            649f to 130f,
+            653f to 96f,
         )
         val stemPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.stem
-            alpha = 150
+            alpha = 88
             style = Paint.Style.STROKE
             strokeWidth = 3.1f
             strokeCap = Paint.Cap.ROUND
@@ -191,11 +201,11 @@ internal object WidgetFoliageArtwork {
             )
         }
         val leaves = listOf(
-            LeafSpec(605f, 224f, 92f, 30f, -158f, palette.highlight),
-            LeafSpec(617f, 183f, 104f, 33f, -143f, palette.primary),
-            LeafSpec(630f, 139f, 108f, 34f, -128f, palette.deep),
-            LeafSpec(640f, 93f, 102f, 32f, -113f, palette.secondary),
-            LeafSpec(649f, 52f, 90f, 29f, -99f, palette.primary),
+            LeafSpec(625f, 229f, 78f, 25f, -150f, palette.highlight),
+            LeafSpec(637f, 198f, 76f, 25f, -135f, palette.primary),
+            LeafSpec(644f, 164f, 72f, 24f, -119f, palette.deep),
+            LeafSpec(649f, 130f, 66f, 22f, -103f, palette.secondary),
+            LeafSpec(653f, 96f, 58f, 20f, -87f, palette.highlight),
         )
         leaves.forEachIndexed { index, leaf ->
             drawLeaf(
@@ -205,10 +215,11 @@ internal object WidgetFoliageArtwork {
                         secondarySway * (0.08f + index * 0.025f),
                 ),
                 vein = palette.vein,
-                alpha = 210,
-                veinAlpha = 104,
+                alpha = 142,
+                veinAlpha = 58,
             )
         }
+        canvas.restore()
     }
 
     /** Broad leaves cropped by the lower-left edge, matching the supplied prayer panel. */
@@ -218,6 +229,8 @@ internal object WidgetFoliageArtwork {
         secondarySway: Float,
         palette: FoliagePalette,
     ) {
+        canvas.save()
+        canvas.rotate(sway * 0.55f, -18f, LOGICAL_HEIGHT + 8f)
         val vein = palette.vein
         val leaves = listOf(
             LeafSpec(-20f, 270f, 110f, 34f, -78f, palette.deep),
@@ -236,6 +249,7 @@ internal object WidgetFoliageArtwork {
                 veinAlpha = 62,
             )
         }
+        canvas.restore()
     }
 
     /** Larger, fewer eucalyptus leaves matching the hero's botanical quote panel. */
@@ -247,6 +261,8 @@ internal object WidgetFoliageArtwork {
     ) {
         val rootX = 626f
         val rootY = LOGICAL_HEIGHT + 5f
+        canvas.save()
+        canvas.rotate(sway * 0.82f, rootX, rootY)
         val stemPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.stem
             alpha = 145
@@ -298,6 +314,7 @@ internal object WidgetFoliageArtwork {
                 veinAlpha = 116,
             )
         }
+        canvas.restore()
     }
 
     private fun drawPlant(

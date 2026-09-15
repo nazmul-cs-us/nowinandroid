@@ -21,6 +21,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Shader
 
 /** Layered forest surface behind the active prayer, matching the supplied reference. */
@@ -45,7 +46,47 @@ internal object WidgetActivePrayerCardArtwork {
                     Shader.TileMode.CLAMP,
                 )
             }
-            Canvas(output).drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            val card = Path().apply {
+                // The reference grows the selected prayer out of the landscape as a
+                // rounded hill, not as a rectangle placed on top of it.
+                moveTo(0f, height * 0.22f)
+                cubicTo(
+                    10f,
+                    height * 0.11f,
+                    width * 0.22f,
+                    height * 0.015f,
+                    width * 0.50f,
+                    0f,
+                )
+                cubicTo(
+                    width * 0.78f,
+                    height * 0.015f,
+                    width - 10f,
+                    height * 0.11f,
+                    width.toFloat(),
+                    height * 0.22f,
+                )
+                lineTo(width.toFloat(), height * 0.88f)
+                cubicTo(
+                    width.toFloat(),
+                    height * 0.965f,
+                    width * 0.90f,
+                    height.toFloat(),
+                    width * 0.78f,
+                    height.toFloat(),
+                )
+                lineTo(width * 0.22f, height.toFloat())
+                cubicTo(
+                    width * 0.10f,
+                    height.toFloat(),
+                    0f,
+                    height * 0.965f,
+                    0f,
+                    height * 0.88f,
+                )
+                close()
+            }
+            Canvas(output).drawPath(card, paint)
         }
     }
 }

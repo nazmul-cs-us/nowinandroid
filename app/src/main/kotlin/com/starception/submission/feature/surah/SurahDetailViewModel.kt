@@ -16,6 +16,7 @@ import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetRepository
+import com.starception.submission.widget.PrayerWidgetUpdater
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -423,6 +424,7 @@ class SurahDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _selectedArabicFont.value = fontName
             prefs.edit().putString("arabic_font", fontName).apply()
+            PrayerWidgetUpdater.refresh(context)
         }
     }
 

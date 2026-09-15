@@ -10,7 +10,7 @@
     android:layout_height="match_parent"
     android:animateFirstView="false"
     android:autoStart="true"
-    android:flipInterval="1800"
+    android:flipInterval="4000"
     android:inAnimation="@anim/widget_foliage_fade_in"
     android:measureAllChildren="true"
     android:outAnimation="@anim/widget_foliage_fade_out">

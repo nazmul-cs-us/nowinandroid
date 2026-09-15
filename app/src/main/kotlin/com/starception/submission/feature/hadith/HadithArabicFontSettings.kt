@@ -102,6 +102,7 @@ internal fun saveHadithArabicFont(context: Context, font: String) {
         .edit()
         .putString(HADITH_ARABIC_FONT_KEY, font)
         .apply()
+    com.starception.submission.widget.PrayerWidgetUpdater.refresh(context)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
