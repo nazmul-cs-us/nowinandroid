@@ -3,6 +3,7 @@
      being dropped and Glance delivering its first RemoteViews. Kept to a single
      TextView so it costs nothing and never flashes a differently-shaped card. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/prayer_widget_background"

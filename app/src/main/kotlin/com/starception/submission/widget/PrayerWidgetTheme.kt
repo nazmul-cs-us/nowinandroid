@@ -58,6 +58,7 @@ import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import com.starception.submission.R
+import java.util.Calendar
 
 /** App theme state plus the global widget appearance captured for this render. */
 internal data class WidgetThemeSource(
@@ -104,6 +105,16 @@ internal val LocalWidgetHeroAccent = staticCompositionLocalOf {
 
 /** Transparent Scaffold paint lets the shared gradient below remain visible. */
 internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
+/**
+ * Paint for the one view marked as android.R.id.background.
+ *
+ * Alpha 1/255 is visually transparent but falls inside One UI's translucent range,
+ * enabling its host-owned blur. A disabled widget background remains truly transparent
+ * and therefore does not ask the launcher for frosting.
+ */
+internal val LocalWidgetHostBackground = staticCompositionLocalOf {
+    TransparentWidgetBackground
+}
 
 /**
  * Widget equivalent of NiaTheme plus mainPageBackgroundBrush().
@@ -152,11 +163,10 @@ internal fun StarceptionWidgetTheme(
         customTertiaryColor = userData.customTertiaryColor.asThemeColor(),
         disableDynamicTheming = !useWallpaperColors,
     )
-    val backgroundAlpha = if (source.appearance.showBackground) {
-        1f - source.appearance.backgroundOpacity.coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val backgroundAlpha = source.appearance.effectiveBackgroundAlpha()
+    val transparentBackground = source.appearance.needsWallpaperContrast()
+    val readableOnWallpaper = Color.White
+    val readableOnWallpaperMuted = Color(0xFFE2E7F1)
     // Make nested themed panels obey the same global transparency. Text/icon roles stay
     // opaque so content remains legible as the wallpaper becomes more visible.
     val widgetScheme = scheme.copy(
@@ -170,6 +180,35 @@ internal fun StarceptionWidgetTheme(
         surfaceContainer = scheme.surfaceContainer.copy(alpha = backgroundAlpha),
         surfaceContainerHigh = scheme.surfaceContainerHigh.copy(alpha = backgroundAlpha),
         surfaceContainerHighest = scheme.surfaceContainerHighest.copy(alpha = backgroundAlpha),
+        primaryContainer = scheme.primaryContainer.copy(alpha = backgroundAlpha),
+        secondaryContainer = scheme.secondaryContainer.copy(alpha = backgroundAlpha),
+        tertiaryContainer = scheme.tertiaryContainer.copy(alpha = backgroundAlpha),
+        inverseSurface = scheme.inverseSurface.copy(alpha = backgroundAlpha),
+        onBackground = if (transparentBackground) readableOnWallpaper else scheme.onBackground,
+        onSurface = if (transparentBackground) readableOnWallpaper else scheme.onSurface,
+        onSurfaceVariant = if (transparentBackground) {
+            readableOnWallpaperMuted
+        } else {
+            scheme.onSurfaceVariant
+        },
+        onPrimaryContainer = if (transparentBackground) {
+            readableOnWallpaper
+        } else {
+            scheme.onPrimaryContainer
+        },
+        onSecondaryContainer = if (transparentBackground) {
+            readableOnWallpaper
+        } else {
+            scheme.onSecondaryContainer
+        },
+        onTertiaryContainer = if (transparentBackground) {
+            readableOnWallpaper
+        } else {
+            scheme.onTertiaryContainer
+        },
+        primary = if (transparentBackground) readableOnWallpaper else scheme.primary,
+        secondary = if (transparentBackground) readableOnWallpaperMuted else scheme.secondary,
+        tertiary = if (transparentBackground) readableOnWallpaperMuted else scheme.tertiary,
     )
     // The hero uses the selected primary hue on a fixed forest photograph. Some custom
     // themes resolve to a dark or muted primary that disappears on that surface, so lift
@@ -221,14 +260,41 @@ internal fun StarceptionWidgetTheme(
         )
     }
     val basicColor = basicBackgroundColor ?: scheme.surface
+    val basicGradientColors = basicBackgroundColor?.let { listOf(it, it) }
+        ?: timeAwareBasicGradientColors(
+            darkTheme = darkTheme,
+            hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
+        )
+    // Keep the bitmap opaque and apply opacity through the generated background
+    // ImageView. One UI reads that view alpha to decide whether to draw its own
+    // frosted layer; baking alpha into the pixels makes the host see an opaque view.
     val backgroundColors = when (source.appearance.backgroundType) {
-        WidgetBackgroundType.BASIC -> listOf(basicColor, basicColor)
+        WidgetBackgroundType.BASIC -> basicGradientColors
         WidgetBackgroundType.DYNAMIC_COLOR -> dynamicGradientColors
-    }.map { it.copy(alpha = backgroundAlpha) }
-    val gradient = remember(userData, source.appearance, darkTheme, scheme, basicColor) {
-        createHomeGradient(backgroundColors)
     }
-    val cookieGradient = remember(userData, source.appearance, darkTheme, scheme, basicColor) {
+    val useSamsungGradientDirection = source.appearance.backgroundType ==
+        WidgetBackgroundType.BASIC && basicBackgroundColor == null
+    val gradient = remember(
+        userData,
+        source.appearance,
+        darkTheme,
+        scheme,
+        backgroundColors,
+        useSamsungGradientDirection,
+    ) {
+        createHomeGradient(
+            colors = backgroundColors,
+            horizontal = useSamsungGradientDirection,
+        )
+    }
+    val cookieGradient = remember(
+        userData,
+        source.appearance,
+        darkTheme,
+        scheme,
+        backgroundColors,
+        useSamsungGradientDirection,
+    ) {
         if (drawRectangularBackground) {
             gradient
         } else {
@@ -236,6 +302,7 @@ internal fun StarceptionWidgetTheme(
                 context = context,
                 colors = backgroundColors,
                 maskRes = R.drawable.four_side_cookie_background,
+                horizontal = useSamsungGradientDirection,
             )
         }
     }
@@ -247,6 +314,11 @@ internal fun StarceptionWidgetTheme(
             LocalWidgetAppearance provides source.appearance,
             LocalTransparentWidgetForeground provides transparentForeground,
             LocalWidgetHeroAccent provides ColorProvider(heroAccent),
+            LocalWidgetHostBackground provides if (source.appearance.showBackground) {
+                ColorProvider(Color(0x01000000))
+            } else {
+                TransparentWidgetBackground
+            },
         ) {
             if (drawRectangularBackground) {
                 // This must be a separate RemoteViews layer. Scaffold paints its own
@@ -255,6 +327,9 @@ internal fun StarceptionWidgetTheme(
                 Box(
                     modifier = GlanceModifier
                         .fillMaxSize()
+                        // The actual surface owns the single host marker. Keeping it off
+                        // this image modifier avoids both Scaffold's built-in marker and
+                        // Glance's image-background expansion producing duplicates.
                         .themedWidgetBackground()
                         .cornerRadius(24.dp),
                 ) {
@@ -271,6 +346,7 @@ internal fun StarceptionWidgetTheme(
 @Composable
 internal fun GlanceModifier.themedWidgetBackground(): GlanceModifier = background(
     imageProvider = LocalWidgetGradient.current,
+    alpha = LocalWidgetAppearance.current.effectiveBackgroundAlpha(),
     contentScale = ContentScale.FillBounds,
 )
 
@@ -278,8 +354,47 @@ internal fun GlanceModifier.themedWidgetBackground(): GlanceModifier = backgroun
 @Composable
 internal fun GlanceModifier.themedCookieWidgetBackground(): GlanceModifier = background(
     imageProvider = LocalCookieWidgetGradient.current,
+    alpha = LocalWidgetAppearance.current.effectiveBackgroundAlpha(),
     contentScale = ContentScale.FillBounds,
 )
+
+/** Applies a global widget-opacity value to drawable artwork before it enters RemoteViews. */
+internal fun alphaAdjustedImageProvider(
+    context: Context,
+    @DrawableRes drawableRes: Int,
+    alpha: Float,
+): ImageProvider {
+    val drawable = context.getDrawable(drawableRes)?.mutate()
+        ?: return ImageProvider(drawableRes)
+    val intrinsicWidth = drawable.intrinsicWidth.coerceAtLeast(1)
+    val intrinsicHeight = drawable.intrinsicHeight.coerceAtLeast(1)
+    // Bitmap ImageProviders count against Android's per-widget RemoteViews memory cap.
+    // 1024px is still above the rendered width on current phones while avoiding a failed
+    // update when several reference panels and rasterized text rows share one widget.
+    val scale = minOf(1f, MAX_REMOTE_ARTWORK_WIDTH.toFloat() / intrinsicWidth)
+    val width = (intrinsicWidth * scale).toInt().coerceAtLeast(1)
+    val height = (intrinsicHeight * scale).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    drawable.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
+    drawable.setBounds(0, 0, width, height)
+    drawable.draw(Canvas(bitmap))
+    return ImageProvider(bitmap)
+}
+
+private const val MAX_REMOTE_ARTWORK_WIDTH = 1024
+
+/** Samsung Now Brief's Basic palettes, including its direction and time-of-day changes. */
+internal fun timeAwareBasicGradientColors(
+    darkTheme: Boolean,
+    hourOfDay: Int,
+): List<Color> = when {
+    darkTheme && hourOfDay in 6..<12 -> listOf(Color(0xFF33535A), Color(0xFF131929))
+    darkTheme && hourOfDay in 12..<21 -> listOf(Color(0xFF484E32), Color(0xFF0E1C1A))
+    darkTheme -> listOf(Color(0xFF4F3C60), Color(0xFF171224))
+    hourOfDay in 6..<12 -> listOf(Color(0xFFBCFFF5), Color(0xFFBAE1FF))
+    hourOfDay in 12..<21 -> listOf(Color(0xFFFFF6CC), Color(0xFFE2FFC9))
+    else -> listOf(Color(0xFFD2E6FB), Color(0xFFE3D8FF))
+}
 
 private fun Int.asThemeColor(): Color = if (this == 0) Color.Unspecified else Color(this)
 
@@ -306,6 +421,7 @@ private fun createHomeGradient(
     colors: List<Color>,
     width: Int = 128,
     height: Int = 128,
+    horizontal: Boolean = false,
 ): Bitmap {
     return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
         val stops = colors.indices.map { index ->
@@ -316,7 +432,7 @@ private fun createHomeGradient(
                 0f,
                 0f,
                 width.toFloat(),
-                height.toFloat(),
+                if (horizontal) 0f else height.toFloat(),
                 colors.map(Color::toArgb).toIntArray(),
                 stops,
                 Shader.TileMode.CLAMP,
@@ -330,9 +446,15 @@ private fun createMaskedHomeGradient(
     context: Context,
     colors: List<Color>,
     @DrawableRes maskRes: Int,
+    horizontal: Boolean = false,
 ): Bitmap {
     val size = 256
-    val output = createHomeGradient(colors, width = size, height = size)
+    val output = createHomeGradient(
+        colors = colors,
+        width = size,
+        height = size,
+        horizontal = horizontal,
+    )
     val mask = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     context.getDrawable(maskRes)?.mutate()?.apply {
         setBounds(0, 0, size, size)

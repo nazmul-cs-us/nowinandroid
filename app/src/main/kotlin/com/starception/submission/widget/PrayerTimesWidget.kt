@@ -112,6 +112,8 @@ private val REFERENCE_DESIGN_CONTENT_HEIGHT = 401.dp
 private val REFERENCE_DESIGN_HERO_HEIGHT = 132.dp
 private val REFERENCE_DESIGN_TIMELINE_HEIGHT = 142.dp
 private val REFERENCE_DESIGN_DEVOTIONAL_HEIGHT = 115.dp
+private const val HERO_ARTWORK_MIN_ALPHA = 0.86f
+private const val PANEL_ARTWORK_MIN_ALPHA = 0.64f
 
 // The 35dp pin plus the measured top/bottom breathing room yields a 49dp visible row;
 // Scaffold contributes the remaining title-bar clearance. Keep the 58dp height budget
@@ -253,9 +255,6 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
         provideContent {
             StarceptionWidgetTheme(
                 source = themeSource,
-                // This editorial widget intentionally follows the supplied light artwork
-                // when the global widget background type is Basic.
-                basicBackgroundColor = Color(0xFFFFFCF8),
             ) {
                 when (state) {
                     PrayerWidgetState.Unavailable -> {
@@ -420,8 +419,8 @@ class PrayerTimesFullWidget : BasePrayerTimesWidget()
 /**
  * Rounded widget background with no chrome, for sizes too small for a title bar.
  *
- * [appWidgetBackground] is what lets the launcher clip the widget to the system corner
- * radius; without it the background paints square corners inside rounded ones.
+ * Compact layouts do not use Glance Scaffold, so this surface owns their single
+ * widget-background marker and the nearly transparent One UI frosting trigger.
  */
 @Composable
 private fun BareSurface(
@@ -435,6 +434,7 @@ private fun BareSurface(
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
+            .background(LocalWidgetHostBackground.current)
             .cornerRadius(24.dp)
             .clickable(actionStartActivity<MainActivity>())
             .padding(padding),
@@ -451,7 +451,8 @@ private fun CompactPrayerSurface(
     contentSize: DpSize,
 ) {
     val context = LocalContext.current
-    val transparentHeader = !LocalWidgetAppearance.current.showBackground
+    val appearance = LocalWidgetAppearance.current
+    val transparentHeader = appearance.needsWallpaperContrast()
     val transparentForeground = LocalTransparentWidgetForeground.current
     val headerInk = if (transparentHeader) {
         transparentForeground.primary
@@ -493,6 +494,7 @@ private fun CompactPrayerSurface(
         modifier = GlanceModifier
             .fillMaxSize()
             .appWidgetBackground()
+            .background(LocalWidgetHostBackground.current)
             .cornerRadius(24.dp)
             .clickable(actionStartActivity<MainActivity>())
             .padding(WIDGET_PADDING),
@@ -656,7 +658,7 @@ private fun TitledSurface(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Scaffold(
-        backgroundColor = TransparentWidgetBackground,
+        backgroundColor = LocalWidgetHostBackground.current,
         horizontalPadding = WIDGET_PADDING,
         // Scaffold pads the sides only. The final content is already an inset surface,
         // so use the compensated bottom inset instead of stacking another full 16dp.
@@ -665,7 +667,7 @@ private fun TitledSurface(
             .clickable(actionStartActivity<MainActivity>()),
         titleBar = {
             val appearance = LocalWidgetAppearance.current
-            val transparentHeader = !appearance.showBackground
+            val transparentHeader = appearance.needsWallpaperContrast()
             val transparentForeground = LocalTransparentWidgetForeground.current
             val headerInk = if (transparentHeader) {
                 transparentForeground.primary
@@ -796,7 +798,7 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
     state: PrayerWidgetState.Available,
 ) {
     val appearance = LocalWidgetAppearance.current
-    val transparentHeader = !appearance.showBackground
+    val transparentHeader = appearance.needsWallpaperContrast()
     val transparentForeground = LocalTransparentWidgetForeground.current
     val dynamicHeader = appearance.backgroundType ==
         WidgetBackgroundType.DYNAMIC_COLOR
@@ -1644,6 +1646,12 @@ private fun ReferencePrayerHero(
     // compact until the left text column can hold “14m since Dhuhr” without ellipsis.
     val compact = width < 380.dp
     val context = LocalContext.current
+    val appearance = LocalWidgetAppearance.current
+    val heroArtwork = alphaAdjustedImageProvider(
+        context = context,
+        drawableRes = R.drawable.prayer_widget_reference_hero_v4,
+        alpha = appearance.effectiveArtworkAlpha(HERO_ARTWORK_MIN_ALPHA),
+    )
     val phaseTitle = state.insight?.title ?: "Prayer now"
     val phaseTitleSize = WidgetTypography
         .fittingSize(
@@ -1658,7 +1666,7 @@ private fun ReferencePrayerHero(
             .fillMaxWidth()
             .height(height)
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_hero_v4),
+                imageProvider = heroArtwork,
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(24.dp),
@@ -1832,6 +1840,13 @@ private fun ReferenceShallowPrayerHero(
     width: Dp,
     height: Dp,
 ) {
+    val context = LocalContext.current
+    val appearance = LocalWidgetAppearance.current
+    val heroArtwork = alphaAdjustedImageProvider(
+        context = context,
+        drawableRes = R.drawable.prayer_widget_reference_hero_v4,
+        alpha = appearance.effectiveArtworkAlpha(HERO_ARTWORK_MIN_ALPHA),
+    )
     val currentName = state.currentPrayerName()
     val elapsed = state.insight?.elapsed.orEmpty()
     val elapsedDuration = elapsed.substringBefore(" since ")
@@ -1846,7 +1861,7 @@ private fun ReferenceShallowPrayerHero(
             .fillMaxWidth()
             .height(height)
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_hero_v4),
+                imageProvider = heroArtwork,
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(24.dp),
@@ -1922,6 +1937,12 @@ private fun ReferencePrayerTimeline(
     height: Dp,
 ) {
     val context = LocalContext.current
+    val appearance = LocalWidgetAppearance.current
+    val panelArtwork = alphaAdjustedImageProvider(
+        context = context,
+        drawableRes = R.drawable.prayer_widget_reference_panel_v2,
+        alpha = appearance.effectiveArtworkAlpha(PANEL_ARTWORK_MIN_ALPHA),
+    )
     val expanded = height >= 160.dp
     val condensed = height < REFERENCE_DESIGN_TIMELINE_HEIGHT
     val footerHeight = if (expanded) 30.dp else 16.dp
@@ -1934,7 +1955,7 @@ private fun ReferencePrayerTimeline(
             .fillMaxWidth()
             .height(height)
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_reference_panel_v2),
+                imageProvider = panelArtwork,
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(22.dp),
@@ -2351,6 +2372,12 @@ private fun ReferenceDevotionalPanel(
     height: Dp,
 ) {
     val context = LocalContext.current
+    val appearance = LocalWidgetAppearance.current
+    val panelArtwork = alphaAdjustedImageProvider(
+        context = context,
+        drawableRes = R.drawable.prayer_widget_devotional_panel,
+        alpha = appearance.effectiveArtworkAlpha(PANEL_ARTWORK_MIN_ALPHA),
+    )
     val reminder = state.reminder
     val expanded = height >= 140.dp
     val artworkWidth = (height * 0.68f).coerceIn(84.dp, 96.dp)
@@ -2365,7 +2392,7 @@ private fun ReferenceDevotionalPanel(
             .fillMaxWidth()
             .height(height)
             .background(
-                imageProvider = ImageProvider(R.drawable.prayer_widget_devotional_panel),
+                imageProvider = panelArtwork,
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(22.dp)

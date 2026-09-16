@@ -65,6 +65,9 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.widget.WidgetAppearanceSettings
 import com.starception.submission.widget.WidgetBackgroundType
 import com.starception.submission.widget.WidgetColorMode
+import com.starception.submission.widget.effectiveBackgroundAlpha
+import com.starception.submission.widget.timeAwareBasicGradientColors
+import java.util.Calendar
 import kotlin.math.roundToInt
 
 /** Global appearance controls shared by every widget supplied by the app. */
@@ -143,7 +146,7 @@ fun WidgetSettingsSection(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Adjust background transparency",
+                        text = "Samsung-style glass · 100% solid",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -229,10 +232,10 @@ private fun WidgetAppearancePreview(
         if (dark) darkColorScheme() else lightColorScheme()
     }
     val backgroundBrush = when (settings.backgroundType) {
-        WidgetBackgroundType.BASIC -> Brush.linearGradient(
-            listOf(
-                if (dark) Color(0xFF1D1B20) else Color(0xFFFFFBFE),
-                if (dark) Color(0xFF1D1B20) else Color(0xFFFFFBFE),
+        WidgetBackgroundType.BASIC -> Brush.horizontalGradient(
+            colors = timeAwareBasicGradientColors(
+                darkTheme = dark,
+                hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
             ),
         )
         WidgetBackgroundType.DYNAMIC_COLOR -> {
@@ -280,7 +283,7 @@ private fun WidgetAppearancePreview(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        alpha = 1f - settings.backgroundOpacity.coerceIn(0f, 1f)
+                        alpha = settings.effectiveBackgroundAlpha()
                     }
                     .background(backgroundBrush),
             )

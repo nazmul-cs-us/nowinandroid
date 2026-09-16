@@ -35,10 +35,47 @@ enum class WidgetColorMode {
 data class WidgetAppearanceSettings(
     val showBackground: Boolean = true,
     val backgroundType: WidgetBackgroundType = WidgetBackgroundType.DYNAMIC_COLOR,
-    // Mirrors Samsung's control: 0 adds no transparency, 1 is fully transparent.
-    val backgroundOpacity: Float = 0f,
+    // Literal slider direction: 0 is the thinnest enabled glass plate and 1 is fully
+    // solid. Turning Background off is the separate path to complete transparency.
+    val backgroundOpacity: Float = 1f,
     val colorMode: WidgetColorMode = WidgetColorMode.FOLLOW_SYSTEM,
 )
+
+/**
+ * Samsung maps the first opacity-slider position to a 70%-opaque launcher plate.
+ * Reserving that floor also gives the switch a distinct meaning: disabling Background
+ * removes the plate completely, while 0% keeps Samsung's lowest enabled opacity.
+ */
+internal fun WidgetAppearanceSettings.effectiveBackgroundAlpha(): Float =
+    if (!showBackground) {
+        0f
+    } else {
+        MIN_ENABLED_BACKGROUND_ALPHA +
+            backgroundOpacity.coerceIn(0f, 1f) * (1f - MIN_ENABLED_BACKGROUND_ALPHA)
+    }
+
+/**
+ * Reference artwork is part of the content, so it cannot disappear as aggressively as the
+ * launcher plate without making the overlaid copy unreadable. It still follows the global
+ * slider, but retains only the small readability floor requested by each section.
+ */
+internal fun WidgetAppearanceSettings.effectiveArtworkAlpha(
+    minimumEnabledAlpha: Float,
+): Float = if (!showBackground) {
+    minimumEnabledAlpha.coerceIn(0f, 1f)
+} else {
+    val minimum = minimumEnabledAlpha.coerceIn(0f, 1f)
+    minimum + backgroundOpacity.coerceIn(0f, 1f) * (1f - minimum)
+}
+
+/** Low-opacity surfaces need wallpaper-safe foregrounds rather than surface-coloured ink. */
+internal fun WidgetAppearanceSettings.needsWallpaperContrast(): Boolean =
+    !showBackground || backgroundOpacity <= WALLPAPER_CONTRAST_OPACITY
+
+// Samsung's Now Brief options report opacity=70 at the first slider position, and its
+// matching drawable uses a 70% alpha. Use the same floor when our slider is at zero.
+private const val MIN_ENABLED_BACKGROUND_ALPHA = 0.70f
+private const val WALLPAPER_CONTRAST_OPACITY = 0.20f
 
 /**
  * Small synchronous preference store for widget-only presentation state.
@@ -64,7 +101,7 @@ object WidgetAppearancePreferences {
             showBackground = preferences.getBoolean(KEY_SHOW_BACKGROUND, true),
             backgroundType = preferences.getString(KEY_BACKGROUND_TYPE, null)
                 .toEnumOrDefault(WidgetBackgroundType.DYNAMIC_COLOR),
-            backgroundOpacity = preferences.getFloat(KEY_BACKGROUND_OPACITY, 0f)
+            backgroundOpacity = preferences.getFloat(KEY_BACKGROUND_OPACITY, 1f)
                 .coerceIn(0f, 1f),
             colorMode = preferences.getString(KEY_COLOR_MODE, null)
                 .toEnumOrDefault(WidgetColorMode.FOLLOW_SYSTEM),
