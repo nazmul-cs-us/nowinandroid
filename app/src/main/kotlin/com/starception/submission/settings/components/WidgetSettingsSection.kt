@@ -65,9 +65,8 @@ import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.widget.WidgetAppearanceSettings
 import com.starception.submission.widget.WidgetBackgroundType
 import com.starception.submission.widget.WidgetColorMode
+import com.starception.submission.widget.basicPlateColors
 import com.starception.submission.widget.effectiveBackgroundAlpha
-import com.starception.submission.widget.timeAwareBasicGradientColors
-import java.util.Calendar
 import kotlin.math.roundToInt
 
 /** Global appearance controls shared by every widget supplied by the app. */
@@ -233,10 +232,7 @@ private fun WidgetAppearancePreview(
     }
     val backgroundBrush = when (settings.backgroundType) {
         WidgetBackgroundType.BASIC -> Brush.horizontalGradient(
-            colors = timeAwareBasicGradientColors(
-                darkTheme = dark,
-                hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
-            ),
+            colors = basicPlateColors(context = context, darkTheme = dark),
         )
         WidgetBackgroundType.DYNAMIC_COLOR -> {
             val launcherAccent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -271,12 +267,18 @@ private fun WidgetAppearancePreview(
     val contentColor = palette.onSurface
     val secondaryContentColor = contentColor.copy(alpha = 0.72f)
 
+    // A flat surface behind the plate would make every opacity look identical. Stand in
+    // for the home-screen wallpaper with something the sheet can visibly let through.
+    val wallpaperStandIn = Brush.linearGradient(
+        colors = listOf(Color(0xFF8E7B86), Color(0xFFB9A4A0), Color(0xFF5B5D74)),
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(150.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .background(wallpaperStandIn),
     ) {
         if (settings.showBackground) {
             Box(

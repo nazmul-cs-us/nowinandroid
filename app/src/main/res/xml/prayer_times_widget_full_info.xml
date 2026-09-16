@@ -1,25 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Prayer times widget, 5x6 entry.
+     Prayer times widget, 5x4 entry — the full three-card composition.
 
      One of five provider entries so the picker lists every size. They all render the
      same responsive layouts and stay freely resizable (minResize stays at a 2x1, max
      well beyond a 5x4); the only thing this file decides is where the widget lands
-     when it is first dropped.
+     when it is first dropped. 5x4 is the reference design's own shape: on One UI's
+     ~115dp rows it grants 406x459dp, whose 401dp of content is what the hero, timeline
+     and devotional card were drawn for. Dropping it at 5x6 forced two rows of surplus
+     into the cards and made the composition read as stretched.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:description="@string/prayer_widget_description"
     android:initialLayout="@layout/prayer_widget_loading"
     android:minWidth="320dp"
-    android:minHeight="450dp"
+    android:minHeight="340dp"
     android:minResizeWidth="110dp"
     android:minResizeHeight="40dp"
     android:maxResizeWidth="600dp"
     android:maxResizeHeight="600dp"
     android:targetCellWidth="5"
-    android:targetCellHeight="6"
+    android:targetCellHeight="4"
     android:previewImage="@mipmap/ic_launcher"
     android:previewLayout="@layout/prayer_widget_preview_full"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
-    android:widgetCategory="home_screen|keyguard" />
+    android:widgetCategory="home_screen|keyguard"
+    app:widgetStyle="colorful" />

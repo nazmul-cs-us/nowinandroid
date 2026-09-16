@@ -8,6 +8,7 @@
      when it is first dropped.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:description="@string/prayer_widget_description"
     android:initialLayout="@layout/prayer_widget_loading"
     android:minWidth="250dp"
@@ -22,4 +23,5 @@
     android:previewLayout="@layout/prayer_widget_preview_large"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
-    android:widgetCategory="home_screen|keyguard" />
+    android:widgetCategory="home_screen|keyguard"
+    app:widgetStyle="colorful" />

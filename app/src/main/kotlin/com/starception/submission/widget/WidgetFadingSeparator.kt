@@ -86,18 +86,26 @@ internal fun FadingVerticalSeparator(height: Dp = 32.dp) {
     )
 }
 
-/** The same location divider turned horizontally for sections and list rows. */
+/**
+ * The same location divider turned horizontally for sections and list rows.
+ *
+ * [color] defaults to the theme primary; surfaces with their own ink (the hero's cream on
+ * forest green) pass it explicitly. [modifier] sets the extent — full width by default.
+ */
 @Composable
-internal fun FadingHorizontalSeparator() {
+internal fun FadingHorizontalSeparator(
+    color: Color? = null,
+    modifier: GlanceModifier = GlanceModifier.fillMaxWidth(),
+) {
     Image(
         provider = ImageProvider(
             fadingSeparatorBitmap(
-                GlanceTheme.colors.primary.getColor(LocalContext.current),
+                color ?: GlanceTheme.colors.primary.getColor(LocalContext.current),
                 vertical = false,
             ),
         ),
         contentDescription = null,
         contentScale = ContentScale.FillBounds,
-        modifier = GlanceModifier.fillMaxWidth().height(1.dp),
+        modifier = modifier.height(1.dp),
     )
 }

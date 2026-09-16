@@ -78,11 +78,17 @@ internal object WidgetTypography {
      * the launcher as well; both sides read the same system font, including a vendor one
      * like One UI's.
      */
-    fun widthPerSp(context: Context, text: String, bold: Boolean): Float {
+    fun widthPerSp(
+        context: Context,
+        text: String,
+        bold: Boolean,
+        serif: Boolean = false,
+        face: Typeface? = null,
+    ): Float {
         if (text.isEmpty()) return 0f
         val metrics = context.resources.displayMetrics
         val widthPx = synchronized(paint) {
-            paint.typeface = typeface(context, bold)
+            paint.typeface = face ?: if (serif) serifTypeface(bold) else typeface(context, bold)
             paint.textSize = REFERENCE_PX
             paint.measureText(text)
         }
@@ -104,8 +110,10 @@ internal object WidgetTypography {
         maxWidthDp: Float,
         lines: Int = 1,
         bold: Boolean = false,
+        serif: Boolean = false,
+        face: Typeface? = null,
     ): Float {
-        val perSp = widthPerSp(context, text, bold)
+        val perSp = widthPerSp(context, text, bold, serif, face)
         if (perSp <= 0f) return Float.MAX_VALUE
         val usable = maxWidthDp * lines * if (lines > 1) WRAP_EFFICIENCY else 1f
         return usable / perSp
@@ -178,6 +186,13 @@ internal object WidgetTypography {
 
     private var regularFace: Typeface? = null
     private var boldFace: Typeface? = null
+
+    /**
+     * The face behind widget_text_serif_*.xml: the system "serif" family, which is what a
+     * RemoteViews TextView resolves `android:fontFamily="serif"` to in the launcher.
+     */
+    private fun serifTypeface(bold: Boolean): Typeface =
+        Typeface.create(Typeface.SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
 
     private const val REFERENCE_PX = 100f
 

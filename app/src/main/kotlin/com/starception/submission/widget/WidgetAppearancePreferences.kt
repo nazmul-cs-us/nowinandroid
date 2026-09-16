@@ -42,9 +42,9 @@ data class WidgetAppearanceSettings(
 )
 
 /**
- * Samsung maps the first opacity-slider position to a 70%-opaque launcher plate.
- * Reserving that floor also gives the switch a distinct meaning: disabling Background
- * removes the plate completely, while 0% keeps Samsung's lowest enabled opacity.
+ * Slider position 0 is the thinnest enabled plate, not a missing one. Reserving a floor
+ * gives the switch a distinct meaning: disabling Background removes the plate completely,
+ * while 0% keeps the launcher's lowest enabled opacity.
  */
 internal fun WidgetAppearanceSettings.effectiveBackgroundAlpha(): Float =
     if (!showBackground) {
@@ -72,8 +72,10 @@ internal fun WidgetAppearanceSettings.effectiveArtworkAlpha(
 internal fun WidgetAppearanceSettings.needsWallpaperContrast(): Boolean =
     !showBackground || backgroundOpacity <= WALLPAPER_CONTRAST_OPACITY
 
-// Samsung's Now Brief options report opacity=70 at the first slider position, and its
-// matching drawable uses a 70% alpha. Use the same floor when our slider is at zero.
+// The supplied design sits on a near-white sheet (~#F1F1F4 over a blurred wallpaper), and
+// One UI itself reports opacity=70 for Now Brief's first slider position. Thinner plates
+// were tried (30–40%) to imitate Now Brief's frosted look, but without the launcher's blur
+// they read as a grey veil and cost the header's muted date its legibility.
 private const val MIN_ENABLED_BACKGROUND_ALPHA = 0.70f
 private const val WALLPAPER_CONTRAST_OPACITY = 0.20f
 

@@ -45,6 +45,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.chrono.HijrahChronology
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoField
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -154,6 +155,27 @@ private const val TAG = "PrayerWidget"
  * Only when neither is available (fresh install, location never resolved) does it
  * report [PrayerWidgetState.Unavailable].
  */
+/**
+ * The last computed state, reused for a short window.
+ *
+ * A resize re-runs provideGlance with nothing about the prayers, weather or reminder
+ * changed, yet computing them again cost ~0.8s — time during which the launcher shows the
+ * previous rendering stretched to the new cells. Within [STATE_REUSE_MS] the state is
+ * handed back as is; the countdown drifts by at most that long before the next update.
+ */
+private var cachedWidgetState: Pair<Long, PrayerWidgetState>? = null
+private val cachedWidgetStateMutex = Mutex()
+private const val STATE_REUSE_MS = 45_000L
+
+internal suspend fun loadPrayerWidgetStateCached(context: Context): PrayerWidgetState =
+    cachedWidgetStateMutex.withLock {
+        val now = android.os.SystemClock.elapsedRealtime()
+        cachedWidgetState?.takeIf { (at, state) ->
+            state is PrayerWidgetState.Available && now - at < STATE_REUSE_MS
+        }?.let { return@withLock it.second }
+        loadPrayerWidgetState(context).also { cachedWidgetState = now to it }
+    }
+
 internal suspend fun loadPrayerWidgetState(context: Context): PrayerWidgetState {
     val entryPoint = EntryPointAccessors.fromApplication(
         context.applicationContext,
@@ -585,14 +607,30 @@ private fun durationLabel(minutes: Long): String {
 /** Compact Gregorian and Umm al-Qura dates used beneath the widget's location header. */
 private fun hijriDateLabel(date: LocalDate): String = runCatching {
     val gregorian = date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH))
-    val hijri = DateTimeFormatter
-        .ofPattern("d MMMM yyyy", Locale.ENGLISH)
-        .withChronology(HijrahChronology.INSTANCE)
-        .format(date)
-    "$gregorian  •  $hijri"
+    val hijrah = HijrahChronology.INSTANCE.date(date)
+    val month = HIJRI_MONTHS.getOrNull(hijrah.get(ChronoField.MONTH_OF_YEAR) - 1)
+        ?: DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH).format(hijrah)
+    "$gregorian  •  ${hijrah.get(ChronoField.DAY_OF_MONTH)} $month ${hijrah.get(ChronoField.YEAR)}"
 }.getOrElse {
     date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH))
 }
+
+// The platform's English Hijri names abbreviate ("Rabiʻ II"); the widget spells them out
+// the way the supplied design does ("Rabi' al-Awwal").
+private val HIJRI_MONTHS = listOf(
+    "Muharram",
+    "Safar",
+    "Rabi' al-Awwal",
+    "Rabi' al-Thani",
+    "Jumada al-Ula",
+    "Jumada al-Akhirah",
+    "Rajab",
+    "Sha'ban",
+    "Ramadan",
+    "Shawwal",
+    "Dhu al-Qi'dah",
+    "Dhu al-Hijjah",
+)
 
 private fun timeFormatter(context: Context): DateTimeFormatter = DateTimeFormatter.ofPattern(
     if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a",

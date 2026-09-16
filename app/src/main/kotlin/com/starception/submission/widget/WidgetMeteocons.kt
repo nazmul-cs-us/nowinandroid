@@ -18,7 +18,6 @@ package com.starception.submission.widget
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.util.Log
@@ -31,9 +30,8 @@ import com.starception.submission.R
 /**
  * Supplies static weather artwork a widget can show.
  *
- * The compact header deliberately uses the bundled Flaticon PNG family. Its broad,
- * rounded shapes remain legible at 24dp and visually match the supplied reference more
- * closely than a frozen frame from the screen's line-based Meteocon animation.
+ * The compact header uses [WidgetWeatherArtwork], painted to match the supplied
+ * reference, rather than a frozen frame from the screen's line-based Meteocon animation.
  *
  * The frame is taken partway into the loop instead of at 0, because Meteocons open on a
  * near-empty canvas (clouds drift in, rain has not fallen yet) and frame 0 reads as a
@@ -83,12 +81,8 @@ internal object WidgetMeteocons {
      * should treat null as "show no icon" rather than substituting a placeholder.
      */
     @Synchronized
-    fun forWeather(context: Context, weatherCode: Int, isDay: Boolean): Bitmap? {
-        val resource = staticWeatherResource(weatherCode, isDay)
-        return cache.getOrPut(resource) {
-            BitmapFactory.decodeResource(context.resources, resource)
-        }
-    }
+    fun forWeather(context: Context, weatherCode: Int, isDay: Boolean): Bitmap? =
+        WidgetWeatherArtwork.bitmap(WidgetWeatherArtwork.condition(weatherCode, isDay))
 
     /**
      * Frames spread evenly across the Meteocon's visible loop, for playback in a
@@ -233,22 +227,6 @@ internal object WidgetMeteocons {
     private fun Bitmap.trimTransparentBorder(): Bitmap {
         val box = opaqueBounds() ?: return this
         return Bitmap.createBitmap(this, box.left, box.top, box.width(), box.height())
-    }
-
-    /** Static, rounded weather artwork used by the reference-style widget header. */
-    @DrawableRes
-    private fun staticWeatherResource(weatherCode: Int, isDay: Boolean): Int = when (weatherCode) {
-        0 -> if (isDay) R.drawable.flaticon_weather_clear else R.drawable.flaticon_weather_moon
-        1, 2 -> if (isDay) {
-            R.drawable.flaticon_weather_partly_cloudy
-        } else {
-            R.drawable.flaticon_weather_moon
-        }
-        3, 45, 48 -> R.drawable.flaticon_weather_cloudy
-        in 51..67, in 80..82 -> R.drawable.flaticon_weather_rain
-        in 71..77, 85, 86 -> R.drawable.flaticon_weather_snow
-        in 95..99 -> R.drawable.flaticon_weather_storm
-        else -> R.drawable.flaticon_weather_cloudy
     }
 
     @RawRes

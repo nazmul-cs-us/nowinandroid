@@ -17,6 +17,7 @@
 package com.starception.submission.widget
 
 import android.app.UiModeManager
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -25,6 +26,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.graphics.Shader
 import android.os.Build
 import androidx.annotation.DrawableRes
@@ -58,7 +60,6 @@ import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import com.starception.submission.R
-import java.util.Calendar
 
 /** App theme state plus the global widget appearance captured for this render. */
 internal data class WidgetThemeSource(
@@ -82,9 +83,6 @@ internal suspend fun loadWidgetThemeSource(context: Context): WidgetThemeSource 
     )
 }
 
-private val LocalWidgetGradient = staticCompositionLocalOf<ImageProvider> {
-    error("Widget gradient was not provided")
-}
 private val LocalCookieWidgetGradient = staticCompositionLocalOf<ImageProvider> {
     error("Cookie widget gradient was not provided")
 }
@@ -103,14 +101,12 @@ internal val LocalWidgetHeroAccent = staticCompositionLocalOf {
     ColorProvider(Color(0xFFD7E9D2))
 }
 
-/** Transparent Scaffold paint lets the shared gradient below remain visible. */
 internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
 /**
- * Paint for the one view marked as android.R.id.background.
+ * Paint for the one view marked as android.R.id.background — the widget's plate.
  *
- * Alpha 1/255 is visually transparent but falls inside One UI's translucent range,
- * enabling its host-owned blur. A disabled widget background remains truly transparent
- * and therefore does not ask the launcher for frosting.
+ * A plain translucent colour rather than a bitmap: it carries the global opacity directly,
+ * and a disabled widget background stays fully transparent.
  */
 internal val LocalWidgetHostBackground = staticCompositionLocalOf {
     TransparentWidgetBackground
@@ -261,13 +257,7 @@ internal fun StarceptionWidgetTheme(
     }
     val basicColor = basicBackgroundColor ?: scheme.surface
     val basicGradientColors = basicBackgroundColor?.let { listOf(it, it) }
-        ?: timeAwareBasicGradientColors(
-            darkTheme = darkTheme,
-            hourOfDay = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
-        )
-    // Keep the bitmap opaque and apply opacity through the generated background
-    // ImageView. One UI reads that view alpha to decide whether to draw its own
-    // frosted layer; baking alpha into the pixels makes the host see an opaque view.
+        ?: basicPlateColors(context, darkTheme)
     val backgroundColors = when (source.appearance.backgroundType) {
         WidgetBackgroundType.BASIC -> basicGradientColors
         WidgetBackgroundType.DYNAMIC_COLOR -> dynamicGradientColors
@@ -309,46 +299,23 @@ internal fun StarceptionWidgetTheme(
 
     GlanceTheme(colors = ColorProviders(light = widgetScheme, dark = widgetScheme)) {
         CompositionLocalProvider(
-            LocalWidgetGradient provides ImageProvider(gradient),
             LocalCookieWidgetGradient provides ImageProvider(cookieGradient),
             LocalWidgetAppearance provides source.appearance,
             LocalTransparentWidgetForeground provides transparentForeground,
             LocalWidgetHeroAccent provides ColorProvider(heroAccent),
+            // The plate is the colour on the @android:id/background view itself, not a
+            // bitmap layered behind it, so the slider's alpha is the view's alpha and the
+            // wallpaper shows through exactly as much as the setting says.
             LocalWidgetHostBackground provides if (source.appearance.showBackground) {
-                ColorProvider(Color(0x01000000))
+                ColorProvider(backgroundColors.first().copy(alpha = backgroundAlpha))
             } else {
                 TransparentWidgetBackground
             },
         ) {
-            if (drawRectangularBackground) {
-                // This must be a separate RemoteViews layer. Scaffold paints its own
-                // background after processing its modifier, so putting the bitmap on
-                // the same view is overwritten even when Scaffold's paint is transparent.
-                Box(
-                    modifier = GlanceModifier
-                        .fillMaxSize()
-                        // The actual surface owns the single host marker. Keeping it off
-                        // this image modifier avoids both Scaffold's built-in marker and
-                        // Glance's image-background expansion producing duplicates.
-                        .themedWidgetBackground()
-                        .cornerRadius(24.dp),
-                ) {
-                    content()
-                }
-            } else {
-                content()
-            }
+            content()
         }
     }
 }
-
-/** Applies the selected-theme home gradient as a stretched, low-cost bitmap background. */
-@Composable
-internal fun GlanceModifier.themedWidgetBackground(): GlanceModifier = background(
-    imageProvider = LocalWidgetGradient.current,
-    alpha = LocalWidgetAppearance.current.effectiveBackgroundAlpha(),
-    contentScale = ContentScale.FillBounds,
-)
 
 /** Keeps the expressive toolbar's silhouette while filling it with the shared gradient. */
 @Composable
@@ -363,9 +330,29 @@ internal fun alphaAdjustedImageProvider(
     context: Context,
     @DrawableRes drawableRes: Int,
     alpha: Float,
+    targetAspect: Float? = null,
+    preservedBand: ClosedFloatingPointRange<Float> = 0.12f..0.88f,
 ): ImageProvider {
+    // Decoding a 1536x512 PNG and re-slicing it on every composition was a visible share
+    // of the resize latency; the handful of (artwork, alpha, aspect) variants in use fit
+    // comfortably in memory.
+    val key = "$drawableRes:$alpha:${targetAspect?.let { "%.3f".format(it) }}:$preservedBand"
+    artworkCache.get(key)?.let { return ImageProvider(it) }
+    return ImageProvider(renderAdjustedArtwork(context, drawableRes, alpha, targetAspect, preservedBand)
+        .also { artworkCache.put(key, it) })
+}
+
+private val artworkCache = android.util.LruCache<String, Bitmap>(8)
+
+private fun renderAdjustedArtwork(
+    context: Context,
+    @DrawableRes drawableRes: Int,
+    alpha: Float,
+    targetAspect: Float?,
+    preservedBand: ClosedFloatingPointRange<Float>,
+): Bitmap {
     val drawable = context.getDrawable(drawableRes)?.mutate()
-        ?: return ImageProvider(drawableRes)
+        ?: return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     val intrinsicWidth = drawable.intrinsicWidth.coerceAtLeast(1)
     val intrinsicHeight = drawable.intrinsicHeight.coerceAtLeast(1)
     // Bitmap ImageProviders count against Android's per-widget RemoteViews memory cap.
@@ -373,27 +360,87 @@ internal fun alphaAdjustedImageProvider(
     // update when several reference panels and rasterized text rows share one widget.
     val scale = minOf(1f, MAX_REMOTE_ARTWORK_WIDTH.toFloat() / intrinsicWidth)
     val width = (intrinsicWidth * scale).toInt().coerceAtLeast(1)
-    val height = (intrinsicHeight * scale).toInt().coerceAtLeast(1)
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val naturalHeight = (intrinsicHeight * scale).toInt().coerceAtLeast(1)
+    val sourceAspect = intrinsicWidth.toFloat() / intrinsicHeight
     drawable.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
-    drawable.setBounds(0, 0, width, height)
-    drawable.draw(Canvas(bitmap))
-    return ImageProvider(bitmap)
+
+    // The host stretches a FillBounds background to whatever box it gets. When the box is
+    // taller than the artwork, pre-render at the box's aspect instead: the band holding the
+    // subject keeps its proportions and only the plain top and bottom margins (sky, foliage,
+    // gradient) take up the extra height. Wider boxes still go through FillBounds, whose
+    // horizontal squeeze at these ratios is not noticeable.
+    if (targetAspect == null || targetAspect >= sourceAspect) {
+        val bitmap = Bitmap.createBitmap(width, naturalHeight, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, width, naturalHeight)
+        drawable.draw(Canvas(bitmap))
+        return bitmap
+    }
+    val height = (width / targetAspect).toInt().coerceAtLeast(naturalHeight)
+    val source = Bitmap.createBitmap(width, naturalHeight, Bitmap.Config.ARGB_8888)
+    drawable.setBounds(0, 0, width, naturalHeight)
+    drawable.draw(Canvas(source))
+    val bandTop = (naturalHeight * preservedBand.start).toInt()
+    val bandBottom = (naturalHeight * preservedBand.endInclusive).toInt()
+    val bandHeight = bandBottom - bandTop
+    val extra = height - naturalHeight
+    // Split the surplus between the two margins in proportion to their source heights.
+    val topSource = bandTop
+    val bottomSource = naturalHeight - bandBottom
+    val topTarget = topSource + (extra * topSource.toFloat() / (topSource + bottomSource)).toInt()
+    val bottomTarget = height - topTarget - bandHeight
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    canvas.drawBitmap(
+        source,
+        Rect(0, 0, width, bandTop),
+        Rect(0, 0, width, topTarget),
+        paint,
+    )
+    canvas.drawBitmap(
+        source,
+        Rect(0, bandTop, width, bandBottom),
+        Rect(0, topTarget, width, topTarget + bandHeight),
+        paint,
+    )
+    canvas.drawBitmap(
+        source,
+        Rect(0, bandBottom, width, naturalHeight),
+        Rect(0, topTarget + bandHeight, width, height),
+        paint,
+    )
+    source.recycle()
+    return bitmap
 }
 
 private const val MAX_REMOTE_ARTWORK_WIDTH = 1024
 
-/** Samsung Now Brief's Basic palettes, including its direction and time-of-day changes. */
-internal fun timeAwareBasicGradientColors(
-    darkTheme: Boolean,
-    hourOfDay: Int,
-): List<Color> = when {
-    darkTheme && hourOfDay in 6..<12 -> listOf(Color(0xFF33535A), Color(0xFF131929))
-    darkTheme && hourOfDay in 12..<21 -> listOf(Color(0xFF484E32), Color(0xFF0E1C1A))
-    darkTheme -> listOf(Color(0xFF4F3C60), Color(0xFF171224))
-    hourOfDay in 6..<12 -> listOf(Color(0xFFBCFFF5), Color(0xFFBAE1FF))
-    hourOfDay in 12..<21 -> listOf(Color(0xFFFFF6CC), Color(0xFFE2FFC9))
-    else -> listOf(Color(0xFFD2E6FB), Color(0xFFE3D8FF))
+/**
+ * Samsung Now Brief's Basic plate is a colourless sheet — white in light mode, near-black in
+ * dark mode — laid over a blur of the wallpaper it covers, so its colour is really the
+ * wallpaper's colour muted toward white or black. Now Brief can read the wallpaper bitmap
+ * because it is a privileged system app; we cannot on Android 13+, so the nearest honest
+ * substitute is the wallpaper's dominant colour from [WallpaperManager.getWallpaperColors],
+ * which is open to every app. Folding a little of it into the sheet keeps the plate reading
+ * as part of the wallpaper rather than a white card resting on top.
+ */
+internal fun basicPlateColors(context: Context, darkTheme: Boolean): List<Color> {
+    val sheet = if (darkTheme) Color(0xFF1C1C1E) else Color.White
+    val tint = wallpaperDominantColor(context) ?: return listOf(sheet, sheet)
+    val plate = tint.copy(alpha = WALLPAPER_TINT_IN_PLATE).compositeOver(sheet)
+    return listOf(plate, plate)
+}
+
+// Just enough for the sheet to take on the wallpaper's cast; the design's plate is close to
+// white, so the tint stays a hint rather than a colour of its own.
+private const val WALLPAPER_TINT_IN_PLATE = 0.10f
+
+private fun wallpaperDominantColor(context: Context): Color? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return null
+    val colors = runCatching {
+        WallpaperManager.getInstance(context).getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+    }.getOrNull() ?: return null
+    return Color(colors.primaryColor.toArgb())
 }
 
 private fun Int.asThemeColor(): Color = if (this == 0) Color.Unspecified else Color(this)

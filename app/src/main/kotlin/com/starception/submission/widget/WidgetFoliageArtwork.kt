@@ -52,14 +52,16 @@ internal enum class WidgetFoliagePlacement {
  */
 internal object WidgetFoliageArtwork {
 
-    private const val FRAME_COUNT = 8
+    private const val FRAME_COUNT = 12
     // Rasterise at half the logical drawing size. The curves stay clean when the launcher
     // scales them, while eight ARGB frames remain comfortably below RemoteViews' bitmap
     // memory ceiling even when two decorated cards are present.
-    private const val BITMAP_WIDTH = 320
-    private const val BITMAP_HEIGHT = 128
-    private const val HERO_BITMAP_WIDTH = 480
-    private const val HERO_BITMAP_HEIGHT = 192
+    // Twelve frames at these sizes cost about what eight did at 320x128 / 480x192;
+    // the extra positions are what make the sway continuous rather than ticking.
+    private const val BITMAP_WIDTH = 272
+    private const val BITMAP_HEIGHT = 109
+    private const val HERO_BITMAP_WIDTH = 400
+    private const val HERO_BITMAP_HEIGHT = 160
     private const val LOGICAL_WIDTH = 640
     private const val LOGICAL_HEIGHT = 256
 
