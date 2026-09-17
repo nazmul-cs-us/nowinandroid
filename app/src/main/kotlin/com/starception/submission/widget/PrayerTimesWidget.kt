@@ -138,6 +138,59 @@ private val REFERENCE_DESIGN_CONTENT_HEIGHT = 401.dp
 private val REFERENCE_DESIGN_HERO_HEIGHT = 132.dp
 private val REFERENCE_DESIGN_TIMELINE_HEIGHT = 142.dp
 private val REFERENCE_DESIGN_DEVOTIONAL_HEIGHT = 115.dp
+
+/**
+ * Ceiling on the devotional card's type ramp, as a multiple of the reference size.
+ *
+ * A flipper page can be better than twice [REFERENCE_DESIGN_DEVOTIONAL_HEIGHT]; every line
+ * on the card is fitted to its own column besides, so this only keeps a very tall grant
+ * from running the type past what the card's proportions can carry.
+ */
+private const val DEVOTIONAL_MAX_TYPE_SCALE = 2.0f
+
+/** The header chips' size relative to the title, from the reference's 9.5/13.5 and 9/13.5. */
+private const val DEVOTIONAL_CHIP_TYPE_RATIO = 9.5f / 13.5f
+private const val DEVOTIONAL_ACTION_TYPE_RATIO = 9f / 13.5f
+
+/**
+ * Everything in the devotional header that is not text, in dp: the 4dp rule and its 7dp
+ * gap, the 8dp before the first chip, both chips' 9dp horizontal padding, and the 8dp the
+ * two chips must keep between them.
+ */
+private const val DEVOTIONAL_HEADER_FURNITURE = 4f + 7f + 8f + 18f + 8f + 18f
+
+/** Rough line height of the widget's Latin type, for budgeting rows against a card. */
+private const val TEXT_LINE_HEIGHT_EM = 1.35f
+
+/**
+ * Line height of the Arabic faces at the 0.72 spacing WidgetArabicText draws them with.
+ *
+ * The Quran faces declare an ascent and descent about twice their letter height, so even
+ * reduced they sit well apart; this is what a line of them costs in dp per sp.
+ */
+private const val ARABIC_LINE_HEIGHT_EM = 1.44f
+
+/**
+ * How near the room's size a single Arabic line must reach to be preferred over wrapping.
+ */
+private const val ARABIC_SINGLE_LINE_SHARE = 0.85f
+
+/**
+ * The Arabic's ramp, per unit of the devotional's type scale.
+ *
+ * Set well above the Latin ramp on purpose. These faces carry their letters small inside a
+ * tall em — the ascent and descent leave room for stacked marks — so Arabic set at the
+ * same nominal size as the English beside it reads about a third smaller. The room is what
+ * limits this in practice; the ramp only has to be high enough not to limit it first.
+ */
+private const val ARABIC_RAMP_SP = 24f
+
+/** Top and bottom padding of the devotional's text column, plus the gaps it keeps. */
+private val DEVOTIONAL_COLUMN_INSETS = 28.dp
+
+/** The lantern column's spaced small caps, one phrase a line as in the reference. */
+private val DHIKR_LINES = listOf("SMALL", "DHIKR", "A BRIGHTER", "TOMORROW")
+private const val DHIKR_TRACKING_EM = 0.16f
 private const val HERO_ARTWORK_MIN_ALPHA = 0.86f
 /**
  * Tallest the hero may grow relative to its width. The 3:1 artwork's sky and foliage
@@ -145,6 +198,14 @@ private const val HERO_ARTWORK_MIN_ALPHA = 0.86f
  * would have to stretch so far that the composition stops looking like a photograph.
  */
 private const val HERO_MIN_ASPECT = 1.95f
+
+/**
+ * Aspect at which the hero swaps between its wide (3:1) and tall (3:2) plate.
+ *
+ * The geometric mean of the two, so each is picked over the range where it is the closer
+ * fit and neither is ever stretched by more than about 40%.
+ */
+private const val HERO_ARTWORK_SWITCH_ASPECT = 2.12f
 private const val PANEL_ARTWORK_MIN_ALPHA = 0.64f
 
 // The reference header's pin disc, weather capsule and refresh disc share one height:
@@ -167,8 +228,28 @@ private val REFERENCE_HEADER_CAPSULE_HEIGHT = 40.dp
 // aligned with the header's 16dp visible top edge while retaining separation at the shell.
 private val TITLED_WIDGET_BOTTOM_PADDING = 4.dp
 
+/**
+ * Slack left on any width a type size is fitted against.
+ *
+ * Paint.measureText and TextView's own layout do not agree to the last dp — default letter
+ * spacing, hinting, and the room TextView keeps for an ellipsis all cost a little — so a
+ * size fitted to exactly its column comes back ellipsised anyway. The devotional's
+ * attribution was the case that showed it: fitted at 12.99sp into 181.6dp, and cut to
+ * "Fortress of the Muslim · Pra...". Three percent covers the disagreement and is not
+ * visible in the type.
+ */
+private const val TEXT_FIT_SLACK = 0.97f
+
 /** Lines the phase title may wrap to; the ramp will not pick a size needing more. */
 private const val TITLE_MAX_LINES = 2
+
+/**
+ * Aspect the foliage frames are rasterised at (see WidgetFoliageArtwork's bitmap sizes).
+ *
+ * Their ImageViews scale fitXY, so any box of a different shape stretches the leaves; the
+ * cards size the strip against this instead of letting it fill.
+ */
+private const val FOLIAGE_ASPECT = 2.5f
 
 /** Measurement constants retained by the narrow fallback renderer. */
 private const val TINY_GROUP_GAP = 16f
@@ -232,6 +313,25 @@ private val REFERENCE_COMPACT_MIN_WIDTH = 200.dp
 
 /** Lift under the hero's closing countdown, which sits larger and lower than list type. */
 private val HERO_BOTTOM_CLEARANCE = 2.dp
+
+/**
+ * Start inset every line in the hero's text column is drawn after.
+ *
+ * The zone fractions are measured from the card's left edge — "the title may reach 53% of
+ * the width" — so this has to come out of them. A column that is `width * fraction` wide
+ * *and* begins this far in ends one whole inset past the edge it was fitted against, which
+ * on a 406dp grant put the title and the elapsed line hard against the arch and clipped
+ * their last glyph.
+ */
+private val HERO_TEXT_START_INSET = 14.dp
+
+/**
+ * How much larger the elapsed duration is set than the words after it.
+ *
+ * The row is drawn as three runs at two sizes, so the line's width is not the width of
+ * the string at one size; [ReferencePrayerHero] measures the runs separately against this.
+ */
+private const val HERO_DURATION_RATIO = 1.35f
 
 /**
  * Reads the launcher's current widget bounds without relying on Glance's cached LocalSize.
@@ -1763,8 +1863,9 @@ private suspend fun buildSectionFlipper(
     // and concurrent sessions for one id abort each other ("Another session for N has
     // started"). The pages carry no id-bound actions, so any unique id will do.
     val realId = (id as? AppWidgetId)?.appWidgetId ?: return null
+    val shownPages = PINNED_SECTION_PAGE?.let(::listOf) ?: SectionPage.entries
     val pages = coroutineScope {
-        SectionPage.entries.map { page ->
+        shownPages.map { page ->
             async {
                 SectionPageWidget(themeSource, state, contentSize, textScale = 1f, page)
                     .compose(
@@ -1775,10 +1876,14 @@ private suspend fun buildSectionFlipper(
             }
         }.awaitAll()
     }
-    pages.forEachIndexed { index, views ->
-        val bitmap = withContext(Dispatchers.Main) { rasterise(context, views, contentSize) }
-            ?: return null
-        flipper.setImageViewBitmap(SECTION_PAGE_VIEW_IDS[index], bitmap)
+    val bitmaps = pages.map { views ->
+        withContext(Dispatchers.Main) { rasterise(context, views, contentSize) } ?: return null
+    }
+    // Pinned, every page carries the same image: the carousel still runs but has nothing to
+    // change to. Stopping it would mean ViewFlipper.stopFlipping across RemoteViews, which
+    // is a method the launcher may or may not accept; this needs nothing of the host.
+    SECTION_PAGE_VIEW_IDS.forEachIndexed { index, viewId ->
+        flipper.setImageViewBitmap(viewId, bitmaps[index % bitmaps.size])
     }
     return flipper
 }
@@ -1860,6 +1965,15 @@ private fun drawWithOutlineClips(view: View, canvas: Canvas) {
 
 private enum class SectionPage { HERO, TIMELINE, DEVOTIONAL }
 
+/**
+ * Pins the flipper to one section while that section is being worked on.
+ *
+ * Only that page is composed, and it is put on all three of the flipper's children, so the
+ * card stops changing under you between screenshots. Must be null in anything shipped —
+ * the widget is meant to rotate through all three.
+ */
+private val PINNED_SECTION_PAGE: SectionPage? = SectionPage.TIMELINE
+
 /** One flipper page: a single card composed at the full reduced content size. */
 private class SectionPageWidget(
     private val themeSource: WidgetThemeSource,
@@ -1875,20 +1989,17 @@ private class SectionPageWidget(
             StarceptionWidgetTheme(source = themeSource) {
                 CompositionLocalProvider(LocalHostTextScale provides textScale) {
                     when (page) {
-                        // The hero's artwork is a 3:1 photograph: capped by aspect and
-                        // centred in the page rather than stretched to fill it.
-                        SectionPage.HERO -> Box(
-                            modifier = GlanceModifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ReferencePrayerHero(
-                                state = state,
-                                width = contentSize.width,
-                                height = contentSize.height
-                                    .coerceAtMost(contentSize.width / HERO_MIN_ASPECT)
-                                    .coerceAtLeast(112.dp),
-                            )
-                        }
+                        // The hero takes the whole page, as the other two sections do. It
+                        // used to be capped at HERO_MIN_ASPECT and centred, which left a
+                        // band of bare plate above and below it and made the flipper
+                        // visibly shrink whenever this page came round. It can fill now
+                        // that the hero has a 3:2 plate to reach for as well as the 3:1
+                        // one — filling on the 3:1 alone is what wrecked the artwork.
+                        SectionPage.HERO -> ReferencePrayerHero(
+                            state = state,
+                            width = contentSize.width,
+                            height = contentSize.height.coerceAtLeast(112.dp),
+                        )
                         SectionPage.TIMELINE -> ReferencePrayerTimeline(
                             state = state,
                             width = contentSize.width,
@@ -1977,11 +2088,12 @@ private fun ReferencePrayerHero(
     // Give the elapsed prayer window enough width for longer labels such as
     // "12h 45m since Maghrib" without shrinking or clipping. The cap follows the scale so
     // a larger type ramp has a proportionally wider column to sit in.
-    val leftWidth = (width * 0.43f).coerceIn(128.dp, 174.dp * heightScale)
+    val leftWidth = (width * 0.43f - HERO_TEXT_START_INSET)
+        .coerceIn(128.dp, 174.dp * heightScale)
     // The arch curves away toward the top of the card, so the title and "since" line have
     // more green to sit on (about 53% of the width) than the prayer name does mid-card.
     // Fitting them to the name's column is what kept them small.
-    val topWidth = (width * 0.53f).coerceAtLeast(leftWidth)
+    val topWidth = (width * 0.53f - HERO_TEXT_START_INSET).coerceAtLeast(leftWidth)
     // The quote/photo region consumes over half the hero; keep the editorial type ramp
     // compact until the left text column can hold “14m since Dhuhr” without ellipsis.
     val compact = width < 380.dp
@@ -2015,15 +2127,28 @@ private fun ReferencePrayerHero(
         )
         .coerceIn(7f, 10f * heightScale)
         .sp
+    // The plate exists at two shapes and the card picks whichever it is closer to. One
+    // bitmap cannot serve both: the stacked layout gives the hero a wide band near 3:1
+    // while a flipper page is nearer 3:2, and FillBounds would stretch whichever is wrong
+    // by about two to one. Inventing the difference at runtime was tried first and there
+    // is no band that survives it — a thick one smears the clouds into streaks, a two-row
+    // sliver turns them into hard vertical stripes.
+    val wideArtwork = width.value / height.value >= HERO_ARTWORK_SWITCH_ASPECT
     val heroArtwork = alphaAdjustedImageProvider(
         context = context,
-        drawableRes = R.drawable.prayer_widget_reference_hero_v4,
+        drawableRes = if (wideArtwork) {
+            R.drawable.prayer_widget_reference_hero_v4
+        } else {
+            R.drawable.prayer_widget_reference_hero_v5
+        },
         alpha = appearance.effectiveArtworkAlpha(HERO_ARTWORK_MIN_ALPHA),
         targetAspect = width.value / height.value,
-        // The arch's curve fills the top of the artwork and the reference cuts the arch
-        // flat at the card's bottom edge, so all extra height goes below the treeline:
-        // keep everything from the top down to ~90% and let only the foliage strip grow.
-        preservedBand = 0f..0.90f,
+        // Whatever height is still missing comes out of the margins either side of the
+        // mosque. On the wide plate the arch is cut flat at the bottom edge and its curve
+        // fills the top, so everything down to ~90% is kept and only the foliage strip
+        // grows; the tall plate carries real sky above the minarets, which can give a
+        // little as well.
+        preservedBand = if (wideArtwork) 0f..0.90f else 0.20f..0.95f,
     )
     val phaseTitle = state.insight?.title ?: "Prayer now"
     val phaseTitleSize = WidgetTypography
@@ -2044,18 +2169,41 @@ private fun ReferencePrayerHero(
     // third of the prayer name; and the reference's closing italic reflection is dropped,
     // its height given to the name and countdown instead.
     // The elapsed time is what people glance for, so the duration is set a third larger
-    // than the words after it. The fit is measured at the smaller size against a slightly
-    // narrower column to leave room for that enlargement.
-    val captionSize = ((if (compact) 18f else 24f) * heightScale).coerceAtMost(
-        WidgetTypography.fittingSize(
-            context = context,
-            text = elapsed.ifBlank { elapsedPrayer },
-            maxWidthDp = (topWidth.value - 4f) * 0.88f,
-            bold = true,
-            serif = true,
-        ),
-    ).sp
-    val durationSize = (captionSize.value * 1.35f).sp
+    // than the words after it. Measuring the whole string at the smaller size against a
+    // flat 88% of the column was the fit this used to take, and it under-measures exactly
+    // when the duration is a large share of the line — "6h 37m since Fajr" needs more than
+    // the 12% that left, so the row overran the column and the launcher clipped its last
+    // glyph mid-stroke. Width per sp is linear, so summing the runs at the ratio each is
+    // drawn at gives the real width of the row and the largest size that fits it.
+    val elapsedWidthPerSp = (
+        elapsedDuration?.let { duration ->
+            HERO_DURATION_RATIO * WidgetTypography.widthPerSp(
+                context = context,
+                text = duration,
+                bold = true,
+                serif = true,
+            ) + WidgetTypography.widthPerSp(
+                context = context,
+                text = " since ",
+                bold = false,
+                serif = true,
+            )
+        } ?: 0f
+        ) + WidgetTypography.widthPerSp(
+        context = context,
+        text = elapsedPrayer,
+        bold = false,
+        serif = true,
+    )
+    val elapsedFittingSize = if (elapsedWidthPerSp > 0f) {
+        (topWidth.value - 4f) * TEXT_FIT_SLACK / elapsedWidthPerSp
+    } else {
+        Float.MAX_VALUE
+    }
+    val captionSize = ((if (compact) 18f else 24f) * heightScale)
+        .coerceAtMost(elapsedFittingSize)
+        .sp
+    val durationSize = (captionSize.value * HERO_DURATION_RATIO).sp
     val nameSize = ((if (compact) 36f else 46f) * heightScale).coerceAtMost(
         WidgetTypography.fittingSize(
             context = context,
@@ -2065,8 +2213,33 @@ private fun ReferencePrayerHero(
             serif = true,
         ),
     ).sp
-    val countdownWordSize = ((if (compact) 16f else 20f) * heightScale).sp
-    val countdownSize = ((if (compact) 21f else 27f) * heightScale).sp
+    // The closing line is two runs at two sizes, like the elapsed one above it, so it is
+    // fitted the same way. It used to take the ramp straight from the height, which held
+    // only while the card was capped short: on a full page heightScale sits at its 1.6
+    // ceiling and "in 3h 22m" ran past the column and came back ellipsized as "in 3h ...".
+    val countdownText = state.countdown.removePrefix("in ")
+    val countdownRatio = if (compact) 21f / 16f else 27f / 20f
+    val countdownWidthPerSp = WidgetTypography.widthPerSp(
+        context = context,
+        text = "in ",
+        bold = false,
+        serif = true,
+    ) + countdownRatio * WidgetTypography.widthPerSp(
+        context = context,
+        text = countdownText,
+        bold = true,
+        serif = true,
+    )
+    val countdownWordSize = ((if (compact) 16f else 20f) * heightScale)
+        .coerceAtMost(
+            if (countdownWidthPerSp > 0f) {
+                (leftWidth.value - 4f) * TEXT_FIT_SLACK / countdownWidthPerSp
+            } else {
+                Float.MAX_VALUE
+            },
+        )
+        .sp
+    val countdownSize = (countdownWordSize.value * countdownRatio).sp
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -2076,11 +2249,20 @@ private fun ReferencePrayerHero(
                 contentScale = ContentScale.FillBounds,
             )
             .cornerRadius(24.dp),
+        // The foliage is the only child given anything but the whole box, and it wants the
+        // bottom of it; the Row below fills, so the alignment does not reach it.
+        contentAlignment = Alignment.BottomStart,
     ) {
+        // Drawn at a fixed 2.5:1 and scaled fitXY, so filling the box stretched the leaves
+        // by however much the card departed from that — about 1.7x once the hero took a
+        // whole flipper page. Give it its own aspect against the card's width instead and
+        // let it sit on the bottom edge, which is where it grows from.
         AnimatedFoliage(
             phase = state.dayPhase,
             placement = WidgetFoliagePlacement.HERO_RIGHT,
-            modifier = GlanceModifier.fillMaxSize(),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height((width / FOLIAGE_ASPECT).coerceAtMost(height)),
         )
         // One left inset for every line — caption, rule, name and countdown share an edge
         // in the reference — with the same clearance top and bottom.
@@ -2167,7 +2349,7 @@ private fun ReferencePrayerHero(
                         modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
                     )
                     WidgetText(
-                        text = state.countdown.removePrefix("in "),
+                        text = countdownText,
                         size = countdownSize,
                         color = LocalWidgetHeroAccent.current,
                         weight = WidgetFontWeight.SerifBold,
@@ -2385,9 +2567,11 @@ private fun ReferenceDevotionalPanel(
     // The card's type follows its height so a taller grant reads as a larger card, and
     // the translation is allowed the lines that height affords instead of ellipsizing
     // with empty space below it.
-    val heightScale = (height / REFERENCE_DESIGN_DEVOTIONAL_HEIGHT).coerceIn(1f, 1.5f)
-    val captionSize = ((if (expanded) 13.5f else 13f) * heightScale).coerceAtMost(17f).sp
-    val sourceSize = ((if (expanded) 10f else 9.5f) * heightScale).coerceAtMost(12f).sp
+    // The card is given the whole flipper page now, which is better than twice the height
+    // the reference drew it at, so the ramp has to reach that far — clamped at 1.5 the type
+    // stopped growing less than halfway up and the card filled with blank space instead.
+    val heightScale = (height / REFERENCE_DESIGN_DEVOTIONAL_HEIGHT)
+        .coerceIn(1f, DEVOTIONAL_MAX_TYPE_SCALE)
     val bodyLines = when {
         height >= 220.dp -> 4
         height >= 170.dp -> 3
@@ -2398,15 +2582,104 @@ private fun ReferenceDevotionalPanel(
     // than fits only trades empty space for an ellipsis. The Arabic prefers a single line,
     // as in the reference, and takes a second only when one line would drop below 12sp.
     val textColumnWidth = (width - artworkWidth - 12.dp - 12.dp - 30.dp).coerceAtLeast(60.dp)
+    // Spaced small caps: the tracking adds 0.16em per character on top of the glyphs, which
+    // no plain width measurement sees, so it is added back here. Without it the column grew
+    // with the ramp and "A BRIGHTER" came back as "A BRIGHTE...".
+    val dhikrPerSp = DHIKR_LINES.maxOf { line ->
+        WidgetTypography.widthPerSp(context, line, bold = false, serif = true) +
+            DHIKR_TRACKING_EM * line.length
+    }
+    val dhikrSize = (7.5f * heightScale)
+        .coerceAtMost(
+            if (dhikrPerSp > 0f) {
+                (artworkWidth.value - 22f) * TEXT_FIT_SLACK / dhikrPerSp
+            } else {
+                Float.MAX_VALUE
+            },
+        )
+        .sp
     val prayerContext = "After ${state.currentPrayerName()}"
+    // The header is a single row of fixed furniture — rule, gaps and the two chips' own
+    // padding — plus three runs of text, and nothing was ever measured against the width it
+    // had. Once the type grew the row simply ran past the card and the launcher cut the
+    // last chip to "See mor". Size the title to what is left after the furniture and derive
+    // both chips from it, so the row keeps the reference's proportions and always fits.
+    val headerWidth = (width - artworkWidth - 24.dp).coerceAtLeast(60.dp)
+    val headerTextPerSp = WidgetTypography.widthPerSp(context, "Dua & Hadith", bold = true) +
+        DEVOTIONAL_CHIP_TYPE_RATIO *
+        WidgetTypography.widthPerSp(context, prayerContext, bold = false, medium = true) +
+        DEVOTIONAL_ACTION_TYPE_RATIO *
+        WidgetTypography.widthPerSp(context, "See more  ›", bold = false, medium = true)
+    val headerFittingSize = if (headerTextPerSp > 0f) {
+        (headerWidth.value - DEVOTIONAL_HEADER_FURNITURE) * TEXT_FIT_SLACK / headerTextPerSp
+    } else {
+        Float.MAX_VALUE
+    }
+    val captionSize = ((if (expanded) 13.5f else 13f) * heightScale)
+        .coerceAtMost(headerFittingSize)
+        .sp
+    val chipSize = (captionSize.value * DEVOTIONAL_CHIP_TYPE_RATIO).sp
+    val actionSize = (captionSize.value * DEVOTIONAL_ACTION_TYPE_RATIO).sp
+    // The chips' padding and corner were fixed dp while the type they wrap more than
+    // doubled, so they stopped reading as the reference's stadium pills and became chunky
+    // rounded boxes. Derive all three from the type: the corner is half the finished
+    // height, which is a stadium at any size, and the flanks stay wider than the caps.
+    val chipVerticalPadding = (chipSize.value * 0.42f).dp
+    val chipHorizontalPadding = (chipSize.value * 0.95f).dp
+    val chipCornerRadius =
+        ((chipSize.value * TEXT_LINE_HEIGHT_EM) / 2f + chipVerticalPadding.value).dp
+    // The attribution shares its row with the topic icon and the bookmark disc's clearance.
+    val sourceText = listOfNotNull(reminder.sourceName, reminder.sourceDetail)
+        .joinToString(" · ")
+    val sourceIconSize = (14f * heightScale).dp
+    val sourcePerSp = WidgetTypography.widthPerSp(context, sourceText, bold = false, medium = true)
+    val sourceSize = ((if (expanded) 10f else 9.5f) * heightScale)
+        .coerceAtMost(
+            if (sourcePerSp > 0f) {
+                (headerWidth.value - sourceIconSize.value - 46f) * TEXT_FIT_SLACK / sourcePerSp
+            } else {
+                Float.MAX_VALUE
+            },
+        )
+        .sp
     // The same colourful topic icons the Interests page uses for these two subjects.
     val reminderIcon = when (reminder.caption) {
         "Hadith" -> topicIconResFor("hadith")
         else -> topicIconResFor("dua")
     } ?: R.drawable.ic_prayer
-    val arabicMax = (15f * heightScale).coerceAtMost(19f)
+    val bodySize = ((if (expanded) 10f else 9.5f) * heightScale).coerceAtMost(
+        WidgetTypography.fittingSize(
+            context = context,
+            text = "“${reminder.text}”",
+            maxWidthDp = textColumnWidth.value * 0.96f,
+            lines = bodyLines,
+            medium = true,
+        ),
+    ).sp
+    // The Arabic gets whatever height the other three rows leave, so it can be sized to
+    // the room it actually has rather than to a fixed ceiling. Their heights are known
+    // here because every one of them has already been fitted above.
+    val arabicRoom = (
+        height -
+            (captionSize.value * TEXT_LINE_HEIGHT_EM + 10f).dp -
+            (bodySize.value * TEXT_LINE_HEIGHT_EM * bodyLines).dp -
+            maxOf(sourceIconSize, (sourceSize.value * TEXT_LINE_HEIGHT_EM).dp) -
+            DEVOTIONAL_COLUMN_INSETS
+        ).coerceAtLeast(18.dp)
+    val arabicLines = if (height >= 220.dp) 3 else 2
+    // Deliberately generous: the room, handed to render as maxHeightDp, is what actually
+    // binds. Capping the size here as well meant estimating these faces' line spacing, and
+    // the estimate came in low — the block was sized for three lines, drew two, and left a
+    // third of the room it had been given empty.
+    val arabicMax = ARABIC_RAMP_SP * heightScale
+    // The single line the reference sets is preferred only while it can stay near the size
+    // the card affords. Held to a flat 12.5sp floor it always won — a long dua fits one
+    // line at about 13sp, so the Arabic stayed that size on a card twice the height while
+    // everything around it grew. Measured against the room instead, it gives way to two or
+    // three lines at a readable size once one line would be small for the space.
+    val arabicSingleLineFloor = maxOf(12.5f, arabicMax * ARABIC_SINGLE_LINE_SHARE)
     // Drawn in-process in the reader's chosen face — see WidgetArabicText — so it always
-    // fits and the font setting is honoured; the reference's single line is preferred.
+    // fits and the font setting is honoured.
     val arabicRendered = reminder.arabic?.let { arabic ->
         WidgetArabicText.render(
             context = context,
@@ -2414,19 +2687,12 @@ private fun ReferenceDevotionalPanel(
             widthDp = textColumnWidth.value,
             maxSizeSp = arabicMax,
             minSizeSp = 11f,
-            maxLines = 2,
-            singleLineFloorSp = 12.5f,
+            maxLines = arabicLines,
+            singleLineFloorSp = arabicSingleLineFloor,
             color = ReferenceForestArgb,
+            maxHeightDp = arabicRoom.value,
         )
     }
-    val bodySize = ((if (expanded) 10f else 9.5f) * heightScale).coerceAtMost(13f).coerceAtMost(
-        WidgetTypography.fittingSize(
-            context = context,
-            text = "“${reminder.text}”",
-            maxWidthDp = textColumnWidth.value * 0.96f,
-            lines = bodyLines,
-        ),
-    ).sp
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -2437,11 +2703,15 @@ private fun ReferenceDevotionalPanel(
             )
             .cornerRadius(22.dp)
             .clickable(reminder.openAction(context)),
+        // As in the hero: the leaves are the one child that is not given the whole box.
+        contentAlignment = Alignment.BottomStart,
     ) {
         AnimatedFoliage(
             phase = state.dayPhase,
             placement = WidgetFoliagePlacement.DEVOTIONAL_RIGHT,
-            modifier = GlanceModifier.fillMaxSize(),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height((width / FOLIAGE_ASPECT).coerceAtMost(height)),
         )
         Row(
             modifier = GlanceModifier.fillMaxSize().padding(end = 12.dp),
@@ -2463,12 +2733,12 @@ private fun ReferenceDevotionalPanel(
                 // The reference sets this as spaced serif small caps, one word a line.
                 Column(modifier = GlanceModifier.padding(start = 10.dp, top = 12.dp)) {
                     WidgetText(
-                        text = "SMALL\nDHIKR\nA BRIGHTER\nTOMORROW",
-                        size = (7.5f * heightScale).coerceAtMost(9.5f).sp,
+                        text = DHIKR_LINES.joinToString("\n"),
+                        size = dhikrSize,
                         color = ReferenceForestOn,
                         weight = WidgetFontWeight.SerifRegular,
                         maxLines = 4,
-                        letterSpacing = 0.16f,
+                        letterSpacing = DHIKR_TRACKING_EM,
                         modifier = GlanceModifier
                             .width(artworkWidth - 12.dp)
                             .wrapContentHeight(),
@@ -2515,13 +2785,16 @@ private fun ReferenceDevotionalPanel(
                         modifier = GlanceModifier
                             .wrapContentWidth()
                             .background(ReferenceHeaderPill)
-                            .cornerRadius(14.dp)
-                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                            .cornerRadius(chipCornerRadius)
+                            .padding(
+                                horizontal = chipHorizontalPadding,
+                                vertical = chipVerticalPadding,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         WidgetText(
                             text = prayerContext,
-                            size = (9.5f * heightScale).coerceAtMost(11.5f).sp,
+                            size = chipSize,
                             color = ReferenceTopHeaderInk,
                             weight = WidgetFontWeight.Medium,
                             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -2532,13 +2805,16 @@ private fun ReferenceDevotionalPanel(
                         modifier = GlanceModifier
                             .wrapContentWidth()
                             .background(ReferenceHeaderPill)
-                            .cornerRadius(14.dp)
-                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                            .cornerRadius(chipCornerRadius)
+                            .padding(
+                                horizontal = chipHorizontalPadding,
+                                vertical = chipVerticalPadding,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         WidgetText(
                             text = "See more  ›",
-                            size = (9f * heightScale).coerceAtMost(11.5f).sp,
+                            size = actionSize,
                             color = ReferenceTopHeaderInk,
                             weight = WidgetFontWeight.Medium,
                             modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
@@ -2576,12 +2852,11 @@ private fun ReferenceDevotionalPanel(
                     Image(
                         provider = ImageProvider(reminderIcon),
                         contentDescription = reminder.caption,
-                        modifier = GlanceModifier.size((14f * heightScale).coerceAtMost(18f).dp),
+                        modifier = GlanceModifier.size(sourceIconSize),
                     )
                     Spacer(modifier = GlanceModifier.width(6.dp))
                     WidgetText(
-                        text = listOfNotNull(reminder.sourceName, reminder.sourceDetail)
-                            .joinToString(" · "),
+                        text = sourceText,
                         size = sourceSize,
                         color = ReferenceTopHeaderInk,
                         weight = WidgetFontWeight.Medium,

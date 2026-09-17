@@ -84,11 +84,14 @@ internal object WidgetTypography {
         bold: Boolean,
         serif: Boolean = false,
         face: Typeface? = null,
+        /** Measure Ubuntu Sans medium, the face WidgetFontWeight.Medium renders in. */
+        medium: Boolean = false,
     ): Float {
         if (text.isEmpty()) return 0f
         val metrics = context.resources.displayMetrics
         val widthPx = synchronized(paint) {
-            paint.typeface = face ?: if (serif) serifTypeface(bold) else typeface(context, bold)
+            paint.typeface = face
+                ?: if (serif) serifTypeface(bold) else typeface(context, bold, medium)
             paint.textSize = REFERENCE_PX
             paint.measureText(text)
         }
@@ -112,8 +115,9 @@ internal object WidgetTypography {
         bold: Boolean = false,
         serif: Boolean = false,
         face: Typeface? = null,
+        medium: Boolean = false,
     ): Float {
-        val perSp = widthPerSp(context, text, bold, serif, face)
+        val perSp = widthPerSp(context, text, bold, serif, face, medium)
         if (perSp <= 0f) return Float.MAX_VALUE
         val usable = maxWidthDp * lines * if (lines > 1) WRAP_EFFICIENCY else 1f
         return usable / perSp
@@ -174,17 +178,33 @@ internal object WidgetTypography {
      * Falls back to the system face if the resource cannot be loaded, which keeps the
      * sizing approximately right rather than dividing by a zero-width measurement.
      */
-    private fun typeface(context: Context, bold: Boolean): Typeface {
-        val cached = if (bold) boldFace else regularFace
+    private fun typeface(context: Context, bold: Boolean, medium: Boolean = false): Typeface {
+        val cached = when {
+            bold -> boldFace
+            medium -> mediumFace
+            else -> regularFace
+        }
         if (cached != null) return cached
-        val resource = if (bold) DesignR.font.ubuntu_sans_bold else DesignR.font.ubuntu_sans_regular
+        val resource = when {
+            bold -> DesignR.font.ubuntu_sans_bold
+            // Medium is measurably wider than regular, and every WidgetText that asks for
+            // it renders in it. Measuring regular instead is what left the devotional's
+            // attribution a shade too large for its row, so the launcher ellipsised it.
+            medium -> DesignR.font.ubuntu_sans_medium
+            else -> DesignR.font.ubuntu_sans_regular
+        }
         val loaded = runCatching { ResourcesCompat.getFont(context, resource) }.getOrNull()
             ?: if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        if (bold) boldFace = loaded else regularFace = loaded
+        when {
+            bold -> boldFace = loaded
+            medium -> mediumFace = loaded
+            else -> regularFace = loaded
+        }
         return loaded
     }
 
     private var regularFace: Typeface? = null
+    private var mediumFace: Typeface? = null
     private var boldFace: Typeface? = null
 
     /**

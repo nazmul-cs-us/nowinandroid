@@ -51,6 +51,13 @@ internal object WidgetArabicText {
         maxLines: Int,
         singleLineFloorSp: Float,
         color: Int,
+        /**
+         * Tallest the finished block may be. The size search honours this as well as the
+         * line allowance, so a caller can hand over the room it has and get the largest
+         * size that truly fits it — estimating the height from the size outside here means
+         * guessing these faces' line spacing, and guessing it low wastes the room.
+         */
+        maxHeightDp: Float = Float.MAX_VALUE,
         // The Quran faces declare an ascent/descent about twice their letter height, so
         // even their natural pitch reads as a gap; 0.72 of it still clears stacked marks.
         lineSpacing: Float = 0.72f,
@@ -74,19 +81,27 @@ internal object WidgetArabicText {
                 .setIncludePad(false)
                 .build()
         }
+        val maxHeightPx = if (maxHeightDp == Float.MAX_VALUE) {
+            Int.MAX_VALUE
+        } else {
+            (maxHeightDp * metrics.density).toInt()
+        }
         var chosen: StaticLayout? = null
         var size = maxSizeSp
         // One line first, while it stays legible; then as many lines as allowed.
         while (size >= singleLineFloorSp) {
             val layout = layoutAt(size)
-            if (layout.lineCount <= 1) { chosen = layout; break }
+            if (layout.lineCount <= 1 && layout.height <= maxHeightPx) { chosen = layout; break }
             size -= 0.5f
         }
         if (chosen == null) {
             size = maxSizeSp
             while (size >= minSizeSp) {
                 val layout = layoutAt(size)
-                if (layout.lineCount <= maxLines) { chosen = layout; break }
+                if (layout.lineCount <= maxLines && layout.height <= maxHeightPx) {
+                    chosen = layout
+                    break
+                }
                 size -= 0.5f
             }
         }

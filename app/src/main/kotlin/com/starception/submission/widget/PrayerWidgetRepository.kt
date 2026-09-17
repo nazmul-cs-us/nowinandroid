@@ -43,6 +43,7 @@ import kotlinx.coroutines.withTimeout
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.chrono.HijrahChronology
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoField
@@ -78,9 +79,13 @@ internal data class WidgetPrayer(
 )
 
 /**
- * What the sky diagram needs to draw today's sun path: the solar events as minutes of the
- * day, where the clock stands, and enough astronomy (latitude, day of year) to place each
- * prayer at the sun's true altitude. [hijriDay] gives the moon its phase after sunset.
+ * What the sky diagram needs to draw the sky over this place: the solar events as minutes
+ * of the day, where the clock stands, and enough to put the sun, the moon and the stars
+ * where they actually are.
+ *
+ * [longitude] is not decoration. Latitude alone fixes how high the sky turns; only
+ * longitude says how far round it has turned, so without it there is no local sidereal
+ * time and therefore no star can be placed at all.
  */
 internal data class WidgetSky(
     val fajr: Int,
@@ -91,7 +96,18 @@ internal data class WidgetSky(
     val isha: Int,
     val now: Int,
     val latitude: Double,
-    val dayOfYear: Int,
+    val longitude: Double,
+    /**
+     * Epoch seconds of local midnight for the day these times belong to.
+     *
+     * One anchor rather than a date plus an offset, so date, zone and daylight saving
+     * cannot disagree with each other. The Julian Day of any local minute `m` is then
+     * `julianDay(localMidnightEpochSeconds + m * 60.0)` — which also works for negative
+     * minutes and minutes past 1440, and it has to: the night runs from Isha, across
+     * midnight, to the next Fajr.
+     */
+    val localMidnightEpochSeconds: Long,
+    /** Still wanted for the date label. The moon's phase is now computed, not inferred. */
     val hijriDay: Int,
 )
 
@@ -587,9 +603,17 @@ private fun DayPrayerTimes.toWidgetState(
             isha = isha.toSecondOfDay() / 60,
             now = now.toSecondOfDay() / 60,
             latitude = location.latitude,
-            dayOfYear = LocalDate.now().dayOfYear,
+            longitude = location.longitude,
+            // atStartOfDay(ZoneId), not the offset form: on a spring-forward day local
+            // midnight may not exist, and ZonedDateTime resolves that where an offset
+            // silently lands an hour out.
+            localMidnightEpochSeconds = date.toLocalDate()
+                .atStartOfDay(ZoneId.systemDefault())
+                .toEpochSecond(),
+            // date, not LocalDate.now(): every prayer time on this object comes from
+            // `date`, and a sky drawn for a different day would disagree with them.
             hijriDay = runCatching {
-                HijrahChronology.INSTANCE.date(LocalDate.now()).get(ChronoField.DAY_OF_MONTH)
+                HijrahChronology.INSTANCE.date(date.toLocalDate()).get(ChronoField.DAY_OF_MONTH)
             }.getOrDefault(1),
         ),
         prayerTimelineProgress = prayerTimelineProgress(now),
