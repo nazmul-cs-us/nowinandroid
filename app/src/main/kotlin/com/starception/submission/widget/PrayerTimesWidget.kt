@@ -28,6 +28,7 @@ import android.util.TypedValue
 import androidx.annotation.FontRes
 import androidx.annotation.LayoutRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.glance.LocalGlanceId
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -2035,7 +2036,7 @@ private fun ReferencePrayerHero(
         // The sans title introduces the serif "since" line beneath it; both are sized to
         // fill the room above the prayer name. Fit is the ceiling, never the floor:
         // "Make Time for Maghrib" must stay whole.
-        .coerceAtMost((if (compact) 12.5f else 14f) * heightScale)
+        .coerceAtMost((if (compact) 15f else 19f) * heightScale)
         .coerceAtLeast(9f)
     // Reference type ramp, measured against the hero's height, with two deliberate changes:
     // the reference sets "2h 9m since Dhuhr" as a faint caption, but the elapsed time is
@@ -2045,7 +2046,7 @@ private fun ReferencePrayerHero(
     // The elapsed time is what people glance for, so the duration is set a third larger
     // than the words after it. The fit is measured at the smaller size against a slightly
     // narrower column to leave room for that enlargement.
-    val captionSize = ((if (compact) 15f else 18f) * heightScale).coerceAtMost(
+    val captionSize = ((if (compact) 18f else 24f) * heightScale).coerceAtMost(
         WidgetTypography.fittingSize(
             context = context,
             text = elapsed.ifBlank { elapsedPrayer },
@@ -2055,7 +2056,7 @@ private fun ReferencePrayerHero(
         ),
     ).sp
     val durationSize = (captionSize.value * 1.35f).sp
-    val nameSize = ((if (compact) 33f else 40f) * heightScale).coerceAtMost(
+    val nameSize = ((if (compact) 36f else 46f) * heightScale).coerceAtMost(
         WidgetTypography.fittingSize(
             context = context,
             text = state.nextPrayer.name,
@@ -2064,8 +2065,8 @@ private fun ReferencePrayerHero(
             serif = true,
         ),
     ).sp
-    val countdownWordSize = ((if (compact) 15f else 18f) * heightScale).sp
-    val countdownSize = ((if (compact) 20f else 24f) * heightScale).sp
+    val countdownWordSize = ((if (compact) 16f else 20f) * heightScale).sp
+    val countdownSize = ((if (compact) 21f else 27f) * heightScale).sp
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -2086,13 +2087,13 @@ private fun ReferencePrayerHero(
         Row(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .padding(start = 12.dp, top = 9.dp, end = 8.dp, bottom = 9.dp),
+                .padding(start = 14.dp, top = 12.dp, end = 8.dp, bottom = 12.dp),
             verticalAlignment = Alignment.Vertical.Top,
         ) {
             Column(
                 modifier = GlanceModifier
                     .width(topWidth)
-                    .height(height - 18.dp),
+                    .height(height - 24.dp),
                 verticalAlignment = Alignment.Vertical.Top,
             ) {
                 WidgetText(
@@ -2321,7 +2322,12 @@ private fun ReferenceShallowPrayerHero(
     }
 }
 
-/** Five-prayer overview with the active prayer given a distinct, expanded surface. */
+/**
+ * Today's Prayers as a living sky — see [WidgetSkyArtwork].
+ *
+ * The whole card is the rendered painting (sky, skyline, sun path, prayers, title and
+ * labels); only the card's clip and click target are Glance.
+ */
 @Composable
 private fun ReferencePrayerTimeline(
     state: PrayerWidgetState.Available,
@@ -2329,460 +2335,34 @@ private fun ReferencePrayerTimeline(
     height: Dp,
 ) {
     val context = LocalContext.current
-    val appearance = LocalWidgetAppearance.current
-    val panelArtwork = alphaAdjustedImageProvider(
-        context = context,
-        drawableRes = R.drawable.prayer_widget_reference_panel_v2,
-        alpha = appearance.effectiveArtworkAlpha(PANEL_ARTWORK_MIN_ALPHA),
-    )
-    // The reference shows the Daylight/Night labels at its own 142dp height, so the
-    // footer with labels is the norm; only a genuinely short card drops them.
-    val expanded = height >= 134.dp
-    val condensed = height < REFERENCE_DESIGN_TIMELINE_HEIGHT
-    // Icons and labels grow with the grant, the way the hero's type does, instead of
-    // stopping at the single "expanded" step and leaving the rest of the height empty.
-    val heightScale = (height / REFERENCE_DESIGN_TIMELINE_HEIGHT).coerceIn(1f, 1.75f)
-    val footerHeight = if (expanded) 27.dp else 16.dp
-    // Title row (10dp above, ~24dp tall, 1dp gaps) plus the 3dp bottom inset: the footer
-    // was landing 3dp past the card edge at 150dp and its pill was clipped.
-    val prayerRowHeight = (height - footerHeight - 40.dp).coerceAtLeast(64.dp)
-    val cellWidth = (width - 20.dp) / state.prayers.size.coerceAtLeast(1)
-    // Reference icons nearly touch their neighbours: about 50dp in a ~74dp cell. They are
-    // also bounded by what the row can hold once the name, time and status row have taken
-    // their share, so a short card (a 2-row flipper page) gets smaller icons rather than
-    // status pills pushed off the bottom.
-    // Name, time, status pill and the active card's own vertical padding.
-    val textBlock = 62.dp
-    val iconBudget = (prayerRowHeight - textBlock).coerceAtLeast(26.dp)
-    val activeIconSize = (
-        when {
-            condensed -> 34.dp
-            else -> 48.dp * heightScale
-        }
-        ).coerceAtMost(cellWidth - 8.dp).coerceAtMost(iconBudget + 2.dp)
-    val iconSize = (
-        when {
-            condensed -> 30.dp
-            else -> 44.dp * heightScale
-        }
-        ).coerceAtMost(cellWidth - 12.dp).coerceAtMost(iconBudget)
-    // Type follows the icons but stops short of the cell width for "Maghrib".
-    val textScale = heightScale.coerceAtMost(1.5f)
-    val activeNameSize = (if (condensed) 10.5f else 11.5f * textScale).sp
-    val nameSize = (if (condensed) 9.5f else 10.5f * textScale).sp
-    val activeTimeSize = (if (condensed) 9.5f else 10f * textScale).sp
-    val timeSize = (if (condensed) 9f else 9.5f * textScale).sp
-    // The active card frames its content with a little air, as in the reference, rather
-    // than stretching to whatever row height a tall grant leaves over.
-    val activeCardHeight = (
-        activeIconSize +
-            (activeNameSize.value * 1.3f).dp +
-            (activeTimeSize.value * 1.3f).dp +
-            (if (expanded) 24.dp else 20.dp) +
-            14.dp
-        ).coerceAtMost(prayerRowHeight - 1.dp)
-    val timelineArtworkHeight = (
-        49.dp + ((height - REFERENCE_DESIGN_TIMELINE_HEIGHT) * 0.50f)
-        ).coerceIn(47.dp, 72.dp)
+    val sky = remember(state.sky, state.prayers, width, height) {
+        WidgetSkyArtwork.render(
+            context = context,
+            input = WidgetSkyArtwork.Input(
+                sky = state.sky,
+                prayers = state.prayers,
+                daylightLabel = state.daylightLabel,
+                nightLabel = state.nightLabel,
+                cornerRadiusDp = 22f,
+            ),
+            widthDp = width.value,
+            heightDp = height.value,
+        )
+    }
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(height)
-            .background(
-                imageProvider = panelArtwork,
-                contentScale = ContentScale.FillBounds,
-            )
             .cornerRadius(22.dp),
     ) {
-        // Keep the journey line within the illustration band. Stretching this artwork
-        // over the whole panel made its lower curves cross prayer names and times.
-        Column(modifier = GlanceModifier.fillMaxSize()) {
-            Spacer(modifier = GlanceModifier.height(30.dp))
-            Image(
-                provider = ImageProvider(WidgetTimelineArtwork.bitmap),
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = GlanceModifier.fillMaxWidth().height(timelineArtworkHeight),
-            )
-        }
-        AnimatedFoliage(
-            phase = state.dayPhase,
-            placement = WidgetFoliagePlacement.TIMELINE_LEFT,
+        // No foliage overlay here: the painting carries its own skyline, and the leaves
+        // drawn for the pale panel read as a dark blot over the Fajr corner of the night sky.
+        Image(
+            provider = ImageProvider(sky),
+            contentDescription = "Today's prayers on the sun's path",
+            contentScale = ContentScale.FillBounds,
             modifier = GlanceModifier.fillMaxSize(),
         )
-        Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .padding(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 3.dp),
-        ) {
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Vertical.CenterVertically,
-            ) {
-                Box(
-                    modifier = GlanceModifier
-                        .width(4.dp)
-                        .height(18.dp)
-                        .background(ReferenceForest)
-                        .cornerRadius(3.dp),
-                ) {}
-                Spacer(modifier = GlanceModifier.width(6.dp))
-                WidgetText(
-                    text = "Today's Prayers",
-                    size = 15.sp,
-                    color = ReferenceInk,
-                    weight = WidgetFontWeight.Bold,
-                    modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-                )
-                Row(
-                    modifier = GlanceModifier
-                        .wrapContentWidth()
-                        .background(ReferenceHeaderPill)
-                        .cornerRadius(14.dp)
-                        .padding(horizontal = 7.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.Vertical.CenterVertically,
-                ) {
-                    Image(
-                        provider = ImageProvider(R.drawable.calendar_month_24),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(ReferenceTopHeaderInk),
-                        modifier = GlanceModifier.size(11.dp),
-                    )
-                    Spacer(modifier = GlanceModifier.width(4.dp))
-                    WidgetText(
-                        text = "View Calendar",
-                        size = 10.5.sp,
-                        color = ReferenceTopHeaderInk,
-                        weight = WidgetFontWeight.Medium,
-                        modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                    )
-                    Spacer(modifier = GlanceModifier.width(4.dp))
-                    WidgetText(
-                        text = "›",
-                        size = 11.sp,
-                        color = ReferenceTopHeaderInk,
-                        weight = WidgetFontWeight.Bold,
-                        modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                    )
-                }
-            }
-            Spacer(modifier = GlanceModifier.height(1.dp))
-            // Prayers sit up on the wave directly under the title, as in the reference.
-            // Height the launcher grants beyond the content opens the illustrated hills
-            // between the status row and the daylight bar rather than floating the icons
-            // mid-card away from the line they are meant to ride.
-            Row(
-                modifier = GlanceModifier.fillMaxWidth().height(prayerRowHeight),
-                verticalAlignment = Alignment.Vertical.Top,
-            ) {
-                state.prayers.forEach { prayer ->
-                    val active = prayer.isNext
-                    val cellModifier = GlanceModifier
-                        .defaultWeight()
-                        .height(if (active) activeCardHeight else prayerRowHeight - 1.dp)
-                        .then(
-                            if (active) {
-                                GlanceModifier
-                                    .background(
-                                        imageProvider = ImageProvider(
-                                            WidgetActivePrayerCardArtwork.bitmap,
-                                        ),
-                                        contentScale = ContentScale.FillBounds,
-                                    )
-                                    .cornerRadius(20.dp)
-                                    .padding(vertical = 3.dp)
-                            } else {
-                                GlanceModifier.padding(vertical = 3.dp)
-                            },
-                        )
-                    // Top-aligned so every icon sits on the wave whatever the row height;
-                    // centring sank the non-active prayers on tall grants while the active
-                    // card, which wraps its content, stayed up.
-                    Column(
-                        modifier = cellModifier,
-                        verticalAlignment = Alignment.Vertical.Top,
-                        horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
-                    ) {
-                        Image(
-                            provider = ImageProvider(
-                                WidgetPrayerPhaseArtwork.bitmap(context, prayer.phaseArtwork()),
-                            ),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = GlanceModifier
-                                .size(if (active) activeIconSize else iconSize),
-                        )
-                        Spacer(modifier = GlanceModifier.height(1.dp))
-                        WidgetText(
-                            text = prayer.name,
-                            size = if (active) activeNameSize else nameSize,
-                            color = if (active) ReferenceForestOn else ReferenceInk,
-                            weight = WidgetFontWeight.Bold,
-                            align = WidgetTextAlign.Center,
-                            modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
-                        )
-                        WidgetText(
-                            text = prayer.time,
-                            size = if (active) activeTimeSize else timeSize,
-                            color = if (active) ReferenceForestOn else ReferenceMuted,
-                            weight = WidgetFontWeight.Medium,
-                            align = WidgetTextAlign.Center,
-                            modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
-                        )
-                        Spacer(modifier = GlanceModifier.height(2.dp))
-                        ReferencePrayerStatus(
-                            prayer = prayer,
-                            expanded = expanded,
-                            condensed = condensed,
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = GlanceModifier.height(1.dp))
-            ReferenceDaylightBar(
-                state = state,
-                width = width - 20.dp,
-                height = footerHeight,
-                expanded = expanded,
-            )
-        }
-    }
-}
-
-/** Completed, relative-time and upcoming treatments from the supplied reference. */
-@Composable
-private fun ReferencePrayerStatus(
-    prayer: WidgetPrayer,
-    expanded: Boolean,
-    condensed: Boolean,
-) {
-    when {
-        prayer.isNext -> {
-            Box(
-                modifier = GlanceModifier
-                    .wrapContentWidth()
-                    .background(ReferenceActiveChip)
-                    .cornerRadius(11.dp)
-                    .padding(
-                        horizontal = when {
-                            expanded -> 7.dp
-                            condensed -> 5.dp
-                            else -> 6.dp
-                        },
-                        vertical = when {
-                            expanded -> 3.dp
-                            condensed -> 1.dp
-                            else -> 2.dp
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                WidgetText(
-                    text = prayer.relativeLabel ?: "Next",
-                    size = when {
-                        expanded -> 10.5.sp
-                        condensed -> 9.sp
-                        else -> 9.5.sp
-                    },
-                    color = ReferenceForestOn,
-                    weight = WidgetFontWeight.Medium,
-                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                )
-            }
-        }
-
-        prayer.relativeLabel != null -> {
-            Box(
-                modifier = GlanceModifier
-                    .wrapContentWidth()
-                    .background(ReferencePinSurface)
-                    .cornerRadius(11.dp)
-                    .padding(
-                        horizontal = when {
-                            expanded -> 7.dp
-                            condensed -> 5.dp
-                            else -> 6.dp
-                        },
-                        vertical = when {
-                            expanded -> 3.dp
-                            condensed -> 1.dp
-                            else -> 2.dp
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                WidgetText(
-                    text = prayer.relativeLabel,
-                    size = when {
-                        expanded -> 10.5.sp
-                        condensed -> 9.sp
-                        else -> 9.5.sp
-                    },
-                    color = ReferenceInk,
-                    weight = WidgetFontWeight.Medium,
-                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                )
-            }
-        }
-
-        prayer.isPast -> {
-            Box(
-                modifier = GlanceModifier
-                    .size(
-                        when {
-                            expanded -> 20.dp
-                            condensed -> 14.dp
-                            else -> 18.dp
-                        },
-                    )
-                    .background(ReferencePinSurface)
-                    .cornerRadius(if (condensed) 7.dp else if (expanded) 10.dp else 9.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    provider = ImageProvider(R.drawable.widget_verified),
-                    contentDescription = "Prayer completed",
-                    colorFilter = ColorFilter.tint(ReferenceForest),
-                    modifier = GlanceModifier.size(
-                        when {
-                            expanded -> 13.dp
-                            condensed -> 10.dp
-                            else -> 12.dp
-                        },
-                    ),
-                )
-            }
-        }
-
-        else -> {
-            // Two nested circles create the reference's blue outlined upcoming marker
-            // without depending on a launcher-specific border implementation.
-            Box(
-                modifier = GlanceModifier
-                    .size(
-                        when {
-                            expanded -> 18.dp
-                            condensed -> 14.dp
-                            else -> 16.dp
-                        },
-                    )
-                    .background(ReferenceUpcoming)
-                    .cornerRadius(if (condensed) 7.dp else if (expanded) 9.dp else 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = GlanceModifier
-                        .size(
-                            when {
-                                expanded -> 12.dp
-                                condensed -> 9.dp
-                                else -> 11.dp
-                            },
-                        )
-                        .background(ReferenceWidgetBackground)
-                        .cornerRadius(6.dp),
-                ) {}
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReferenceDaylightBar(
-    state: PrayerWidgetState.Available,
-    width: Dp,
-    height: Dp,
-    expanded: Boolean,
-) {
-    // The five prayer cells divide the panel into equal fifths, so the first and last
-    // centres sit at 10% and 90%. The gradient must span those exact centres: putting the
-    // daylight/night labels in the same row previously shortened it to the middle three
-    // prayers and placed those labels underneath Fajr and Isha.
-    val endpointInset = width * 0.10f
-    val trackWidth = (width - endpointInset * 2f).coerceAtLeast(72.dp)
-    val markerWidth = if (expanded) 6.dp else 5.dp
-    val prayerProgress = state.prayerTimelineProgress.coerceIn(0f, 1f)
-    val markerOffset = (trackWidth - markerWidth) * prayerProgress
-    Column(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .height(height)
-            .background(ReferenceWidgetBackground)
-            .cornerRadius(10.dp),
-    ) {
-        if (expanded) {
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxWidth()
-                    .height(15.dp)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.Vertical.CenterVertically,
-            ) {
-                Image(
-                    provider = ImageProvider(R.drawable.flaticon_weather_clear),
-                    contentDescription = null,
-                    modifier = GlanceModifier.size(14.dp),
-                )
-                Spacer(modifier = GlanceModifier.width(3.dp))
-                WidgetText(
-                    text = state.daylightLabel,
-                    size = 10.sp,
-                    color = ReferenceInk,
-                    weight = WidgetFontWeight.Medium,
-                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                )
-                Spacer(modifier = GlanceModifier.defaultWeight())
-                Image(
-                    provider = ImageProvider(R.drawable.widget_night_crescent),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(ReferenceNight),
-                    modifier = GlanceModifier.size(14.dp),
-                )
-                Spacer(modifier = GlanceModifier.width(3.dp))
-                WidgetText(
-                    text = state.nightLabel,
-                    size = 10.sp,
-                    color = ReferenceInk,
-                    weight = WidgetFontWeight.Medium,
-                    align = WidgetTextAlign.End,
-                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-                )
-            }
-        }
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-            verticalAlignment = Alignment.Vertical.CenterVertically,
-        ) {
-            Spacer(modifier = GlanceModifier.width(endpointInset))
-            Box(
-                modifier = GlanceModifier.width(trackWidth).fillMaxHeight(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    provider = ImageProvider(WidgetDaylightBarArtwork.bitmap),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .height(if (expanded) 8.dp else 7.dp),
-                )
-                Row(
-                    modifier = GlanceModifier.fillMaxSize(),
-                    verticalAlignment = Alignment.Vertical.CenterVertically,
-                ) {
-                    Spacer(modifier = GlanceModifier.width(markerOffset))
-                    Box(
-                        modifier = GlanceModifier
-                            .width(markerWidth)
-                            .height(if (expanded) 14.dp else 12.dp)
-                            .background(ReferenceForest)
-                            .cornerRadius(3.dp),
-                    ) {}
-                    Spacer(modifier = GlanceModifier.defaultWeight())
-                }
-            }
-            Spacer(modifier = GlanceModifier.width(endpointInset))
-        }
     }
 }
 
@@ -3031,14 +2611,6 @@ private fun ReferenceDevotionalPanel(
             }
         }
     }
-}
-
-private fun WidgetPrayer.phaseArtwork(): Int = when (name) {
-    "Fajr" -> R.drawable.prayer_widget_phase_fajr
-    "Dhuhr" -> R.drawable.prayer_widget_phase_dhuhr
-    "Asr" -> R.drawable.prayer_widget_phase_asr
-    "Maghrib" -> R.drawable.prayer_widget_phase_maghrib
-    else -> R.drawable.prayer_widget_phase_isha
 }
 
 private fun DailyReminder.openAction(context: Context) = target?.let { target ->

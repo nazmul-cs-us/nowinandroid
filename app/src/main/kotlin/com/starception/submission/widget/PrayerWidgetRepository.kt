@@ -77,6 +77,24 @@ internal data class WidgetPrayer(
     val weatherSummary: String? = null,
 )
 
+/**
+ * What the sky diagram needs to draw today's sun path: the solar events as minutes of the
+ * day, where the clock stands, and enough astronomy (latitude, day of year) to place each
+ * prayer at the sun's true altitude. [hijriDay] gives the moon its phase after sunset.
+ */
+internal data class WidgetSky(
+    val fajr: Int,
+    val sunrise: Int,
+    val dhuhr: Int,
+    val asr: Int,
+    val maghrib: Int,
+    val isha: Int,
+    val now: Int,
+    val latitude: Double,
+    val dayOfYear: Int,
+    val hijriDay: Int,
+)
+
 /** The next solar event shown beside the refresh action in the detailed widget header. */
 internal data class WidgetSolarEvent(
     val label: String,
@@ -122,6 +140,7 @@ internal sealed interface PrayerWidgetState {
         val dayPhase: WidgetDayPhase,
         val daylightLabel: String,
         val nightLabel: String,
+        val sky: WidgetSky,
         /**
          * Current position across the five prayer anchors, from Fajr (0f) to Isha (1f).
          * This keeps the day/night marker spatially aligned with the prayer journey above
@@ -559,6 +578,20 @@ private fun DayPrayerTimes.toWidgetState(
         dayPhase = widgetDayPhase(now),
         daylightLabel = "Daylight ${durationLabel(daylightMinutes)}",
         nightLabel = "Night ${durationLabel(nightMinutes)}",
+        sky = WidgetSky(
+            fajr = fajr.toSecondOfDay() / 60,
+            sunrise = sunrise.toSecondOfDay() / 60,
+            dhuhr = dhuhr.toSecondOfDay() / 60,
+            asr = asr.toSecondOfDay() / 60,
+            maghrib = maghrib.toSecondOfDay() / 60,
+            isha = isha.toSecondOfDay() / 60,
+            now = now.toSecondOfDay() / 60,
+            latitude = location.latitude,
+            dayOfYear = LocalDate.now().dayOfYear,
+            hijriDay = runCatching {
+                HijrahChronology.INSTANCE.date(LocalDate.now()).get(ChronoField.DAY_OF_MONTH)
+            }.getOrDefault(1),
+        ),
         prayerTimelineProgress = prayerTimelineProgress(now),
     )
 }
