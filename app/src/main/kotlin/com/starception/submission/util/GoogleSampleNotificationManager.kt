@@ -647,11 +647,19 @@ object GoogleSampleNotificationManager {
                                   isPrayerNotificationEnabled
 
             if (shouldPlayAdhan) {
+                // DOUBLE-ADHAN FIX: The scheduled notification path (PrayerNotificationReceiver /
+                // PrayerNotificationWorker) is the SINGLE owner of Adhan playback - it plays the
+                // Adhan via its notification channel sound at the exact prayer time and survives the
+                // foreground service being killed. This live-update path must NOT also play the
+                // Adhan, otherwise it fires twice back-to-back for every prayer.
+                //
+                // We still record the play in adhan_tracker_prefs so this path's own de-dup logic
+                // (isNewPrayer / isEnoughTimePassedSinceLastAdhan) stays consistent, but we no longer
+                // call playAdhanSound() here.
                 android.util.Log.d("GoogleSampleNotificationManager",
-                    "📢 ADHAN TIME: New prayer '${currentPrayerName}' at ${currentPrayerTime} (progress: ${progress}%) - playing Adhan")
-                playAdhanSound()
+                    "🔕 ADHAN suppressed here (scheduled notification channel is the sole owner): '${currentPrayerName}' at ${currentPrayerTime} (progress: ${progress}%)")
 
-                // Save this prayer to persistent storage so we don't play Adhan again for it even after app restart
+                // Track this prayer so we don't re-evaluate playback for it even after app restart.
                 val currentTime = System.currentTimeMillis()
                 prefs.edit().apply {
                     putString(KEY_LAST_ADHAN_PRAYER_NAME, currentPrayerName)
@@ -677,17 +685,13 @@ object GoogleSampleNotificationManager {
                     "⏭️ Skipping Adhan: $reason")
             }
 
-            // CRITICAL FIX: Always silence notification channel sound to prevent unwanted adhan playback
-            // We only use MediaPlayer (playAdhanSound()) for adhan - never the notification channel sound
-            // This prevents the channel's default sound from playing during startup or when adhan shouldn't play
+            // This live-update notification is ALWAYS silent. Adhan playback is owned exclusively by
+            // the scheduled notification path (PrayerNotificationReceiver / PrayerNotificationWorker),
+            // which plays it via its notification channel sound at the exact prayer time. Keeping this
+            // notification silent (and not playing a MediaPlayer Adhan above) prevents the Adhan from
+            // firing twice for the same prayer.
             notificationBuilder.setSilent(true)
-            android.util.Log.d("GoogleSampleNotificationManager", "🔇 Notification channel sound silenced - only MediaPlayer used for Adhan")
-
-            // DISABLED: Notification sound to prevent double Adhan
-            // The playAdhanSound() method above already plays the Adhan when conditions are met
-            // Having both causes double playback
-            // val adhanSoundUri = Uri.parse("android.resource://${appContext.packageName}/${R.raw.short_adhan}")
-            // notificationBuilder.setSound(adhanSoundUri)
+            android.util.Log.d("GoogleSampleNotificationManager", "🔇 Live-update notification silenced - scheduled channel is the sole Adhan owner")
         } else {
             // Progress update within same phase: Make completely silent
             android.util.Log.d("GoogleSampleNotificationManager", "🔕 Progress update - setting notification as SILENT (no sound/vibration)")
