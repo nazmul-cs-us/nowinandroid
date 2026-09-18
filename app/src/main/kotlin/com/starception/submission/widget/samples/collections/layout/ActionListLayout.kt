@@ -1,5 +1,6 @@
 package com.starception.submission.widget.samples.collections.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
@@ -31,7 +32,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.data.FakeActionListDataRepository.Companion.demoData
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.circularCornerRadius
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.filledItemCornerRadius
@@ -124,7 +124,7 @@ fun ActionListLayout(
   }
 
   Scaffold(
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     modifier = GlanceModifier
       .padding(top = scaffoldTopPadding),
     titleBar = if (showTitleBar()) {

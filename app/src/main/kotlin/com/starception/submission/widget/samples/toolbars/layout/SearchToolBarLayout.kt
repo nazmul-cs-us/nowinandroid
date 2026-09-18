@@ -15,6 +15,7 @@
  */
 package com.starception.submission.widget.samples.toolbars.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -46,7 +47,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.headerItemHeight
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.iconSize
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.itemsSpacing
@@ -104,7 +104,7 @@ fun SearchToolBarLayout(
     }
 
   Scaffold(
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     modifier = GlanceModifier
       .padding(vertical = widgetPadding),
     horizontalPadding = widgetPadding

@@ -9,7 +9,7 @@
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:description="@string/prayer_widget_description"
+    android:description="@string/prayer_widget_description_tiny"
     android:initialLayout="@layout/prayer_widget_loading"
     android:minWidth="110dp"
     android:minHeight="40dp"
@@ -19,8 +19,7 @@
     android:maxResizeHeight="600dp"
     android:targetCellWidth="2"
     android:targetCellHeight="1"
-    android:previewImage="@mipmap/ic_launcher"
-    android:previewLayout="@layout/prayer_widget_preview_tiny"
+    android:previewImage="@drawable/prayer_widget_preview_tiny_image"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen|keyguard"

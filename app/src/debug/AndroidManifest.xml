@@ -18,5 +18,15 @@
                 <action android:name="com.starception.submission.DEBUG_RESIZE_WIDGET" />
             </intent-filter>
         </receiver>
+
+        <!-- Renders the widget at each picker size to a PNG, so the previews can be the
+             widget itself rather than a hand-built likeness of it. -->
+        <receiver
+            android:name="com.starception.submission.widget.DebugWidgetPreviewReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_RENDER_PREVIEWS" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -15,6 +15,7 @@
  */
 package com.starception.submission.widget.samples.toolbars.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -36,7 +37,6 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.iconSize
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.itemsSpacing
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.minButtonSize
@@ -107,7 +107,7 @@ fun ToolBarLayout(
     HorizontalRow, VerticalColumn -> {
 
       Scaffold(
-        backgroundColor = TransparentWidgetBackground,
+        backgroundColor = LocalWidgetHostBackground.current,
         modifier = GlanceModifier
           .padding(vertical = widgetPadding),
         horizontalPadding = widgetPadding,
@@ -143,7 +143,7 @@ fun ToolBarLayout(
       )
 
       Scaffold(
-        backgroundColor = TransparentWidgetBackground,
+        backgroundColor = LocalWidgetHostBackground.current,
         modifier = GlanceModifier
           .padding(vertical = widgetPadding),
         horizontalPadding = widgetPadding
@@ -158,7 +158,7 @@ fun ToolBarLayout(
 
     HeaderTwoRowGrid -> {
       Scaffold(
-        backgroundColor = TransparentWidgetBackground,
+        backgroundColor = LocalWidgetHostBackground.current,
         modifier = GlanceModifier
           .padding(bottom = widgetPadding),
         horizontalPadding = widgetPadding,

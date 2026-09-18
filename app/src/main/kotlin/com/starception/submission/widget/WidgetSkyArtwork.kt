@@ -243,9 +243,6 @@ internal object WidgetSkyArtwork {
         private val nowAltitude = altitude(sky.now.toDouble())
         private val palette = paletteFor(nowAltitude)
 
-        /** 0 in daylight, 1 once the sun is well down. */
-        private val nightBlend: Float = palette.stars
-
         fun draw() {
             drawSky()
             drawTwilightBands()
@@ -535,34 +532,18 @@ internal object WidgetSkyArtwork {
 
             canvas.drawPath(hills, paint)
 
-            // The skyline is drawn in its own colours and then taken toward a silhouette as
-            // the sun goes down, which is what actually happens to a building at dusk: the
-            // green dome and the gold finials hold their colour while there is light on
-            // them, and the whole thing flattens to a shape against the afterglow.
+            // Drawn in its own colours at every hour, on purpose.
+            //
+            // It used to flatten toward a silhouette as the sun went down — which is what
+            // happens to a real building at dusk, but on a widget it cost the thing its
+            // legibility: by Isha the dome and the palms were a slate shape barely separable
+            // from the night sky. A card you cannot read at night is worse than one that is
+            // not quite photographic, so the artwork keeps its greens and creams and only
+            // the sky behind it changes.
             canvas.drawBitmap(
                 art, null, dst,
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
             )
-            val silhouette = (255 * nightBlend).toInt()
-            if (silhouette > 0) {
-                canvas.drawBitmap(
-                    art, null, dst,
-                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                        colorFilter = PorterDuffColorFilter(ink, PorterDuff.Mode.SRC_IN)
-                        alpha = silhouette
-                    },
-                )
-                // A backlit rim along the top, as a skyline has against a bright horizon.
-                canvas.drawBitmap(
-                    art, null,
-                    RectF(dst.left, dst.top - 1.6f * px, dst.right, dst.bottom - 1.6f * px),
-                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                        colorFilter =
-                            PorterDuffColorFilter(0xFF8FA3D9.toInt(), PorterDuff.Mode.SRC_IN)
-                        alpha = (120 * nightBlend).toInt()
-                    },
-                )
-            }
         }
 
         /**

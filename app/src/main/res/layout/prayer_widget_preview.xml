@@ -1,25 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Current titled prayer-window hero for the 4x2 picker entry. -->
+<!--
+     4x2 picker entry: the illustrated hero, as the widget actually draws it.
+
+     This used to be a generic card — a location row, a progress bar and a "next prayer"
+     line — which shared nothing with the widget it was advertising. The preview now stands
+     on the same artwork plate the hero uses, so what the picker shows is what gets placed.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/prayer_widget_background"
-    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="10dp"
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="8dp"
     tools:ignore="HardcodedText">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:contentDescription="@null"
             android:src="@drawable/ic_flaticon_location_marker"
             android:tint="@color/prayer_widget_accent" />
@@ -27,95 +33,77 @@
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="5dp"
             android:layout_weight="1"
             android:fontFamily="@font/ubuntu_sans"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="Al Safouh Second"
+            android:text="Dubai"
             android:textColor="@color/prayer_widget_on_background"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:contentDescription="@null"
-            android:src="@drawable/sample_refresh_icon"
-            android:tint="@color/prayer_widget_muted" />
     </LinearLayout>
 
-    <TextView
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:maxLines="1"
-        android:text="Make Time for Isha"
-        android:textColor="@color/prayer_widget_on_background"
-        android:textSize="17sp"
-        android:textStyle="bold" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/prayer_widget_reference_hero_v4">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="1h 43m since Isha"
-        android:textColor="@color/prayer_widget_accent"
-        android:textSize="13sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/prayer_widget_preview_progress_active" />
-
-        <ImageView
-            android:layout_width="4dp"
-            android:layout_height="match_parent" />
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="4"
-            android:background="@drawable/prayer_widget_preview_progress_track" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="@font/ubuntu_sans"
-            android:includeFontPadding="false"
-            android:text="Next Prayer"
-            android:textColor="@color/prayer_widget_accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:gravity="end"
-            android:includeFontPadding="false"
-            android:text="Fajr in 6h 46m"
-            android:textColor="@color/prayer_widget_on_background"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="Best Time to Pray Maghrib"
+                android:textColor="#FFF4F1E6"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="serif"
+                android:includeFontPadding="false"
+                android:text="46m since Maghrib"
+                android:textColor="#FFF4F1E6"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- A FrameLayout, not a Space: previewLayout has to inflate as RemoteViews,
+                 and Space is not on the remotable whitelist — the launcher answers
+                 "Couldn't add widget." -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="serif"
+                android:includeFontPadding="false"
+                android:text="Isha"
+                android:textColor="#FFF4F1E6"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="serif"
+                android:includeFontPadding="false"
+                android:text="in 28m"
+                android:textColor="#FFD8C9A8"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

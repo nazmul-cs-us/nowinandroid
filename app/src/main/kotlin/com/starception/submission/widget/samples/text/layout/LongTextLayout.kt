@@ -15,6 +15,7 @@
  */
 package com.starception.submission.widget.samples.text.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -47,7 +48,6 @@ import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
 import com.starception.submission.widget.WidgetFontWeight
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.FadingHorizontalSeparator
 import androidx.core.content.res.ResourcesCompat
 import androidx.glance.appwidget.AndroidRemoteViews
@@ -124,7 +124,7 @@ fun LongTextLayout(
   }
 
   Scaffold(
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     horizontalPadding = widgetPadding,
     modifier = GlanceModifier
       .padding(

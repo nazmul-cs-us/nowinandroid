@@ -66,6 +66,12 @@
   <string name="prayer_widget_label_large">Prayer Times &amp; Location</string>
   <string name="prayer_widget_label_full">Prayer Times (Full Day)</string>
   <string name="prayer_widget_description">Next prayer and today\'s full schedule, at any widget size.</string>
+  <!-- One per size: the picker shows these side by side, so each says what that size adds. -->
+  <string name="prayer_widget_description_tiny">The next prayer and the time until it, in a single row.</string>
+  <string name="prayer_widget_description_small">The next prayer, with how much of the current one is left.</string>
+  <string name="prayer_widget_description_medium">The next prayer on an illustrated card that follows the sky.</string>
+  <string name="prayer_widget_description_large">Cycles through the next prayer, today\'s sun path, and a dua.</string>
+  <string name="prayer_widget_description_full">All at once: the next prayer, today\'s sun path, and a dua.</string>
   <string name="prayer_widget_loading">Prayer times</string>
 
   <!-- Strings for the canonical widget layouts ported from platform-samples.

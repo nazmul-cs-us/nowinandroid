@@ -333,6 +333,19 @@ private val HERO_TEXT_START_INSET = 14.dp
  */
 private const val HERO_DURATION_RATIO = 1.35f
 
+/** The hero column's fixed gaps — 4 + 5 + the rule + 2 — which the type cannot squeeze. */
+private const val HERO_STACK_SPACERS = 12f
+
+/**
+ * Line height of the hero's serif display type, for measuring its stack against the card.
+ *
+ * Lower than [TEXT_LINE_HEIGHT_EM] because these lines draw with `includeFontPadding=false`
+ * and there is nothing wrapping. Estimating high is not free: it makes the squeeze believe
+ * the stack is taller than it is, so the type comes out smaller than it needed to be and
+ * the slack reappears as a gap in the middle of the card.
+ */
+private const val HERO_LINE_HEIGHT_EM = 1.22f
+
 /**
  * Reads the launcher's current widget bounds without relying on Glance's cached LocalSize.
  *
@@ -1900,7 +1913,7 @@ private val SECTION_PAGE_VIEW_IDS = intArrayOf(
  * plate shows through around the hero), and at most ~1.1MP so three pages stay inside the
  * host's bitmap budget alongside the rest of the widget.
  */
-private fun rasterise(context: Context, views: RemoteViews, size: DpSize): Bitmap? =
+internal fun rasterise(context: Context, views: RemoteViews, size: DpSize): Bitmap? =
     runCatching {
         val density = context.resources.displayMetrics.density
         val scale = minOf(1f, kotlin.math.sqrt(1_100_000f / (size.width.value * size.height.value * density * density)))
@@ -1972,7 +1985,7 @@ private enum class SectionPage { HERO, TIMELINE, DEVOTIONAL }
  * card stops changing under you between screenshots. Must be null in anything shipped —
  * the widget is meant to rotate through all three.
  */
-private val PINNED_SECTION_PAGE: SectionPage? = SectionPage.TIMELINE
+private val PINNED_SECTION_PAGE: SectionPage? = null
 
 /** One flipper page: a single card composed at the full reduced content size. */
 private class SectionPageWidget(
@@ -2151,7 +2164,7 @@ private fun ReferencePrayerHero(
         preservedBand = if (wideArtwork) 0f..0.90f else 0.20f..0.95f,
     )
     val phaseTitle = state.insight?.title ?: "Prayer now"
-    val phaseTitleSize = WidgetTypography
+    val phaseTitleSizeRaw = WidgetTypography
         .fittingSize(
             context = context,
             text = phaseTitle,
@@ -2200,11 +2213,11 @@ private fun ReferencePrayerHero(
     } else {
         Float.MAX_VALUE
     }
-    val captionSize = ((if (compact) 18f else 24f) * heightScale)
+    val captionSizeRaw = ((if (compact) 18f else 24f) * heightScale)
         .coerceAtMost(elapsedFittingSize)
         .sp
-    val durationSize = (captionSize.value * HERO_DURATION_RATIO).sp
-    val nameSize = ((if (compact) 36f else 46f) * heightScale).coerceAtMost(
+    val durationSizeRaw = (captionSizeRaw.value * HERO_DURATION_RATIO).sp
+    val nameSizeRaw = ((if (compact) 36f else 46f) * heightScale).coerceAtMost(
         WidgetTypography.fittingSize(
             context = context,
             text = state.nextPrayer.name,
@@ -2230,7 +2243,7 @@ private fun ReferencePrayerHero(
         bold = true,
         serif = true,
     )
-    val countdownWordSize = ((if (compact) 16f else 20f) * heightScale)
+    val countdownWordSizeRaw = ((if (compact) 16f else 20f) * heightScale)
         .coerceAtMost(
             if (countdownWidthPerSp > 0f) {
                 (leftWidth.value - 4f) * TEXT_FIT_SLACK / countdownWidthPerSp
@@ -2239,7 +2252,26 @@ private fun ReferencePrayerHero(
             },
         )
         .sp
-    val countdownSize = (countdownWordSize.value * countdownRatio).sp
+    val countdownSizeRaw = (countdownWordSizeRaw.value * countdownRatio).sp
+
+    // Every line above is fitted to the width of its column; nothing ever checked the
+    // card's height. The stacked layout hands the hero about 127dp, where these four ask
+    // for roughly 142 — so the closing countdown was clipped straight off the bottom.
+    // Measure the stack and squeeze it as one, which keeps the type's proportions to each
+    // other and only gives up size when the card genuinely cannot hold them.
+    val heroStackHeight = (
+        phaseTitleSizeRaw +
+            maxOf(durationSizeRaw.value, captionSizeRaw.value) +
+            nameSizeRaw.value +
+            countdownSizeRaw.value
+        ) * HERO_LINE_HEIGHT_EM + HERO_STACK_SPACERS
+    val heroSqueeze = ((height - 24.dp).value / heroStackHeight).coerceIn(0.55f, 1f)
+    val phaseTitleSize = phaseTitleSizeRaw * heroSqueeze
+    val captionSize = (captionSizeRaw.value * heroSqueeze).sp
+    val durationSize = (durationSizeRaw.value * heroSqueeze).sp
+    val nameSize = (nameSizeRaw.value * heroSqueeze).sp
+    val countdownWordSize = (countdownWordSizeRaw.value * heroSqueeze).sp
+    val countdownSize = (countdownSizeRaw.value * heroSqueeze).sp
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()

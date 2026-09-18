@@ -1,5 +1,6 @@
 package com.starception.submission.widget.samples.collections.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -26,7 +27,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.layout.Dimensions.NUM_GRID_CELLS
 import com.starception.submission.widget.samples.collections.layout.Dimensions.fillItemItemPadding
 import com.starception.submission.widget.samples.collections.layout.Dimensions.filledItemCornerRadius
@@ -112,7 +112,7 @@ fun ImageTextListLayout(
   }
 
   Scaffold(
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     modifier = GlanceModifier
       .padding(
         top = scaffoldTopPadding,

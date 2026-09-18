@@ -1,5 +1,6 @@
 package com.starception.submission.widget.samples.collections.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
@@ -21,7 +22,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.data.FakeCheckListDataRepository.Companion.demoData
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowStartPadding
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowEndPadding
@@ -116,7 +116,7 @@ fun CheckListLayout(
   }
 
   Scaffold(
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     horizontalPadding = scaffoldHorizontalPadding,
     modifier = GlanceModifier
       .padding(

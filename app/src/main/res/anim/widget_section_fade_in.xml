@@ -1,6 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<alpha xmlns:android="http://schemas.android.com/apk/res/android"
-    android:duration="450"
-    android:fromAlpha="0"
+<!--
+     The incoming page, as Material's shared-axis X transition.
+
+     It was a plain alpha fade, symmetric with the outgoing one. Two half-transparent pages
+     overlapped for most of the transition, so the plate showed through both and the card
+     visibly dipped in brightness before recovering — the ghosting that makes a carousel
+     look cheap.
+
+     Shared axis fixes it by separating the two in time rather than blending them: the page
+     travels in from a fifth of the card's width while the one leaving is already on its way
+     out, and its opacity only starts to climb after the outgoing page has gone. The travel
+     is longer than the fade on purpose — motion carries the continuity, opacity just keeps
+     the hand-off clean.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
     android:interpolator="@android:interpolator/fast_out_slow_in"
-    android:toAlpha="1" />
+    android:shareInterpolator="false"
+    android:zAdjustment="top">
+
+    <translate
+        android:duration="500"
+        android:fromXDelta="20%p"
+        android:toXDelta="0" />
+
+    <alpha
+        android:duration="260"
+        android:fromAlpha="0"
+        android:interpolator="@android:interpolator/linear"
+        android:startOffset="180"
+        android:toAlpha="1" />
+</set>

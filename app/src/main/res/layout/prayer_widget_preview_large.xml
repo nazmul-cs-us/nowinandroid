@@ -1,192 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Current location, prayer-window and schedule hierarchy for the 4x3 picker entry. -->
+<!--
+     4x3 picker entry: the sun-path card, which is the page this size leads with.
+     Built on the same skyline artwork the widget draws, over the twilight palette.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/prayer_widget_background"
     android:orientation="vertical"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="10dp"
+    android:padding="10dp"
     tools:ignore="HardcodedText">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/prayer_widget_preview_sky">
 
         <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
+            android:layout_width="match_parent"
+            android:layout_height="66dp"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="34dp"
             android:contentDescription="@null"
-            android:src="@drawable/ic_flaticon_location_marker"
-            android:tint="@color/prayer_widget_accent" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:includeFontPadding="false"
-            android:text="Al Safouh Second"
-            android:textColor="@color/prayer_widget_on_background"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:contentDescription="@null"
-            android:src="@drawable/sample_refresh_icon"
-            android:tint="@color/prayer_widget_muted" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:includeFontPadding="false"
-            android:text="Monday, 11 Rabiʿ I 1448 AH"
-            android:textColor="@color/prayer_widget_muted"
-            android:textSize="9sp" />
+            android:scaleType="fitXY"
+            android:src="@drawable/prayer_widget_skyline_v1" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_margin="9dp"
             android:fontFamily="@font/ubuntu_sans"
             android:includeFontPadding="false"
-            android:text="Sunrise  5:53 AM"
-            android:textColor="@color/prayer_widget_muted"
-            android:textSize="9sp" />
-    </LinearLayout>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="Make Time for Isha"
-        android:textColor="@color/prayer_widget_on_background"
-        android:textSize="17sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="1h 43m since Isha"
-        android:textColor="@color/prayer_widget_accent"
-        android:textSize="12sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="7dp"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/prayer_widget_preview_progress_active" />
-
-        <ImageView android:layout_width="4dp" android:layout_height="match_parent" />
-
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="4"
-            android:background="@drawable/prayer_widget_preview_progress_track" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:fontFamily="@font/ubuntu_sans"
-            android:includeFontPadding="false"
-            android:text="Next Prayer"
-            android:textColor="@color/prayer_widget_accent"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:gravity="end"
-            android:includeFontPadding="false"
-            android:text="Fajr in 6h 46m"
-            android:textColor="@color/prayer_widget_on_background"
+            android:text="Today's Prayers"
+            android:textColor="#FFF4F1E6"
             android:textSize="13sp"
             android:textStyle="bold" />
-    </LinearLayout>
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="Today’s Prayers"
-        android:textColor="@color/prayer_widget_muted"
-        android:textSize="9sp"
-        android:textStyle="bold" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:layout_gravity="bottom"
+            android:background="#E6091A18"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Fajr\n4:48 AM"
+                android:textColor="#FFB9C7C0"
+                android:textSize="9sp" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:includeFontPadding="false"
-            android:text="Fajr   4:36 AM"
-            android:textColor="@color/prayer_widget_accent"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Dhuhr\n12:16 PM"
+                android:textColor="#FFB9C7C0"
+                android:textSize="9sp" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="Dhuhr   12:24 PM"
-            android:textColor="@color/prayer_widget_on_background"
-            android:textSize="10sp" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Asr\n3:44 PM"
+                android:textColor="#FFB9C7C0"
+                android:textSize="9sp" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:fontFamily="@font/ubuntu_sans"
-            android:gravity="end"
-            android:includeFontPadding="false"
-            android:text="Asr   3:54 PM"
-            android:textColor="@color/prayer_widget_on_background"
-            android:textSize="10sp" />
-    </LinearLayout>
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Maghrib\n6:24 PM"
+                android:textColor="#FFB9C7C0"
+                android:textSize="9sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Isha\n7:39 PM"
+                android:textColor="#FFFFD86A"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

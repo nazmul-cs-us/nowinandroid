@@ -1,5 +1,6 @@
 package com.starception.submission.widget.samples.collections.layout
 
+import com.starception.submission.widget.LocalWidgetHostBackground
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -34,7 +35,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.TransparentWidgetBackground
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.contentPadding
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.gridCells
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.imageCornerRadius
@@ -109,7 +109,7 @@ fun ImageGridLayout(
 
   Scaffold(
     titleBar = { TitleBar() },
-    backgroundColor = TransparentWidgetBackground,
+    backgroundColor = LocalWidgetHostBackground.current,
     horizontalPadding = contentPadding,
     modifier = GlanceModifier
       .padding(bottom = contentPadding)

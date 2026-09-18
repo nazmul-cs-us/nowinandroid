@@ -1,78 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Current compact prayer-window hero for the 2x2 picker entry. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 2x2 picker entry: the compact hero, on the same artwork the widget uses. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/prayer_widget_background"
-    android:gravity="center_vertical"
-    android:orientation="vertical"
-    android:padding="12dp"
+    android:background="@drawable/prayer_widget_reference_hero_v5"
     tools:ignore="HardcodedText">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:maxLines="2"
-        android:text="Make Time for Isha"
-        android:textColor="@color/prayer_widget_on_background"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="1h 43m since Isha"
-        android:textColor="@color/prayer_widget_accent"
-        android:textSize="11sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="10dp"
-        android:orientation="horizontal">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/prayer_widget_preview_progress_active" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:text="Best Time to Pray"
+            android:textColor="#FFF4F1E6"
+            android:textSize="10sp" />
 
-        <ImageView
-            android:layout_width="3dp"
-            android:layout_height="match_parent" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
-        <ImageView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="3"
-            android:background="@drawable/prayer_widget_preview_progress_track" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="serif"
+            android:includeFontPadding="false"
+            android:text="Isha"
+            android:textColor="#FFF4F1E6"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="serif"
+            android:includeFontPadding="false"
+            android:text="in 28m"
+            android:textColor="#FFD8C9A8"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:text="Next Prayer"
-        android:textColor="@color/prayer_widget_accent"
-        android:textSize="10sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/ubuntu_sans"
-        android:includeFontPadding="false"
-        android:maxLines="1"
-        android:text="Fajr in 6h 46m"
-        android:textColor="@color/prayer_widget_on_background"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-</LinearLayout>
+</FrameLayout>
