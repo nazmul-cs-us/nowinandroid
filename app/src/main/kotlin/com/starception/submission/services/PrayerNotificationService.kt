@@ -1091,9 +1091,7 @@ class PrayerNotificationService : Service() {
                     PrayerTime("Isha", adjustedIsha, isNext = false, isCurrently = false)
                 )
 
-                // TEMP ADHAN-TEST SIMULATION - REMOVE AFTER VERIFYING DOUBLE-ADHAN FIX
-                val now = LocalTime.of(18, 25, 0)
-                Log.d(TAG, "🕐 SIMULATING TIME: $now (adhan double-play verification)")
+                val now = LocalTime.now()
 
                 // Find current prayer (the most recent prayer that has passed TODAY)
                 var rawCurrentPrayer = allAdjustedPrayers.findLast { prayer ->
@@ -1232,8 +1230,7 @@ class PrayerNotificationService : Service() {
      * Phase durations are configurable per-prayer in notification settings.
      */
     private fun calculatePrayerProgress(currentPrayer: PrayerTime, nextPrayer: PrayerTime?): PrayerProgress {
-        // TEMP ADHAN-TEST SIMULATION - REMOVE AFTER VERIFYING DOUBLE-ADHAN FIX
-        val now = LocalTime.of(18, 25, 0)
+        val now = LocalTime.now()
         val prayerStart = currentPrayer.time
 
         // Get per-prayer go-to-mosque duration from settings (configurable by user)

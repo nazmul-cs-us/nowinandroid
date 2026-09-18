@@ -3171,7 +3171,16 @@ private fun InsightPreviewCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        prayerRecap.forEach { prayer ->
+                        prayerRecap.forEachIndexed { index, prayer ->
+                            // Align the first indicator to the start and the last to the
+                            // end of the row so the F (Fajr) circle lines up flush-left
+                            // with the "X prayers complete" text below it, and Isha sits
+                            // flush-right. Middle prayers stay centered in their cells.
+                            val cellAlignment = when (index) {
+                                0 -> Alignment.TopStart
+                                prayerRecap.lastIndex -> Alignment.TopEnd
+                                else -> Alignment.TopCenter
+                            }
                             Box(
                                 modifier = Modifier
                                     // Divide the available row evenly instead of
@@ -3201,7 +3210,7 @@ private fun InsightPreviewCard(
                                             Modifier
                                         },
                                     ),
-                                contentAlignment = Alignment.TopCenter,
+                                contentAlignment = cellAlignment,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
