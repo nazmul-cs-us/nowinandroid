@@ -124,6 +124,11 @@ private val ReferenceHeaderPill = ColorProvider(Color(0xFFF0F2F5))
 private val ReferenceTopHeaderPill = ColorProvider(Color(0xFFEAEAEF))
 private val ReferenceTopHeaderInk = ColorProvider(Color(0xFF110F3B))
 private val ReferenceTopHeaderMuted = ColorProvider(Color(0xFF61607A))
+// Dark-plate variants: the location name and date sit directly on the widget plate, which
+// turns dark when the widget's colour mode is Dark (or follows a dark system). The fixed
+// indigo inks above vanish on that surface, so the on-plate copy switches to light inks.
+private val ReferenceTopHeaderInkOnDark = ColorProvider(Color(0xFFF3F2FB))
+private val ReferenceTopHeaderMutedOnDark = ColorProvider(Color(0xFFC3C2D6))
 private val ReferencePinSurface = ColorProvider(Color(0xFFD9E1DC))
 private val ReferenceHeaderPinInk = ColorProvider(Color(0xFF14352B))
 private val ReferenceSun = ColorProvider(Color(0xFFF5B83D))
@@ -222,11 +227,10 @@ private val TITLE_BAR_HEIGHT = 61.dp
 /** The weather capsule stands a little taller than the discs it sits between. */
 private val REFERENCE_HEADER_CAPSULE_HEIGHT = 40.dp
 
-// Titled layouts finish with an inset card (the next-prayer or timetable surface). Its
-// final row contributes its own visual clearance, so a full 16dp outer bottom inset would
-// double the visible space below the last item. Four dp keeps the perceived content edge
-// aligned with the header's 16dp visible top edge while retaining separation at the shell.
-private val TITLED_WIDGET_BOTTOM_PADDING = 4.dp
+// The content surface must clear the plate's bottom edge by the same amount it clears the
+// left and right edges (WIDGET_PADDING), or the card reads as bottom-heavy — the full-bleed
+// artwork cards (sky timeline, flipper) have no inset of their own to make up the shortfall.
+private val TITLED_WIDGET_BOTTOM_PADDING = WIDGET_PADDING
 
 /**
  * Slack left on any width a type size is fitted against.
@@ -1050,6 +1054,12 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
     } else {
         ReferenceTopHeaderMuted
     }
+    // The location name and date sit directly on the plate (not inside a pill), so they must
+    // follow the plate's day/night colour. The weather capsule and refresh disc keep their
+    // own light backgrounds, so their ink stays fixed regardless of mode.
+    val darkPlate = !transparentHeader && LocalWidgetDarkTheme.current
+    val placeTitleColor = if (darkPlate) ReferenceTopHeaderInkOnDark else titleColor
+    val placeSubtitleColor = if (darkPlate) ReferenceTopHeaderMutedOnDark else subtitleColor
     Box(
         modifier = GlanceModifier
             .size(disc)
@@ -1077,14 +1087,14 @@ private fun androidx.glance.layout.RowScope.ReferenceHeader(
         WidgetText(
             text = state.place,
             size = (15f * scale).sp,
-            color = titleColor,
+            color = placeTitleColor,
             weight = WidgetFontWeight.Bold,
         )
         Spacer(modifier = GlanceModifier.height(2.dp * scale))
         WidgetText(
             text = state.dateLabel,
             size = dateSize,
-            color = subtitleColor,
+            color = placeSubtitleColor,
             weight = if (transparentHeader) {
                 WidgetFontWeight.ShadowMedium
             } else {
