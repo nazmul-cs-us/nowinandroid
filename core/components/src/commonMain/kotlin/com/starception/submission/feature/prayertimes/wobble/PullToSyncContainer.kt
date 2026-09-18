@@ -388,7 +388,7 @@ fun PullToSyncContainer(
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
     // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 40f).dp.coerceAtMost(36.dp)
+    val cornerRadius = (wobbleIntensity * 64f).dp.coerceAtMost(48.dp)
     // A spring can spend a few frames just above zero while a banner opens or
     // closes. Painting the full accent color during those frames produces a
     // stray colored line at the very top before any banner content is visible.
