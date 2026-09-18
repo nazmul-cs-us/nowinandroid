@@ -73,14 +73,14 @@ class NiaPreferencesDataSource @Inject constructor(
                 bookmarkedNewsResources = it.bookmarkedNewsResourceIdsMap.keys,
                 viewedNewsResources = it.viewedNewsResourceIdsMap.keys,
                 followedTopics = it.followedTopicIdsMap.keys,
-                // Unset prefs fall back to COASTAL (the app's launch theme), but an
-                // explicit DEFAULT selection must round-trip — mapping it to COASTAL
-                // here made the Default pill impossible to select.
+                // Unset prefs fall back to DEFAULT (the app's launch theme). An
+                // explicit DEFAULT selection round-trips through THEME_BRAND_DEFAULT
+                // below, so this fallback only applies to brand-new installs.
                 themeBrand = when (it.themeBrand) {
                     null,
                     ThemeBrandProto.THEME_BRAND_UNSPECIFIED,
                     ThemeBrandProto.UNRECOGNIZED,
-                    -> ThemeBrand.COASTAL
+                    -> ThemeBrand.DEFAULT
                     ThemeBrandProto.THEME_BRAND_DEFAULT -> ThemeBrand.DEFAULT
                     ThemeBrandProto.THEME_BRAND_ANDROID -> ThemeBrand.ANDROID
                     ThemeBrandProto.THEME_BRAND_COASTAL -> ThemeBrand.COASTAL
@@ -98,7 +98,9 @@ class NiaPreferencesDataSource @Inject constructor(
                         DarkThemeConfig.LIGHT
                     DarkThemeConfigProto.DARK_THEME_CONFIG_DARK -> DarkThemeConfig.DARK
                 },
-                useDynamicColor = it.useDynamicColor,
+                // Dynamic colour defaults to ENABLED: the stored value is the inverse
+                // "disabled" flag whose unset default (false) therefore means "on".
+                useDynamicColor = !it.dynamicColorDisabled,
                 shouldHideOnboarding = it.shouldHideOnboarding,
                 newsResourceLastOpenedTimes = it.newsResourceLastOpenedTimestampsMap,
                 topicOrder = it.topicOrderIdsList,
@@ -206,7 +208,7 @@ class NiaPreferencesDataSource @Inject constructor(
         
         try {
             userPreferences.updateData {
-                it.copy { this.useDynamicColor = useDynamicColor }
+                it.copy { this.dynamicColorDisabled = !useDynamicColor }
             }
             
             verifyDataStoreWrite(

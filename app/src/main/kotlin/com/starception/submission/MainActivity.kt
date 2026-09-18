@@ -275,11 +275,11 @@ class MainActivity : FragmentActivity() {
             }
             val resolvedBrand = when (uiState) {
                 is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).themeBrand
-                is MainActivityUiState.Loading -> ThemeBrand.COASTAL
+                is MainActivityUiState.Loading -> ThemeBrand.DEFAULT
             }
             val resolvedDisableDynamic = when (uiState) {
                 is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).shouldDisableDynamicTheming
-                is MainActivityUiState.Loading -> true
+                is MainActivityUiState.Loading -> false
             }
             val resolvedCustomSeed = when (uiState) {
                 is MainActivityUiState.Success -> (uiState as MainActivityUiState.Success).customThemeColor
