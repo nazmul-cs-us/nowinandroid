@@ -88,6 +88,19 @@ class AssetDownloadManager @Inject constructor(
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
+    /**
+     * Whether the active connection is metered mobile data (cellular, or a metered
+     * hotspot). Used to warn the user before a CDN download consumes their data plan.
+     */
+    fun isOnCellularData(): Boolean {
+        val cm = context.getSystemService<ConnectivityManager>() ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        val isCellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        val isMetered = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        return isCellular || isMetered
+    }
+
     private fun beginGlobalDownload() {
         synchronized(activeDownloadLock) {
             activeDownloadCount++
