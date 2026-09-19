@@ -340,6 +340,13 @@ class AudioDownloadHelper @Inject constructor(
     }
 
     /**
+     * Whether the device currently has a validated internet connection. Callers gate
+     * on-demand audio downloads on this so offline playback fails fast (and can show a
+     * "No internet connection" message) instead of blocking on network timeouts.
+     */
+    fun isOnline(): Boolean = downloadManager.isOnline()
+
+    /**
      * Get download progress flow for a CDN key.
      */
     fun getDownloadProgress(cdnKey: String) = downloadManager.getDownloadState(cdnKey)

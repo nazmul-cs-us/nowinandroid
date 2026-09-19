@@ -1,7 +1,10 @@
 package com.starception.submission.download
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Log
+import androidx.core.content.getSystemService
 import com.starception.submission.core.assetcache.AssetSource
 import com.starception.submission.core.assetcache.CloudAssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -70,6 +73,20 @@ class AssetDownloadManager @Inject constructor(
 
     private var activeDownloadCount = 0
     private val activeDownloadLock = Any()
+
+    /**
+     * Fast, synchronous connectivity check. Offline network calls (manifest load, asset
+     * download) otherwise block for the full OkHttp timeout — repeated across a Play-All
+     * loop that becomes an apparent hang with no feedback. Callers use this to fail fast
+     * and surface a "No internet connection" message instead.
+     */
+    fun isOnline(): Boolean {
+        val cm = context.getSystemService<ConnectivityManager>() ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
 
     private fun beginGlobalDownload() {
         synchronized(activeDownloadLock) {
@@ -232,6 +249,14 @@ class AssetDownloadManager @Inject constructor(
             return@withContext DownloadState.Completed
         }
 
+        // Not available locally and there's no network: fail fast rather than blocking on
+        // OkHttp timeouts. Callers surface this as "No internet connection".
+        if (!isOnline()) {
+            return@withContext DownloadState.Failed(OFFLINE_ERROR).also {
+                stateFlow.value = it
+            }
+        }
+
         val category = manifest.assets[cdnKey]?.category ?: ""
         _globalDownloadLabel.value = AssetDownloadViewModel.formatCategoryName(category)
         beginGlobalDownload()
@@ -348,6 +373,9 @@ class AssetDownloadManager @Inject constructor(
 
     suspend fun loadManifest(): AssetManifest? = withContext(Dispatchers.IO) {
         cachedManifest?.let { return@withContext it }
+        // Loading the manifest hits the network. Offline, skip it so callers fail fast
+        // instead of blocking on the OkHttp timeout.
+        if (!isOnline()) return@withContext null
         sharedAssets.loadManifest()?.also { manifest ->
             cachedManifest = manifest
             Log.i(TAG, "Loaded shared Cloudflare manifest (version=${manifest.version})")
@@ -421,6 +449,7 @@ class AssetDownloadManager @Inject constructor(
 
     companion object {
         private const val TAG = "AssetDownloadManager"
+        const val OFFLINE_ERROR = "No internet connection"
         private const val CDN_ASSETS_DIR = "cdn_assets"
         private const val BUFFER_SIZE = 8192
         private const val PROGRESS_UPDATE_INTERVAL = 0.01f

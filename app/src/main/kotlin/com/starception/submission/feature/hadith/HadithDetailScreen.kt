@@ -691,6 +691,7 @@ fun HadithDetailScreen(
 
         try {
             var playlistNumber = rangeStart
+            var offlineNotified = false
             while (playlistNumber <= rangeEnd) {
                 if (!bookPlaylistEnabled) break
                 val number = playlistNumber
@@ -781,7 +782,21 @@ fun HadithDetailScreen(
 
                 val completed = if (selectedLanguage == "bn") {
                     var audioFile = audioDownloadHelper.resolveHadithAudioFile(number)
-                    if (audioFile == null) {
+                    if (audioFile == null && !audioDownloadHelper.isOnline()) {
+                        // No cached recording and no network: don't stall the Play-All loop on
+                        // a network timeout for every item. Notify once, then use the on-device
+                        // English Sherpa voice for the rest of the book.
+                        if (!offlineNotified) {
+                            offlineNotified = true
+                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "No internet connection",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    } else if (audioFile == null) {
                         val cdnKey = audioDownloadHelper.getHadithCdnKey(number)
                         isDownloadingAudio = true
                         audioFile = when (audioDownloadHelper.downloadAudio(cdnKey)) {
@@ -1084,6 +1099,16 @@ fun HadithDetailScreen(
 
                                     if (audioFile != null) {
                                         playBengaliRecordingWithIntro(audioFile.absolutePath)
+                                    } else if (!audioDownloadHelper.isOnline()) {
+                                        // Recording isn't cached and there's no network to fetch it.
+                                        // Tell the user why, then fall back to the on-device English
+                                        // Sherpa voice instead of hanging on a network timeout.
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "No internet connection",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                        playExactEnglishBukhariWithSherpa(completeCurrentPlayback)
                                     } else {
                                         // File not available locally - attempt on-demand download
                                         val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)

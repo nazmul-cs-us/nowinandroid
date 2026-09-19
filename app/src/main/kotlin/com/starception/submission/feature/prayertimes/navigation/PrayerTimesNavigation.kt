@@ -32,6 +32,8 @@ fun NavGraphBuilder.prayerTimesScreen(
     onSearchSubmit: (query: String) -> Unit = {},
     isSyncingExternal: Boolean = false,
     onSetSyncing: (Boolean) -> Unit = {},
+    isOffline: Boolean = false,
+    offlineText: String = "No internet connection",
 ) {
     composable<PrayerTimesRoute> {
         PrayerTimesScreen(
@@ -53,6 +55,8 @@ fun NavGraphBuilder.prayerTimesScreen(
             onSearchSubmit = onSearchSubmit,
             isSyncingExternal = isSyncingExternal,
             onSetSyncing = onSetSyncing,
+            isOffline = isOffline,
+            offlineText = offlineText,
         )
     }
 }

@@ -534,6 +534,8 @@ fun PrayerTimesScreen(
     onSearchSubmit: (query: String) -> Unit = {},
     isSyncingExternal: Boolean = false,
     onSetSyncing: (Boolean) -> Unit = {},
+    isOffline: Boolean = false,
+    offlineText: String = "No internet connection",
 ) {
     val screenContext = LocalContext.current
     val dailyReadingPlayer: QuranPlayerViewModel = viewModel(
@@ -2265,6 +2267,8 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
+                isOffline = isOffline,
+                offlineText = offlineText,
                 syncResultText = voiceFeedback,
                 onSyncResultClick = voiceFeedback?.let {
                     {

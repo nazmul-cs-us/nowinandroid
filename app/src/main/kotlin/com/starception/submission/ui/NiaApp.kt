@@ -215,18 +215,8 @@ fun NiaApp(
         ) {
             val snackbarHostState = remember { SnackbarHostState() }
 
-            val isOffline by appState.isOffline.collectAsStateWithLifecycle()
-
-            // If user is not connected to the internet show a snack bar to inform them.
-            val notConnectedMessage = stringResource(R.string.not_connected)
-            LaunchedEffect(isOffline) {
-                if (isOffline) {
-                    snackbarHostState.showSnackbar(
-                        message = notConnectedMessage,
-                        duration = Indefinite,
-                    )
-                }
-            }
+            // Offline is now surfaced inside the PullToSyncContainer strip (see
+            // NiaMainContent) rather than as a bottom snackbar.
 
             CompositionLocalProvider(
                 LocalProfileClick provides { showProfileSheet = true },
@@ -935,6 +925,11 @@ private fun NiaMainContent(
         // Home has its own PullToSyncContainer — suppress app-level banner and
         // pull-to-sync there to avoid doubles. All other pages get both.
         val isOnHome = appState.currentTopLevelDestination == TopLevelDestination.HOME
+        // Connectivity banner: shown in the pull-to-sync strip on every page,
+        // including Home (the always-present app-level container carries it, so
+        // Home's own inner container does not need to know about it).
+        val isOffline by appState.isOffline.collectAsStateWithLifecycle()
+        val notConnectedMessage = stringResource(R.string.not_connected)
         val isDownloadingRaw = if (mainViewModel != null) {
             val d by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
             d
@@ -1074,6 +1069,8 @@ private fun NiaMainContent(
                 },
                 isTtsPreparing = isTtsPreparing,
             ),
+            isOffline = if (isOnHome) false else isOffline,
+            offlineText = notConnectedMessage,
             prayerAlertState = appLevelPrayerAlert,
             forbiddenPrayerTimeState = appLevelForbiddenPrayerTime,
             silentModeState = appLevelSilentModeState,

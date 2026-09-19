@@ -48,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -164,6 +165,9 @@ fun PullToSyncContainer(
     forbiddenPrayerTimeState: ForbiddenPrayerTimeState = ForbiddenPrayerTimeState(),
     weatherWarningText: String? = null,
     onWeatherWarningDismiss: () -> Unit = {},
+    /** When true, the strip carries a persistent "no internet" line. */
+    isOffline: Boolean = false,
+    offlineText: String = "No internet connection",
     silentModeState: SilentModeState = SilentModeState(),
     islamicEventState: IslamicEventState = IslamicEventState(),
     onIslamicEventClick: (IslamicEventState) -> Unit = {},
@@ -312,8 +316,8 @@ fun PullToSyncContainer(
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
     val hasSyncResult = !syncResultText.isNullOrBlank()
-    val hasStatus = isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning || isIslamicEvent ||
-        isSilentMode || hasSyncResult ||
+    val hasStatus = isOffline || isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning ||
+        isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
     val targetHoldHeightDp = if (mediaBar?.isVisible == true || isMushafActive || hasStatus) {
         standardBarHeightDp
@@ -422,6 +426,11 @@ fun PullToSyncContainer(
     // live, the row cycles between them — that is how the bar carries several
     // pieces of information without ever growing a second row.
     val statuses = buildList {
+        // Connectivity trumps everything else: nothing here can succeed offline,
+        // so it owns the row first and stays until the network returns.
+        if (isOffline) {
+            add(SyncBarStatus("offline", offlineText, SyncBarIcon.NoInternet))
+        }
         if (isDownloading) {
             val pct = (animatedDownloadProgress * 100).toInt()
             val label = downloadLabel.ifEmpty { "Downloading" }
@@ -720,7 +729,7 @@ fun PullToSyncContainer(
 }
 
 /** Leading glyph for a [SyncBarStatus]. */
-private enum class SyncBarIcon { Spinner, Sparkle, Retry, WeatherWarning, DoNotDisturb }
+private enum class SyncBarIcon { Spinner, Sparkle, Retry, WeatherWarning, DoNotDisturb, NoInternet }
 
 /**
  * One line of information the top strip can show. Several can be live at once;
@@ -847,6 +856,13 @@ private fun SyncBarStatusRow(
 
             SyncBarIcon.DoNotDisturb -> Icon(
                 imageVector = Icons.Default.DoNotDisturbOn,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+            )
+
+            SyncBarIcon.NoInternet -> Icon(
+                imageVector = Icons.Default.WifiOff,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(18.dp),

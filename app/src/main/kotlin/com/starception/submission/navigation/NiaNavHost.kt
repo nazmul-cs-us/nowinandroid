@@ -26,7 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import com.starception.submission.core.designsystem.animation.NiaTransitions
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.R
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.feature.search.SearchNote
 import androidx.navigation.compose.composable
@@ -171,6 +173,10 @@ fun NiaNavHost(
         val p by mainViewModel.isTtsPreparing.collectAsStateWithLifecycle()
         p
     } else false
+    // Home renders its own PullToSyncContainer, so the offline banner must be routed
+    // here (the app-level container suppresses it on Home to avoid a double top inset).
+    val homeIsOffline by appState.isOffline.collectAsStateWithLifecycle()
+    val homeOfflineText = stringResource(R.string.not_connected)
 
     // Handle deep link for course
     var deepLinkHandled by remember { mutableStateOf(false) }
@@ -466,6 +472,8 @@ fun NiaNavHost(
             forbiddenPrayerTimeState = homeForbiddenPrayerTime,
             isSyncingExternal = homeIsSyncing,
             onSetSyncing = { syncing -> mainViewModel?.setSyncing(syncing) },
+            isOffline = homeIsOffline,
+            offlineText = homeOfflineText,
         )
         courseScreen(
             titleRes = TopLevelDestination.COURSE.titleTextId,
