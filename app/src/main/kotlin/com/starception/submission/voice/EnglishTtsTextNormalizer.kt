@@ -71,8 +71,18 @@ object EnglishTtsTextNormalizer {
      * Sherpa's English phonemizers can silently skip decimal digit tokens. Bukhari numbers
      * are therefore written as words before normalization and synthesis.
      */
+    fun hadithIntro(hadithNumber: Int, collectionName: String): String {
+        val spokenCollectionName = when {
+            collectionName.contains("bukhari", ignoreCase = true) -> "Sahih Al-Bukhari"
+            collectionName.contains("shamai", ignoreCase = true) ||
+                collectionName.contains("shamay", ignoreCase = true) -> "Shamail At-Tirmidhi"
+            else -> collectionName
+        }
+        return "Hadith number ${integerToEnglishWords(hadithNumber)} from $spokenCollectionName."
+    }
+
     fun bukhariIntro(hadithNumber: Int): String =
-        "Hadith number ${integerToEnglishWords(hadithNumber)} from Sahih Al-Bukhari."
+        hadithIntro(hadithNumber, "Sahih Al-Bukhari")
 
     internal fun integerToEnglishWords(number: Int): String {
         require(number >= 0) { "Only non-negative numbers are supported" }

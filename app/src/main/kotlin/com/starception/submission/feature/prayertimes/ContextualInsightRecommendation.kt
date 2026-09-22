@@ -3,6 +3,8 @@ package com.starception.submission.feature.prayertimes
 import com.starception.submission.core.duadatabase.Dua
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.ShamayelBook
+import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.feature.quran.QuranData
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -43,6 +45,10 @@ internal sealed interface ContextualRecommendationTarget {
     data class Bukhari(
         val book: BukhariBook,
     ) : ContextualRecommendationTarget
+
+    data class Shamayel(
+        val book: ShamayelBook,
+    ) : ContextualRecommendationTarget
 }
 
 internal data class ContextualInsightRecommendation(
@@ -58,6 +64,7 @@ private data class RecommendationWindow(
     val surahCandidates: List<Int>,
     val duaChapterCandidates: List<Int>,
     val bukhariBookCandidates: List<Int>,
+    val shamayelBookCandidates: List<Int>,
     val surahTitlePrefix: String,
 )
 
@@ -95,6 +102,22 @@ internal fun buildContextualInsightRecommendation(
     // Rotate by day so recommendations stay stable for the entire day.
     when (date.dayOfYear % 3) {
         0 -> {
+            if (Math.floorMod(date.toEpochDay(), 2L) == 1L) {
+                val candidateIndex = Math.floorMod(
+                    date.toEpochDay(),
+                    window.shamayelBookCandidates.size.toLong(),
+                ).toInt()
+                val book = checkNotNull(
+                    ShamayelBooks.find(window.shamayelBookCandidates[candidateIndex]),
+                )
+                return ContextualInsightRecommendation(
+                    title = "Discover: ${book.nameEnglish}",
+                    supportingText = book.nameBengali,
+                    footerText = "Shama'il At-Tirmidhi · Book ${book.id} · ${book.hadithCount} hadiths",
+                    actionDescription = "Play ${book.nameEnglish} from Shama'il At-Tirmidhi",
+                    target = ContextualRecommendationTarget.Shamayel(book),
+                )
+            }
             val candidateIndex = Math.floorMod(
                 date.toEpochDay(),
                 window.bukhariBookCandidates.size.toLong(),
@@ -122,6 +145,7 @@ internal fun buildContextualInsightRecommendation(
                 )
             }
         }
+
     }
 
     val candidateIndex = Math.floorMod(
@@ -175,6 +199,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         surahCandidates = listOf(93, 94, 91),
         duaChapterCandidates = listOf(1, 27, 130),
         bukhariBookCandidates = listOf(2, 3, 80),
+        shamayelBookCandidates = listOf(1, 34, 40),
         surahTitlePrefix = "Begin gently with",
     )
 
@@ -183,6 +208,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         surahCandidates = listOf(55, 49, 103),
         duaChapterCandidates = listOf(43, 44, 129, 130),
         bukhariBookCandidates = listOf(8, 9, 78),
+        shamayelBookCandidates = listOf(24, 28, 47),
         surahTitlePrefix = "Pause and reflect with",
     )
 
@@ -191,6 +217,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         surahCandidates = listOf(103, 92, 55),
         duaChapterCandidates = listOf(27, 106, 123, 129),
         bukhariBookCandidates = listOf(66, 80, 81),
+        shamayelBookCandidates = listOf(35, 36, 48),
         surahTitlePrefix = "Reset your evening with",
     )
 
@@ -199,6 +226,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         surahCandidates = listOf(67, 32, 112),
         duaChapterCandidates = listOf(28, 29, 30, 34),
         bukhariBookCandidates = listOf(19, 80, 81),
+        shamayelBookCandidates = listOf(38, 39, 40),
         surahTitlePrefix = "Close the day with",
     )
 
@@ -207,6 +235,7 @@ private fun recommendationWindow(time: LocalTime): RecommendationWindow = when (
         surahCandidates = listOf(73, 67, 32),
         duaChapterCandidates = listOf(34, 35, 126, 129),
         bukhariBookCandidates = listOf(19, 80, 81),
+        shamayelBookCandidates = listOf(39, 45, 56),
         surahTitlePrefix = "Take a quiet moment with",
     )
 }

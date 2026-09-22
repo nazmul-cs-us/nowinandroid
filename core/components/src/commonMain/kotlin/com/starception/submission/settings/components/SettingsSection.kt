@@ -56,6 +56,7 @@ fun SettingsSection(
     title: String,
     icon: ImageVector? = null,
     iconGlyph: String? = null,
+    iconContent: (@Composable () -> Unit)? = null,
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     modifier: Modifier = Modifier,
@@ -114,7 +115,7 @@ fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Icon with gradient background
-                if (icon != null || iconGlyph != null) {
+                if (icon != null || iconGlyph != null || iconContent != null) {
                     Box(
                         modifier = Modifier
                             .size(44.dp)
@@ -122,7 +123,9 @@ fun SettingsSection(
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (iconGlyph != null) {
+                        if (iconContent != null) {
+                            iconContent()
+                        } else if (iconGlyph != null) {
                             FlaticonIcon(
                                 glyph = iconGlyph,
                                 contentDescription = null,

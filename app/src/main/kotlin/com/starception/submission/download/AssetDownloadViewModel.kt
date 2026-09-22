@@ -253,16 +253,39 @@ class AssetDownloadViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                downloadManager.downloadCategory(categoryKey, m) { progress, downloaded, total ->
+                val completed = downloadManager.downloadCategory(categoryKey, m) { progress, downloaded, total ->
                     viewModelScope.launch {
                         refreshCategoryStates()
                     }
+                }
+                // Room copies downloadable hadith databases into databases/ on first open.
+                // Re-downloading the source alone would otherwise leave that older managed copy
+                // active, so newly corrected translations/explanations would not appear.
+                hadithDatabaseFileForCategory(categoryKey).takeIf { completed }?.let { databaseFile ->
+                    com.starception.submission.core.hadithdatabase.HadithDatabase.clearInstance(
+                        context,
+                        databaseFile,
+                    )
                 }
                 refreshCategoryStates()
             } catch (e: Exception) {
                 Log.e(TAG, "Error downloading category $categoryKey", e)
             }
         }
+    }
+
+    private fun hadithDatabaseFileForCategory(categoryKey: String): String? = when (categoryKey) {
+        "hadith_sahih_bukhari" -> "sahih_bukhari.db"
+        "hadith_sahih_muslim" -> "sahih_muslim.db"
+        "hadith_sunan_abu_dawud" -> "sunan_abu_dawud.db"
+        "hadith_sunan_tirmidhi" -> "sunan_tirmidhi.db"
+        "hadith_shamayele_tirmidhi" -> "shamayele_tirmidhi_complete.db"
+        "hadith_sunan_nasai" -> "sunan_nasai.db"
+        "hadith_sunan_ibn_majah" -> "sunan_ibn_majah.db"
+        "hadith_musnad_ahmad" -> "musnad_ahmad.db"
+        "hadith_muwatta_malik" -> "muwatta_malik.db"
+        "hadith_sunan_darimi" -> "sunan_darimi.db"
+        else -> null
     }
 
     /**
@@ -335,6 +358,7 @@ class AssetDownloadViewModel @Inject constructor(
             "hadith_sahih_muslim" -> "Sahih Muslim"
             "hadith_sunan_abu_dawud" -> "Sunan Abu Dawud"
             "hadith_sunan_tirmidhi" -> "Jami at-Tirmidhi"
+            "hadith_shamayele_tirmidhi" -> "Shamai'l At-Tirmidhi"
             "hadith_sunan_nasai" -> "Sunan an-Nasa'i"
             "hadith_sunan_ibn_majah" -> "Sunan Ibn Majah"
             "hadith_musnad_ahmad" -> "Musnad Ahmad"
@@ -404,6 +428,7 @@ class AssetDownloadViewModel @Inject constructor(
             "hadith_sahih_muslim" -> "Second most authentic, 7,453 hadith"
             "hadith_sunan_abu_dawud" -> "Focus on legal rulings, 5,274 hadith"
             "hadith_sunan_tirmidhi" -> "Includes grading of hadith, 3,956 hadith"
+            "hadith_shamayele_tirmidhi" -> "56 chapters and 322 hadiths on the Prophet's character and appearance"
             "hadith_sunan_nasai" -> "Known for strict criteria, 5,758 hadith"
             "hadith_sunan_ibn_majah" -> "Covers fiqh topics, 4,341 hadith"
             "hadith_musnad_ahmad" -> "Largest collection, 27,647 hadith"

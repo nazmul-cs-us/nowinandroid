@@ -22,10 +22,13 @@ import java.util.Locale
  */
 object NewsDbGenerator {
     private const val TAG = "NewsDbGenerator"
+    private val RESOLVED_ASSET_ROOTS =
+        listOf("cdn_assets", "extracted_assets", "bundled_asset_fallback")
 
     // Topic IDs
     private const val TOPIC_HOLY_QURAN = 7
     private const val TOPIC_SAHIH_BUKHARI = 8
+    private const val TOPIC_SHAMAYELE_TIRMIDHI = 9
     private const val TOPIC_QURANIC_DUAS = 11
     private const val TOPIC_MORNING_EVENING = 21
     private const val TOPIC_PRAYER = 22
@@ -132,18 +135,33 @@ object NewsDbGenerator {
      * Checks CDN-downloaded files first, then falls back to bundled APK assets.
      */
     private fun getAssetDbPath(context: Context, dbName: String): String? {
-        // Check CDN-downloaded files in multiple locations
+        // Check downloaded and previously extracted files in every location used by the app's
+        // asset resolvers. These files survive an APK update and are still valid app data.
         val cdnPaths = listOf(
+            "databases/hadith/$dbName", // For downloadable Hadith collections
             "databases/quran/$dbName",  // For quran.db, quran_enhanced.db
             "databases/$dbName"          // For quranic_duas.db, fortress_of_the_muslim_v2.db
         )
 
-        for (cdnKey in cdnPaths) {
-            val cdnFile = File(context.filesDir, "cdn_assets/$cdnKey")
-            if (cdnFile.exists() && cdnFile.length() > 0) {
-                Log.d(TAG, "Using CDN-downloaded database: $dbName from $cdnKey (${cdnFile.length()} bytes)")
-                return cdnFile.absolutePath
+        for (storageRoot in RESOLVED_ASSET_ROOTS) {
+            for (cdnKey in cdnPaths) {
+                val resolvedFile = File(context.filesDir, "$storageRoot/$cdnKey")
+                if (resolvedFile.isFile && resolvedFile.length() > 0L) {
+                    Log.d(
+                        TAG,
+                        "Using resolved database: $dbName from $storageRoot/$cdnKey " +
+                            "(${resolvedFile.length()} bytes)",
+                    )
+                    return resolvedFile.absolutePath
+                }
             }
+        }
+
+        // Room may already have copied the source database before it moved out of the APK.
+        val installedDatabase = context.getDatabasePath(dbName)
+        if (installedDatabase.isFile && installedDatabase.length() > 0L) {
+            Log.d(TAG, "Using installed database: ${installedDatabase.absolutePath}")
+            return installedDatabase.absolutePath
         }
 
         // Fall back to bundled APK asset
@@ -160,7 +178,16 @@ object NewsDbGenerator {
                 }
             }
 
-            outFile.absolutePath
+            if (outFile.length() > 0L) {
+                outFile.absolutePath
+            } else {
+                // CDN-only assets are represented by 0-byte APK placeholders. Never hand one to
+                // SQLite: it opens successfully but has no schema and fails later with misleading
+                // "no such table" errors.
+                outFile.delete()
+                Log.w(TAG, "Bundled database is an empty placeholder: $dbName")
+                null
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Database not available (CDN or bundled): $dbName", e)
             null
@@ -441,11 +468,19 @@ object NewsDbGenerator {
             // Generate Bukhari Hadiths from JSON
             var bukhariCount = 0
             try {
-                // Check CDN-downloaded file first, then fall back to bundled asset
-                val cdnJsonFile = File(context.filesDir, "cdn_assets/json/sahih_bukhari.json")
-                val jsonString = if (cdnJsonFile.exists() && cdnJsonFile.length() > 0) {
-                    Log.d(TAG, "Using CDN-downloaded sahih_bukhari.json (${cdnJsonFile.length()} bytes)")
-                    cdnJsonFile.readText()
+                // Use the same persistent locations as the download manager. In particular, an
+                // extracted copy can remain valid after the asset is removed from a newer APK.
+                val resolvedJsonFile = RESOLVED_ASSET_ROOTS
+                    .asSequence()
+                    .map { root -> File(context.filesDir, "$root/json/sahih_bukhari.json") }
+                    .firstOrNull { it.isFile && it.length() > 0L }
+                val jsonString = if (resolvedJsonFile != null) {
+                    Log.d(
+                        TAG,
+                        "Using resolved sahih_bukhari.json " +
+                            "(${resolvedJsonFile.length()} bytes)",
+                    )
+                    resolvedJsonFile.readText()
                 } else {
                     context.assets.open("sahih_bukhari.json").bufferedReader().use { it.readText() }
                 }
@@ -504,6 +539,82 @@ object NewsDbGenerator {
                 Log.e(TAG, "Failed to generate Bukhari hadiths", e)
             }
 
+            // Generate Shama'il at-Tirmidhi hadiths from its multilingual delivery database.
+            var shamayeleCount = 0
+            try {
+                val shamayeleDbPath = getAssetDbPath(context, "shamayele_tirmidhi_complete.db")
+                if (shamayeleDbPath != null) {
+                    val shamayeleDb = SQLiteDatabase.openDatabase(
+                        shamayeleDbPath,
+                        null,
+                        SQLiteDatabase.OPEN_READONLY,
+                    )
+                    try {
+                        val cursor = shamayeleDb.rawQuery(
+                            """
+                            SELECT d.hadith_id, d.hadith_no_in_book, d.chapter_id,
+                                   COALESCE(d.chapter_title_en, c.title_en, ''),
+                                   COALESCE(d.chapter_title_bn, c.title_bn, ''),
+                                   COALESCE(d.english_text, ''), COALESCE(d.bengali_text, '')
+                            FROM hadith_details d
+                            LEFT JOIN chapters c ON c.chapter_no = d.chapter_id
+                            ORDER BY d.hadith_id
+                            """.trimIndent(),
+                            null,
+                        )
+                        cursor.use {
+                            while (it.moveToNext()) {
+                                val hadithId = it.getInt(0)
+                                val numberInBook = it.getInt(1)
+                                val chapterId = it.getInt(2)
+                                val chapterEnglish = it.getString(3).orEmpty()
+                                val chapterBengali = it.getString(4).orEmpty()
+                                val englishText = it.getString(5).orEmpty()
+                                val bengaliText = it.getString(6).orEmpty()
+                                val chapterTitle = chapterEnglish.ifBlank { chapterBengali }
+                                val title = "Hadith $numberInBook · Chapter $chapterId: $chapterTitle"
+                                val content = buildString {
+                                    append(englishText)
+                                    if (englishText.isNotBlank() && bengaliText.isNotBlank()) {
+                                        append("\n\n")
+                                    }
+                                    append(bengaliText)
+                                }
+
+                                newsResources.add(
+                                    NewsResourceEntity(
+                                        id = 11000 + hadithId,
+                                        title = title,
+                                        content = content,
+                                        url = "hadith://shamayele_tirmidhi_complete/$hadithId",
+                                        headerImageUrl = "drawable://masjid_al_nawabi",
+                                        publishDate = now,
+                                        type = "Hadith 📖",
+                                        isSystem = 1,
+                                        isUserCreated = 0,
+                                        source = "Shamai'l At-Tirmidhi",
+                                        createdAt = now,
+                                        updatedAt = now,
+                                    ),
+                                )
+                                crossRefs.add(
+                                    NewsTopicCrossRef(
+                                        newsId = 11000 + hadithId,
+                                        topicId = TOPIC_SHAMAYELE_TIRMIDHI,
+                                    ),
+                                )
+                                shamayeleCount++
+                            }
+                        }
+                    } finally {
+                        shamayeleDb.close()
+                    }
+                }
+                Log.d(TAG, "Generated $shamayeleCount Shama'il at-Tirmidhi hadiths")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to generate Shama'il at-Tirmidhi hadiths", e)
+            }
+
             // Clear and insert only after all sources generated cleanly, so a failed
             // generation never leaves news.db emptier than it started.
             dao.deleteAllNewsTopics()
@@ -514,7 +625,12 @@ object NewsDbGenerator {
 
             val duration = System.currentTimeMillis() - startTime
             Log.d(TAG, "News.db regeneration completed in ${duration}ms")
-            Log.d(TAG, "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, $fortressCount Fortress Duas, $bukhariCount Bukhari Hadiths")
+            Log.d(
+                TAG,
+                "Generated: $surahCount Surahs, $quranicDuaCount Quranic Duas, " +
+                    "$fortressCount Fortress Duas, $bukhariCount Bukhari Hadiths, " +
+                    "$shamayeleCount Shama'il Hadiths",
+            )
             Log.d(TAG, "Total topic mappings: ${crossRefs.size}")
 
             RegenerationResult(
@@ -523,6 +639,7 @@ object NewsDbGenerator {
                 quranicDuaCount = quranicDuaCount,
                 fortressDuaCount = fortressCount,
                 bukhariHadithCount = bukhariCount,
+                shamayeleHadithCount = shamayeleCount,
                 topicMappings = crossRefs.size,
                 durationMs = duration
             )
@@ -545,10 +662,12 @@ data class RegenerationResult(
     val quranicDuaCount: Int = 0,
     val fortressDuaCount: Int = 0,
     val bukhariHadithCount: Int = 0,
+    val shamayeleHadithCount: Int = 0,
     val topicMappings: Int = 0,
     val durationMs: Long = 0,
     val error: String? = null
 ) {
     val totalNewsResources: Int
-        get() = surahCount + quranicDuaCount + fortressDuaCount + bukhariHadithCount
+        get() = surahCount + quranicDuaCount + fortressDuaCount + bukhariHadithCount +
+            shamayeleHadithCount
 }

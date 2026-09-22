@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x2 picker entry: the same lantern-and-reading composition as the widget. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/prayer_widget_devotional_panel"
+    android:orientation="horizontal"
+    android:paddingEnd="9dp"
+    tools:ignore="HardcodedText">
+
+    <FrameLayout
+        android:layout_width="84dp"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/prayer_widget_devotional_lantern_v2" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="9dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="serif"
+            android:includeFontPadding="false"
+            android:letterSpacing="0.12"
+            android:lineSpacingExtra="-1dp"
+            android:text="SMALL\nDHIKR\nA BRIGHTER\nTOMORROW"
+            android:textColor="#FFF4F1E6"
+            android:textSize="7sp" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="9dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingVertical="7dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:text="Dua &amp; Hadith"
+                android:textColor="#FF0B5B4C"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/prayer_widget_chip_background"
+                android:fontFamily="@font/ubuntu_sans"
+                android:includeFontPadding="false"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="After Fajr"
+                android:textColor="#FF315E52"
+                android:textSize="7sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fontFamily="serif"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:maxLines="2"
+            android:text="اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا"
+            android:textColor="#FF0B5B4C"
+            android:textDirection="rtl"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:maxLines="2"
+            android:text="“O Allah, I ask You for beneficial knowledge and good provision.”"
+            android:textColor="#FF25362F"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/ubuntu_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Fortress of the Muslim · Prayer"
+            android:textColor="#FF52675F"
+            android:textSize="7sp" />
+    </LinearLayout>
+</LinearLayout>

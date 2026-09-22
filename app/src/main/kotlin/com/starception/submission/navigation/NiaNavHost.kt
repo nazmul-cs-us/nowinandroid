@@ -49,7 +49,12 @@ import com.starception.submission.feature.hadith.hadithDetailScreen
 import com.starception.submission.feature.hadith.bukhariBookScreen
 import com.starception.submission.feature.hadith.navigateToBukhariBook
 import com.starception.submission.feature.hadith.navigateToBukhariBookPlayback
+import com.starception.submission.feature.hadith.navigateToBukhariCollectionPlayback
+import com.starception.submission.feature.hadith.navigateToShamayelBook
+import com.starception.submission.feature.hadith.navigateToShamayelBookPlayback
+import com.starception.submission.feature.hadith.navigateToShamayelCollectionPlayback
 import com.starception.submission.feature.hadith.navigateToHadithDetail
+import com.starception.submission.feature.hadith.shamayelBookScreen
 import com.starception.submission.feature.salah.datacollection.navigateToSalahDataCollection
 import com.starception.submission.feature.salah.datacollection.navigateToSalahLiveRecording
 import com.starception.submission.feature.salah.datacollection.navigateToSalahPrayerReview
@@ -326,7 +331,11 @@ fun NiaNavHost(
             },
             onBukhariBookClick = navController::navigateToBukhariBook,
             onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
-            // Show a download card under the header for content-backed topics (Quran/Bukhari)
+            onBukhariCollectionPlayClick = navController::navigateToBukhariCollectionPlayback,
+            onShamayelBookClick = navController::navigateToShamayelBook,
+            onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
+            onShamayelCollectionPlayClick = navController::navigateToShamayelCollectionPlayback,
+            // Show a download card under the header for downloadable Quran/Hadith topics.
             // whose database isn't downloaded yet.
             belowHeaderContent = { topicName ->
                 com.starception.submission.download.TopicMissingContentCard(topicName)
@@ -446,6 +455,10 @@ fun NiaNavHost(
             },
             onBukhariBookClick = navController::navigateToBukhariBook,
             onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
+            onBukhariCollectionPlayClick = navController::navigateToBukhariCollectionPlayback,
+            onShamayelBookClick = navController::navigateToShamayelBook,
+            onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
+            onShamayelCollectionPlayClick = navController::navigateToShamayelCollectionPlayback,
         )
         prayerTimesScreen(
             onSearchClick = { appState.navigateToSearch() },
@@ -455,6 +468,7 @@ fun NiaNavHost(
             onSurahClickWithAyah = { surahNumber, ayahNumber -> navController.navigateToSurah(surahNumber, scrollToAyah = ayahNumber) },
             onFortressDuaClick = navController::navigateToFortressDua,
             onBukhariBookPlayClick = navController::navigateToBukhariBookPlayback,
+            onShamayelBookPlayClick = navController::navigateToShamayelBookPlayback,
             onMediaSourceClick = { source -> navController.navigateToMediaSourceDetail(source) },
             downloadProgress = homeDownloadProgress,
             downloadLabel = homeDownloadLabel,
@@ -536,6 +550,17 @@ fun NiaNavHost(
                 )
             },
             onPlayAllClick = navController::navigateToBukhariBookPlayback,
+        )
+        shamayelBookScreen(
+            onBackClick = navController::popBackStack,
+            onHadithClick = { hadithNumber ->
+                navController.navigateToHadithDetail(
+                    collectionName = "Shamai'l At-Tirmidhi",
+                    hadithNumber = hadithNumber,
+                    databaseFile = "shamayele_tirmidhi_complete.db",
+                )
+            },
+            onPlayAllClick = navController::navigateToShamayelBookPlayback,
         )
         // Hadith detail screen
         hadithDetailScreen(

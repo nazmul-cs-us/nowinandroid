@@ -117,6 +117,18 @@ class PrayerTimesFullWidgetReceiver : BasePrayerWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = PrayerTimesFullWidget()
 }
 
+class PrayerNextWidgetReceiver : BasePrayerWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = PrayerNextWidget()
+}
+
+class PrayerTimelineWidgetReceiver : BasePrayerWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = PrayerTimelineWidget()
+}
+
+class PrayerDevotionalWidgetReceiver : BasePrayerWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = PrayerDevotionalWidget()
+}
+
 /**
  * Pushes fresh content into every placed prayer widget, at every size.
  *
@@ -149,6 +161,9 @@ object PrayerWidgetUpdater {
             PrayerTimesWidget(),
             PrayerTimesLargeWidget(),
             PrayerTimesFullWidget(),
+            PrayerNextWidget(),
+            PrayerTimelineWidget(),
+            PrayerDevotionalWidget(),
             // The insight card reads the same generator and carries the same two moving
             // figures, so it goes stale on the same clock. Left out of this list it had
             // no cadence at all: its provider declares updatePeriodMillis=0, so nothing

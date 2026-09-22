@@ -1,5 +1,6 @@
 package com.starception.submission.settings
 
+import com.starception.submission.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -8,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,12 +57,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -309,8 +313,15 @@ fun UnifiedSettingsScreen(
                 item {
                     SettingsSection(
                         title = "Widgets",
-                        subtitle = "Background, opacity & colors",
-                        iconGlyph = FlaticonIcons.QUICK_ACTION,
+                        subtitle = "Add widgets, background & colors",
+                        iconContent = {
+                            Image(
+                                painter = painterResource(R.drawable.flaticon_widget_8338851),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.size(22.dp),
+                            )
+                        },
                         isExpanded = expandedSections.contains("widget"),
                         onToggleExpanded = { viewModel.toggleSection("widget") },
                     ) {

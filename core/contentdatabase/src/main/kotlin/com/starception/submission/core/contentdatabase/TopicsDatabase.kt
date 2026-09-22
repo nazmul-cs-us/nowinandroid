@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -40,6 +41,12 @@ abstract class TopicsDatabase : RoomDatabase() {
                 )
                     .createFromAsset("databases/$DATABASE_NAME")
                     .fallbackToDestructiveMigration()
+                    .addCallback(object : Callback() {
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            super.onOpen(db)
+                            ensureShamayeleTopic(db)
+                        }
+                    })
                     .build()
                 INSTANCE = instance
                 instance
@@ -52,6 +59,32 @@ abstract class TopicsDatabase : RoomDatabase() {
         fun closeDatabase() {
             INSTANCE?.close()
             INSTANCE = null
+        }
+
+        /** Adds the system topic to databases created by an older app version. */
+        private fun ensureShamayeleTopic(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO topics (
+                    id, name, short_description, long_description, image_url, url, icon,
+                    is_system, is_user_created, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any?>(
+                    9,
+                    "Shamai'l At-Tirmidhi",
+                    "الشمائل المحمدية",
+                    "Explore 56 books and 322 hadiths describing the Prophet's appearance, " +
+                        "character, manners, and daily life.",
+                    "https://cdn-icons-png.flaticon.com/512/4556/4556746.png",
+                    null,
+                    null,
+                    1,
+                    0,
+                    null,
+                    null,
+                ),
+            )
         }
 
         /**

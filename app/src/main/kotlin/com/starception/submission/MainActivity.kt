@@ -61,6 +61,7 @@ import com.starception.submission.core.translation.LocationBasedTranslationDefau
 import com.starception.submission.core.ui.LocalTimeZone
 import com.starception.submission.ui.NiaApp
 import com.starception.submission.widget.WidgetNavigationBus
+import com.starception.submission.widget.WidgetDiscoveryPrompt
 import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.services.PrayerNotificationService
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
@@ -353,6 +354,7 @@ class MainActivity : FragmentActivity() {
                             mainViewModel = viewModel,
                             deepLinkCourseId = deepLinkCourseId,
                         )
+                        WidgetDiscoveryPrompt()
                     }
                 }
             }

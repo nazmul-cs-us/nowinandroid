@@ -229,12 +229,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Launcher callback for in-app widget pin requests. -->
+        <receiver
+            android:name=".widget.WidgetPinnedReceiver"
+            android:exported="false" />
+
         <!-- Home-screen prayer times widgets (Glance).
 
-             Five receivers, one per size, because the launcher binds widgets by provider
-             component: a single receiver can only ever produce a single picker entry.
-             They all render the same responsive layouts and all stay resizable — the
-             only difference is the footprint each one lands at when dropped.
+             Five receivers provide responsive starting sizes, and three more expose the
+             combined design's next-prayer, timeline, and devotional cards independently.
+             The launcher binds widgets by provider component, so every picker entry needs
+             its own receiver.
 
              Exported because the launcher process is what delivers APPWIDGET_UPDATE. The
              clock actions are on each filter rather than in a separate receiver so a
@@ -318,6 +323,54 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/prayer_times_widget_full_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerNextWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_next_standalone">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_next_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerTimelineWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_timeline_standalone">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_timeline_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PrayerDevotionalWidgetReceiver"
+            android:exported="true"
+            android:label="@string/prayer_widget_label_devotional_standalone">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_devotional_widget_info" />
         </receiver>
 
 

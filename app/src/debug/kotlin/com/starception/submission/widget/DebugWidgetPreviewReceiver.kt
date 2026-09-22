@@ -21,11 +21,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.util.Log
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.glance.ExperimentalGlanceApi
-import androidx.glance.appwidget.AppWidgetId
-import androidx.glance.appwidget.compose
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Renders each placed-size of the prayer widget to a PNG, for use as its picker preview.
+ * Renders every widget at its placed size to a PNG, for use as its picker preview.
  *
  * The picker previews were hand-built layouts that only resembled the widget — a location
  * row, a progress bar, colours picked by eye. The widget can render itself at any size
@@ -52,37 +47,28 @@ import kotlinx.coroutines.withContext
  */
 class DebugWidgetPreviewReceiver : BroadcastReceiver() {
 
-    @OptIn(ExperimentalGlanceApi::class)
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
-            val targets = listOf(
-                Triple("tiny", PrayerTimesTinyWidget(), DpSize(162.dp, 111.dp)),
-                Triple("small", PrayerTimesSmallWidget(), DpSize(162.dp, 222.dp)),
-                Triple("medium", PrayerTimesWidget(), DpSize(325.dp, 222.dp)),
-                Triple("large", PrayerTimesLargeWidget(), DpSize(325.dp, 334.dp)),
-                Triple("full", PrayerTimesFullWidget(), DpSize(406.dp, 445.dp)),
-            )
             val dir = File(context.getExternalFilesDir(null), "previews").apply { mkdirs() }
-            targets.forEachIndexed { index, (name, widget, size) ->
+            widgetPreviewSpecs.forEach { spec ->
                 runCatching {
-                    // A synthetic negative id: compose() registers a session per id and
-                    // must not collide with a real placed widget's.
-                    val views = widget.compose(
-                        context = context,
-                        id = AppWidgetId(-20_000 - index),
-                        size = size,
-                    )
-                    val bitmap = withContext(Dispatchers.Main) { rasterise(context, views, size) }
+                    val views = spec.previewRemoteViews(context, slot = 3)
+                    val bitmap = withContext(Dispatchers.Main) {
+                        rasterise(context, views, spec.size)
+                    }
                     if (bitmap == null) {
-                        Log.w("WidgetPreview", "$name rasterised to nothing")
+                        Log.w("WidgetPreview", "${spec.key} rasterised to nothing")
                         return@runCatching
                     }
-                    File(dir, "preview_$name.png").outputStream().use {
+                    File(dir, "preview_${spec.key}.png").outputStream().use {
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                     }
-                    Log.i("WidgetPreview", "$name -> ${bitmap.width}x${bitmap.height}")
-                }.onFailure { Log.e("WidgetPreview", "$name failed", it) }
+                    Log.i(
+                        "WidgetPreview",
+                        "${spec.key} -> ${bitmap.width}x${bitmap.height}",
+                    )
+                }.onFailure { Log.e("WidgetPreview", "${spec.key} failed", it) }
             }
             pending.finish()
         }

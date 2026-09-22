@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.starception.submission.download.AssetRepository
 
@@ -16,7 +17,7 @@ import com.starception.submission.download.AssetRepository
  */
 @Database(
     entities = [HadithEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class HadithDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class HadithDatabase : RoomDatabase() {
             "Bukhari" to "sahih_bukhari.db",
             "Muslim" to "sahih_muslim.db",
             "Tirmidhi" to "sunan_tirmidhi.db",
+            "Shamai'l At-Tirmidhi" to "shamayele_tirmidhi_complete.db",
             "Abu Dawud" to "sunan_abu_dawud.db",
             "Nasa'i" to "sunan_nasai.db",
             "Ibn Majah" to "sunan_ibn_majah.db",
@@ -104,6 +106,10 @@ abstract class HadithDatabase : RoomDatabase() {
             }
 
             return builder
+                // Version 2 adds source-specific auxiliary tables (such as
+                // hadith_details) without changing Room's hadiths table.
+                // A no-op migration keeps version-1 collections intact.
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .setJournalMode(JournalMode.TRUNCATE)
                 .addCallback(object : Callback() {
@@ -119,39 +125,41 @@ abstract class HadithDatabase : RoomDatabase() {
          * Get collection metadata from database
          */
         suspend fun getCollectionMetadata(context: Context, databaseFile: String): HadithCollectionMetadata? {
+            var temporaryFile: java.io.File? = null
             return try {
-                val dbPath = context.getDatabasePath("hadith_temp_meta.db")
-                if (dbPath.exists()) dbPath.delete()
-
-                // Copy from assets to temp location
-                context.assets.open("$HADITH_DB_PATH$databaseFile").use { input ->
-                    dbPath.parentFile?.mkdirs()
-                    java.io.FileOutputStream(dbPath).use { output ->
-                        input.copyTo(output)
+                val sourceFile = resolveDownloadedDatabaseFile(context, databaseFile) ?: run {
+                    // Use a unique cache file because metadata for multiple collections can be
+                    // requested concurrently. The previous shared filename could be deleted while
+                    // another reader still had it open.
+                    java.io.File.createTempFile("hadith_metadata_", ".db", context.cacheDir).also {
+                        temporaryFile = it
+                        context.assets.open("$HADITH_DB_PATH$databaseFile").use { input ->
+                            java.io.FileOutputStream(it).use { output -> input.copyTo(output) }
+                        }
                     }
                 }
 
                 val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                    dbPath.absolutePath,
+                    sourceFile.absolutePath,
                     null,
                     android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                 )
 
-                var metadata: HadithCollectionMetadata? = null
-                val cursor = db.rawQuery("SELECT key, value FROM metadata", null)
-
                 val metaMap = mutableMapOf<String, String>()
-                while (cursor.moveToNext()) {
-                    val key = cursor.getString(0)
-                    val value = cursor.getString(1)
-                    metaMap[key] = value
+                try {
+                    db.rawQuery("SELECT key, value FROM metadata", null).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val key = cursor.getString(0)
+                            val value = cursor.getString(1)
+                            metaMap[key] = value
+                        }
+                    }
+                } finally {
+                    db.close()
                 }
-                cursor.close()
-                db.close()
-                dbPath.delete()
 
                 if (metaMap.isNotEmpty()) {
-                    metadata = HadithCollectionMetadata(
+                    HadithCollectionMetadata(
                         collectionId = metaMap["collection_id"]?.toIntOrNull() ?: 0,
                         name = metaMap["name"] ?: "",
                         nameArabic = metaMap["name_arabic"] ?: "",
@@ -161,12 +169,12 @@ abstract class HadithDatabase : RoomDatabase() {
                         hasElaboration = metaMap["has_elaboration"] == "1",
                         hadithCount = metaMap["hadith_count"]?.toIntOrNull() ?: 0
                     )
-                }
-
-                metadata
+                } else null
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Error getting collection metadata", e)
                 null
+            } finally {
+                temporaryFile?.delete()
             }
         }
 
@@ -233,12 +241,16 @@ abstract class HadithDatabase : RoomDatabase() {
             instances.clear()
         }
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) = Unit
+        }
+
         private fun resolveDownloadedDatabaseFile(context: Context, databaseFile: String): java.io.File? {
             val cdnKey = "$HADITH_DB_PATH$databaseFile"
             return assetRepo?.getDatabaseFile(cdnKey)
                 ?: run {
                     val cdnFile = java.io.File(context.applicationContext.filesDir, "cdn_assets/$cdnKey")
-                    if (cdnFile.exists()) {
+                    if (cdnFile.isFile && cdnFile.length() > 0L) {
                         android.util.Log.d(TAG, "📂 Found CDN-downloaded DB directly: ${cdnFile.absolutePath}")
                         cdnFile
                     } else {

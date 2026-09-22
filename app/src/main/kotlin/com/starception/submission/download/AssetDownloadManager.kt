@@ -109,11 +109,10 @@ class AssetDownloadManager @Inject constructor(
     }
 
     fun isAssetAvailable(cdnKey: String): Boolean {
-        // First check if downloaded to cdn_assets directory
-        val file = getAssetFile(cdnKey)
-        if (file != null && file.exists() && file.length() > 0) {
-            return true
-        }
+        // CloudAssetRepository may resolve an APK-bundled asset to an internal fallback file.
+        // Keep this synchronous UI check in agreement with that resolver, including across app
+        // updates where the preserved fallback remains valid after the APK stops bundling it.
+        if (getLocallyAvailableAssetFile(cdnKey) != null) return true
 
         // Also check if bundled in APK assets
         return isAssetBundled(cdnKey)
@@ -139,6 +138,26 @@ class AssetDownloadManager @Inject constructor(
         if (!file.exists() || file.length() == 0L) return null
         if (!hasExpectedSize(file, cdnKey)) return null
         return file
+    }
+
+    /**
+     * Returns any persistent file that the app can consume for [cdnKey].
+     *
+     * Besides a CDN download, assets can already have been extracted by [AssetRepository] or by
+     * [AndroidAssetPlatform]. Ignoring those copies made a completed download immediately appear
+     * missing again in the UI.
+     */
+    fun getLocallyAvailableAssetFile(cdnKey: String): File? {
+        getAssetFile(cdnKey)?.let { return it }
+
+        val normalizedKey = cdnKey.trimStart('/')
+        val fallbackFiles = listOf(
+            File(context.filesDir, "extracted_assets/$normalizedKey"),
+            File(context.filesDir, "bundled_asset_fallback/$normalizedKey"),
+        )
+        return fallbackFiles.firstOrNull { file ->
+            file.isFile && file.length() > 0L && hasExpectedSize(file, cdnKey)
+        }
     }
 
     /**

@@ -56,6 +56,7 @@ abstract class TopicsDatabase : RoomDatabase() {
 
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
+                            ensureShamayeleTopic(db)
                             android.util.Log.d(TAG, "Topics database opened")
                             logDatabaseInfo(db)
                         }
@@ -98,6 +99,32 @@ abstract class TopicsDatabase : RoomDatabase() {
             INSTANCE?.close()
             INSTANCE = null
             android.util.Log.d(TAG, "Topics database closed")
+        }
+
+        /** Adds the system topic to databases created by an older app version. */
+        private fun ensureShamayeleTopic(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO topics (
+                    id, name, short_description, long_description, image_url, url, icon,
+                    is_system, is_user_created, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any?>(
+                    9,
+                    "Shamai'l At-Tirmidhi",
+                    "الشمائل المحمدية",
+                    "Explore 56 books and 322 hadiths describing the Prophet's appearance, " +
+                        "character, manners, and daily life.",
+                    "https://cdn-icons-png.flaticon.com/512/4556/4556746.png",
+                    null,
+                    null,
+                    1,
+                    0,
+                    null,
+                    null,
+                ),
+            )
         }
 
         /**

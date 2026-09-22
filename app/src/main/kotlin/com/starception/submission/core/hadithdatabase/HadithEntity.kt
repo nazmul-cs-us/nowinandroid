@@ -37,7 +37,13 @@ data class Hadith(
     val collectionNameArabic: String = "",
     val collectionNameEnglish: String = "",
     val author: String = "",
-    val authorArabic: String = ""
+    val authorArabic: String = "",
+    // Rich, source-authored fields available in the Shama'il database. Keeping
+    // these separate prevents the UI from displaying the legacy combined
+    // English/Bengali text_plain value as a single translation.
+    val bengaliText: String? = null,
+    val englishText: String? = null,
+    val bengaliExplanation: String? = null,
 )
 
 /**

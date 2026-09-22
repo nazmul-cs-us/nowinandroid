@@ -53,17 +53,58 @@ class HadithRepository(
                 val metadata = try {
                     HadithDatabase.getCollectionMetadata(context, databaseFile)
                 } catch (_: Exception) { null }
-                entity.toHadith(
+                val baseHadith = entity.toHadith(
                     collectionName = metadata?.name ?: HadithDatabase.getCollectionNameFromFile(databaseFile),
                     collectionNameArabic = metadata?.nameArabic ?: "",
                     collectionNameEnglish = metadata?.nameEnglish ?: "",
                     author = metadata?.author ?: "",
                     authorArabic = metadata?.authorArabic ?: ""
                 )
+                if (databaseFile == SHAMAYEL_DATABASE) {
+                    loadShamayelFields(databaseFile, hadithNumber, baseHadith)
+                } else {
+                    baseHadith
+                }
             } else {
                 android.util.Log.w(TAG, "⚠️ Hadith not found: $databaseFile #$hadithNumber")
                 null
             }
+        }
+    }
+
+    private fun loadShamayelFields(
+        databaseFile: String,
+        hadithNumber: Int,
+        base: Hadith,
+    ): Hadith {
+        val roomCopy = context.getDatabasePath("hadith_$databaseFile")
+        if (!roomCopy.exists()) return base
+
+        return try {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                roomCopy.absolutePath,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+            ).use { database ->
+                database.rawQuery(
+                    """
+                    SELECT bengali_text, english_text, bengali_explanation
+                    FROM hadith_details
+                    WHERE hadith_id = ?
+                    """.trimIndent(),
+                    arrayOf(hadithNumber.toString()),
+                ).use { cursor ->
+                    if (!cursor.moveToFirst()) return@use base
+                    base.copy(
+                        bengaliText = cursor.getString(0)?.trim()?.takeIf(String::isNotEmpty),
+                        englishText = cursor.getString(1)?.trim()?.takeIf(String::isNotEmpty),
+                        bengaliExplanation = cursor.getString(2)?.trim()?.takeIf(String::isNotEmpty),
+                    )
+                }
+            }
+        } catch (error: Exception) {
+            android.util.Log.w(TAG, "Rich Shama'il fields unavailable; using legacy fields", error)
+            base
         }
     }
 
@@ -154,6 +195,7 @@ class HadithRepository(
 
     companion object {
         private const val TAG = "HadithRepository"
+        private const val SHAMAYEL_DATABASE = "shamayele_tirmidhi_complete.db"
 
         @Volatile
         private var INSTANCE: HadithRepository? = null

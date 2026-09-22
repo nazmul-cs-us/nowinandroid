@@ -57,8 +57,9 @@ import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.hadithdatabase.HadithDatabase
 import com.starception.submission.core.hadithdatabase.HadithEntity
-import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.HadithCollectionBook
+import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.FlaticonPlayIcon
@@ -71,18 +72,82 @@ import kotlinx.coroutines.withContext
 
 private const val BUKHARI_DATABASE = "sahih_bukhari.db"
 private const val BUKHARI_DOWNLOAD_CATEGORY = "hadith_sahih_bukhari"
+private const val SHAMAYEL_DATABASE = "shamayele_tirmidhi_complete.db"
+private const val SHAMAYEL_DOWNLOAD_CATEGORY = "hadith_shamayele_tirmidhi"
 
-private sealed interface BukhariBookLoadState {
-    data object Loading : BukhariBookLoadState
-    data object MissingDatabase : BukhariBookLoadState
-    data class Loaded(val hadiths: List<HadithEntity>) : BukhariBookLoadState
-    data class Error(val message: String) : BukhariBookLoadState
+private data class HadithBookCollectionConfig(
+    val title: String,
+    val databaseFile: String,
+    val downloadCategory: String,
+    val totalBooks: Int,
+    val iconTopicName: String,
+    val secondaryIsArabic: Boolean,
+)
+
+private val bukhariConfig = HadithBookCollectionConfig(
+    title = "Sahih Bukhari",
+    databaseFile = BUKHARI_DATABASE,
+    downloadCategory = BUKHARI_DOWNLOAD_CATEGORY,
+    totalBooks = 97,
+    iconTopicName = "Sahih Bukhari",
+    secondaryIsArabic = true,
+)
+
+private val shamayelConfig = HadithBookCollectionConfig(
+    title = "Shamai'l At-Tirmidhi",
+    databaseFile = SHAMAYEL_DATABASE,
+    downloadCategory = SHAMAYEL_DOWNLOAD_CATEGORY,
+    totalBooks = 56,
+    iconTopicName = "Shamai'l At-Tirmidhi",
+    secondaryIsArabic = false,
+)
+
+private sealed interface HadithBookLoadState {
+    data object Loading : HadithBookLoadState
+    data object MissingDatabase : HadithBookLoadState
+    data class Loaded(val hadiths: List<HadithEntity>) : HadithBookLoadState
+    data class Error(val message: String) : HadithBookLoadState
+}
+
+@Composable
+fun BukhariBookScreen(
+    bookId: Int,
+    onBackClick: () -> Unit,
+    onHadithClick: (Int) -> Unit,
+    onPlayAllClick: () -> Unit,
+) {
+    val book = remember(bookId) { BukhariBooks.find(bookId) }
+    HadithBookScreen(
+        book = book,
+        config = bukhariConfig,
+        onBackClick = onBackClick,
+        onHadithClick = onHadithClick,
+        onPlayAllClick = onPlayAllClick,
+    )
+}
+
+@Composable
+fun ShamayelBookScreen(
+    bookId: Int,
+    onBackClick: () -> Unit,
+    onHadithClick: (Int) -> Unit,
+    onPlayAllClick: () -> Unit,
+) {
+    val book = remember(bookId) { ShamayelBooks.find(bookId) }
+    HadithBookScreen(
+        book = book,
+        config = shamayelConfig,
+        onBackClick = onBackClick,
+        onHadithClick = onHadithClick,
+        onPlayAllClick = onPlayAllClick,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BukhariBookScreen(
-    bookId: Int,
+private fun HadithBookScreen(
+    book: HadithCollectionBook?,
+    config: HadithBookCollectionConfig,
     onBackClick: () -> Unit,
     onHadithClick: (Int) -> Unit,
     onPlayAllClick: () -> Unit,
@@ -99,26 +164,25 @@ fun BukhariBookScreen(
     val arabicFontFamily = remember(selectedArabicFont) {
         hadithArabicFontFamily(selectedArabicFont)
     }
-    val book = remember(bookId) { BukhariBooks.find(bookId) }
-    val loadState by produceState<BukhariBookLoadState>(
-        initialValue = BukhariBookLoadState.Loading,
+    val loadState by produceState<HadithBookLoadState>(
+        initialValue = HadithBookLoadState.Loading,
         key1 = book,
         key2 = reloadTrigger,
     ) {
         value = if (book == null) {
-            BukhariBookLoadState.Error("This Bukhari book could not be found.")
-        } else if (!HadithDatabase.isDatabaseAvailable(context, BUKHARI_DATABASE)) {
-            BukhariBookLoadState.MissingDatabase
+            HadithBookLoadState.Error("This ${config.title} book could not be found.")
+        } else if (!HadithDatabase.isDatabaseAvailable(context, config.databaseFile)) {
+            HadithBookLoadState.MissingDatabase
         } else {
             try {
                 val hadiths = withContext(Dispatchers.IO) {
-                    HadithDatabase.getInstance(context, BUKHARI_DATABASE)
+                    HadithDatabase.getInstance(context, config.databaseFile)
                         .hadithDao()
                         .getHadithsInRange(book.firstHadithId, book.lastHadithId)
                 }
-                BukhariBookLoadState.Loaded(hadiths)
+                HadithBookLoadState.Loaded(hadiths)
             } catch (error: Exception) {
-                BukhariBookLoadState.Error(error.message ?: "Unable to open Sahih Bukhari.")
+                HadithBookLoadState.Error(error.message ?: "Unable to open ${config.title}.")
             }
         }
     }
@@ -126,7 +190,7 @@ fun BukhariBookScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sahih Bukhari") },
+                title = { Text(config.title) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         FlaticonIcon(
@@ -140,7 +204,7 @@ fun BukhariBookScreen(
         },
     ) { innerPadding ->
         when (val state = loadState) {
-            BukhariBookLoadState.Loading -> {
+            HadithBookLoadState.Loading -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -152,7 +216,7 @@ fun BukhariBookScreen(
                 }
             }
 
-            BukhariBookLoadState.MissingDatabase -> {
+            HadithBookLoadState.MissingDatabase -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -160,32 +224,34 @@ fun BukhariBookScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     MissingContentCard(
-                        resourceName = "Sahih Bukhari Hadith Collection",
-                        category = BUKHARI_DOWNLOAD_CATEGORY,
-                        description = "Download the reader database to browse and play this Bukhari book.",
+                        resourceName = "${config.title} Hadith Collection",
+                        category = config.downloadCategory,
+                        description = "Download the reader database to browse and play this book.",
                         downloadManager = downloadManager,
                         onDownloadComplete = {
                             // A deleted source can leave an open Room handle behind. Close it and
                             // remove Room's managed copy so the next load opens the new CDN file.
-                            HadithDatabase.clearInstance(context, BUKHARI_DATABASE)
+                            HadithDatabase.clearInstance(context, config.databaseFile)
                             reloadTrigger++
                         },
                     )
                 }
             }
 
-            is BukhariBookLoadState.Error -> {
-                BukhariBookMessage(
+            is HadithBookLoadState.Error -> {
+                HadithBookMessage(
                     title = "Unable to load this book",
                     message = state.message,
+                    iconTopicName = config.iconTopicName,
                     modifier = Modifier.padding(innerPadding),
                 )
             }
 
-            is BukhariBookLoadState.Loaded -> {
+            is HadithBookLoadState.Loaded -> {
                 if (book != null) {
-                    BukhariHadithList(
+                    HadithBookList(
                         book = book,
+                        config = config,
                         hadiths = state.hadiths,
                         onHadithClick = onHadithClick,
                         onPlayAllClick = onPlayAllClick,
@@ -199,8 +265,9 @@ fun BukhariBookScreen(
 }
 
 @Composable
-private fun BukhariHadithList(
-    book: BukhariBook,
+private fun HadithBookList(
+    book: HadithCollectionBook,
+    config: HadithBookCollectionConfig,
     hadiths: List<HadithEntity>,
     onHadithClick: (Int) -> Unit,
     onPlayAllClick: () -> Unit,
@@ -268,9 +335,9 @@ private fun BukhariHadithList(
                             Box(contentAlignment = Alignment.Center) {
                                 Image(
                                     painter = painterResource(
-                                        checkNotNull(topicIconResFor("Sahih Bukhari")),
+                                        checkNotNull(topicIconResFor(config.iconTopicName)),
                                     ),
-                                    contentDescription = "Bukhari book",
+                                    contentDescription = "${config.title} book",
                                     modifier = Modifier.size(32.dp),
                                 )
                             }
@@ -280,7 +347,7 @@ private fun BukhariHadithList(
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             Text(
-                                text = "BOOK ${book.id.toString().padStart(2, '0')} OF 97",
+                                text = "BOOK ${book.id.toString().padStart(2, '0')} OF ${config.totalBooks}",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold,
@@ -294,10 +361,10 @@ private fun BukhariHadithList(
                         }
                     }
                     Text(
-                        text = book.nameArabic,
+                        text = book.nameSecondary,
                         modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = arabicFontFamily,
+                            fontFamily = if (config.secondaryIsArabic) arabicFontFamily else null,
                             lineHeight = 30.sp,
                         ),
                         textAlign = TextAlign.End,
@@ -410,7 +477,7 @@ private fun BukhariHadithList(
             }
         } else {
             items(filteredHadiths, key = HadithEntity::id) { hadith ->
-                BukhariHadithCard(
+                HadithBookHadithCard(
                     hadith = hadith,
                     onClick = { onHadithClick(hadith.id) },
                     arabicFontFamily = arabicFontFamily,
@@ -424,7 +491,7 @@ private fun BukhariHadithList(
 }
 
 @Composable
-private fun BukhariHadithCard(
+private fun HadithBookHadithCard(
     hadith: HadithEntity,
     onClick: () -> Unit,
     arabicFontFamily: FontFamily,
@@ -434,7 +501,7 @@ private fun BukhariHadithCard(
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressedScale by animateFloatAsState(
         targetValue = if (isPressed) 0.985f else 1f,
-        label = "Bukhari hadith card press",
+        label = "Hadith book card press",
     )
     Card(
         onClick = onClick,
@@ -492,9 +559,10 @@ private fun BukhariHadithCard(
 }
 
 @Composable
-private fun BukhariBookMessage(
+private fun HadithBookMessage(
     title: String,
     message: String,
+    iconTopicName: String,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -506,7 +574,7 @@ private fun BukhariBookMessage(
     ) {
         Image(
             painter = painterResource(
-                checkNotNull(topicIconResFor("Sahih Bukhari")),
+                checkNotNull(topicIconResFor(iconTopicName)),
             ),
             contentDescription = null,
             modifier = Modifier.size(64.dp),

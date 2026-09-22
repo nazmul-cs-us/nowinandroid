@@ -74,6 +74,9 @@ class ContentCoordinator @Inject constructor(
  * Categories whose downloaded source feeds news.db generation:
  * - quran_core / quran_translation / quran_enhanced → quran.db (Surahs)
  * - json_data → json/sahih_bukhari.json (Bukhari hadiths)
+ * - hadith_shamayele_tirmidhi → Shama'il chapters and hadiths
  */
 private fun String.feedsNewsDb(): Boolean =
-    startsWith("quran", ignoreCase = true) || equals("json_data", ignoreCase = true)
+    startsWith("quran", ignoreCase = true) ||
+        equals("json_data", ignoreCase = true) ||
+        equals("hadith_shamayele_tirmidhi", ignoreCase = true)

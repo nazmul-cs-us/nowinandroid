@@ -17,6 +17,7 @@
 package com.starception.submission.voice
 
 import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetRepository
 import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.download.ContentCoordinator
 import com.starception.submission.core.data.repository.UserDataRepository
@@ -34,6 +35,7 @@ import dagger.hilt.components.SingletonComponent
 interface SherpaOnnxTtsEntryPoint {
     fun sherpaOnnxTtsService(): SherpaOnnxTtsService
     fun assetDownloadManager(): AssetDownloadManager
+    fun assetRepository(): AssetRepository
     fun audioDownloadHelper(): AudioDownloadHelper
     fun contentCoordinator(): ContentCoordinator
     fun userDataRepository(): UserDataRepository

@@ -139,6 +139,9 @@ internal object PrayerWidgetRefreshScheduler {
             PrayerTimesWidgetReceiver::class.java,
             PrayerTimesLargeWidgetReceiver::class.java,
             PrayerTimesFullWidgetReceiver::class.java,
+            PrayerNextWidgetReceiver::class.java,
+            PrayerTimelineWidgetReceiver::class.java,
+            PrayerDevotionalWidgetReceiver::class.java,
         ).any { receiver ->
             manager.getAppWidgetIds(ComponentName(context, receiver)).isNotEmpty()
         }

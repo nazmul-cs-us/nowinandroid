@@ -97,6 +97,8 @@ import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.layout.wrapContentHeight
 import androidx.glance.layout.wrapContentWidth
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -346,6 +348,13 @@ private const val HERO_STACK_SPACERS = 12f
  */
 private const val HERO_LINE_HEIGHT_EM = 1.22f
 
+/** A card from the combined prayer widget that can also be placed independently. */
+enum class PrayerWidgetSection {
+    NEXT_PRAYER,
+    TODAYS_PRAYERS,
+    DEVOTIONAL,
+}
+
 /**
  * Reads the launcher's current widget bounds without relying on Glance's cached LocalSize.
  *
@@ -402,13 +411,18 @@ private fun hostReportedWidgetSize(context: Context, glanceId: GlanceId): DpSize
  * from the granted footprint (see [PrayerHeroContent]); every x1 size carries the same
  * information in a compact horizontal or stacked reflow.
  *
- * Every subclass renders the identical layouts and stays freely resizable; they exist
- * only so the widget picker lists one entry per size, each landing at its own footprint.
+ * The five size-based subclasses render identical responsive layouts and exist so the
+ * widget picker can offer useful starting footprints. The three section subclasses pin
+ * one of the combined widget's cards, allowing the next prayer, today's timeline, or the
+ * devotional reminder to be placed independently.
+ *
  * The size a subclass drops at is declared in its appwidget-provider XML
- * (targetCellWidth/Height), not here — Glance always chooses the layout from the space
- * it is actually given.
+ * (targetCellWidth/Height), not here — Glance always receives the space actually granted
+ * by the launcher.
  */
-abstract class BasePrayerTimesWidget : GlanceAppWidget() {
+abstract class BasePrayerTimesWidget protected constructor(
+    private val standaloneSection: PrayerWidgetSection? = null,
+) : GlanceAppWidget() {
 
     // Exact, not Responsive, and for the same reason the ported widgets use it: with
     // Responsive, Glance composes once per declared bucket and the host picks the
@@ -476,7 +490,18 @@ abstract class BasePrayerTimesWidget : GlanceAppWidget() {
                                 .coerceAtLeast(1.dp)
                         val bareHeight =
                             (size.height - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
-                        when {
+                        if (standaloneSection != null) {
+                            BareSurface(
+                                verticalAlignment = Alignment.Vertical.Top,
+                                padding = WIDGET_PADDING,
+                            ) {
+                                StandalonePrayerSection(
+                                    section = standaloneSection,
+                                    state = state,
+                                    contentSize = DpSize(innerWidth, bareHeight),
+                                )
+                            }
+                        } else when {
                             // A real one-row footprint cannot carry a header plus a body.
                             // Use the launcher's live height rather than its nominal x1
                             // label: display scaling and grid density change the actual dp.
@@ -596,6 +621,15 @@ class PrayerTimesLargeWidget : BasePrayerTimesWidget()
 
 /** Picker entry "Prayer Times (Full Day)" — drops at 5x4. */
 class PrayerTimesFullWidget : BasePrayerTimesWidget()
+
+/** Picker entry for the illustrated current/next-prayer card on its own. */
+class PrayerNextWidget : BasePrayerTimesWidget(PrayerWidgetSection.NEXT_PRAYER)
+
+/** Picker entry for today's five-prayer sun-path timeline on its own. */
+class PrayerTimelineWidget : BasePrayerTimesWidget(PrayerWidgetSection.TODAYS_PRAYERS)
+
+/** Picker entry for the source-backed dua and hadith card on its own. */
+class PrayerDevotionalWidget : BasePrayerTimesWidget(PrayerWidgetSection.DEVOTIONAL)
 
 // ---------------------------------------------------------------------------------
 // Surfaces
@@ -1812,6 +1846,34 @@ private fun ReferencePrayerContent(
     }
 }
 
+/** Renders one of the combined widget's three cards at the standalone widget's full size. */
+@Composable
+private fun StandalonePrayerSection(
+    section: PrayerWidgetSection,
+    state: PrayerWidgetState.Available,
+    contentSize: DpSize,
+) {
+    when (section) {
+        PrayerWidgetSection.NEXT_PRAYER -> ReferencePrayerHero(
+            state = state,
+            width = contentSize.width,
+            height = contentSize.height,
+        )
+
+        PrayerWidgetSection.TODAYS_PRAYERS -> ReferencePrayerTimeline(
+            state = state,
+            width = contentSize.width,
+            height = contentSize.height,
+        )
+
+        PrayerWidgetSection.DEVOTIONAL -> ReferenceDevotionalPanel(
+            state = state,
+            width = contentSize.width,
+            height = contentSize.height,
+        )
+    }
+}
+
 /**
  * Reduced footprints show the same three cards one at a time.
  *
@@ -2567,17 +2629,13 @@ private fun ReferencePrayerTimeline(
         modifier = GlanceModifier
             .fillMaxWidth()
             .height(height)
-            .cornerRadius(22.dp),
-    ) {
-        // No foliage overlay here: the painting carries its own skyline, and the leaves
-        // drawn for the pale panel read as a dark blot over the Fajr corner of the night sky.
-        Image(
-            provider = ImageProvider(sky),
-            contentDescription = "Today's prayers on the sun's path",
-            contentScale = ContentScale.FillBounds,
-            modifier = GlanceModifier.fillMaxSize(),
-        )
-    }
+            .background(
+                imageProvider = ImageProvider(sky),
+                contentScale = ContentScale.FillBounds,
+            )
+            .cornerRadius(22.dp)
+            .semantics { contentDescription = "Today's prayers on the sun's path" },
+    ) {}
 }
 
 /** A source-backed dua or hadith panel, linked to its full in-app reading. */

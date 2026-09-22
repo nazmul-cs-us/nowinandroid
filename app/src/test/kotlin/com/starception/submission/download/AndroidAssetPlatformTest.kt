@@ -272,6 +272,48 @@ class AndroidAssetPlatformTest {
         isolatedFiles.deleteRecursively()
     }
 
+    @Test
+    fun managerAvailabilityIncludesPersistentResolvedFallbacks() {
+        val isolatedFiles = File(context.cacheDir, "asset-fallback-${System.nanoTime()}").apply {
+            mkdirs()
+        }
+        val isolatedContext = object : ContextWrapper(context) {
+            override fun getFilesDir(): File = isolatedFiles
+        }
+        val manager = AssetDownloadManager(isolatedContext, OkHttpClient())
+        val cdnKey = "databases/quran/quran.db"
+        val fallback = File(isolatedFiles, "bundled_asset_fallback/$cdnKey").apply {
+            parentFile?.mkdirs()
+            writeText("valid persisted database")
+        }
+
+        assertEquals(fallback, manager.getLocallyAvailableAssetFile(cdnKey))
+        assertTrue(manager.isAssetAvailable(cdnKey))
+
+        isolatedFiles.deleteRecursively()
+    }
+
+    @Test
+    fun managerAvailabilityIgnoresEmptyPersistentFallbacks() {
+        val isolatedFiles = File(context.cacheDir, "asset-empty-fallback-${System.nanoTime()}").apply {
+            mkdirs()
+        }
+        val isolatedContext = object : ContextWrapper(context) {
+            override fun getFilesDir(): File = isolatedFiles
+        }
+        val manager = AssetDownloadManager(isolatedContext, OkHttpClient())
+        val cdnKey = "test/empty.db"
+        File(isolatedFiles, "extracted_assets/$cdnKey").apply {
+            parentFile?.mkdirs()
+            createNewFile()
+        }
+
+        assertNull(manager.getLocallyAvailableAssetFile(cdnKey))
+        assertFalse(manager.isAssetAvailable(cdnKey))
+
+        isolatedFiles.deleteRecursively()
+    }
+
     private fun writePartial(cdnKey: String, content: ByteArray, etag: String): File {
         val partial = AndroidAssetPlatform.partialFile(root, cdnKey)
         partial.parentFile?.mkdirs()

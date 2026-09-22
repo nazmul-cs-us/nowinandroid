@@ -65,6 +65,9 @@
   <string name="prayer_widget_label">Prayer Times</string>
   <string name="prayer_widget_label_large">Prayer Times &amp; Location</string>
   <string name="prayer_widget_label_full">Prayer Times (Full Day)</string>
+  <string name="prayer_widget_label_next_standalone">Next Prayer Illustrated</string>
+  <string name="prayer_widget_label_timeline_standalone">Today\'s Prayers</string>
+  <string name="prayer_widget_label_devotional_standalone">Dua &amp; Hadith</string>
   <string name="prayer_widget_description">Next prayer and today\'s full schedule, at any widget size.</string>
   <!-- One per size: the picker shows these side by side, so each says what that size adds. -->
   <string name="prayer_widget_description_tiny">The next prayer and the time until it, in a single row.</string>
@@ -72,7 +75,21 @@
   <string name="prayer_widget_description_medium">The next prayer on an illustrated card that follows the sky.</string>
   <string name="prayer_widget_description_large">Cycles through the next prayer, today\'s sun path, and a dua.</string>
   <string name="prayer_widget_description_full">All at once: the next prayer, today\'s sun path, and a dua.</string>
+  <string name="prayer_widget_description_next_standalone">The illustrated current and next-prayer card as a separate widget.</string>
+  <string name="prayer_widget_description_timeline_standalone">Today\'s five prayers displayed along the sun\'s path.</string>
+  <string name="prayer_widget_description_devotional_standalone">A source-backed daily dua or hadith with its full reading one tap away.</string>
   <string name="prayer_widget_loading">Prayer times</string>
+
+  <!-- In-app widget discovery and launcher pinning. -->
+  <string name="widget_add_section_title">Add to your Home screen</string>
+  <string name="widget_add_section_description">Choose a widget, then confirm its position with your launcher.</string>
+  <string name="widget_add_button">Add widget</string>
+  <string name="widget_pin_unavailable">Your current Home screen does not support adding widgets from inside the app.</string>
+  <string name="widget_pinned_message">%1$s added. Go to your Home screen to see it.</string>
+  <string name="widget_discovery_title">Keep prayer times close</string>
+  <string name="widget_discovery_body">Add the Prayer Times widget to your Home screen for the next prayer and today’s schedule at a glance. More designs are available in Settings › Widgets.</string>
+  <string name="widget_discovery_add">Add Prayer Times widget</string>
+  <string name="widget_discovery_not_now">Not now</string>
 
   <!-- Strings for the canonical widget layouts ported from platform-samples.
        Kept under the sample_ prefix they arrived with so they stay recognisable

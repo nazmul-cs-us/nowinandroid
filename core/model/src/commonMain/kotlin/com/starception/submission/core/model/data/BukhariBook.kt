@@ -2,13 +2,15 @@ package com.starception.submission.core.model.data
 
 /** A canonical top-level book (Kitab) in Sahih al-Bukhari. */
 data class BukhariBook(
-    val id: Int,
-    val nameEnglish: String,
+    override val id: Int,
+    override val nameEnglish: String,
     val nameArabic: String,
-    val firstHadithId: Int,
-    val lastHadithId: Int,
-    val hadithCount: Int,
-)
+    override val firstHadithId: Int,
+    override val lastHadithId: Int,
+    override val hadithCount: Int,
+) : HadithCollectionBook {
+    override val nameSecondary: String get() = nameArabic
+}
 
 /**
  * The 97 canonical books in the same order and ID ranges as sahih_bukhari.db.

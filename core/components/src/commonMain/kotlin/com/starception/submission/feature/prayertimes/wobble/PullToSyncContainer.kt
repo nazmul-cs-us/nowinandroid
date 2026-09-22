@@ -387,8 +387,19 @@ fun PullToSyncContainer(
     val maxRevealDp = maxRevealDpForBanners
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
-    // Fitbit-style rounded top corners on content card when pushed down
-    val cornerRadius = (wobbleIntensity * 40f).dp.coerceAtMost(36.dp)
+    // Match the sheet to the app window's rounded top edge as soon as the normal banner
+    // row is fully revealed. This used to scale against the entire 220dp overscroll range,
+    // so a resting PullToSync banner only reached roughly a quarter of the intended curve.
+    // Extra pull distance keeps the same radius instead of making the sheet progressively
+    // rounder than the screen it sits in.
+    val cornerRevealFraction = (
+        contentOffsetY.value / standardBarHeightDp.value.coerceAtLeast(1f)
+        ).coerceIn(0f, 1f)
+    // The target device reports a 79px top-corner radius at 450dpi, which is 28dp.
+    // Material 3 uses the same 28dp extra-large curve. The former 36dp radius made
+    // the displaced page read as a floating card instead of a continuation of the
+    // physical screen edge.
+    val cornerRadius = 28.dp * cornerRevealFraction
     // A spring can spend a few frames just above zero while a banner opens or
     // closes. Painting the full accent color during those frames produces a
     // stray colored line at the very top before any banner content is visible.
@@ -397,11 +408,16 @@ fun PullToSyncContainer(
     val revealColorAlpha = ((wobbleIntensity - 0.03f) / 0.12f).coerceIn(0f, 1f)
     val horizontalMargin = 0.dp
 
-    // Two-tone pull-to-refresh background using theme colors (Fitbit-style)
-    val fitbitBgColor = MaterialTheme.colorScheme.primaryContainer
-    val fitbitBgColorLight = MaterialTheme.colorScheme.tertiaryContainer
+    // Keep both halves of the sweep in one Material color family. Dynamic palettes do
+    // not promise that onPrimaryContainer is readable on tertiaryContainer; on Samsung's
+    // dynamic dark palette that combination was pale green text on a pale yellow strip.
+    // The progress layer is a translucent wash of the same foreground over
+    // primaryContainer, so onPrimaryContainer remains readable before, during and after
+    // the sweep in both light and dark modes.
+    val fitbitBgColorLight = MaterialTheme.colorScheme.primaryContainer
+    val fitbitBgColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
 
-    // Indicator text color from theme
+    // Indicator and injected mini-bar content use this same foreground role.
     val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     // Spinning animation for syncing state

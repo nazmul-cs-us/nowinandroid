@@ -46,6 +46,10 @@ fun NavGraphBuilder.topicScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     composable<TopicRoute>(
@@ -64,6 +68,10 @@ fun NavGraphBuilder.topicScreen(
             onHadithClick = onHadithClick,
             onBukhariBookClick = onBukhariBookClick,
             onBukhariBookPlayClick = onBukhariBookPlayClick,
+            onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+            onShamayelBookClick = onShamayelBookClick,
+            onShamayelBookPlayClick = onShamayelBookPlayClick,
+            onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
             belowHeaderContent = belowHeaderContent,
             viewModel = hiltViewModel<TopicViewModel, TopicViewModel.Factory>(
                 key = id,

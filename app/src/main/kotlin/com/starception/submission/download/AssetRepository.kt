@@ -23,9 +23,10 @@ class AssetRepository @Inject constructor(
      * Returns the File if available, null if not yet downloaded.
      */
     fun getDatabaseFile(cdnKey: String): File? {
-        // Check CDN download first
-        val cdnFile = downloadManager.getAssetFile(cdnKey)
-        if (cdnFile != null) return cdnFile
+        // Reuse CDN downloads and persistent extracted/bundled fallbacks. This must use the same
+        // resolution policy as the availability UI or a usable database can be reported missing.
+        val localFile = downloadManager.getLocallyAvailableAssetFile(cdnKey)
+        if (localFile != null) return localFile
 
         // Fall back to bundled asset by extracting to internal storage
         return tryExtractBundledAsset(cdnKey)
@@ -35,9 +36,9 @@ class AssetRepository @Inject constructor(
      * Open an asset as InputStream, preferring CDN-downloaded version.
      */
     fun openAsset(cdnKey: String): InputStream? {
-        // Check CDN download first
-        val cdnFile = downloadManager.getAssetFile(cdnKey)
-        if (cdnFile != null) return cdnFile.inputStream()
+        // Check all persistent resolved copies first.
+        val localFile = downloadManager.getLocallyAvailableAssetFile(cdnKey)
+        if (localFile != null) return localFile.inputStream()
 
         // Fall back to bundled asset
         return tryOpenBundledAsset(cdnKey)

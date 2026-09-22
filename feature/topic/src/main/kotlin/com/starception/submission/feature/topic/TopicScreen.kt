@@ -48,6 +48,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,6 +98,8 @@ import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.FollowableTopic
 import com.starception.submission.core.model.data.BukhariBook
 import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.HadithCollectionBook
+import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.ui.DevicePreviews
@@ -120,6 +123,10 @@ fun TopicScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     // Optional app-provided content rendered directly under the topic header (gets the topic name).
     // Used to surface a "download missing content" card for content-backed topics (Quran/Hadith).
@@ -145,6 +152,10 @@ fun TopicScreen(
         onHadithClick = onHadithClick,
         onBukhariBookClick = onBukhariBookClick,
         onBukhariBookPlayClick = onBukhariBookPlayClick,
+        onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+        onShamayelBookClick = onShamayelBookClick,
+        onShamayelBookPlayClick = onShamayelBookPlayClick,
+        onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
         belowHeaderContent = belowHeaderContent,
     )
 }
@@ -165,13 +176,17 @@ internal fun TopicScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     val state = rememberLazyListState()
-    var bukhariQuery by rememberSaveable { mutableStateOf("") }
-    val filteredBukhariBooks = remember(bukhariQuery) {
-        val query = bukhariQuery.trim()
+    var collectionQuery by rememberSaveable { mutableStateOf("") }
+    val filteredBukhariBooks = remember(collectionQuery) {
+        val query = collectionQuery.trim()
         if (query.isEmpty()) {
             BukhariBooks.all
         } else {
@@ -179,6 +194,18 @@ internal fun TopicScreen(
                 book.id.toString() == query ||
                     book.nameEnglish.contains(query, ignoreCase = true) ||
                     book.nameArabic.contains(query)
+            }
+        }
+    }
+    val filteredShamayelBooks = remember(collectionQuery) {
+        val query = collectionQuery.trim()
+        if (query.isEmpty()) {
+            ShamayelBooks.all
+        } else {
+            ShamayelBooks.all.filter { book ->
+                book.id.toString() == query ||
+                    book.nameEnglish.contains(query, ignoreCase = true) ||
+                    book.nameBengali.contains(query)
             }
         }
     }
@@ -249,10 +276,7 @@ internal fun TopicScreen(
                             onBackClick = onBackClick,
                             onFollowClick = onFollowClick,
                             uiState = topicUiState.followableTopic,
-                            compact = topicUiState.followableTopic.topic.name.contains(
-                                "Bukhari",
-                                ignoreCase = true,
-                            ),
+                            compact = topicUiState.followableTopic.topic.name.isHadithBookCollection(),
                         )
                     }
                     topicBody(
@@ -268,9 +292,14 @@ internal fun TopicScreen(
                         onHadithClick = onHadithClick,
                         onBukhariBookClick = onBukhariBookClick,
                         onBukhariBookPlayClick = onBukhariBookPlayClick,
-                        bukhariQuery = bukhariQuery,
-                        onBukhariQueryChange = { bukhariQuery = it },
+                        onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+                        onShamayelBookClick = onShamayelBookClick,
+                        onShamayelBookPlayClick = onShamayelBookPlayClick,
+                        onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+                        collectionQuery = collectionQuery,
+                        onCollectionQueryChange = { collectionQuery = it },
                         filteredBukhariBooks = filteredBukhariBooks,
+                        filteredShamayelBooks = filteredShamayelBooks,
                         belowHeaderContent = belowHeaderContent,
                     )
                 }
@@ -302,6 +331,42 @@ internal fun TopicScreen(
     }
 }
 
+private fun String.isShamayelCollection(): Boolean =
+    contains("Shamai", ignoreCase = true) || contains("Shamay", ignoreCase = true)
+
+private fun String.isHadithBookCollection(): Boolean =
+    contains("Bukhari", ignoreCase = true) || isShamayelCollection()
+
+private sealed class HadithBookBrowserConfig(
+    val key: String,
+    val label: String,
+    val shortName: String,
+    val bookCount: Int,
+    val hadithCountLabel: String,
+    val searchPlaceholder: String,
+    val secondaryIsArabic: Boolean,
+) {
+    data object Bukhari : HadithBookBrowserConfig(
+        key = "bukhari",
+        label = "SAHIH BUKHARI",
+        shortName = "Bukhari",
+        bookCount = 97,
+        hadithCountLabel = "7,277",
+        searchPlaceholder = "Search English or Arabic",
+        secondaryIsArabic = true,
+    )
+
+    data object Shamayel : HadithBookBrowserConfig(
+        key = "shamayel",
+        label = "SHAMA'IL AT-TIRMIDHI",
+        shortName = "Shama’il",
+        bookCount = 56,
+        hadithCountLabel = "322",
+        searchPlaceholder = "Search English or Bengali",
+        secondaryIsArabic = false,
+    )
+}
+
 private fun LazyListScope.topicBody(
     name: String,
     description: String,
@@ -315,16 +380,22 @@ private fun LazyListScope.topicBody(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
-    bukhariQuery: String = "",
-    onBukhariQueryChange: (String) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
+    collectionQuery: String = "",
+    onCollectionQueryChange: (String) -> Unit = {},
     filteredBukhariBooks: List<BukhariBook> = BukhariBooks.all,
+    filteredShamayelBooks: List<HadithCollectionBook> = ShamayelBooks.all,
     belowHeaderContent: @Composable (topicName: String) -> Unit = {},
 ) {
     val isBukhari = name.contains("Bukhari", ignoreCase = true)
+    val isShamayel = name.isShamayelCollection()
 
     // The collection browser owns its compact identity header. The generic topic hero is useful
-    // for editorial topics, but duplicated the Bukhari title and consumed most of the first screen.
-    if (!isBukhari) {
+    // for editorial topics, but duplicates collection titles and consumes most of the first screen.
+    if (!isBukhari && !isShamayel) {
         item {
             TopicHeader(name, description, imageUrl)
         }
@@ -336,26 +407,40 @@ private fun LazyListScope.topicBody(
     }
 
     if (isBukhari) {
-        bukhariBookBrowser(
-            query = bukhariQuery,
-            onQueryChange = onBukhariQueryChange,
+        hadithBookBrowser(
+            config = HadithBookBrowserConfig.Bukhari,
+            query = collectionQuery,
+            onQueryChange = onCollectionQueryChange,
             books = filteredBukhariBooks,
             onBookClick = onBukhariBookClick,
             onBookPlayClick = onBukhariBookPlayClick,
+            onCollectionPlayClick = onBukhariCollectionPlayClick,
+        )
+    } else if (isShamayel) {
+        hadithBookBrowser(
+            config = HadithBookBrowserConfig.Shamayel,
+            query = collectionQuery,
+            onQueryChange = onCollectionQueryChange,
+            books = filteredShamayelBooks,
+            onBookClick = onShamayelBookClick,
+            onBookPlayClick = onShamayelBookPlayClick,
+            onCollectionPlayClick = onShamayelCollectionPlayClick,
         )
     } else {
         userNewsResourceCards(news, onBookmarkChanged, onNewsResourceViewed, onTopicClick, onSurahClick, onDuaClick, onHadithClick)
     }
 }
 
-private fun LazyListScope.bukhariBookBrowser(
+private fun LazyListScope.hadithBookBrowser(
+    config: HadithBookBrowserConfig,
     query: String,
     onQueryChange: (String) -> Unit,
-    books: List<BukhariBook>,
+    books: List<HadithCollectionBook>,
     onBookClick: (Int) -> Unit,
     onBookPlayClick: (Int) -> Unit,
+    onCollectionPlayClick: (Boolean) -> Unit,
 ) {
-    item(key = "bukhari-book-search") {
+    item(key = "${config.key}-book-search") {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -383,20 +468,20 @@ private fun LazyListScope.bukhariBookBrowser(
                         verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Text(
-                            text = "SAHIH BUKHARI",
+                            text = config.label,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp,
                         )
                         Text(
-                            text = "Browse 97 books",
+                            text = "Browse ${config.bookCount} books",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             lineHeight = 25.sp,
                         )
                         Text(
-                            text = "7,277 hadiths · arranged by subject",
+                            text = "${config.hadithCountLabel} hadiths · arranged by subject",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -416,7 +501,7 @@ private fun LazyListScope.bukhariBookBrowser(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                text = "97",
+                                text = config.bookCount.toString(),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                             )
@@ -428,6 +513,37 @@ private fun LazyListScope.bukhariBookBrowser(
                         }
                     }
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = { onCollectionPlayClick(false) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(
+                            topStart = 20.dp,
+                            topEnd = 20.dp,
+                            bottomEnd = 8.dp,
+                            bottomStart = 20.dp,
+                        ),
+                    ) {
+                        FlaticonPlayIcon(contentDescription = null, iconSize = 20.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play all")
+                    }
+                    Button(
+                        onClick = { onCollectionPlayClick(true) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(
+                            topStart = 20.dp,
+                            topEnd = 20.dp,
+                            bottomEnd = 8.dp,
+                            bottomStart = 20.dp,
+                        ),
+                    ) {
+                        Text("Feeling lucky")
+                    }
+                }
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQueryChange,
@@ -437,7 +553,7 @@ private fun LazyListScope.bukhariBookBrowser(
                     leadingIcon = {
                         FlaticonSearchIcon(contentDescription = null)
                     },
-                    placeholder = { Text("Search English or Arabic") },
+                    placeholder = { Text(config.searchPlaceholder) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -456,9 +572,9 @@ private fun LazyListScope.bukhariBookBrowser(
     }
 
     if (books.isEmpty()) {
-        item(key = "bukhari-no-results") {
+        item(key = "${config.key}-no-results") {
             Text(
-                text = "No Bukhari books match your search.",
+                text = "No ${config.shortName} books match your search.",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(32.dp),
@@ -470,7 +586,7 @@ private fun LazyListScope.bukhariBookBrowser(
     } else {
         items(
             items = books.chunked(2),
-            key = { row -> "bukhari-row-${row.first().id}" },
+            key = { row -> "${config.key}-row-${row.first().id}" },
         ) { rowBooks ->
             Row(
                 modifier = Modifier
@@ -480,14 +596,15 @@ private fun LazyListScope.bukhariBookBrowser(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 rowBooks.forEachIndexed { index, book ->
-                    BukhariBookCard(
+                    HadithBookCard(
                         book = book,
+                        secondaryIsArabic = config.secondaryIsArabic,
                         onClick = { onBookClick(book.id) },
                         onPlayClick = { onBookPlayClick(book.id) },
                         position = when {
-                            rowBooks.size == 1 -> BukhariBookCardPosition.Solo
-                            index == 0 -> BukhariBookCardPosition.Left
-                            else -> BukhariBookCardPosition.Right
+                            rowBooks.size == 1 -> HadithBookCardPosition.Solo
+                            index == 0 -> HadithBookCardPosition.Left
+                            else -> HadithBookCardPosition.Right
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -501,43 +618,44 @@ private fun LazyListScope.bukhariBookBrowser(
 }
 
 @Composable
-private fun BukhariBookCard(
-    book: BukhariBook,
+private fun HadithBookCard(
+    book: HadithCollectionBook,
+    secondaryIsArabic: Boolean,
     onClick: () -> Unit,
     onPlayClick: () -> Unit,
-    position: BukhariBookCardPosition,
+    position: HadithBookCardPosition,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val outerCorner by animateDpAsState(
         targetValue = if (isPressed) 20.dp else 24.dp,
-        label = "bukhariBookOuterCorner",
+        label = "hadithBookOuterCorner",
     )
     val innerCorner by animateDpAsState(
         targetValue = if (isPressed) 20.dp else 7.dp,
-        label = "bukhariBookInnerCorner",
+        label = "hadithBookInnerCorner",
     )
     val pressedScale by animateFloatAsState(
         targetValue = if (isPressed) 0.985f else 1f,
-        label = "bukhariBookPressedScale",
+        label = "hadithBookPressedScale",
     )
     val shape = when (position) {
-        BukhariBookCardPosition.Left -> RoundedCornerShape(
+        HadithBookCardPosition.Left -> RoundedCornerShape(
             topStart = outerCorner,
             topEnd = innerCorner,
             bottomEnd = innerCorner,
             bottomStart = outerCorner,
         )
-        BukhariBookCardPosition.Right -> RoundedCornerShape(
+        HadithBookCardPosition.Right -> RoundedCornerShape(
             topStart = innerCorner,
             topEnd = outerCorner,
             bottomEnd = outerCorner,
             bottomStart = innerCorner,
         )
-        BukhariBookCardPosition.Solo -> RoundedCornerShape(outerCorner)
+        HadithBookCardPosition.Solo -> RoundedCornerShape(outerCorner)
     }
-    val (containerColor, contentColor) = bukhariBookCardColors()
+    val (containerColor, contentColor) = hadithBookCardColors()
 
     Card(
         onClick = onClick,
@@ -575,7 +693,7 @@ private fun BukhariBookCard(
                 val isPlayPressed by playInteractionSource.collectIsPressedAsState()
                 val playCorner by animateDpAsState(
                     targetValue = if (isPlayPressed) 26.dp else 14.dp,
-                    label = "bukhariPlayCorner",
+                    label = "hadithPlayCorner",
                 )
                 FilledIconButton(
                     onClick = onPlayClick,
@@ -608,10 +726,10 @@ private fun BukhariBookCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = book.nameArabic,
+                text = book.nameSecondary,
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = QuranFonts.PDMSSaleem,
+                    fontFamily = if (secondaryIsArabic) QuranFonts.PDMSSaleem else null,
                     lineHeight = 23.sp,
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -635,14 +753,14 @@ private fun BukhariBookCard(
     }
 }
 
-private enum class BukhariBookCardPosition {
+private enum class HadithBookCardPosition {
     Left,
     Right,
     Solo,
 }
 
 @Composable
-private fun bukhariBookCardColors(): Pair<Color, Color> =
+private fun hadithBookCardColors(): Pair<Color, Color> =
     MaterialTheme.colorScheme.surfaceContainerLow to MaterialTheme.colorScheme.onSurface
 
 @Composable

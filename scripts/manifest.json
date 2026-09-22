@@ -1,8 +1,8 @@
 {
   "version": 1,
   "base_url": "https://pub-aeff8de563e549db8ec4ee32f72790e4.r2.dev",
-  "total_size": 8315879835,
-  "total_files": 6810,
+  "total_size": 8318386587,
+  "total_files": 6811,
   "categories": {
     "json_data": {
       "total_size": 10246616,
@@ -41,6 +41,11 @@
     },
     "hadith_sahih_muslim": {
       "total_size": 54992896,
+      "file_count": 1,
+      "required": false
+    },
+    "hadith_shamayele_tirmidhi": {
+      "total_size": 2334720,
       "file_count": 1,
       "required": false
     },
@@ -273,6 +278,12 @@
       "size": 54992896,
       "sha256": "91d3becf453d142401ffc93d73db6332f145b8df0208f065ea591629e5f57e92",
       "category": "hadith_sahih_muslim",
+      "required": false
+    },
+    "databases/hadith/shamayele_tirmidhi_complete.db": {
+      "size": 2334720,
+      "sha256": "2f7db927d95645c7e3881a28cfa9cc0ab39e8ee00541bf715bdaf8790dc71cb5",
+      "category": "hadith_shamayele_tirmidhi",
       "required": false
     },
     "databases/hadith/sunan_abu_dawud.db": {

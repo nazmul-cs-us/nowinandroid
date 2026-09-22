@@ -12,6 +12,7 @@ import com.starception.submission.core.designsystem.R
 fun topicIconResFor(name: String): Int? {
     val n = name.lowercase()
     return when {
+        "shamai" in n || "shamay" in n -> R.drawable.topic_shamayele_tirmidhi
         "bukhari" in n || "hadith" in n -> R.drawable.topic_sahih_bukhari
         "dua" in n -> R.drawable.topic_quranic_duas
         "quran" in n || "surah" in n -> R.drawable.topic_holy_quran

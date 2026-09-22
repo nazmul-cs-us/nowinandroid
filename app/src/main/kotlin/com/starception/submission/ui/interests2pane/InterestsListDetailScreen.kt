@@ -76,6 +76,10 @@ fun NavGraphBuilder.interestsListDetailScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
     onSearchSubmit: (query: String) -> Unit = {},
 ) {
     composable<InterestsRoute> {
@@ -91,6 +95,10 @@ fun NavGraphBuilder.interestsListDetailScreen(
                 onHadithClick = onHadithClick,
                 onBukhariBookClick = onBukhariBookClick,
                 onBukhariBookPlayClick = onBukhariBookPlayClick,
+                onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+                onShamayelBookClick = onShamayelBookClick,
+                onShamayelBookPlayClick = onShamayelBookPlayClick,
+                onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
             )
         }
     }
@@ -105,6 +113,10 @@ internal fun InterestsListDetailScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
 ) {
     val selectedTopicId by viewModel.selectedTopicId.collectAsStateWithLifecycle()
     InterestsListDetailScreen(
@@ -116,6 +128,10 @@ internal fun InterestsListDetailScreen(
         onHadithClick = onHadithClick,
         onBukhariBookClick = onBukhariBookClick,
         onBukhariBookPlayClick = onBukhariBookPlayClick,
+        onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+        onShamayelBookClick = onShamayelBookClick,
+        onShamayelBookPlayClick = onShamayelBookPlayClick,
+        onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
     )
 }
 
@@ -130,6 +146,10 @@ internal fun InterestsListDetailScreen(
     onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onBukhariBookClick: (Int) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onBukhariCollectionPlayClick: (Boolean) -> Unit = {},
+    onShamayelBookClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
+    onShamayelCollectionPlayClick: (Boolean) -> Unit = {},
 ) {
     val listDetailNavigator = rememberListDetailPaneScaffoldNavigator(
         scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo),
@@ -254,7 +274,11 @@ internal fun InterestsListDetailScreen(
                                     onHadithClick = onHadithClick,
                                     onBukhariBookClick = onBukhariBookClick,
                                     onBukhariBookPlayClick = onBukhariBookPlayClick,
-                                    // Offer to download missing content (Quran/Bukhari) for content-backed topics.
+                                    onBukhariCollectionPlayClick = onBukhariCollectionPlayClick,
+                                    onShamayelBookClick = onShamayelBookClick,
+                                    onShamayelBookPlayClick = onShamayelBookPlayClick,
+                                    onShamayelCollectionPlayClick = onShamayelCollectionPlayClick,
+                                    // Offer to download missing content for downloadable Quran/Hadith topics.
                                     belowHeaderContent = { topicName ->
                                         com.starception.submission.download.TopicMissingContentCard(topicName)
                                     },

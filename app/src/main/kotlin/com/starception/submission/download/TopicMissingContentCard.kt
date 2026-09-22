@@ -92,6 +92,13 @@ private data class TopicContentSpec(
 
 /** Maps a topic name to its downloadable content, or null for topics without bundled-DB content. */
 private fun topicContentSpec(name: String): TopicContentSpec? = when {
+    name.contains("Shamai", ignoreCase = true) || name.contains("Shamay", ignoreCase = true) ->
+        TopicContentSpec(
+            cdnKey = "databases/hadith/shamayele_tirmidhi_complete.db",
+            category = "hadith_shamayele_tirmidhi",
+            resourceName = "Shamai'l At-Tirmidhi",
+            description = "56 chapters and 322 hadiths in Arabic, Bengali, and English.",
+        )
     name.contains("Quran", ignoreCase = true) -> TopicContentSpec(
         cdnKey = "databases/quran/quran.db",
         category = "quran_core",

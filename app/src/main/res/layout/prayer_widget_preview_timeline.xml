@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x2 picker entry: the five-prayer sun-path page at its actual drop size. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/prayer_widget_preview_sky"
+    tools:ignore="HardcodedText">
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="30dp"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/prayer_widget_skyline_v1" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="8dp"
+        android:fontFamily="@font/ubuntu_sans"
+        android:includeFontPadding="false"
+        android:text="Today’s Prayers"
+        android:textColor="#FFF4F1E6"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:layout_gravity="bottom"
+        android:background="#E6091A18"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Fajr\n4:48"
+            android:textColor="#FFB9C7C0"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Dhuhr\n12:16"
+            android:textColor="#FFB9C7C0"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/prayer_widget_preview_timeline_active"
+            android:fontFamily="@font/ubuntu_sans"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Asr\n3:44"
+            android:textColor="#FFF4F1E6"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Maghrib\n6:31"
+            android:textColor="#FFB9C7C0"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/ubuntu_sans"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Isha\n7:46"
+            android:textColor="#FFB9C7C0"
+            android:textSize="8sp" />
+    </LinearLayout>
+</FrameLayout>

@@ -59,6 +59,7 @@ CATEGORY_RULES = [
     ("databases/hadith/sahih_muslim.db", "hadith_sahih_muslim"),
     ("databases/hadith/sunan_abu_dawud.db", "hadith_sunan_abu_dawud"),
     ("databases/hadith/sunan_tirmidhi.db", "hadith_sunan_tirmidhi"),
+    ("databases/hadith/shamayele_tirmidhi_complete.db", "hadith_shamayele_tirmidhi"),
     ("databases/hadith/sunan_nasai.db", "hadith_sunan_nasai"),
     ("databases/hadith/sunan_ibn_majah.db", "hadith_sunan_ibn_majah"),
     ("databases/hadith/musnad_ahmad.db", "hadith_musnad_ahmad"),

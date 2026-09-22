@@ -423,6 +423,7 @@ fun PrayerTimesScreen(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onFortressDuaClick: (com.starception.submission.core.duadatabase.Dua) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
     // Full media-source router for the mini-bar title tap (surah/hadith/dua);
     // when null, falls back to the legacy surah-only behavior.
     onMediaSourceClick: ((com.starception.submission.media.MediaSource) -> Unit)? = null,
@@ -2338,6 +2339,7 @@ fun PrayerTimesScreen(
                                 onSurahClickWithAyah = onSurahClickWithAyah,
                                 onFortressDuaClick = onFortressDuaClick,
                                 onBukhariBookPlayClick = onBukhariBookPlayClick,
+                                onShamayelBookPlayClick = onShamayelBookPlayClick,
                                 fortressDuasByChapter = contextualDuasByChapter,
                                 goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                                 isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
@@ -2607,6 +2609,7 @@ fun PrayerTimesScreen(
                     onSurahClickWithAyah = onSurahClickWithAyah,
                     onFortressDuaClick = onFortressDuaClick,
                     onBukhariBookPlayClick = onBukhariBookPlayClick,
+                    onShamayelBookPlayClick = onShamayelBookPlayClick,
                     fortressDuasByChapter = contextualDuasByChapter,
                     goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
                     isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,

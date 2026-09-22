@@ -20,7 +20,7 @@ sealed class MediaSource {
     /** Hadith playback from HadithDetailScreen */
     data class Hadith(
         val hadithNumber: Int = 0,
-        val collectionName: String = "Sahih Al-Bukhari",
+        val collectionName: String = "Hadith",
     ) : MediaSource()
 
     /** Fortress-of-the-Muslim chapter recitation from a news card (ChapterAudioController) */

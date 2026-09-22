@@ -53,6 +53,9 @@ class DebugResizeWidgetReceiver : BroadcastReceiver() {
             PrayerTimesWidgetReceiver::class.java,
             PrayerTimesLargeWidgetReceiver::class.java,
             PrayerTimesFullWidgetReceiver::class.java,
+            PrayerNextWidgetReceiver::class.java,
+            PrayerTimelineWidgetReceiver::class.java,
+            PrayerDevotionalWidgetReceiver::class.java,
         )
 
         var resized = 0

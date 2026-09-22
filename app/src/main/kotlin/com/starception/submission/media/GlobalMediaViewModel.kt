@@ -11,6 +11,7 @@ import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlaybackService
 import com.starception.submission.services.DrivingAudioService
 import com.starception.submission.services.ChapterRecitationState
+import com.starception.submission.services.ChapterRecitationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -368,7 +369,7 @@ class GlobalMediaViewModel(
 
         if (title.startsWith("Hadith #")) {
             val hadithNumber = title.substringAfter('#').toIntOrNull() ?: 0
-            val collectionName = subtitle.ifBlank { "Sahih Bukhari" }
+            val collectionName = subtitle.ifBlank { "Hadith" }
             activeSource = MediaSource.Hadith(hadithNumber, collectionName)
             _controllerState.update { current ->
                 current.copy(
@@ -495,6 +496,10 @@ class GlobalMediaViewModel(
      * keeps reading), stop the TTS engine directly and clear the mini-bar.
      */
     private fun toggleHadithOrFallbackStop() {
+        if (ChapterRecitationState.isBookPlaylistActive) {
+            ChapterRecitationService.toggle(context)
+            return
+        }
         val callback = onHadithPlayPauseRequested
         if (callback != null) {
             callback.invoke()
@@ -509,7 +514,13 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playNext()
             is MediaSource.DrivingMode -> drivingService?.skipCurrent()
-            is MediaSource.Hadith -> onHadithSkipNextRequested?.invoke()
+            is MediaSource.Hadith -> {
+                if (ChapterRecitationState.isBookPlaylistActive) {
+                    ChapterRecitationService.next(context)
+                } else {
+                    onHadithSkipNextRequested?.invoke()
+                }
+            }
             is MediaSource.Fortress -> {} // Single-track player; no chapter skip
             is MediaSource.None -> {}
         }
@@ -520,7 +531,13 @@ class GlobalMediaViewModel(
         when (activeSource) {
             is MediaSource.Quran -> quranService?.playPrevious()
             is MediaSource.DrivingMode -> {} // Driving mode doesn't support previous
-            is MediaSource.Hadith -> onHadithSkipPreviousRequested?.invoke()
+            is MediaSource.Hadith -> {
+                if (ChapterRecitationState.isBookPlaylistActive) {
+                    ChapterRecitationService.previous(context)
+                } else {
+                    onHadithSkipPreviousRequested?.invoke()
+                }
+            }
             is MediaSource.Fortress -> {} // Single-track player; no chapter skip
             is MediaSource.None -> {}
         }
@@ -705,7 +722,7 @@ class GlobalMediaViewModel(
             if (recite.title.startsWith("Hadith #")) {
                 onHadithPlaybackStarted(
                     hadithNumber = recite.title.substringAfter('#').toIntOrNull() ?: 0,
-                    collectionName = recite.subtitle.ifBlank { "Sahih Bukhari" },
+                    collectionName = recite.subtitle.ifBlank { "Hadith" },
                     title = recite.title,
                 )
             } else {

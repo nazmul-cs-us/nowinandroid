@@ -47,6 +47,13 @@ expect fun createSharedTopicRepository(): SharedTopicRepository
 val SharedTopics = listOf(
     SharedTopic(7, "Holy Quran", "The final revelation from Allah", "Read all 114 chapters of the Holy Quran."),
     SharedTopic(8, "Sahih Bukhari", "صحيح البخاري", "Browse the complete Sahih al-Bukhari collection by book."),
+    SharedTopic(
+        9,
+        "Shamai'l At-Tirmidhi",
+        "الشمائل المحمدية",
+        "Explore 56 books and 322 hadiths describing the Prophet's appearance, character, manners, and daily life.",
+        imageUrl = "https://cdn-icons-png.flaticon.com/512/4556/4556746.png",
+    ),
     SharedTopic(11, "Quranic Duas", "Remembrance of Allah and supplications", "Supplications collected directly from the Holy Quran."),
     SharedTopic(21, "Morning & Evening", "أذكار الصباح والمساء", "Fortress of the Muslim invocations for morning and evening."),
     SharedTopic(22, "Prayer", "الصلاة", "Fortress of the Muslim invocations connected with salah."),

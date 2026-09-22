@@ -72,6 +72,24 @@ class ContextualInsightRecommendationTest {
     }
 
     @Test
+    fun alternateHadithDayRecommendsPlayableShamayelBook() {
+        val result = buildContextualInsightRecommendation(
+            date = LocalDate.of(2026, 8, 4),
+            time = LocalTime.of(17, 30),
+            fortressDuasByChapter = emptyMap(),
+            locale = Locale.ENGLISH,
+        )
+
+        val target = result.target as ContextualRecommendationTarget.Shamayel
+        assertTrue(target.book.id in listOf(35, 36, 48))
+        assertEquals(
+            target.book.hadithCount,
+            target.book.lastHadithId - target.book.firstHadithId + 1,
+        )
+        assertTrue(result.footerText.startsWith("Shama'il At-Tirmidhi · Book"))
+    }
+
+    @Test
     fun missingFortressDataFallsBackToQuran() {
         val result = buildContextualInsightRecommendation(
             date = LocalDate.of(2026, 8, 2),

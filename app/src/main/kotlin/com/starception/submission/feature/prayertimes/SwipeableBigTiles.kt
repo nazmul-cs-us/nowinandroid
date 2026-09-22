@@ -1347,6 +1347,7 @@ fun SwipeableBigTiles(
     onSurahClickWithAyah: (surahNumber: Int, ayahNumber: Int) -> Unit = { _, _ -> },
     onFortressDuaClick: (Dua) -> Unit = {},
     onBukhariBookPlayClick: (Int) -> Unit = {},
+    onShamayelBookPlayClick: (Int) -> Unit = {},
     fortressDuasByChapter: Map<Int, List<Dua>> = emptyMap(),
     goToMosqueDurationMinutes: (String) -> Int = { 20 },
     isInteractionBlocked: Boolean = false,
@@ -2145,6 +2146,7 @@ fun SwipeableBigTiles(
                                 is ContextualRecommendationTarget.Surah -> "Read"
                                 is ContextualRecommendationTarget.FortressDua -> "Open dua"
                                 is ContextualRecommendationTarget.Bukhari -> "Play book"
+                                is ContextualRecommendationTarget.Shamayel -> "Play book"
                             },
                             actionDescription = displayedAiRecommendation.actionDescription,
                             onClick = {
@@ -2161,6 +2163,10 @@ fun SwipeableBigTiles(
 
                                     is ContextualRecommendationTarget.Bukhari -> {
                                         onBukhariBookPlayClick(target.book.id)
+                                    }
+
+                                    is ContextualRecommendationTarget.Shamayel -> {
+                                        onShamayelBookPlayClick(target.book.id)
                                     }
                                 }
                             },
