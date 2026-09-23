@@ -87,6 +87,12 @@ private val LocalCookieWidgetGradient = staticCompositionLocalOf<ImageProvider> 
     error("Cookie widget gradient was not provided")
 }
 internal val LocalWidgetAppearance = staticCompositionLocalOf { WidgetAppearanceSettings() }
+/**
+ * The resolved day/night state for this render, after applying the widget's own colour-mode
+ * override on top of the system mode. Header ink that sits directly on the plate reads this
+ * to stay legible when the plate turns dark.
+ */
+internal val LocalWidgetDarkTheme = staticCompositionLocalOf { false }
 internal data class TransparentWidgetForeground(
     val primary: ColorProvider,
     val secondary: ColorProvider,
@@ -301,6 +307,7 @@ internal fun StarceptionWidgetTheme(
         CompositionLocalProvider(
             LocalCookieWidgetGradient provides ImageProvider(cookieGradient),
             LocalWidgetAppearance provides source.appearance,
+            LocalWidgetDarkTheme provides darkTheme,
             LocalTransparentWidgetForeground provides transparentForeground,
             LocalWidgetHeroAccent provides ColorProvider(heroAccent),
             // The plate is the colour on the @android:id/background view itself, not a

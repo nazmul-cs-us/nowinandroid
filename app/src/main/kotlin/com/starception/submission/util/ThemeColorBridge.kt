@@ -30,11 +30,11 @@ object ThemeColorBridge {
     val onSurfaceColor: Int get() = _onSurfaceColor
 
     // Observable state so inner ComposeViews re-compose when the user switches brand.
-    var themeBrand by mutableStateOf(ThemeBrand.COASTAL)
+    var themeBrand by mutableStateOf(ThemeBrand.DEFAULT)
         private set
     var darkTheme by mutableStateOf(false)
         private set
-    var disableDynamicTheming by mutableStateOf(true)
+    var disableDynamicTheming by mutableStateOf(false)
         private set
 
     // CUSTOM-brand seed colors (ARGB, 0 = unset) so inner ComposeViews can

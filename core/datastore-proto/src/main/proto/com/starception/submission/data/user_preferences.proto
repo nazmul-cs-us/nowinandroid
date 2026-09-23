@@ -68,5 +68,11 @@ message UserPreferences {
     // ARGB int of the user-selected TERTIARY accent for ThemeBrand.CUSTOM. 0 = unset.
     fixed32 custom_tertiary_color = 26;
 
-    // NEXT AVAILABLE ID: 27
+    // Inverse of "use dynamic color" so the feature defaults to ENABLED. A proto3
+    // bool cannot tell "unset" apart from "false", so use_dynamic_color (19) could
+    // never default to on. Storing the disabled state instead makes the unset value
+    // (false) mean "dynamic colour enabled", while still letting the user turn it off.
+    bool dynamic_color_disabled = 27;
+
+    // NEXT AVAILABLE ID: 28
 }

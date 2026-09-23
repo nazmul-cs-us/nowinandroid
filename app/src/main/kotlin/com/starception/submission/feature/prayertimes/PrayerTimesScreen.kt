@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
@@ -103,6 +104,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
@@ -273,10 +275,105 @@ private const val PERMISSION_ONBOARDING_PREFERENCES = "permission_onboarding_pre
 private const val KEY_PERMISSION_ONBOARDING_COMPLETE = "initial_permission_flow_complete"
 
 private enum class PermissionOnboardingStep {
+    Intro,
     Location,
     Notifications,
     PhysicalActivity,
     Complete,
+}
+
+/**
+ * A single permission line shown in the [PermissionPrimerDialog] so the user understands *why*
+ * each permission is requested before the system dialog appears. Explaining the value up front
+ * measurably increases the grant rate versus firing the raw OS prompt with no context.
+ */
+private data class PermissionRationale(
+    val icon: ImageVector,
+    val title: String,
+    val description: String,
+)
+
+/**
+ * A friendly priming dialog that explains why the app is about to request each permission. Shown
+ * before the system prompts so the user grants with context, which significantly improves the
+ * grant rate. "Continue" proceeds to the OS dialogs; "Not now" backs out without nagging again.
+ */
+@Composable
+private fun PermissionPrimerDialog(
+    rationales: List<PermissionRationale>,
+    onContinue: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Filled.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = {
+            androidx.compose.material3.Text(
+                text = "Get the most out of prayer times",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                androidx.compose.material3.Text(
+                    text = "We'll ask for a few permissions next. Here's why each one helps:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                rationales.forEach { rationale ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = rationale.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Column {
+                            androidx.compose.material3.Text(
+                                text = rationale.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            androidx.compose.material3.Text(
+                                text = rationale.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(onClick = onContinue) {
+                androidx.compose.material3.Text("Continue")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                androidx.compose.material3.Text("Not now")
+            }
+        },
+    )
 }
 
 private data class PrayerTileWeatherAlert(
@@ -438,6 +535,8 @@ fun PrayerTimesScreen(
     onSearchSubmit: (query: String) -> Unit = {},
     isSyncingExternal: Boolean = false,
     onSetSyncing: (Boolean) -> Unit = {},
+    isOffline: Boolean = false,
+    offlineText: String = "No internet connection",
 ) {
     val screenContext = LocalContext.current
     val dailyReadingPlayer: QuranPlayerViewModel = viewModel(
@@ -1096,18 +1195,11 @@ fun PrayerTimesScreen(
         null // Not needed on older Android versions
     }
 
-    var activityPermissionRequested by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(activityRecognitionPermissionState?.status) {
-        val permissionState = activityRecognitionPermissionState ?: return@LaunchedEffect
-        if (
-            permissionState.status is com.google.accompanist.permissions.PermissionStatus.Denied &&
-            !activityPermissionRequested
-        ) {
-            activityPermissionRequested = true
-            permissionState.launchPermissionRequest()
-        }
-    }
-    
+    // NOTE: Activity-recognition permission is intentionally NOT auto-requested here anymore.
+    // It is now handled by the sequential onboarding wizard below (PhysicalActivity step), which
+    // shows the "why we need these permissions" primer first. Firing a raw request here caused the
+    // OS activity dialog to pop up on top of that primer.
+
     // Storage/Media audio permission for Quran playback from SD card
     // This will be requested only when user tries to play Quran audio
     val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1190,9 +1282,11 @@ fun PrayerTimesScreen(
         )
     }
     var permissionOnboardingStep by rememberSaveable {
-        mutableStateOf(PermissionOnboardingStep.Location)
+        mutableStateOf(PermissionOnboardingStep.Intro)
     }
     var permissionRequestInFlight by rememberSaveable { mutableStateOf(false) }
+    // Controls the "why we need these permissions" primer shown before any system dialog.
+    var permissionPrimerVisible by rememberSaveable { mutableStateOf(false) }
 
     fun advancePermissionOnboarding(nextStep: PermissionOnboardingStep) {
         permissionRequestInFlight = false
@@ -1232,6 +1326,26 @@ fun PrayerTimesScreen(
         if (permissionOnboardingComplete || permissionRequestInFlight) return@LaunchedEffect
 
         when (permissionOnboardingStep) {
+            PermissionOnboardingStep.Intro -> {
+                // Decide whether anything actually needs requesting. If every relevant permission
+                // is already granted, silently finish so returning users never see the primer.
+                val locationGranted = locationPermissionState.status is
+                    com.google.accompanist.permissions.PermissionStatus.Granted
+                val notificationGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    notificationPermissionState.status is
+                    com.google.accompanist.permissions.PermissionStatus.Granted
+                val activityGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                    activityRecognitionPermissionState?.status is
+                    com.google.accompanist.permissions.PermissionStatus.Granted
+
+                if (locationGranted && notificationGranted && activityGranted) {
+                    advancePermissionOnboarding(PermissionOnboardingStep.Complete)
+                } else {
+                    // Pause the wizard and explain why the permissions are needed. The primer's
+                    // "Continue" button advances to the first system prompt.
+                    permissionPrimerVisible = true
+                }
+            }
             PermissionOnboardingStep.Location -> {
                 if (locationPermissionState.status is com.google.accompanist.permissions.PermissionStatus.Granted) {
                     advancePermissionOnboarding(PermissionOnboardingStep.Notifications)
@@ -1271,8 +1385,113 @@ fun PrayerTimesScreen(
         }
     }
 
+    // "Why we need these permissions" primer. Shown once before the system dialogs so users grant
+    // with context instead of reflexively tapping "Don't allow". Only lists the permissions that
+    // are actually still missing.
+    if (permissionPrimerVisible) {
+        val rationales = buildList {
+            if (locationPermissionState.status !is
+                com.google.accompanist.permissions.PermissionStatus.Granted
+            ) {
+                add(
+                    PermissionRationale(
+                        icon = Icons.Filled.LocationOn,
+                        title = "Location",
+                        description = "Used to calculate accurate prayer times and the Qibla direction for exactly where you are.",
+                    ),
+                )
+            }
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                notificationPermissionState.status !is
+                com.google.accompanist.permissions.PermissionStatus.Granted
+            ) {
+                add(
+                    PermissionRationale(
+                        icon = Icons.Filled.Notifications,
+                        title = "Notifications",
+                        description = "Lets us remind you at the start of each prayer so you never miss a salah.",
+                    ),
+                )
+            }
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                activityRecognitionPermissionState?.status !is
+                com.google.accompanist.permissions.PermissionStatus.Granted
+            ) {
+                add(
+                    PermissionRationale(
+                        icon = Icons.Filled.DirectionsWalk,
+                        title = "Physical activity",
+                        description = "Detects when you're driving or walking to tailor reminders and hands-free features.",
+                    ),
+                )
+            }
+        }
+
+        PermissionPrimerDialog(
+            rationales = rationales,
+            onContinue = {
+                permissionPrimerVisible = false
+                advancePermissionOnboarding(PermissionOnboardingStep.Location)
+            },
+            onDismiss = {
+                // "Not now" - respect the choice and don't nag again this install.
+                permissionPrimerVisible = false
+                advancePermissionOnboarding(PermissionOnboardingStep.Complete)
+            },
+        )
+    }
+
     // Audio permission remains on-demand when the user starts audio playback.
-    
+
+    // FAILSAFE PERMISSION RE-REQUEST
+    // The one-time onboarding wizard above is permanently disabled once
+    // `initial_permission_flow_complete` is persisted (PrayerTimesScreen.kt onboarding block).
+    // That flag can be set even when a permission was never actually granted - or never even
+    // prompted (e.g. the flow was interrupted by process death, or notifications was denied).
+    // The result is a device that never asks for notification/location permission again.
+    //
+    // These effects re-request the missing permission independently of that flag, but ONLY when
+    // the OS will still surface the system dialog (Denied && !shouldShowRationale). They therefore
+    // never nag a user who explicitly denied a permission - that case must be resolved from
+    // Android app settings. Guarded with rememberSaveable so we attempt at most once per session.
+    var locationFailsafeRequested by rememberSaveable { mutableStateOf(false) }
+    var notificationFailsafeRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(
+        permissionOnboardingComplete,
+        locationPermissionState.status,
+        notificationPermissionState.status,
+    ) {
+        // Only act once the sequential wizard is done, so we never fight with an active wizard.
+        if (!permissionOnboardingComplete) return@LaunchedEffect
+
+        val locationStatus = locationPermissionState.status
+        if (
+            locationStatus is com.google.accompanist.permissions.PermissionStatus.Denied &&
+            !locationStatus.shouldShowRationale &&
+            !locationFailsafeRequested
+        ) {
+            locationFailsafeRequested = true
+            android.util.Log.i("PrayerTimesScreen", "🔁 Failsafe: re-requesting location permission")
+            locationPermissionState.launchPermissionRequest()
+            return@LaunchedEffect
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationStatus = notificationPermissionState.status
+            if (
+                notificationStatus is com.google.accompanist.permissions.PermissionStatus.Denied &&
+                !notificationStatus.shouldShowRationale &&
+                !notificationFailsafeRequested
+            ) {
+                notificationFailsafeRequested = true
+                android.util.Log.i("PrayerTimesScreen", "🔁 Failsafe: re-requesting notification permission")
+                notificationPermissionState.launchPermissionRequest()
+            }
+        }
+    }
+
     // LIVE CLOCK UPDATES - Updates current time every minute for real-time prayer status
     LaunchedEffect(Unit) {
         while (true) {
@@ -2049,6 +2268,8 @@ fun PrayerTimesScreen(
             PullToSyncContainer(
                 isRefreshing = isRefreshing,
                 onRefresh = { onSetSyncing(true) },
+                isOffline = isOffline,
+                offlineText = offlineText,
                 syncResultText = voiceFeedback,
                 onSyncResultClick = voiceFeedback?.let {
                     {

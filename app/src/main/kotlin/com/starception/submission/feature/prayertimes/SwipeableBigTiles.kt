@@ -64,6 +64,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -3180,11 +3181,15 @@ private fun InsightPreviewCard(
                         prayerRecap.forEach { prayer ->
                             Box(
                                 modifier = Modifier
-                                    // Divide the available row evenly instead of
-                                    // reserving five fixed 40dp slots. The fixed
-                                    // widths overflowed when pull-to-sync narrowed
-                                    // the card and visually squeezed the indicators.
-                                    .weight(1f)
+                                    // Each item is exactly the circle's width; the Row's
+                                    // SpaceBetween then distributes the five circles with
+                                    // EQUAL gaps, flush-left (F) to flush-right (Isha), so
+                                    // F lines up with the "X prayers complete" text below.
+                                    // The prayer name label overflows this width centered
+                                    // (wrapContentWidth below) so it never shifts spacing.
+                                    // Size tracks recapIndicatorSize so it shrinks with the
+                                    // card instead of overflowing like the old fixed slots.
+                                    .width(recapIndicatorSize)
                                     .height(42.dp)
                                     .semantics {
                                         contentDescription = when {
@@ -3210,6 +3215,7 @@ private fun InsightPreviewCard(
                                 contentAlignment = Alignment.TopCenter,
                             ) {
                                 Column(
+                                    modifier = Modifier.wrapContentWidth(unbounded = true),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {

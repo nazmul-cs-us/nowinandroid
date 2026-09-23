@@ -48,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -164,6 +165,9 @@ fun PullToSyncContainer(
     forbiddenPrayerTimeState: ForbiddenPrayerTimeState = ForbiddenPrayerTimeState(),
     weatherWarningText: String? = null,
     onWeatherWarningDismiss: () -> Unit = {},
+    /** When true, the strip carries a persistent "no internet" line. */
+    isOffline: Boolean = false,
+    offlineText: String = "No internet connection",
     silentModeState: SilentModeState = SilentModeState(),
     islamicEventState: IslamicEventState = IslamicEventState(),
     onIslamicEventClick: (IslamicEventState) -> Unit = {},
@@ -312,8 +316,8 @@ fun PullToSyncContainer(
     // Nothing here branches on *which* information is live: the row is either up
     // at its standard height or fully closed.
     val hasSyncResult = !syncResultText.isNullOrBlank()
-    val hasStatus = isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning || isIslamicEvent ||
-        isSilentMode || hasSyncResult ||
+    val hasStatus = isOffline || isPrayerAlert || isForbiddenPrayerTime || isWeatherWarning ||
+        isIslamicEvent || isSilentMode || hasSyncResult ||
         isRefreshing || isDownloading || isTtsPreparing
     val targetHoldHeightDp = if (mediaBar?.isVisible == true || isMushafActive || hasStatus) {
         standardBarHeightDp
@@ -387,19 +391,8 @@ fun PullToSyncContainer(
     val maxRevealDp = maxRevealDpForBanners
     val contentOffsetY = (wobbleIntensity * maxRevealDp).dp
 
-    // Match the sheet to the app window's rounded top edge as soon as the normal banner
-    // row is fully revealed. This used to scale against the entire 220dp overscroll range,
-    // so a resting PullToSync banner only reached roughly a quarter of the intended curve.
-    // Extra pull distance keeps the same radius instead of making the sheet progressively
-    // rounder than the screen it sits in.
-    val cornerRevealFraction = (
-        contentOffsetY.value / standardBarHeightDp.value.coerceAtLeast(1f)
-        ).coerceIn(0f, 1f)
-    // The target device reports a 79px top-corner radius at 450dpi, which is 28dp.
-    // Material 3 uses the same 28dp extra-large curve. The former 36dp radius made
-    // the displaced page read as a floating card instead of a continuation of the
-    // physical screen edge.
-    val cornerRadius = 28.dp * cornerRevealFraction
+    // Fitbit-style rounded top corners on content card when pushed down
+    val cornerRadius = (wobbleIntensity * 64f).dp.coerceAtMost(48.dp)
     // A spring can spend a few frames just above zero while a banner opens or
     // closes. Painting the full accent color during those frames produces a
     // stray colored line at the very top before any banner content is visible.
@@ -408,16 +401,11 @@ fun PullToSyncContainer(
     val revealColorAlpha = ((wobbleIntensity - 0.03f) / 0.12f).coerceIn(0f, 1f)
     val horizontalMargin = 0.dp
 
-    // Keep both halves of the sweep in one Material color family. Dynamic palettes do
-    // not promise that onPrimaryContainer is readable on tertiaryContainer; on Samsung's
-    // dynamic dark palette that combination was pale green text on a pale yellow strip.
-    // The progress layer is a translucent wash of the same foreground over
-    // primaryContainer, so onPrimaryContainer remains readable before, during and after
-    // the sweep in both light and dark modes.
-    val fitbitBgColorLight = MaterialTheme.colorScheme.primaryContainer
-    val fitbitBgColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+    // Two-tone pull-to-refresh background using theme colors (Fitbit-style)
+    val fitbitBgColor = MaterialTheme.colorScheme.primaryContainer
+    val fitbitBgColorLight = MaterialTheme.colorScheme.tertiaryContainer
 
-    // Indicator and injected mini-bar content use this same foreground role.
+    // Indicator text color from theme
     val indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     // Spinning animation for syncing state
@@ -438,6 +426,11 @@ fun PullToSyncContainer(
     // live, the row cycles between them — that is how the bar carries several
     // pieces of information without ever growing a second row.
     val statuses = buildList {
+        // Connectivity trumps everything else: nothing here can succeed offline,
+        // so it owns the row first and stays until the network returns.
+        if (isOffline) {
+            add(SyncBarStatus("offline", offlineText, SyncBarIcon.NoInternet))
+        }
         if (isDownloading) {
             val pct = (animatedDownloadProgress * 100).toInt()
             val label = downloadLabel.ifEmpty { "Downloading" }
@@ -736,7 +729,7 @@ fun PullToSyncContainer(
 }
 
 /** Leading glyph for a [SyncBarStatus]. */
-private enum class SyncBarIcon { Spinner, Sparkle, Retry, WeatherWarning, DoNotDisturb }
+private enum class SyncBarIcon { Spinner, Sparkle, Retry, WeatherWarning, DoNotDisturb, NoInternet }
 
 /**
  * One line of information the top strip can show. Several can be live at once;
@@ -863,6 +856,13 @@ private fun SyncBarStatusRow(
 
             SyncBarIcon.DoNotDisturb -> Icon(
                 imageVector = Icons.Default.DoNotDisturbOn,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+            )
+
+            SyncBarIcon.NoInternet -> Icon(
+                imageVector = Icons.Default.WifiOff,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(18.dp),

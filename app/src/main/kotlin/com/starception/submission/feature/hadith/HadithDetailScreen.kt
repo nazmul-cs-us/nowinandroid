@@ -211,7 +211,6 @@ fun HadithDetailScreen(
     initialAutoAdvance: Boolean = false,
     playbackRangeStart: Int? = null,
     playbackRangeEnd: Int? = null,
-    shufflePlayback: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Capture the route-provided value, then shadow with mutable state so navigation
@@ -504,46 +503,6 @@ fun HadithDetailScreen(
     // Uses local Bukhari translations for English, online API for other languages
     LaunchedEffect(hadith, selectedLanguage, selectedProvider) {
         val currentHadith = hadith ?: return@LaunchedEffect
-        val isShamayel = databaseFile.contains("shamayele_tirmidhi", ignoreCase = true)
-
-        // Shama'il already contains editorial Bengali and English translations
-        // plus a separate Bengali explanation. Never feed its legacy combined
-        // text_plain field back through machine translation.
-        if (isShamayel && (currentHadith.bengaliText != null || currentHadith.englishText != null)) {
-            translatedArabic = null
-            when (selectedLanguage) {
-                "bn" -> {
-                    translatedText = currentHadith.bengaliText
-                    translatedElaboration = currentHadith.bengaliExplanation
-                }
-                "en" -> {
-                    translatedText = currentHadith.englishText
-                    translatedElaboration = currentHadith.bengaliExplanation
-                }
-                "ar" -> {
-                    translatedText = null
-                    translatedElaboration = null
-                }
-                else -> {
-                    isTranslating = true
-                    try {
-                        translatedText = currentHadith.englishText?.let {
-                            translationService.translateFromEnglish(it, selectedLanguage)
-                        }
-                        translatedElaboration = currentHadith.bengaliExplanation?.let {
-                            translationService.translate(it, selectedLanguage)
-                        }
-                    } catch (error: Exception) {
-                        android.util.Log.e("HadithDetailScreen", "Shama'il translation error", error)
-                        translatedText = currentHadith.englishText
-                        translatedElaboration = currentHadith.bengaliExplanation
-                    } finally {
-                        isTranslating = false
-                    }
-                }
-            }
-            return@LaunchedEffect
-        }
 
         // Skip translation only for transliteration (no API support)
         if (selectedLanguage == "transliteration") {
@@ -636,9 +595,10 @@ fun HadithDetailScreen(
     val handleSkipNext: () -> Unit = {
         if (isBookPlaylistPlayback) {
             val rangeEnd = playbackRangeEnd
-            if (rangeEnd != null && (shufflePlayback || hadithNumber < rangeEnd)) {
+            if (rangeEnd != null && hadithNumber < rangeEnd) {
+                bookPlaylistJumpTarget = hadithNumber + 1
                 isBookPlaylistPaused = false
-                com.starception.submission.services.ChapterRecitationService.next(context)
+                sherpaOnnxTts.stopSpeaking()
             }
         } else if (playbackRangeEnd == null || hadithNumber < playbackRangeEnd) {
             hadithNumber += 1
@@ -647,9 +607,10 @@ fun HadithDetailScreen(
     val handleSkipPrev: () -> Unit = {
         if (isBookPlaylistPlayback) {
             val firstAllowed = playbackRangeStart ?: 1
-            if (shufflePlayback || hadithNumber > firstAllowed) {
+            if (hadithNumber > firstAllowed) {
+                bookPlaylistJumpTarget = hadithNumber - 1
                 isBookPlaylistPaused = false
-                com.starception.submission.services.ChapterRecitationService.previous(context)
+                sherpaOnnxTts.stopSpeaking()
             }
         } else {
             val firstAllowed = playbackRangeStart ?: 1
@@ -698,76 +659,190 @@ fun HadithDetailScreen(
         }
     }
 
-    val startServiceOwnedBookPlayback: () -> Unit = {
-        val rangeStart = playbackRangeStart
-        val rangeEnd = playbackRangeEnd
-        if (rangeStart != null && rangeEnd != null) {
-            if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                showTtsModelDownload = true
-            } else {
-                isBookPlaylistPlayback = true
-                isBookPlaylistPaused = false
-                shouldAutoPlayAfterLoad = false
-                isPlaying = true
-                com.starception.submission.services.ChapterRecitationService.playHadithBook(
-                    context = context,
-                    databaseFile = databaseFile,
-                    collectionName = collectionName,
-                    startHadith = hadithNumber.coerceIn(rangeStart, rangeEnd),
-                    rangeStart = rangeStart,
-                    rangeEnd = rangeEnd,
-                    shuffle = shufflePlayback,
-                    // Shama'il has no Bengali recording set. Its Bengali setting
-                    // controls display only; service playback uses the authored
-                    // English text and the selected English Sherpa voice.
-                    language = if (databaseFile.contains("shamayele_tirmidhi", true)) {
-                        "en"
-                    } else {
-                        selectedLanguage
-                    },
-                    voiceName = selectedVoice.name,
-                    speakerId = selectedSpeakerId,
-                )
-            }
-        }
-    }
-
-    // Play All is owned by the foreground service. This effect only hands over the queue once;
-    // disposing this screen does not cancel synthesis, downloaded audio, or track advancement.
-    androidx.compose.runtime.LaunchedEffect(bookPlaylistEnabled) {
-        if (bookPlaylistEnabled) {
-            startServiceOwnedBookPlayback()
+    // Keep book playback independent from recomposition. The former implementation
+    // finished one hadith, changed Compose state, and waited for a LaunchedEffect to
+    // start the next. With the display off that handoff can be deferred indefinitely.
+    // This loop awaits each TTS item directly and therefore advances in the background.
+    androidx.compose.runtime.LaunchedEffect(
+        bookPlaylistEnabled,
+        playbackRangeStart,
+        playbackRangeEnd,
+        selectedLanguage,
+        selectedVoice,
+        selectedSpeakerId,
+    ) {
+        if (!bookPlaylistEnabled) return@LaunchedEffect
+        val rangeStart = playbackRangeStart ?: return@LaunchedEffect
+        val rangeEnd = playbackRangeEnd ?: return@LaunchedEffect
+        // Every Bukhari item now begins with its numbered English Sherpa intro, including
+        // Bengali recordings, so the selected voice model is required for Play All.
+        if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
             bookPlaylistEnabled = false
+            showTtsModelDownload = true
+            return@LaunchedEffect
         }
-    }
 
-    androidx.compose.runtime.DisposableEffect(databaseFile, collectionName) {
-        val trackCallback: (Int, Boolean, Boolean, String) -> Unit =
-            { number, playing, active, collection ->
-            if (collection == collectionName) {
-                isBookPlaylistPlayback = active
-                isBookPlaylistPaused = !playing
-                isPlaying = playing
-                if (hadithNumber != number) hadithNumber = number
+        isBookPlaylistPlayback = true
+        isBookPlaylistPaused = false
+        bookPlaylistJumpTarget = null
+        shouldAutoPlayAfterLoad = false
+        bukhariTranslationRepo.loadTranslations()
+        sherpaOnnxTts.setVoice(selectedVoice)
+
+        try {
+            var playlistNumber = rangeStart
+            var offlineNotified = false
+            while (playlistNumber <= rangeEnd) {
+                if (!bookPlaylistEnabled) break
+                val number = playlistNumber
+                val nextHadith = repository.getHadith(databaseFile, number)
+                if (nextHadith == null) {
+                    playlistNumber += 1
+                    continue
+                }
+                val englishText = bukhariTranslationRepo.getEnglishText(number)
+                    ?: nextHadith.textPlain
+                if (englishText == null) {
+                    playlistNumber += 1
+                    continue
+                }
+                val spokenText = if (selectedLanguage == "en") {
+                    englishText
+                } else {
+                    runCatching {
+                        translationService.translateFromEnglish(englishText, selectedLanguage)
+                    }.getOrNull() ?: englishText
+                }
+
+                playbackGeneration += 1
+                prevHadithNumberRef = number
+                hadithNumber = number
+                hadithCache[number] = nextHadith
+                hadith = nextHadith
+                translatedText = spokenText
+                isLoading = false
+                isPlaying = true
+                isTtsBackedPlayback = true
+                com.starception.submission.services.ChapterRecitationService
+                    .showExternalPlayback(
+                        context = context,
+                        title = "Hadith #$number",
+                        subtitle = "Sahih Bukhari",
+                    )
+
+                // Once this hadith starts playing, Sherpa's native engine is idle. Use
+                // that playback window to prepare the next English fallback as one clip,
+                // so Play All normally pays the preparation cost only for the first item.
+                val nextSherpaText = if (number < rangeEnd) {
+                    val nextNumber = number + 1
+                    val nextHasBengaliRecording = selectedLanguage == "bn" &&
+                        audioDownloadHelper.resolveHadithAudioFile(nextNumber) != null
+                    if (nextHasBengaliRecording) {
+                        EnglishTtsTextNormalizer.bukhariIntro(nextNumber)
+                    } else {
+                        val nextEnglishText = bukhariTranslationRepo.getEnglishText(nextNumber)
+                            ?: repository.getHadith(databaseFile, nextNumber)?.textPlain
+                        nextEnglishText?.let {
+                            "${EnglishTtsTextNormalizer.bukhariIntro(nextNumber)} $it"
+                        }
+                    }
+                } else {
+                    null
+                }
+
+                val preGenerateNext: () -> Unit = {
+                    nextSherpaText?.let { nextText ->
+                        sherpaOnnxTts.preGenerateAsync(
+                            text = nextText,
+                            speakerId = selectedSpeakerId,
+                        )
+                    }
+                }
+
+                suspend fun playExactEnglishWithSherpa(): Boolean {
+                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
+                        bookPlaylistEnabled = false
+                        showTtsModelDownload = true
+                        return false
+                    }
+                    sherpaOnnxTts.setVoice(selectedVoice)
+                    return sherpaOnnxTts.speakCachedOrGenerate(
+                        text = "${EnglishTtsTextNormalizer.bukhariIntro(number)} $englishText",
+                        speakerId = selectedSpeakerId,
+                        onPlaybackStart = preGenerateNext,
+                    )
+                }
+
+                suspend fun playNumberIntroWithSherpa(): Boolean =
+                    sherpaOnnxTts.speakCachedOrGenerate(
+                        text = EnglishTtsTextNormalizer.bukhariIntro(number),
+                        speakerId = selectedSpeakerId,
+                        onPlaybackStart = preGenerateNext,
+                    )
+
+                val completed = if (selectedLanguage == "bn") {
+                    var audioFile = audioDownloadHelper.resolveHadithAudioFile(number)
+                    if (audioFile == null && !audioDownloadHelper.isOnline()) {
+                        // No cached recording and no network: don't stall the Play-All loop on
+                        // a network timeout for every item. Notify once, then use the on-device
+                        // English Sherpa voice for the rest of the book.
+                        if (!offlineNotified) {
+                            offlineNotified = true
+                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "No internet connection",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    } else if (audioFile == null) {
+                        val cdnKey = audioDownloadHelper.getHadithCdnKey(number)
+                        isDownloadingAudio = true
+                        audioFile = when (audioDownloadHelper.downloadAudio(cdnKey)) {
+                            is AssetDownloadManager.DownloadState.Completed ->
+                                audioDownloadHelper.resolveHadithAudioFile(number)
+                            else -> null
+                        }
+                        isDownloadingAudio = false
+                    }
+                    if (audioFile != null) {
+                        val introCompleted = playNumberIntroWithSherpa()
+                        val recordingCompleted = introCompleted && bookPlaylistEnabled &&
+                            playHadithRecordingAndAwait(
+                                context = context,
+                                source = audioFile.absolutePath,
+                                hadithNumber = number,
+                            )
+                        if (recordingCompleted) {
+                            true
+                        } else if (bookPlaylistEnabled) {
+                            playExactEnglishWithSherpa()
+                        } else {
+                            false
+                        }
+                    } else {
+                        playExactEnglishWithSherpa()
+                    }
+                } else {
+                    playExactEnglishWithSherpa()
+                }
+                val requestedHadith = bookPlaylistJumpTarget
+                if (requestedHadith != null) {
+                    bookPlaylistJumpTarget = null
+                    playlistNumber = requestedHadith
+                    continue
+                }
+                if (!completed || !bookPlaylistEnabled) break
+                playlistNumber += 1
             }
-        }
-        com.starception.submission.services.ChapterRecitationState.onBookTrackChanged = trackCallback
-        val state = com.starception.submission.services.ChapterRecitationState
-        if (state.isBookPlaylistActive && state.subtitle == collectionName) {
-            trackCallback(
-                state.bookCurrentHadith,
-                state.isPlaying,
-                true,
-                state.subtitle,
-            )
-        }
-        onDispose {
-            if (
-                com.starception.submission.services.ChapterRecitationState.onBookTrackChanged ===
-                trackCallback
-            ) {
-                com.starception.submission.services.ChapterRecitationState.onBookTrackChanged = null
-            }
+        } finally {
+            isBookPlaylistPlayback = false
+            isBookPlaylistPaused = false
+            bookPlaylistJumpTarget = null
+            isTtsBackedPlayback = false
+            isPlaying = false
+            com.starception.submission.services.ChapterRecitationService.stop(context)
         }
     }
 
@@ -887,7 +962,7 @@ fun HadithDetailScreen(
                                 .showExternalPlayback(
                                     context = context,
                                     title = "Hadith #$hadithNumber",
-                                    subtitle = collectionName,
+                                    subtitle = "Sahih Bukhari",
                                 )
                         } else if (isTtsBackedPlayback) {
                             com.starception.submission.services.ChapterRecitationService.stop(context)
@@ -896,13 +971,7 @@ fun HadithDetailScreen(
                     }
                     val playExactEnglishBukhariWithSherpa:
                         (onPlaybackCompleted: () -> Unit) -> Unit = { onPlaybackCompleted ->
-                            val isShamayel = databaseFile.contains("shamayele_tirmidhi", true)
-                            val englishText = if (isShamayel) {
-                                hadith?.englishTextForPlayback()
-                            } else {
-                                bukhariTranslationRepo.getEnglishText(hadithNumber)
-                                    ?: hadith?.englishTextForPlayback()
-                            }
+                            val englishText = bukhariTranslationRepo.getEnglishText(hadithNumber)
                                 ?: hadith?.textPlain
                                 ?: hadith?.elaboration
                                 ?: ""
@@ -928,7 +997,6 @@ fun HadithDetailScreen(
                                     sherpaOnnxTts = sherpaOnnxTts,
                                     text = englishText,
                                     hadithNumber = hadithNumber,
-                                    collectionName = collectionName,
                                     selectedVoice = selectedVoice,
                                     speakerId = selectedSpeakerId,
                                     onPlayingChanged = updateTtsPlaybackState,
@@ -953,12 +1021,6 @@ fun HadithDetailScreen(
                                 com.starception.submission.services.ChapterRecitationService.stop(context)
                                 isTtsBackedPlayback = false
                                 isPlaying = false
-                            } else if (
-                                autoAdvance &&
-                                playbackRangeStart != null &&
-                                playbackRangeEnd != null
-                            ) {
-                                startServiceOwnedBookPlayback()
                             } else {
                                 // Start playback
                                 playbackGeneration += 1
@@ -969,7 +1031,6 @@ fun HadithDetailScreen(
                                     }
                                 }
                                 val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
-                                val isShamayel = databaseFile.contains("shamayele_tirmidhi", ignoreCase = true)
                                 val playBengaliRecordingWithIntro: (source: String) -> Unit =
                                     playRecording@{ source ->
                                         val recordingHadithNumber = hadithNumber
@@ -985,13 +1046,12 @@ fun HadithDetailScreen(
                                                 .showExternalPlayback(
                                                     context = context,
                                                     title = "Hadith #$recordingHadithNumber",
-                                                    subtitle = collectionName,
+                                                    subtitle = "Sahih Bukhari",
                                                 )
                                             sherpaOnnxTts.setVoice(selectedVoice)
                                             val introCompleted = sherpaOnnxTts.speakCachedOrGenerate(
-                                                text = EnglishTtsTextNormalizer.hadithIntro(
+                                                text = EnglishTtsTextNormalizer.bukhariIntro(
                                                     recordingHadithNumber,
-                                                    collectionName,
                                                 ),
                                                 speakerId = selectedSpeakerId,
                                             )
@@ -1005,7 +1065,7 @@ fun HadithDetailScreen(
                                                         context = context,
                                                         source = source,
                                                         title = "Hadith #$recordingHadithNumber",
-                                                        subtitle = collectionName,
+                                                        subtitle = "Sahih Bukhari",
                                                     )
                                                     android.util.Log.i(
                                                         "HadithDetailScreen",
@@ -1039,6 +1099,16 @@ fun HadithDetailScreen(
 
                                     if (audioFile != null) {
                                         playBengaliRecordingWithIntro(audioFile.absolutePath)
+                                    } else if (!audioDownloadHelper.isOnline()) {
+                                        // Recording isn't cached and there's no network to fetch it.
+                                        // Tell the user why, then fall back to the on-device English
+                                        // Sherpa voice instead of hanging on a network timeout.
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "No internet connection",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                        playExactEnglishBukhariWithSherpa(completeCurrentPlayback)
                                     } else {
                                         // File not available locally - attempt on-demand download
                                         val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
@@ -1104,10 +1174,9 @@ fun HadithDetailScreen(
                                             }
                                         }
                                     }
-                                } else if (isBukhari || isShamayel) {
-                                    // Shama'il has no Bengali recordings. Like Bukhari's
-                                    // fallback, always use exact English with Sherpa instead
-                                    // of sending displayed Bengali through Android TTS.
+                                } else if (isBukhari) {
+                                    // Bukhari has no matching recording for this selected
+                                    // language. Do not route it through a system TTS voice.
                                     playExactEnglishBukhariWithSherpa(
                                         completeCurrentPlayback,
                                     )
@@ -1127,7 +1196,6 @@ fun HadithDetailScreen(
                                                 sherpaOnnxTts = sherpaOnnxTts,
                                                 text = textToSpeak,
                                                 hadithNumber = hadithNumber,
-                                                collectionName = collectionName,
                                                 selectedVoice = selectedVoice,
                                                 speakerId = selectedSpeakerId,
                                                 onPlayingChanged = updateTtsPlaybackState,
@@ -1141,7 +1209,6 @@ fun HadithDetailScreen(
                                             context = context,
                                             text = textToSpeak,
                                             language = selectedLanguage,
-                                            collectionName = collectionName,
                                             tts = textToSpeech,
                                             onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
                                             onPlayingChanged = updateTtsPlaybackState,
@@ -1508,13 +1575,8 @@ private fun HadithContent(
         val availableSections = remember(hadith) {
             mutableListOf<HadithSection>().apply {
                 if (hadith.textArabic.isNotEmpty()) add(HadithSection.ARABIC)
-                if (!hadith.textPlain.isNullOrEmpty() || hadith.bengaliText != null || hadith.englishText != null) {
-                    add(HadithSection.TRANSLATION)
-                }
-                if (hadith.englishText != null) add(HadithSection.ENGLISH)
-                if (!hadith.elaboration.isNullOrEmpty() || hadith.bengaliExplanation != null) {
-                    add(HadithSection.EXPLANATION)
-                }
+                if (!hadith.textPlain.isNullOrEmpty()) add(HadithSection.TRANSLATION)
+                if (!hadith.elaboration.isNullOrEmpty()) add(HadithSection.EXPLANATION)
             }.toList()
         }
 
@@ -1871,34 +1933,18 @@ private fun HadithContent(
                         }
                         HadithSection.TRANSLATION -> {
                             val displayText = normalizeHadithParagraphs(
-                                hadith.bengaliText ?: translatedText ?: hadith.textPlain.orEmpty(),
+                                translatedText ?: hadith.textPlain.orEmpty(),
                             )
                             HadithSectionCard(
-                                title = if (hadith.bengaliText != null) {
-                                    "Bengali"
-                                } else {
-                                    "Translation (${getLanguageName(selectedLanguage)})"
-                                },
+                                title = "Translation (${getLanguageName(selectedLanguage)})",
                                 accentColor = MaterialTheme.colorScheme.primary,
                                 content = displayText,
-                                contentLanguage = if (hadith.bengaliText != null) "bn" else selectedLanguage,
+                                contentLanguage = selectedLanguage,
                                 isLoading = isTranslating && translatedText == null,
                                 showDragHandle = true,
                                 isDragging = isDragging,
                                 dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
                                 modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                            )
-                        }
-                        HadithSection.ENGLISH -> {
-                            HadithSectionCard(
-                                title = "English",
-                                accentColor = MaterialTheme.colorScheme.tertiary,
-                                content = normalizeHadithParagraphs(hadith.englishText.orEmpty()),
-                                contentLanguage = "en",
-                                showDragHandle = true,
-                                isDragging = isDragging,
-                                dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
                             )
                         }
                         HadithSection.EXPLANATION -> {
@@ -2088,42 +2134,6 @@ private fun getLanguageName(code: String): String {
     }
 }
 
-private fun Hadith.englishTextForPlayback(): String? {
-    englishText?.trim()?.takeIf(String::isNotEmpty)?.let { return it }
-    val plain = textPlain?.trim()?.takeIf(String::isNotEmpty) ?: return null
-    if (!plain.startsWith("English\n")) return plain
-    return plain
-        .removePrefix("English\n")
-        .substringBefore("\n\nবাংলা\n")
-        .trim()
-        .takeIf(String::isNotEmpty)
-}
-
-private fun hadithCollectionIntro(collectionName: String, language: String): String {
-    val isBukhari = collectionName.contains("bukhari", ignoreCase = true)
-    if (!isBukhari) {
-        val isShamayel = collectionName.contains("shamai", ignoreCase = true) ||
-            collectionName.contains("shamay", ignoreCase = true)
-        return when {
-            isShamayel && language == "bn" -> "শামায়েলে তিরমিযি থেকে।"
-            isShamayel && language == "ar" -> "من الشمائل المحمدية."
-            else -> "From $collectionName."
-        }
-    }
-    return when (language) {
-        "bn" -> "সহীহ আল-বুখারী থেকে।"
-        "ar" -> "من صحيح البخاري."
-        "es" -> "De Sahih Al-Bujari."
-        "fr" -> "De Sahih Al-Boukhari."
-        "id" -> "Dari Sahih Al-Bukhari."
-        "ru" -> "Из Сахих аль-Бухари."
-        "tr" -> "Sahih-i Buhari'den."
-        "ur" -> "صحیح البخاری سے۔"
-        "zh" -> "来自《布哈里圣训》。"
-        else -> "From Sahih Al-Bukhari."
-    }
-}
-
 /**
  * Play text using TextToSpeech
  */
@@ -2131,7 +2141,6 @@ private suspend fun playHadithRecordingAndAwait(
     context: android.content.Context,
     source: String,
     hadithNumber: Int,
-    collectionName: String,
 ): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
     val state = com.starception.submission.services.ChapterRecitationState
     val previousCallback = state.onHadithCompletion
@@ -2154,7 +2163,7 @@ private suspend fun playHadithRecordingAndAwait(
         context = context,
         source = source,
         title = "Hadith #$hadithNumber",
-        subtitle = collectionName,
+        subtitle = "Sahih Bukhari",
         continuousHandoff = true,
     )
 }
@@ -2163,12 +2172,11 @@ private suspend fun speakWithAndroidTtsAndAwait(
     context: android.content.Context,
     text: String,
     language: String,
-    collectionName: String,
     existingTts: TextToSpeech?,
     onTtsCreated: (TextToSpeech) -> Unit,
 ): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
     var activeTts = existingTts
-    val utteranceId = "hadith_playlist_${System.nanoTime()}"
+    val utteranceId = "bukhari_playlist_${System.nanoTime()}"
     val locale = when (language) {
         "ar" -> java.util.Locale.forLanguageTag("ar")
         "bn" -> java.util.Locale.forLanguageTag("bn-BD")
@@ -2182,7 +2190,18 @@ private suspend fun speakWithAndroidTtsAndAwait(
         "zh" -> java.util.Locale.SIMPLIFIED_CHINESE
         else -> java.util.Locale.US
     }
-    val intro = hadithCollectionIntro(collectionName, language)
+    val intro = when (language) {
+        "bn" -> "সহীহ আল-বুখারী থেকে।"
+        "ar" -> "من صحيح البخاري."
+        "es" -> "De Sahih Al-Bujari."
+        "fr" -> "De Sahih Al-Boukhari."
+        "id" -> "Dari Sahih Al-Bukhari."
+        "ru" -> "Из Сахих аль-Бухари."
+        "tr" -> "Sahih-i Buhari'den."
+        "ur" -> "صحیح البخاری سے۔"
+        "zh" -> "来自《布哈里圣训》。"
+        else -> "From Sahih Al-Bukhari."
+    }
     val speechText = if (language == "en") {
         EnglishTtsTextNormalizer.normalize("$intro $text")
     } else {
@@ -2227,7 +2246,6 @@ private fun playWithTts(
     context: android.content.Context,
     text: String,
     language: String,
-    collectionName: String,
     tts: TextToSpeech?,
     onTtsCreated: (TextToSpeech) -> Unit,
     onPlayingChanged: (Boolean) -> Unit,
@@ -2248,12 +2266,24 @@ private fun playWithTts(
         else -> java.util.Locale.US
     }
 
-    val collectionIntro = hadithCollectionIntro(collectionName, language)
+    // Get intro for hadith
+    val intro = when (language) {
+        "bn" -> "সহীহ আল-বুখারী থেকে।"
+        "ar" -> "من صحيح البخاري."
+        "es" -> "De Sahih Al-Bujari."
+        "fr" -> "De Sahih Al-Boukhari."
+        "id" -> "Dari Sahih Al-Bukhari."
+        "ru" -> "Из Сахих аль-Бухари."
+        "tr" -> "Sahih-i Buhari'den."
+        "ur" -> "صحیح البخاری سے۔"
+        "zh" -> "来自《布哈里圣训》。"
+        else -> "From Sahih Al-Bukhari."
+    }
 
     val fullText = if (language == "en") {
-        EnglishTtsTextNormalizer.normalize("$collectionIntro $text")
+        EnglishTtsTextNormalizer.normalize("$intro $text")
     } else {
-        "$collectionIntro $text"
+        "$intro $text"
     }
 
     if (tts != null) {
@@ -2309,13 +2339,13 @@ private fun playWithSherpaOnnxTts(
     sherpaOnnxTts: SherpaOnnxTtsService,
     text: String,
     hadithNumber: Int,
-    collectionName: String,
     selectedVoice: TtsVoice,
     speakerId: Int,
     onPlayingChanged: (Boolean) -> Unit,
     onPlaybackCompleted: () -> Unit,
 ) {
-    val introText = EnglishTtsTextNormalizer.hadithIntro(hadithNumber, collectionName)
+    // IMPORTANT: Use same intro format as DrivingAudioService for cache compatibility
+    val introText = EnglishTtsTextNormalizer.bukhariIntro(hadithNumber)
     val fullText = "$introText $text"
 
     // Set the voice from user settings
@@ -2721,7 +2751,6 @@ private fun HadithSectionCardWithContent(
 private enum class HadithSection {
     ARABIC,
     TRANSLATION,
-    ENGLISH,
     EXPLANATION
 }
 

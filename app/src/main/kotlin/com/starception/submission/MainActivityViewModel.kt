@@ -220,11 +220,11 @@ class MainActivityViewModel @Inject constructor(
     private fun loadCachedTheme(): UserData {
         val prefs = context.getSharedPreferences(THEME_CACHE_PREFS, Context.MODE_PRIVATE)
 
-        val themeBrandOrdinal = prefs.getInt(KEY_THEME_BRAND, ThemeBrand.COASTAL.ordinal)
+        val themeBrandOrdinal = prefs.getInt(KEY_THEME_BRAND, ThemeBrand.DEFAULT.ordinal)
         val darkThemeConfigOrdinal = prefs.getInt(KEY_DARK_THEME_CONFIG, DarkThemeConfig.FOLLOW_SYSTEM.ordinal)
         val useDynamicColor = prefs.getBoolean(KEY_USE_DYNAMIC_COLOR, true)
 
-        val themeBrand = ThemeBrand.entries.getOrElse(themeBrandOrdinal) { ThemeBrand.COASTAL }
+        val themeBrand = ThemeBrand.entries.getOrElse(themeBrandOrdinal) { ThemeBrand.DEFAULT }
         val darkThemeConfig = DarkThemeConfig.entries.getOrElse(darkThemeConfigOrdinal) { DarkThemeConfig.FOLLOW_SYSTEM }
 
         Log.d("MainActivityViewModel", "📦 Loaded cached theme: brand=$themeBrand, darkConfig=$darkThemeConfig, dynamic=$useDynamicColor")
@@ -456,9 +456,10 @@ sealed interface MainActivityUiState {
     fun shouldKeepSplashScreen() = this is Loading
 
     /**
-     * Returns `true` if the dynamic color is disabled.
+     * Returns `true` if the dynamic color is disabled. Defaults to `false` so dynamic
+     * colour is enabled while preferences are still loading (matches the stored default).
      */
-    val shouldDisableDynamicTheming: Boolean get() = true
+    val shouldDisableDynamicTheming: Boolean get() = false
 
     /**
      * Returns the theme brand to be used.
