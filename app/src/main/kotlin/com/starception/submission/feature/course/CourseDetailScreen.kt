@@ -139,8 +139,10 @@ data class Lesson(
     val type: LessonType,
     val isCompleted: Boolean = false,
     val isLocked: Boolean = false,
-    val totalAyahs: Int = 3, // For memorization courses
-    val surahNumber: Int = 0, // Surah number for Quran courses
+    // For memorization courses
+    val totalAyahs: Int = 3, 
+    // Surah number for Quran courses
+    val surahNumber: Int = 0, 
 )
 
 enum class LessonType {
@@ -168,9 +170,12 @@ data class MemorizationProgress(
     val lessonId: String,
     val memorizedAyahs: Set<Int> = emptySet(), // Set of ayah numbers that are memorized
     val totalAyahs: Int = 3,
-    val timeSpentMinutes: Int = 0, // Total time spent on this lesson
-    val lastPracticed: Long = 0L, // Timestamp of last practice
-    val practiceCount: Int = 0, // Number of times practiced
+    // Total time spent on this lesson
+    val timeSpentMinutes: Int = 0, 
+    // Timestamp of last practice
+    val lastPracticed: Long = 0L, 
+    // Number of times practiced
+    val practiceCount: Int = 0, 
 )
 
 /**

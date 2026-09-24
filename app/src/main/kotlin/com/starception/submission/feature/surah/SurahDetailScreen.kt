@@ -397,12 +397,17 @@ internal fun getArabicFontResId(selectedFont: String): Int = when (selectedFont)
 @Composable
 fun SurahDetailScreen(
     surahNumber: Int,
-    newsResourceId: String? = null, // News resource ID for bookmark tracking
-    scrollToAyah: Int = 0, // Optional: scroll to specific ayah number (0 = no scroll)
+    // News resource ID for bookmark tracking
+    newsResourceId: String? = null, 
+    // Optional: scroll to specific ayah number (0 = no scroll)
+    scrollToAyah: Int = 0, 
     onBackClick: () -> Unit,
-    onTopicClick: (String) -> Unit = {}, // Navigate to topic detail screen
-    onNavigateToPreviousSurah: () -> Unit = {}, // Navigate to previous surah (swipe right)
-    onNavigateToNextSurah: () -> Unit = {}, // Navigate to next surah (swipe left)
+    // Navigate to topic detail screen
+    onTopicClick: (String) -> Unit = {}, 
+    // Navigate to previous surah (swipe right)
+    onNavigateToPreviousSurah: () -> Unit = {}, 
+    // Navigate to next surah (swipe left)
+    onNavigateToNextSurah: () -> Unit = {}, 
     viewModel: SurahDetailViewModel = hiltViewModel()
 ) {
     // Enable immersive full-screen mode (hides status bar)
@@ -2445,8 +2450,10 @@ private fun AlbumPlayerContent(
     currentProgress: Float,
     currentVolume: Float,
     currentPlayingSurahNumber: Int,
-    currentPlayingSurah: Surah?, // Passed from parent for proper recomposition
-    currentPlayingAyahs: List<Ayah>?, // Passed from parent for proper recomposition
+    // Passed from parent for proper recomposition
+    currentPlayingSurah: Surah?, 
+    // Passed from parent for proper recomposition
+    currentPlayingAyahs: List<Ayah>?, 
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
@@ -4253,7 +4260,8 @@ private fun BottomSheetWordStudyContent(
 private fun AlbumHeader(
     surah: Surah,
     isLandscape: Boolean = false,
-    scrollOffset: Int = 0 // Scroll offset for parallax effect
+    // Scroll offset for parallax effect
+    scrollOffset: Int = 0 
 ) {
     // Reuse the exact chapter-specific artwork shown by the Quran Grid widget.
     val artwork = remember(surah.number) { surahArtworkRes(surah.number) }

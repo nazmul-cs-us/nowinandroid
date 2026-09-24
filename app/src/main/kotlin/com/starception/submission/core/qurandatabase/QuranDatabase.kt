@@ -36,7 +36,7 @@ abstract class QuranDatabase : RoomDatabase() {
         private const val CDN_KEY = "databases/quran/quran.db"
 
         @Volatile
-        private var INSTANCE: QuranDatabase? = null
+        private var dbInstance: QuranDatabase? = null
 
         /**
          * Migration from version 1 to 2: Add favourite_ayahs table
@@ -98,7 +98,7 @@ abstract class QuranDatabase : RoomDatabase() {
          * Get the singleton instance of QuranDatabase
          */
         fun getInstance(context: Context, assetRepository: AssetRepository? = null): QuranDatabase {
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranDatabase::class.java,
@@ -128,7 +128,7 @@ abstract class QuranDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }

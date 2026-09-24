@@ -17,10 +17,10 @@
 package com.starception.submission.shared.weather
 
 import com.starception.submission.core.logging.SharedLog
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
 private const val TAG = "HttpGet"
 private const val TIMEOUT_MS = 5_000

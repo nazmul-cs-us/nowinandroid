@@ -17,25 +17,21 @@
 package com.starception.submission.core.designsystem.icon
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ShortText
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayLesson
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.Upcoming
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PlayLesson
+import androidx.compose.material.icons.outlined.Upcoming
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
@@ -44,8 +40,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Grid3x3
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Upcoming
@@ -79,7 +75,7 @@ object NiaIcons {
     val UpcomingBorder = Icons.Outlined.Upcoming
     val ViewDay = Icons.Rounded.ViewDay
     val VolumeUp = Icons.AutoMirrored.Rounded.VolumeUp
-    
+
     // Home tab icons - using Home icons which represent the main/home screen
     val Home = Icons.Filled.Home
     val HomeBorder = Icons.Outlined.Home

@@ -20,8 +20,8 @@ package com.starception.submission.feature.settings
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -71,8 +71,8 @@ import com.starception.submission.core.model.data.DarkThemeConfig.LIGHT
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.ThemeBrand.ANDROID
 import com.starception.submission.core.model.data.ThemeBrand.COASTAL
-import com.starception.submission.core.model.data.ThemeBrand.ROYAL
 import com.starception.submission.core.model.data.ThemeBrand.DEFAULT
+import com.starception.submission.core.model.data.ThemeBrand.ROYAL
 import com.starception.submission.core.ui.TrackScreenViewEvent
 import com.starception.submission.feature.settings.R.string
 import com.starception.submission.feature.settings.SettingsUiState.Loading
@@ -197,7 +197,7 @@ private fun ColumnScope.SettingsPanel(
     AnimatedVisibility(
         visible = settings.brand == DEFAULT && supportDynamicColor,
         enter = fadeIn(tween(300)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
-        exit = fadeOut(tween(200)) + shrinkVertically(tween(200, easing = FastOutSlowInEasing))
+        exit = fadeOut(tween(200)) + shrinkVertically(tween(200, easing = FastOutSlowInEasing)),
     ) {
         Column {
             SettingsDialogSectionTitle(text = stringResource(string.feature_settings_dynamic_color_preference))

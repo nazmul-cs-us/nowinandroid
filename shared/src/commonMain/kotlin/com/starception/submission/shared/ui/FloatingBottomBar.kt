@@ -39,6 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,9 +54,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 
@@ -176,8 +176,9 @@ fun FloatingBottomBar(
                                 imageVector = item.unselectedIcon,
                                 contentDescription = item.label,
                                 tint = when {
-                                    !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        .copy(alpha = 0.35f)
+                                    !item.enabled ->
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                            .copy(alpha = 0.35f)
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
                                 modifier = Modifier.size(24.dp),
@@ -265,8 +266,9 @@ fun FloatingSideBar(
                         imageVector = item.unselectedIcon,
                         contentDescription = item.label,
                         tint = when {
-                            !item.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-                                .copy(alpha = 0.35f)
+                            !item.enabled ->
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = 0.35f)
                             else -> MaterialTheme.colorScheme.onSurface
                         },
                         modifier = Modifier.size(23.dp),

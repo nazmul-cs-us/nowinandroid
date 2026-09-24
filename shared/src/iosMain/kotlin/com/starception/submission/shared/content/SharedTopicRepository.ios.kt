@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.shared.content
 
 import cnames.structs.sqlite3
@@ -46,11 +62,15 @@ private class IosSharedTopicRepository : SharedTopicRepository {
         }
 
     @OptIn(ExperimentalForeignApi::class)
-    private suspend fun readTopics(): List<SharedTopic> = query("topics", "db", """
+    private suspend fun readTopics(): List<SharedTopic> = query(
+        "topics",
+        "db",
+        """
         SELECT id, name, short_description, long_description, url, image_url
         FROM topics
         ORDER BY id ASC
-    """.trimIndent()) { statement ->
+        """.trimIndent(),
+    ) { statement ->
         SharedTopic(
             id = sqlite3_column_int(statement, 0),
             name = statement.text(1),
@@ -62,12 +82,16 @@ private class IosSharedTopicRepository : SharedTopicRepository {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private suspend fun readQuranicDuas(): List<SharedTopicArticle> = query("quranic_duas", "db", """
+    private suspend fun readQuranicDuas(): List<SharedTopicArticle> = query(
+        "quranic_duas",
+        "db",
+        """
         SELECT id, dua_number, title, arabic, translation, transliteration,
                surah_reference, explanation
         FROM quranic_duas
         ORDER BY dua_number ASC
-    """.trimIndent()) { statement ->
+        """.trimIndent(),
+    ) { statement ->
         val duaNumber = sqlite3_column_int(statement, 1)
         val reference = statement.text(6)
         SharedTopicArticle(
@@ -90,7 +114,10 @@ private class IosSharedTopicRepository : SharedTopicRepository {
         val chapters = fortressChaptersByTopic[topicId].orEmpty()
         if (chapters.isEmpty()) return emptyList()
         val chapterIds = chapters.joinToString(",")
-        return query("fortress_of_the_muslim_v2", "db", """
+        return query(
+            "fortress_of_the_muslim_v2",
+            "db",
+            """
             SELECT i.id, c.title, i.position, i.arabic, i.translation,
                    i.transliteration, i.context, i.instruction, i.note,
                    i.post_context,
@@ -101,7 +128,8 @@ private class IosSharedTopicRepository : SharedTopicRepository {
             JOIN chapters c ON c.id = i.chapter_id
             WHERE c.id IN ($chapterIds)
             ORDER BY c.id ASC, i.position ASC
-        """.trimIndent()) { statement ->
+            """.trimIndent(),
+        ) { statement ->
             val position = sqlite3_column_int(statement, 2)
             SharedTopicArticle(
                 id = sqlite3_column_int(statement, 0),
@@ -142,36 +170,36 @@ private suspend inline fun <T> query(
         cacheName = "$resource.$type",
     )
     return memScoped {
-    val database = alloc<CPointerVar<sqlite3>>()
-    val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
-    if (openResult != SQLITE_OK) {
-        val message = database.value.errorMessage()
-        database.value?.let(::sqlite3_close)
-        error("Unable to open $resource database: $message")
-    }
-
-    try {
-        val statement = alloc<CPointerVar<sqlite3_stmt>>()
-        val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
-        if (prepareResult != SQLITE_OK) {
-            error("Unable to prepare $resource query: ${database.value.errorMessage()}")
+        val database = alloc<CPointerVar<sqlite3>>()
+        val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+        if (openResult != SQLITE_OK) {
+            val message = database.value.errorMessage()
+            database.value?.let(::sqlite3_close)
+            error("Unable to open $resource database: $message")
         }
+
         try {
-            buildList {
-                while (true) {
-                    when (sqlite3_step(statement.value)) {
-                        SQLITE_ROW -> add(row(requireNotNull(statement.value)))
-                        SQLITE_DONE -> break
-                        else -> error("Unable to read $resource: ${database.value.errorMessage()}")
+            val statement = alloc<CPointerVar<sqlite3_stmt>>()
+            val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
+            if (prepareResult != SQLITE_OK) {
+                error("Unable to prepare $resource query: ${database.value.errorMessage()}")
+            }
+            try {
+                buildList {
+                    while (true) {
+                        when (sqlite3_step(statement.value)) {
+                            SQLITE_ROW -> add(row(requireNotNull(statement.value)))
+                            SQLITE_DONE -> break
+                            else -> error("Unable to read $resource: ${database.value.errorMessage()}")
+                        }
                     }
                 }
+            } finally {
+                statement.value?.let(::sqlite3_finalize)
             }
         } finally {
-            statement.value?.let(::sqlite3_finalize)
+            database.value?.let(::sqlite3_close)
         }
-    } finally {
-        database.value?.let(::sqlite3_close)
-    }
     }
 }
 

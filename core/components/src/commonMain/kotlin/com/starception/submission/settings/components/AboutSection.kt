@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
@@ -44,13 +60,13 @@ fun AboutSection(
             text = "Version",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
         Text(
             text = versionName,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         // Attributions
@@ -58,27 +74,27 @@ fun AboutSection(
             text = "Attributions",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 4.dp),
         )
         Text(
             text = "Interface, location, and weather PNG icons by Flaticon creators. " +
                 "Animated weather icons by Meteocons. Weather data by Open-Meteo.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         // Links
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(
                 space = 8.dp,
-                alignment = Alignment.Start
+                alignment = Alignment.Start,
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             if (showProjectLinks) {
                 TextButton(
-                    onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) }
+                    onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
                 ) {
                     Text(text = "Privacy Policy")
                 }
@@ -88,7 +104,7 @@ fun AboutSection(
                 TextButton(
                     onClick = {
                         onOpenLicenses()
-                    }
+                    },
                 ) {
                     Text(text = "Licenses")
                 }
@@ -96,32 +112,32 @@ fun AboutSection(
 
             if (showProjectLinks) {
                 TextButton(
-                    onClick = { uriHandler.openUri(BRAND_GUIDELINES_URL) }
+                    onClick = { uriHandler.openUri(BRAND_GUIDELINES_URL) },
                 ) {
                     Text(text = "Brand Guidelines")
                 }
 
                 TextButton(
-                    onClick = { uriHandler.openUri(FEEDBACK_URL) }
+                    onClick = { uriHandler.openUri(FEEDBACK_URL) },
                 ) {
                     Text(text = "Feedback")
                 }
             }
 
             TextButton(
-                onClick = { uriHandler.openUri(FLATICON_URL) }
+                onClick = { uriHandler.openUri(FLATICON_URL) },
             ) {
                 Text(text = "UIcons by Flaticon")
             }
 
             TextButton(
-                onClick = { uriHandler.openUri(OPEN_METEO_URL) }
+                onClick = { uriHandler.openUri(OPEN_METEO_URL) },
             ) {
                 Text(text = "Weather by Open-Meteo")
             }
 
             TextButton(
-                onClick = { uriHandler.openUri(METEOCONS_URL) }
+                onClick = { uriHandler.openUri(METEOCONS_URL) },
             ) {
                 Text(text = "Animations by Meteocons")
             }

@@ -68,7 +68,7 @@ class CompositeUserNewsResourceRepository @Inject constructor(
                         NewsResourceQuery(
                             filterTopicIds = followedTopics,
                             limit = FOR_YOU_DEFAULT_LIMIT,
-                        )
+                        ),
                     )
                 }
             }

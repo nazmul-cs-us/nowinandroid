@@ -1,7 +1,7 @@
 package com.starception.submission.prayer
 
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
-import com.starception.submission.prayer.model.*
+import com.starception.submission.prayer.model.Location
 import org.junit.Test
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime

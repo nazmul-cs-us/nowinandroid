@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import androidx.core.content.ContextCompat
 import com.whispercpp.media.decodeWaveFile
 import com.whispercpp.recorder.Recorder
 import com.whispercpp.whisper.WhisperContext
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +50,7 @@ import java.io.File
  * - Native C++ performance
  */
 class WhisperVoiceService(
-    private val context: Context
+    private val context: Context,
 ) {
     companion object {
         private const val TAG = "WhisperVoiceService"
@@ -90,6 +90,7 @@ class WhisperVoiceService(
         private const val VAD_MODEL_ASSET_PATH = "models/silero_vad.onnx"
         private const val VAD_WINDOW_SIZE = 512
         private const val VAD_SPEECH_PROBABILITY = 0.5f
+
         // The raw VOICE_RECOGNITION source is quiet (speech 0.01-0.03); a fixed
         // pre-gain puts it in the range Silero was trained on.
         private const val VAD_PRE_GAIN = 8f
@@ -179,7 +180,6 @@ class WhisperVoiceService(
                 _isInitialized.value = success
                 _statusMessage.value = if (success) "Whisper ready" else "Failed to load model"
                 onComplete?.invoke(success)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing Whisper", e)
                 _error.value = "Failed to initialize: ${e.message}"
@@ -241,7 +241,6 @@ class WhisperVoiceService(
 
             Log.i(TAG, "whisper.cpp initialized successfully")
             return true
-
         } catch (e: Exception) {
             Log.e(TAG, "Error in initializeWhisper", e)
             return false
@@ -275,7 +274,7 @@ class WhisperVoiceService(
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -349,7 +348,7 @@ class WhisperVoiceService(
                             _voiceLevel.value = 0f
                             _error.value = "Recording error: ${error.message}"
                             currentCallback?.invoke(
-                                VoiceSearchService.VoiceSearchResult.Error("Recording failed: ${error.message}")
+                                VoiceSearchService.VoiceSearchResult.Error("Recording failed: ${error.message}"),
                             )
                             currentCallback = null
                         }
@@ -366,7 +365,7 @@ class WhisperVoiceService(
                 _isListening.value = false
                 _error.value = "Failed to start recording: ${e.message}"
                 currentCallback?.invoke(
-                    VoiceSearchService.VoiceSearchResult.Error("Failed to start recording: ${e.message}")
+                    VoiceSearchService.VoiceSearchResult.Error("Failed to start recording: ${e.message}"),
                 )
                 currentCallback = null
             }
@@ -511,7 +510,7 @@ class WhisperVoiceService(
                     _isListening.value = false
                     _error.value = "Error stopping recording: ${e.message}"
                     currentCallback?.invoke(
-                        VoiceSearchService.VoiceSearchResult.Error("Error: ${e.message}")
+                        VoiceSearchService.VoiceSearchResult.Error("Error: ${e.message}"),
                     )
                     currentCallback = null
                 }
@@ -560,7 +559,6 @@ class WhisperVoiceService(
                 return
             }
             handleTranscriptionResult(result)
-
         } catch (e: CancellationException) {
             Log.i(TAG, "Transcription coroutine cancelled")
         } catch (e: Exception) {
@@ -569,7 +567,7 @@ class WhisperVoiceService(
             _isTranscribing.value = false
             _error.value = "Transcription error: ${e.message}"
             currentCallback?.invoke(
-                VoiceSearchService.VoiceSearchResult.Error("Transcription failed: ${e.message}")
+                VoiceSearchService.VoiceSearchResult.Error("Transcription failed: ${e.message}"),
             )
             currentCallback = null
         }

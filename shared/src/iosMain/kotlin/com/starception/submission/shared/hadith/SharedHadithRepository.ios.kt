@@ -3,6 +3,15 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.starception.submission.shared.hadith
@@ -57,46 +66,46 @@ private class IosSharedHadithRepository : SharedHadithRepository {
             cacheName = "sahih_bukhari.db",
         )
         return memScoped {
-        val database = alloc<CPointerVar<sqlite3>>()
-        check(sqlite3_open_v2(path, database.ptr, SQLITE_OPEN_READONLY, null) == SQLITE_OK) {
-            "Unable to open Sahih al-Bukhari database: ${database.value.errorMessage()}"
-        }
-        try {
-            val statement = alloc<CPointerVar<sqlite3_stmt>>()
-            val sql = """
+            val database = alloc<CPointerVar<sqlite3>>()
+            check(sqlite3_open_v2(path, database.ptr, SQLITE_OPEN_READONLY, null) == SQLITE_OK) {
+                "Unable to open Sahih al-Bukhari database: ${database.value.errorMessage()}"
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
                 SELECT id, text_arabic, text_plain, elaboration
                 FROM hadiths
                 WHERE id BETWEEN ? AND ?
                 ORDER BY id ASC
-            """.trimIndent()
-            check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
-                "Unable to prepare the Bukhari query: ${database.value.errorMessage()}"
-            }
-            try {
-                check(sqlite3_bind_int(statement.value, 1, firstId) == SQLITE_OK)
-                check(sqlite3_bind_int(statement.value, 2, lastId) == SQLITE_OK)
-                buildList {
-                    while (true) {
-                        when (sqlite3_step(statement.value)) {
-                            SQLITE_ROW -> add(
-                                SharedHadith(
-                                    id = sqlite3_column_int(statement.value, 0),
-                                    arabic = statement.value.text(1),
-                                    english = statement.value.text(2),
-                                    explanation = statement.value.text(3),
-                                ),
-                            )
-                            SQLITE_DONE -> break
-                            else -> error("Unable to read Bukhari: ${database.value.errorMessage()}")
+                """.trimIndent()
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare the Bukhari query: ${database.value.errorMessage()}"
+                }
+                try {
+                    check(sqlite3_bind_int(statement.value, 1, firstId) == SQLITE_OK)
+                    check(sqlite3_bind_int(statement.value, 2, lastId) == SQLITE_OK)
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    SharedHadith(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        arabic = statement.value.text(1),
+                                        english = statement.value.text(2),
+                                        explanation = statement.value.text(3),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to read Bukhari: ${database.value.errorMessage()}")
+                            }
                         }
                     }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
                 }
             } finally {
-                statement.value?.let(::sqlite3_finalize)
+                database.value?.let(::sqlite3_close)
             }
-        } finally {
-            database.value?.let(::sqlite3_close)
-        }
         }
     }
 }

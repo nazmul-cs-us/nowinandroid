@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.shared.quran
 
 import cnames.structs.sqlite3
@@ -47,61 +63,61 @@ private class IosQuranVerseRepository : QuranVerseRepository {
         )
         val translations = runCatching { readTranslations(surahNumber) }.getOrDefault(emptyMap())
         return memScoped {
-        val database = alloc<CPointerVar<sqlite3>>()
-        val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
-        if (openResult != SQLITE_OK) {
-            val message = database.value.errorMessage()
-            database.value?.let(::sqlite3_close)
-            error("Unable to open Quran database: $message")
-        }
+            val database = alloc<CPointerVar<sqlite3>>()
+            val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+            if (openResult != SQLITE_OK) {
+                val message = database.value.errorMessage()
+                database.value?.let(::sqlite3_close)
+                error("Unable to open Quran database: $message")
+            }
 
-        try {
-            val statement = alloc<CPointerVar<sqlite3_stmt>>()
-            val sql = """
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
                 SELECT id, surah_number, number_in_surah, text, page, juz_id
                 FROM ayahs
                 WHERE surah_number = ?
                 ORDER BY number_in_surah ASC
-            """.trimIndent()
-            val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
-            if (prepareResult != SQLITE_OK) {
-                error("Unable to prepare Quran query: ${database.value.errorMessage()}")
-            }
-
-            try {
-                check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK) {
-                    "Unable to bind surah number: ${database.value.errorMessage()}"
+                """.trimIndent()
+                val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
+                if (prepareResult != SQLITE_OK) {
+                    error("Unable to prepare Quran query: ${database.value.errorMessage()}")
                 }
-                buildList {
-                    while (true) {
-                        when (sqlite3_step(statement.value)) {
-                            SQLITE_ROW -> add(
-                                QuranVerse(
-                                    id = sqlite3_column_int(statement.value, 0),
-                                    surahNumber = sqlite3_column_int(statement.value, 1),
-                                    numberInSurah = sqlite3_column_int(statement.value, 2),
-                                    arabicText = cleanQuranText(
-                                        sqlite3_column_text(statement.value, 3)
-                                            ?.reinterpret<ByteVar>()
-                                            ?.toKString()
-                                            ?: error("Ayah text is missing"),
+
+                try {
+                    check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK) {
+                        "Unable to bind surah number: ${database.value.errorMessage()}"
+                    }
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    QuranVerse(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        surahNumber = sqlite3_column_int(statement.value, 1),
+                                        numberInSurah = sqlite3_column_int(statement.value, 2),
+                                        arabicText = cleanQuranText(
+                                            sqlite3_column_text(statement.value, 3)
+                                                ?.reinterpret<ByteVar>()
+                                                ?.toKString()
+                                                ?: error("Ayah text is missing"),
+                                        ),
+                                        page = sqlite3_column_int(statement.value, 4),
+                                        juz = sqlite3_column_int(statement.value, 5),
+                                        translation = translations[sqlite3_column_int(statement.value, 2)].orEmpty(),
                                     ),
-                                    page = sqlite3_column_int(statement.value, 4),
-                                    juz = sqlite3_column_int(statement.value, 5),
-                                    translation = translations[sqlite3_column_int(statement.value, 2)].orEmpty(),
-                                ),
-                            )
-                            SQLITE_DONE -> break
-                            else -> error("Unable to read Quran ayahs: ${database.value.errorMessage()}")
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to read Quran ayahs: ${database.value.errorMessage()}")
+                            }
                         }
                     }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
                 }
             } finally {
-                statement.value?.let(::sqlite3_finalize)
+                database.value?.let(::sqlite3_close)
             }
-        } finally {
-            database.value?.let(::sqlite3_close)
-        }
         }
     }
 
@@ -113,51 +129,51 @@ private class IosQuranVerseRepository : QuranVerseRepository {
             cacheName = "quran_en.db",
         )
         return memScoped {
-        val database = alloc<CPointerVar<sqlite3>>()
-        val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
-        if (openResult != SQLITE_OK) {
-            val message = database.value.errorMessage()
-            database.value?.let(::sqlite3_close)
-            error("Unable to open Quran translation database: $message")
-        }
-        try {
-            val statement = alloc<CPointerVar<sqlite3_stmt>>()
-            val sql = """
+            val database = alloc<CPointerVar<sqlite3>>()
+            val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+            if (openResult != SQLITE_OK) {
+                val message = database.value.errorMessage()
+                database.value?.let(::sqlite3_close)
+                error("Unable to open Quran translation database: $message")
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
                 SELECT number_in_surah, text
                 FROM ayahs
                 WHERE surah_number = ?
                 ORDER BY number_in_surah ASC
-            """.trimIndent()
-            check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
-                "Unable to prepare Quran translation query: ${database.value.errorMessage()}"
-            }
-            try {
-                check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK)
-                buildMap {
-                    while (true) {
-                        when (sqlite3_step(statement.value)) {
-                            SQLITE_ROW -> put(
-                                sqlite3_column_int(statement.value, 0),
-                                cleanQuranText(
-                                    sqlite3_column_text(statement.value, 1)
-                                        ?.reinterpret<ByteVar>()
-                                        ?.toKString()
-                                        .orEmpty(),
-                                ),
-                            )
-                            SQLITE_DONE -> break
-                            else -> error(
-                                "Unable to read Quran translations: ${database.value.errorMessage()}",
-                            )
+                """.trimIndent()
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare Quran translation query: ${database.value.errorMessage()}"
+                }
+                try {
+                    check(sqlite3_bind_int(statement.value, 1, surahNumber) == SQLITE_OK)
+                    buildMap {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> put(
+                                    sqlite3_column_int(statement.value, 0),
+                                    cleanQuranText(
+                                        sqlite3_column_text(statement.value, 1)
+                                            ?.reinterpret<ByteVar>()
+                                            ?.toKString()
+                                            .orEmpty(),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error(
+                                    "Unable to read Quran translations: ${database.value.errorMessage()}",
+                                )
+                            }
                         }
                     }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
                 }
             } finally {
-                statement.value?.let(::sqlite3_finalize)
+                database.value?.let(::sqlite3_close)
             }
-        } finally {
-            database.value?.let(::sqlite3_close)
-        }
         }
     }
 }

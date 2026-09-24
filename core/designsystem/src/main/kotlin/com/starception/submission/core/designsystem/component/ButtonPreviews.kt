@@ -16,11 +16,11 @@
 
 package com.starception.submission.core.designsystem.component
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.NiaTheme

@@ -47,8 +47,8 @@ import com.starception.submission.shared.notifications.IosPrayerSchedulePublishe
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.salah.SalahTracker
 import com.starception.submission.shared.settings.LastLocationStore
-import com.starception.submission.shared.settings.UserAudioSettings
 import com.starception.submission.shared.settings.UserAppearanceSettings
+import com.starception.submission.shared.settings.UserAudioSettings
 import com.starception.submission.shared.settings.UserPrayerSettings
 import com.starception.submission.shared.settings.VoiceRecognitionMode
 import com.starception.submission.shared.travel.IosTravelDuaMonitor
@@ -60,9 +60,6 @@ import com.starception.submission.shared.voice.PlatformSpeechRecognizer
 import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import com.starception.submission.shared.voice.SpeechRecognitionEvent
 import com.starception.submission.shared.weather.CurrentConditionsClient
-import kotlin.time.Clock
-import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +73,9 @@ import kotlinx.datetime.toLocalDateTime
 import platform.Foundation.NSBundle
 import platform.Foundation.NSProcessInfo
 import platform.UIKit.UIViewController
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.time.Clock
 
 /**
  * Bridges the shared Compose UI into UIKit so `iosApp/` can present it.
@@ -764,28 +764,28 @@ private suspend fun loadIosContentStorageState(): ContentStorageState =
             val categories = manifest.categories
                 .filterKeys { it in IOS_CONTENT_STORAGE_CATEGORIES }
                 .map { (category, info) ->
-                val status = iosCloudAssets.getCategoryStatus(category, manifest)
-                ContentStorageCategoryState(
-                    categoryKey = category,
-                    displayName = storageCategoryDisplayName(category),
-                    description = storageCategoryDescription(category),
-                    totalSize = status.totalBytes.takeIf { it > 0L } ?: info.totalSize,
-                    downloadedSize = status.downloadedBytes,
-                    availableSize = status.availableBytes,
-                    fileCount = status.totalFiles.takeIf { it > 0 } ?: info.fileCount,
-                    required = info.required,
-                    isDownloaded = status.isDownloaded,
-                    isAvailable = status.isAvailable,
-                    progress = if (status.totalBytes > 0L) {
-                        status.downloadedBytes.toFloat() / status.totalBytes
-                    } else {
-                        1f
-                    },
+                    val status = iosCloudAssets.getCategoryStatus(category, manifest)
+                    ContentStorageCategoryState(
+                        categoryKey = category,
+                        displayName = storageCategoryDisplayName(category),
+                        description = storageCategoryDescription(category),
+                        totalSize = status.totalBytes.takeIf { it > 0L } ?: info.totalSize,
+                        downloadedSize = status.downloadedBytes,
+                        availableSize = status.availableBytes,
+                        fileCount = status.totalFiles.takeIf { it > 0 } ?: info.fileCount,
+                        required = info.required,
+                        isDownloaded = status.isDownloaded,
+                        isAvailable = status.isAvailable,
+                        progress = if (status.totalBytes > 0L) {
+                            status.downloadedBytes.toFloat() / status.totalBytes
+                        } else {
+                            1f
+                        },
+                    )
+                }.sortedWith(
+                    compareByDescending<ContentStorageCategoryState> { it.required }
+                        .thenBy { it.displayName },
                 )
-            }.sortedWith(
-                compareByDescending<ContentStorageCategoryState> { it.required }
-                    .thenBy { it.displayName },
-            )
             ContentStorageState(categories = categories)
         } catch (cancelled: CancellationException) {
             throw cancelled

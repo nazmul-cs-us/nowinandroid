@@ -281,7 +281,7 @@ object WidgetPreviewRegistrar {
                 val views = spec.previewRemoteViews(appContext, slot = 2)
                 val accepted = manager.setWidgetPreview(
                     ComponentName(appContext.packageName, spec.receiverClassName),
-                    AppWidgetProviderCategoryHomeScreen,
+                    APP_WIDGET_PROVIDER_CATEGORY_HOME_SCREEN,
                     views,
                 )
                 Log.d(TAG, "${spec.key}: launcher preview accepted=$accepted")
@@ -293,5 +293,5 @@ object WidgetPreviewRegistrar {
 }
 
 // Kept as a named constant so the platform category used by every preview is unambiguous.
-private const val AppWidgetProviderCategoryHomeScreen =
+private const val APP_WIDGET_PROVIDER_CATEGORY_HOME_SCREEN =
     AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN

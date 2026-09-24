@@ -148,7 +148,8 @@ data class TtsSettingsState(
     val selectedVoice: TtsVoice = TtsVoice.KOKORO_EN,
     val selectedSpeakerId: Int = 0,
     val availableVoices: List<TtsVoice> = listOf(TtsVoice.KOKORO_EN, TtsVoice.VITS_VCTK),
-    val amplitude: Float = 0f,  // Real-time audio amplitude (0.0 to 1.0)
+    // Real-time audio amplitude (0.0 to 1.0)
+    val amplitude: Float = 0f,  
     val needsDownload: Boolean = false,
     val downloadCategory: String? = null,
 )

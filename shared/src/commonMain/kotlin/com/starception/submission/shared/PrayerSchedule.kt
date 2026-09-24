@@ -27,13 +27,13 @@ import com.starception.submission.prayer.model.HighLatitudeAdjustment
 import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerInstant
 import com.starception.submission.prayer.model.PrayerSettings
-import com.starception.submission.prayer.model.getPrayerNameInLocalLanguage
 import com.starception.submission.prayer.model.PrayerWindows
-import kotlin.time.Clock
+import com.starception.submission.prayer.model.getPrayerNameInLocalLanguage
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 /**
  * One prayer in a day's schedule, flattened for Objective-C interop.

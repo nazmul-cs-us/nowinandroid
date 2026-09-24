@@ -1,7 +1,17 @@
 /*
- * Copyright 2025 Starception
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.starception.submission.core.ui
@@ -112,11 +122,13 @@ object ChapterAudioController {
         val player = mp
         if (currentUrl == url && player != null) {
             if (isPlaying) {
-                player.pause(); isPlaying = false
+                player.pause()
+                isPlaying = false
                 onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
                 stopProgressTicker()
             } else {
-                player.start(); isPlaying = true
+                player.start()
+                isPlaying = true
                 onPlaybackStateChanged?.invoke(true, currentTitle.orEmpty())
                 startProgressTicker()
             }
@@ -182,7 +194,10 @@ object ChapterAudioController {
 
     /** Play/pause the currently loaded track — invoked by the global media mini-bar. */
     fun togglePlayPause() {
-        playbackDelegate?.let { it.togglePlayPause(); return }
+        playbackDelegate?.let {
+            it.togglePlayPause()
+            return
+        }
         currentUrl?.let { toggle(it) }
     }
 
@@ -198,7 +213,10 @@ object ChapterAudioController {
 
     /** Seek the current track — invoked by the global media mini-bar. */
     fun seekTo(positionMs: Int) {
-        playbackDelegate?.let { it.seekTo(positionMs); return }
+        playbackDelegate?.let {
+            it.seekTo(positionMs)
+            return
+        }
         mp?.let { player ->
             runCatching { player.seekTo(positionMs) }
             onProgressChanged?.invoke(player.currentPosition, player.duration)
@@ -218,7 +236,9 @@ object ChapterAudioController {
                 .build(),
         )
         newPlayer.setOnPreparedListener {
-            loadingUrl = null; newPlayer.start(); isPlaying = true
+            loadingUrl = null
+            newPlayer.start()
+            isPlaying = true
             onPlaybackStateChanged?.invoke(true, currentTitle.orEmpty())
             onProgressChanged?.invoke(0, newPlayer.duration)
             startProgressTicker()
@@ -230,7 +250,9 @@ object ChapterAudioController {
             onCompletion?.invoke()
         }
         newPlayer.setOnErrorListener { _, _, _ ->
-            loadingUrl = null; isPlaying = false; currentUrl = null
+            loadingUrl = null
+            isPlaying = false
+            currentUrl = null
             stopProgressTicker()
             onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
             true
@@ -240,7 +262,9 @@ object ChapterAudioController {
             newPlayer.setDataSource(dataSource)
             newPlayer.prepareAsync()
         } catch (_: Exception) {
-            loadingUrl = null; isPlaying = false; currentUrl = null
+            loadingUrl = null
+            isPlaying = false
+            currentUrl = null
             onPlaybackStateChanged?.invoke(false, currentTitle.orEmpty())
         }
     }
@@ -269,8 +293,13 @@ object ChapterAudioController {
     /** Tear down only the MediaPlayer, leaving any in-flight resolve/download running. */
     private fun stopPlayback() {
         stopProgressTicker()
-        mp?.let { runCatching { it.stop() }; it.release() }
-        mp = null; isPlaying = false; loadingUrl = null
+        mp?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
+        mp = null
+        isPlaying = false
+        loadingUrl = null
     }
 
     fun release() {

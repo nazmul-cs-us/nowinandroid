@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.contentdatabase
 
 import androidx.room.ColumnInfo
@@ -43,7 +59,7 @@ data class NewsResourceEntity(
     val createdAt: String?,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: String?
+    val updatedAt: String?,
 )
 
 /**
@@ -51,14 +67,14 @@ data class NewsResourceEntity(
  */
 @Entity(
     tableName = "news_topics",
-    primaryKeys = ["news_id", "topic_id"]
+    primaryKeys = ["news_id", "topic_id"],
 )
 data class NewsTopicCrossRef(
     @ColumnInfo(name = "news_id")
     val newsId: Int,
 
     @ColumnInfo(name = "topic_id")
-    val topicId: Int
+    val topicId: Int,
 )
 
 /**
@@ -75,5 +91,6 @@ data class NewsResourceWithTopics(
     val isSystem: Int,
     val isUserCreated: Int,
     val source: String?,
-    val topicIds: String? // Comma-separated topic IDs
+    // Comma-separated topic IDs
+    val topicIds: String?,
 )

@@ -36,6 +36,7 @@ internal val DarkGreen90 = Color(0xFFD3E8D3)
 internal val DarkGreenGray10 = Color(0xFF1A1C1A)
 internal val DarkGreenGray20 = Color(0xFF2F312E)
 internal val DarkGreenGray90 = Color(0xFFE2E3DE)
+
 // Public rather than internal because core:designsystem still references these
 // from Theme.kt, and `internal` does not cross a module boundary. The rest of the
 // palette stays internal — it is consumed by ColorSchemes.kt in this module.
@@ -92,52 +93,52 @@ internal val Teal90 = Color(0xFFBEEAF6)
  * Features deep forest greens, warm golds, and soft sage tones
  */
 // Forest Green Family - Deep, sophisticated greens
-internal val ForestGreen10 = Color(0xFF0D1B0F)  // Deep forest shadow
-internal val ForestGreen20 = Color(0xFF1A2F1D)  // Dark forest green
-internal val ForestGreen30 = Color(0xFF2E4B32)  // Medium forest green
-internal val ForestGreen40 = Color(0xFF3E5B41)  // Elegant forest green - sophisticated
-internal val ForestGreen80 = Color(0xFF9BB99E)  // Light sage green - calming
-internal val ForestGreen90 = Color(0xFFC8D4CA)  // Pale sage green
+internal val ForestGreen10 = Color(0xFF0D1B0F) // Deep forest shadow
+internal val ForestGreen20 = Color(0xFF1A2F1D) // Dark forest green
+internal val ForestGreen30 = Color(0xFF2E4B32) // Medium forest green
+internal val ForestGreen40 = Color(0xFF3E5B41) // Elegant forest green - sophisticated
+internal val ForestGreen80 = Color(0xFF9BB99E) // Light sage green - calming
+internal val ForestGreen90 = Color(0xFFC8D4CA) // Pale sage green
 
 // Warm Gold Family - Elegant metallic accents
-internal val WarmGold10 = Color(0xFF2A1F0A)     // Deep bronze
-internal val WarmGold20 = Color(0xFF4A3B18)     // Dark gold
-internal val WarmGold30 = Color(0xFF6B5526)     // Medium gold
-internal val WarmGold40 = Color(0xFF8B6914)     // Rich warm gold - luxurious
-internal val WarmGold80 = Color(0xFFD4C078)     // Light champagne gold
-internal val WarmGold90 = Color(0xFFE8DFB8)     // Pale golden cream
+internal val WarmGold10 = Color(0xFF2A1F0A) // Deep bronze
+internal val WarmGold20 = Color(0xFF4A3B18) // Dark gold
+internal val WarmGold30 = Color(0xFF6B5526) // Medium gold
+internal val WarmGold40 = Color(0xFF8B6914) // Rich warm gold - luxurious
+internal val WarmGold80 = Color(0xFFD4C078) // Light champagne gold
+internal val WarmGold90 = Color(0xFFE8DFB8) // Pale golden cream
 
 // Soft Sage Family - Peaceful natural tones
-internal val SoftSage10 = Color(0xFF1C1F1A)     // Deep sage shadow
-internal val SoftSage20 = Color(0xFF2F332B)     // Dark sage
-internal val SoftSage30 = Color(0xFF4A523E)     // Medium sage
-internal val SoftSage40 = Color(0xFF5C6B4F)     // Gentle sage - peaceful
-internal val SoftSage80 = Color(0xFFB8C3AC)     // Light sage
-internal val SoftSage90 = Color(0xFFD6DFD0)     // Pale sage cream
+internal val SoftSage10 = Color(0xFF1C1F1A) // Deep sage shadow
+internal val SoftSage20 = Color(0xFF2F332B) // Dark sage
+internal val SoftSage30 = Color(0xFF4A523E) // Medium sage
+internal val SoftSage40 = Color(0xFF5C6B4F) // Gentle sage - peaceful
+internal val SoftSage80 = Color(0xFFB8C3AC) // Light sage
+internal val SoftSage90 = Color(0xFFD6DFD0) // Pale sage cream
 
 // Garnet Family - Deep refined red (Apple "Garnet" accent)
-internal val Garnet10 = Color(0xFF2A0A0E)       // Very deep garnet
-internal val Garnet20 = Color(0xFF4A1A20)       // Dark garnet
-internal val Garnet30 = Color(0xFF6B2A30)       // Medium dark garnet
-internal val Garnet40 = Color(0xFF9B3D3A)       // Rich garnet — primary
-internal val Garnet80 = Color(0xFFE6A89F)       // Soft garnet tint
-internal val Garnet90 = Color(0xFFF6D9D2)       // Pale garnet cream
+internal val Garnet10 = Color(0xFF2A0A0E) // Very deep garnet
+internal val Garnet20 = Color(0xFF4A1A20) // Dark garnet
+internal val Garnet30 = Color(0xFF6B2A30) // Medium dark garnet
+internal val Garnet40 = Color(0xFF9B3D3A) // Rich garnet — primary
+internal val Garnet80 = Color(0xFFE6A89F) // Soft garnet tint
+internal val Garnet90 = Color(0xFFF6D9D2) // Pale garnet cream
 
 // Lapis Family - Deep refined blue (Apple "Lapis" accent)
-internal val Lapis10 = Color(0xFF071029)        // Deep ink blue
-internal val Lapis20 = Color(0xFF152547)        // Dark lapis
-internal val Lapis30 = Color(0xFF233E70)        // Medium dark lapis
-internal val Lapis40 = Color(0xFF2D5DA8)        // Rich lapis — primary
-internal val Lapis80 = Color(0xFFA8C4EE)        // Soft lapis tint
-internal val Lapis90 = Color(0xFFD6E2F7)        // Pale lapis cream
+internal val Lapis10 = Color(0xFF071029) // Deep ink blue
+internal val Lapis20 = Color(0xFF152547) // Dark lapis
+internal val Lapis30 = Color(0xFF233E70) // Medium dark lapis
+internal val Lapis40 = Color(0xFF2D5DA8) // Rich lapis — primary
+internal val Lapis80 = Color(0xFFA8C4EE) // Soft lapis tint
+internal val Lapis90 = Color(0xFFD6E2F7) // Pale lapis cream
 
 // Wave Gray Family - Premium neutral tones
-internal val WaveGray10 = Color(0xFF1C1E20)   // Dark wave shadow
-internal val WaveGray20 = Color(0xFF2F3133)   // Medium dark gray
-internal val WaveGray30 = Color(0xFF424547)   // Medium gray
-internal val WaveGray50 = Color(0xFF707578)   // Neutral gray
-internal val WaveGray60 = Color(0xFF8A8E91)   // Light medium gray
-internal val WaveGray80 = Color(0xFFC4C7CA)   // Premium light gray
-internal val WaveGray90 = Color(0xFFE4E6E9)   // Elegant very light gray
-internal val WaveGray95 = Color(0xFFF2F4F6)   // Sophisticated near white
-internal val WaveGray99 = Color(0xFFFAFBFC)   // Pure coastal white
+internal val WaveGray10 = Color(0xFF1C1E20) // Dark wave shadow
+internal val WaveGray20 = Color(0xFF2F3133) // Medium dark gray
+internal val WaveGray30 = Color(0xFF424547) // Medium gray
+internal val WaveGray50 = Color(0xFF707578) // Neutral gray
+internal val WaveGray60 = Color(0xFF8A8E91) // Light medium gray
+internal val WaveGray80 = Color(0xFFC4C7CA) // Premium light gray
+internal val WaveGray90 = Color(0xFFE4E6E9) // Elegant very light gray
+internal val WaveGray95 = Color(0xFFF2F4F6) // Sophisticated near white
+internal val WaveGray99 = Color(0xFFFAFBFC) // Pure coastal white

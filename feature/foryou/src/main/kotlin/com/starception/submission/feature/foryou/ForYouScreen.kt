@@ -21,16 +21,13 @@ import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,12 +41,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -61,8 +56,10 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -101,6 +98,7 @@ import com.starception.submission.core.designsystem.component.scrollbar.Draggabl
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
 import com.starception.submission.core.designsystem.icon.NiaIcons
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.ui.DevicePreviews
@@ -110,7 +108,6 @@ import com.starception.submission.core.ui.TrackScrollJank
 import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
 import com.starception.submission.core.ui.launchCustomChromeTab
 import com.starception.submission.core.ui.newsFeed
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun ForYouScreen(
@@ -332,7 +329,7 @@ private fun EmptyFeedContent(
         )
         Spacer(Modifier.height(24.dp))
         NiaOutlinedButton(
-            onClick = onBrowseTopicsClick
+            onClick = onBrowseTopicsClick,
         ) {
             Text("Browse topics")
         }

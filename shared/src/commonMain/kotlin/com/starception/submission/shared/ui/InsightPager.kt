@@ -16,9 +16,14 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,22 +39,20 @@ import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,35 +71,31 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.images.resources.Res
 import com.starception.submission.core.images.resources.insight_prayer_background
 import com.starception.submission.core.images.resources.insight_prayer_foreground
-import com.starception.submission.core.images.resources.insight_quran_background
-import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_qibla_background
 import com.starception.submission.core.images.resources.insight_qibla_foreground_v2
+import com.starception.submission.core.images.resources.insight_quran_background
+import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
-import androidx.compose.runtime.LaunchedEffect
-import com.starception.submission.shared.SharedPrayerDay
-import com.starception.submission.shared.salah.FARD_PRAYERS
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
-import com.starception.submission.shared.salah.SalahProgress
-import com.starception.submission.shared.content.dailyRecommendation
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
+import com.starception.submission.shared.content.dailyRecommendation
+import com.starception.submission.shared.qibla.HeadingProvider
+import com.starception.submission.shared.qibla.HeadingReading
 import com.starception.submission.shared.qibla.cardinalDirection
 import com.starception.submission.shared.qibla.qiblaBearing
 import com.starception.submission.shared.qibla.relativeQiblaTurn
-import com.starception.submission.shared.qibla.HeadingProvider
-import com.starception.submission.shared.qibla.HeadingReading
-import com.starception.submission.prayer.model.PrayerNotificationPreferences
-import kotlinx.datetime.LocalDate
+import com.starception.submission.shared.salah.FARD_PRAYERS
+import com.starception.submission.shared.salah.SalahProgress
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
+import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.roundToInt
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The swipeable insight tiles at the top of the home page.
@@ -276,121 +275,121 @@ fun InsightPager(
                             alpha = 0.9f + (0.1f * focus)
                         },
                 ) {
-                when (logicalPage) {
-                    0 -> PrayerNowTile(
-                        phase = day.skyPhase,
-                        weather = day.skyWeather,
-                        headline = day.heroHeadline(notifications),
-                        subtitle = day.heroSubtitle(placeName),
-                        nextPrayer = nextPrayerText,
-                        forecast = day.temperatureCelsius?.let { "${it.roundToInt()}°C" },
-                        sceneIndex = prayerSceneIndex,
-                        timelineProgress = day.prayerWindowProgress(),
-                        tileHeight = tileHeight,
-                        onClick = onOpenQibla,
-                        onLongClick = { prayerSceneIndex = (prayerSceneIndex + 1).mod(3) },
-                    )
-
-                    1 -> ArtworkTile(
-                        artwork = Res.drawable.insight_prayer_background,
-                        foreground = Res.drawable.insight_prayer_foreground,
-                        foregroundScale = 0.88f,
-                        foregroundOffsetYFraction = 0.08f,
-                        label = "Today's salah",
-                        title = salah.headline,
-                        subtitle = salah.detail,
-                        tileHeight = tileHeight,
-                    ) {
-                        SalahMarkers(
-                            completed = salah.completed,
-                            available = day.slots
-                                .filter { it.hasStarted && it.name in FARD_PRAYERS }
-                                .mapTo(mutableSetOf()) { it.name },
-                            onToggle = onTogglePrayer,
-                        )
-                    }
-
-                    2 -> {
-                        val surah = dailyReading(today)
-                        ArtworkTile(
-                            artwork = Res.drawable.insight_quran_background,
-                            foreground = Res.drawable.insight_quran_foreground_v2,
-                            foregroundScale = 0.80f,
-                            foregroundOffsetYFraction = 0.10f,
-                            label = "Today's reading",
-                            title = surah.nameEnglish,
-                            subtitle = surah.subtitle(),
-                            arabicTitle = surah.nameArabic,
+                    when (logicalPage) {
+                        0 -> PrayerNowTile(
+                            phase = day.skyPhase,
+                            weather = day.skyWeather,
+                            headline = day.heroHeadline(notifications),
+                            subtitle = day.heroSubtitle(placeName),
+                            nextPrayer = nextPrayerText,
+                            forecast = day.temperatureCelsius?.let { "${it.roundToInt()}°C" },
+                            sceneIndex = prayerSceneIndex,
+                            timelineProgress = day.prayerWindowProgress(),
                             tileHeight = tileHeight,
-                            onClick = {
-                                quranPlayer.stop()
-                                isReadingAudio = false
-                                onOpenQuran(surah.number)
-                            },
-                            content = {
-                                Surface(
-                                    onClick = {
-                                        if (isReadingAudio) {
-                                            quranPlayer.pause()
-                                            isReadingAudio = false
-                                        } else {
-                                            isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
-                                        }
-                                    },
-                                    shape = CircleShape,
-                                    color = Color.Black.copy(alpha = 0.38f),
-                                    contentColor = Color.White,
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                            onClick = onOpenQibla,
+                            onLongClick = { prayerSceneIndex = (prayerSceneIndex + 1).mod(3) },
+                        )
+
+                        1 -> ArtworkTile(
+                            artwork = Res.drawable.insight_prayer_background,
+                            foreground = Res.drawable.insight_prayer_foreground,
+                            foregroundScale = 0.88f,
+                            foregroundOffsetYFraction = 0.08f,
+                            label = "Today's salah",
+                            title = salah.headline,
+                            subtitle = salah.detail,
+                            tileHeight = tileHeight,
+                        ) {
+                            SalahMarkers(
+                                completed = salah.completed,
+                                available = day.slots
+                                    .filter { it.hasStarted && it.name in FARD_PRAYERS }
+                                    .mapTo(mutableSetOf()) { it.name },
+                                onToggle = onTogglePrayer,
+                            )
+                        }
+
+                        2 -> {
+                            val surah = dailyReading(today)
+                            ArtworkTile(
+                                artwork = Res.drawable.insight_quran_background,
+                                foreground = Res.drawable.insight_quran_foreground_v2,
+                                foregroundScale = 0.80f,
+                                foregroundOffsetYFraction = 0.10f,
+                                label = "Today's reading",
+                                title = surah.nameEnglish,
+                                subtitle = surah.subtitle(),
+                                arabicTitle = surah.nameArabic,
+                                tileHeight = tileHeight,
+                                onClick = {
+                                    quranPlayer.stop()
+                                    isReadingAudio = false
+                                    onOpenQuran(surah.number)
+                                },
+                                content = {
+                                    Surface(
+                                        onClick = {
+                                            if (isReadingAudio) {
+                                                quranPlayer.pause()
+                                                isReadingAudio = false
+                                            } else {
+                                                isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
+                                            }
+                                        },
+                                        shape = CircleShape,
+                                        color = Color.Black.copy(alpha = 0.38f),
+                                        contentColor = Color.White,
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+                                        modifier = Modifier.padding(bottom = 8.dp),
                                     ) {
-                                        Icon(
-                                            imageVector = if (isReadingAudio) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                            contentDescription = if (isReadingAudio) "Pause recitation" else "Play recitation",
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                        Text(
-                                            text = if (isReadingAudio) "Pause" else "Listen",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isReadingAudio) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                contentDescription = if (isReadingAudio) "Pause recitation" else "Play recitation",
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Text(
+                                                text = if (isReadingAudio) "Pause" else "Listen",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                        )
-                    }
+                                },
+                            )
+                        }
 
-                    3 -> ArtworkTile(
-                        artwork = Res.drawable.insight_qibla_background,
-                        foreground = Res.drawable.insight_qibla_foreground_v2,
-                        foregroundScale = 0.75f,
-                        foregroundOffsetYFraction = 0.10f,
-                        label = "Qibla",
-                        title = "$qiblaBearing° toward Makkah",
-                        subtitle = qiblaGuidance(
-                            qiblaBearing = qiblaBearing,
-                            headingDegrees = heading.headingDegrees,
-                        ),
-                        tileHeight = tileHeight,
-                        onClick = onOpenQibla,
-                    )
-
-                    else -> {
-                        val recommendation = dailyRecommendation(today)
-                        ArtworkTile(
-                            artwork = Res.drawable.insight_suggestion,
-                            label = "AI suggested · ${recommendation.category}",
-                            title = recommendation.title,
-                            subtitle = recommendation.summary,
+                        3 -> ArtworkTile(
+                            artwork = Res.drawable.insight_qibla_background,
+                            foreground = Res.drawable.insight_qibla_foreground_v2,
+                            foregroundScale = 0.75f,
+                            foregroundOffsetYFraction = 0.10f,
+                            label = "Qibla",
+                            title = "$qiblaBearing° toward Makkah",
+                            subtitle = qiblaGuidance(
+                                qiblaBearing = qiblaBearing,
+                                headingDegrees = heading.headingDegrees,
+                            ),
                             tileHeight = tileHeight,
-                            onClick = onOpenRecommendation,
+                            onClick = onOpenQibla,
                         )
+
+                        else -> {
+                            val recommendation = dailyRecommendation(today)
+                            ArtworkTile(
+                                artwork = Res.drawable.insight_suggestion,
+                                label = "AI suggested · ${recommendation.category}",
+                                title = recommendation.title,
+                                subtitle = recommendation.summary,
+                                tileHeight = tileHeight,
+                                onClick = onOpenRecommendation,
+                            )
+                        }
                     }
-                }
                 }
             }
         }
@@ -426,7 +425,9 @@ private fun SharedPrayerDay.heroHeadline(
         val elapsed = if (slot != null) {
             val startMin = slot.hour * 60 + slot.minute
             (nowMinute - startMin + 1440) % 1440
-        } else 0
+        } else {
+            0
+        }
         return when {
             elapsed <= notifications.getGoToMosqueDurationForPrayer(effectiveCurrent) ->
                 "Go to Mosque for $effectiveCurrent"
@@ -444,8 +445,12 @@ private fun SharedPrayerDay.heroHeadline(
  */
 private fun SharedPrayerDay.heroSubtitle(placeName: String): String {
     val effectiveCurrent = currentPrayer
-        ?: if (countdown == "Now") nextPrayer else null
-        ?: return placeName
+        ?: if (countdown == "Now") {
+            nextPrayer
+        } else {
+            null
+                ?: return placeName
+        }
     val slot = slots.firstOrNull { it.isCurrent }
         ?: slots.firstOrNull { it.name == effectiveCurrent }
         ?: return placeName

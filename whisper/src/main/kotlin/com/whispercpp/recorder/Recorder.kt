@@ -1,7 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.whispercpp.recorder
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -23,7 +38,7 @@ import kotlin.math.sqrt
 
 class Recorder(private val audioManager: AudioManager? = null) {
     private val scope: CoroutineScope = CoroutineScope(
-        Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher(),
     )
     private var recorder: AudioRecordThread? = null
 
@@ -45,7 +60,7 @@ class Recorder(private val audioManager: AudioManager? = null) {
         outputFile: File,
         onError: (Exception) -> Unit,
         onAmplitude: (Float) -> Unit,
-        onSamples: ((FloatArray) -> Unit)? = null
+        onSamples: ((FloatArray) -> Unit)? = null,
     ) = withContext(scope.coroutineContext) {
         val isBluetoothMode = audioManager?.mode == AudioManager.MODE_IN_COMMUNICATION
         recorder = AudioRecordThread(outputFile, onError, onAmplitude, audioManager, isBluetoothMode, onSamples)
@@ -66,7 +81,7 @@ private class AudioRecordThread(
     private val onAmplitude: ((Float) -> Unit)?,
     private val audioManager: AudioManager? = null,
     private val isBluetoothMode: Boolean = false,
-    private val onSamples: ((FloatArray) -> Unit)? = null
+    private val onSamples: ((FloatArray) -> Unit)? = null,
 ) :
     Thread("AudioRecorder") {
     private var quit = AtomicBoolean(false)
@@ -86,7 +101,7 @@ private class AudioRecordThread(
          * Cutoff ~200Hz to preserve speech (300Hz-3400Hz) while removing road rumble.
          */
         private fun applyHighPassFilter(sample: Short): Short {
-            val alpha = 0.926f  // Cutoff ~200Hz at 16kHz sample rate
+            val alpha = 0.926f // Cutoff ~200Hz at 16kHz sample rate
             val inputFloat = sample.toFloat() / Short.MAX_VALUE
             filteredSample = alpha * (filteredSample + inputFloat - previousSample)
             previousSample = inputFloat
@@ -110,7 +125,7 @@ private class AudioRecordThread(
             val bufferSize = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+                AudioFormat.ENCODING_PCM_16BIT,
             ) * 4
             val buffer = ShortArray(bufferSize / 2)
 
@@ -146,7 +161,7 @@ private class AudioRecordThread(
                 // Add 500ms of pre-roll silence at the start
                 // This prevents Whisper from cutting off the first word ("yes")
                 // which was being lost due to AudioRecord startup delay
-                val preRollSamples = SAMPLE_RATE / 2  // 500ms at 16kHz = 8000 samples
+                val preRollSamples = SAMPLE_RATE / 2 // 500ms at 16kHz = 8000 samples
                 Log.i(TAG, "🎙️ Adding $preRollSamples samples of pre-roll silence")
                 repeat(preRollSamples) {
                     if (!appendSample(0)) {
@@ -189,7 +204,7 @@ private class AudioRecordThread(
 
                         // Calculate amplitude for logging and callback
                         val amplitude = calculateRmsAmplitude(buffer, read)
-                        val rms = amplitude * 32767  // Convert back to raw RMS
+                        val rms = amplitude * 32767 // Convert back to raw RMS
                         val dbLevel = if (rms > 0) 20 * kotlin.math.log10(rms.toDouble()) else -100.0
 
                         // Log audio level - first 3 chunks, then every 4th chunk for diagnosis
@@ -277,9 +292,15 @@ private class AudioRecordThread(
      * Release audio enhancement effects.
      */
     private fun releaseAudioEffects() {
-        try { noiseSuppressor?.release() } catch (_: Exception) {}
-        try { acousticEchoCanceler?.release() } catch (_: Exception) {}
-        try { automaticGainControl?.release() } catch (_: Exception) {}
+        try {
+            noiseSuppressor?.release()
+        } catch (_: Exception) {}
+        try {
+            acousticEchoCanceler?.release()
+        } catch (_: Exception) {}
+        try {
+            automaticGainControl?.release()
+        } catch (_: Exception) {}
         noiseSuppressor = null
         acousticEchoCanceler = null
         automaticGainControl = null
@@ -325,7 +346,7 @@ private class AudioRecordThread(
                         .setSampleRate(SAMPLE_RATE)
                         .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
+                        .build(),
                 )
                 .setBufferSizeInBytes(bufferSize)
 
@@ -346,7 +367,7 @@ private class AudioRecordThread(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
+                bufferSize,
             )
         }
     }
@@ -376,7 +397,8 @@ private class AudioRecordThread(
         // If no built-in mic found, return first non-Bluetooth device
         for (device in devices) {
             if (device.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
-                device.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                device.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+            ) {
                 Log.i(TAG, "🎤 Using fallback device: ${device.productName}")
                 return device
             }

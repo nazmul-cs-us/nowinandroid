@@ -42,13 +42,13 @@ abstract class DuaDatabase : RoomDatabase() {
         private const val TAG = "DuaDatabase"
 
         @Volatile
-        private var INSTANCE: DuaDatabase? = null
+        private var dbInstance: DuaDatabase? = null
 
         /**
          * Get the singleton instance of DuaDatabase
          */
         fun getInstance(context: Context): DuaDatabase {
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     DuaDatabase::class.java,
@@ -70,7 +70,7 @@ abstract class DuaDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }
@@ -121,8 +121,8 @@ abstract class DuaDatabase : RoomDatabase() {
          * Close database instance (for testing or cleanup)
          */
         fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+            dbInstance?.close()
+            dbInstance = null
             android.util.Log.d(TAG, "🔒 Dua database closed")
         }
 

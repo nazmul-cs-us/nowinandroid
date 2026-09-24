@@ -16,46 +16,49 @@
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Thermostat
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,42 +74,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.shared.SharedPrayerDay
-import com.starception.submission.shared.dashboardSlots
-import com.starception.submission.prayer.model.PrayerTimeOffsets
-import com.starception.submission.prayer.model.PrayerNotificationPreferences
-import com.starception.submission.feature.prayertimes.wobble.AlertPhase
-import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
-import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Thermostat
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import com.starception.submission.shared.salah.SalahProgress
+import com.starception.submission.feature.prayertimes.wobble.AlertPhase
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
+import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.prayer.model.PrayerTimeOffsets
+import com.starception.submission.shared.SharedPrayerDay
+import com.starception.submission.shared.SharedPrayerSlot
 import com.starception.submission.shared.audio.QuranAudioPlayer
+import com.starception.submission.shared.dashboardSlots
+import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
-import com.starception.submission.shared.SharedPrayerSlot
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.rounded.ExpandMore
 import kotlin.math.roundToInt
 
 // Shared copies of the Android dashboard's reference palette. Keeping these
@@ -244,7 +241,7 @@ fun PrayerTimesScreen(
                 // minus the schedule header (44) and 8dp row gaps evenly.
                 val tabletCardHeight = (
                     (paneContentHeight - 44.dp - (8.dp * 3)) / 3
-                ).coerceIn(96.dp, 190.dp)
+                    ).coerceIn(96.dp, 190.dp)
                 // Portrait tablet single-pane: the schedule always shows all
                 // six prayers, and its three rows absorb the height left after
                 // the header (58), hero block (~454), schedule header (44),
@@ -254,7 +251,7 @@ fun PrayerTimesScreen(
                 // bottom-bar clearance (112) ≈ 810dp; rows share the rest.
                 val portraitCardHeight = (
                     (maxHeight - 810.dp) / 3
-                ).coerceIn(96.dp, 132.dp)
+                    ).coerceIn(96.dp, 132.dp)
                 Box(
                     modifier = Modifier
                         .widthIn(max = 1200.dp)
@@ -273,60 +270,107 @@ fun PrayerTimesScreen(
                             )
                             .padding(top = 8.dp),
                     ) {
-                PrayerHomeHeader(
-                    onOpenSettings = onOpenSettings,
-                    onOpenProfile = onOpenProfile,
-                    onOpenSearch = onOpenSearch,
-                    searchTerm = day.nextPrayer ?: day.currentPrayer,
-                    onVoiceTap = onVoiceTap,
-                )
-                Spacer(Modifier.height(10.dp))
+                        PrayerHomeHeader(
+                            onOpenSettings = onOpenSettings,
+                            onOpenProfile = onOpenProfile,
+                            onOpenSearch = onOpenSearch,
+                            searchTerm = day.nextPrayer ?: day.currentPrayer,
+                            onVoiceTap = onVoiceTap,
+                        )
+                        Spacer(Modifier.height(10.dp))
 
-                if (useTwoPaneLayout) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.weight(if (isTablet) 5f else 1f),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(bottom = 84.dp),
-                        ) {
-                            item {
-                                InsightPager(
-                                    day = day,
-                                    placeName = placeName,
-                                    salah = salah,
-                                    onTogglePrayer = onTogglePrayer,
-                                    today = today,
-                                    latitude = latitude,
-                                    longitude = longitude,
-                                    quranPlayer = quranPlayer,
-                                    onOpenQuran = onOpenQuran,
-                                    onOpenQibla = onOpenQibla,
-                                    onOpenRecommendation = onOpenRecommendation,
-                                    notifications = notifications,
-                                    tileHeight = landscapeInsightHeight,
-                                    fullWidthPage = true,
-                                    maxPageWidth = if (isTablet) 520.dp else null,
-                                )
+                        if (useTwoPaneLayout) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier.weight(if (isTablet) 5f else 1f),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    contentPadding = PaddingValues(bottom = 84.dp),
+                                ) {
+                                    item {
+                                        InsightPager(
+                                            day = day,
+                                            placeName = placeName,
+                                            salah = salah,
+                                            onTogglePrayer = onTogglePrayer,
+                                            today = today,
+                                            latitude = latitude,
+                                            longitude = longitude,
+                                            quranPlayer = quranPlayer,
+                                            onOpenQuran = onOpenQuran,
+                                            onOpenQibla = onOpenQibla,
+                                            onOpenRecommendation = onOpenRecommendation,
+                                            notifications = notifications,
+                                            tileHeight = landscapeInsightHeight,
+                                            fullWidthPage = true,
+                                            maxPageWidth = if (isTablet) 520.dp else null,
+                                        )
+                                    }
+                                    item {
+                                        LocationWeatherRow(
+                                            placeName = placeName,
+                                            temperatureCelsius = day.temperatureCelsius,
+                                            conditionLabel = day.conditionLabel,
+                                            isLocating = isLocating,
+                                            compact = false,
+                                            onRefresh = onRefresh,
+                                        )
+                                    }
+                                }
+                                LazyColumn(
+                                    modifier = Modifier.weight(if (isTablet) 6f else 1f),
+                                    contentPadding = PaddingValues(bottom = 84.dp),
+                                ) {
+                                    item {
+                                        PrayerScheduleSection(
+                                            day = day,
+                                            offsets = offsets,
+                                            showAllPrayers = true,
+                                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                            onAdjustPrayer = onAdjustPrayer,
+                                            isTuning = isTuningSchedule,
+                                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                            notifications = notifications,
+                                            onTogglePrayerNotification = onTogglePrayerNotification,
+                                            showExpandControl = false,
+                                            compact = !isTablet,
+                                            cardMinHeight = if (isTablet) tabletCardHeight else null,
+                                        )
+                                    }
+                                }
                             }
-                            item {
-                                LocationWeatherRow(
-                                    placeName = placeName,
-                                    temperatureCelsius = day.temperatureCelsius,
-                                    conditionLabel = day.conditionLabel,
-                                    isLocating = isLocating,
-                                    compact = false,
-                                    onRefresh = onRefresh,
-                                )
-                            }
-                        }
-                        LazyColumn(
-                            modifier = Modifier.weight(if (isTablet) 6f else 1f),
-                            contentPadding = PaddingValues(bottom = 84.dp),
-                        ) {
-                            item {
+                        } else if (isTabletPortrait) {
+                            // Portrait tablets never need to scroll: every fixed block
+                            // takes its natural height and the hero absorbs whatever
+                            // the window measurement leaves over, so nothing can
+                            // overlap the floating bar or pool at the bottom.
+                            Column(Modifier.fillMaxSize()) {
+                                Box(Modifier.weight(1f).fillMaxWidth()) {
+                                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                                        // The pager draws its own 34dp title row plus
+                                        // an 8dp gap above the artwork.
+                                        val heroTile = (maxHeight - 42.dp).coerceAtLeast(220.dp)
+                                        InsightPager(
+                                            day = day,
+                                            placeName = placeName,
+                                            salah = salah,
+                                            onTogglePrayer = onTogglePrayer,
+                                            today = today,
+                                            latitude = latitude,
+                                            longitude = longitude,
+                                            quranPlayer = quranPlayer,
+                                            onOpenQuran = onOpenQuran,
+                                            onOpenQibla = onOpenQibla,
+                                            onOpenRecommendation = onOpenRecommendation,
+                                            notifications = notifications,
+                                            tileHeight = heroTile,
+                                            maxPageWidth = 420.dp,
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(10.dp))
                                 PrayerScheduleSection(
                                     day = day,
                                     offsets = offsets,
@@ -338,120 +382,73 @@ fun PrayerTimesScreen(
                                     notifications = notifications,
                                     onTogglePrayerNotification = onTogglePrayerNotification,
                                     showExpandControl = false,
-                                    compact = !isTablet,
-                                    cardMinHeight = if (isTablet) tabletCardHeight else null,
-                                )
-                            }
-                        }
-                    }
-                } else if (isTabletPortrait) {
-                    // Portrait tablets never need to scroll: every fixed block
-                    // takes its natural height and the hero absorbs whatever
-                    // the window measurement leaves over, so nothing can
-                    // overlap the floating bar or pool at the bottom.
-                    Column(Modifier.fillMaxSize()) {
-                        Box(Modifier.weight(1f).fillMaxWidth()) {
-                            BoxWithConstraints(Modifier.fillMaxSize()) {
-                                // The pager draws its own 34dp title row plus
-                                // an 8dp gap above the artwork.
-                                val heroTile = (maxHeight - 42.dp).coerceAtLeast(220.dp)
-                                InsightPager(
-                                    day = day,
-                                    placeName = placeName,
-                                    salah = salah,
-                                    onTogglePrayer = onTogglePrayer,
-                                    today = today,
-                                    latitude = latitude,
-                                    longitude = longitude,
-                                    quranPlayer = quranPlayer,
-                                    onOpenQuran = onOpenQuran,
-                                    onOpenQibla = onOpenQibla,
-                                    onOpenRecommendation = onOpenRecommendation,
-                                    notifications = notifications,
-                                    tileHeight = heroTile,
-                                    maxPageWidth = 420.dp,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        PrayerScheduleSection(
-                            day = day,
-                            offsets = offsets,
-                            showAllPrayers = true,
-                            onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                            onAdjustPrayer = onAdjustPrayer,
-                            isTuning = isTuningSchedule,
-                            onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                            notifications = notifications,
-                            onTogglePrayerNotification = onTogglePrayerNotification,
-                            showExpandControl = false,
-                            compact = false,
-                            cardMinHeight = 104.dp,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        LocationWeatherRow(
-                            placeName = placeName,
-                            temperatureCelsius = day.temperatureCelsius,
-                            conditionLabel = day.conditionLabel,
-                            isLocating = isLocating,
-                            compact = false,
-                            onRefresh = onRefresh,
-                        )
-                        // Keeps the location card clear of the floating pill:
-                        // 56dp pill + 8dp padding + safe-area breathing room.
-                        Spacer(Modifier.height(88.dp))
-                    }
-                } else {
-                    // The pager and schedule scroll together on a phone so the
-                    // artwork never leaves only a couple of prayer rows visible.
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 112.dp),
-                    ) {
-                        item {
-                            InsightPager(
-                                day = day,
-                                placeName = placeName,
-                                salah = salah,
-                                onTogglePrayer = onTogglePrayer,
-                                today = today,
-                                latitude = latitude,
-                                longitude = longitude,
-                                quranPlayer = quranPlayer,
-                                onOpenQuran = onOpenQuran,
-                                onOpenQibla = onOpenQibla,
-                                onOpenRecommendation = onOpenRecommendation,
-                                notifications = notifications,
-                                tileHeight = portraitInsightHeight,
-                            )
-                        }
-                        item {
-                            PrayerScheduleSection(
-                                day = day,
-                                offsets = offsets,
-                                showAllPrayers = showAllPrayers,
-                                onToggleExpanded = { showAllPrayers = !showAllPrayers },
-                                onAdjustPrayer = onAdjustPrayer,
-                                isTuning = isTuningSchedule,
-                                onToggleTuning = { isTuningSchedule = !isTuningSchedule },
-                                notifications = notifications,
-                                    onTogglePrayerNotification = onTogglePrayerNotification,
-                                    showExpandControl = true,
                                     compact = false,
+                                    cardMinHeight = 104.dp,
                                 )
+                                Spacer(Modifier.height(10.dp))
+                                LocationWeatherRow(
+                                    placeName = placeName,
+                                    temperatureCelsius = day.temperatureCelsius,
+                                    conditionLabel = day.conditionLabel,
+                                    isLocating = isLocating,
+                                    compact = false,
+                                    onRefresh = onRefresh,
+                                )
+                                // Keeps the location card clear of the floating pill:
+                                // 56dp pill + 8dp padding + safe-area breathing room.
+                                Spacer(Modifier.height(88.dp))
+                            }
+                        } else {
+                            // The pager and schedule scroll together on a phone so the
+                            // artwork never leaves only a couple of prayer rows visible.
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 112.dp),
+                            ) {
+                                item {
+                                    InsightPager(
+                                        day = day,
+                                        placeName = placeName,
+                                        salah = salah,
+                                        onTogglePrayer = onTogglePrayer,
+                                        today = today,
+                                        latitude = latitude,
+                                        longitude = longitude,
+                                        quranPlayer = quranPlayer,
+                                        onOpenQuran = onOpenQuran,
+                                        onOpenQibla = onOpenQibla,
+                                        onOpenRecommendation = onOpenRecommendation,
+                                        notifications = notifications,
+                                        tileHeight = portraitInsightHeight,
+                                    )
+                                }
+                                item {
+                                    PrayerScheduleSection(
+                                        day = day,
+                                        offsets = offsets,
+                                        showAllPrayers = showAllPrayers,
+                                        onToggleExpanded = { showAllPrayers = !showAllPrayers },
+                                        onAdjustPrayer = onAdjustPrayer,
+                                        isTuning = isTuningSchedule,
+                                        onToggleTuning = { isTuningSchedule = !isTuningSchedule },
+                                        notifications = notifications,
+                                        onTogglePrayerNotification = onTogglePrayerNotification,
+                                        showExpandControl = true,
+                                        compact = false,
+                                    )
+                                }
+                                item {
+                                    LocationWeatherRow(
+                                        placeName = placeName,
+                                        temperatureCelsius = day.temperatureCelsius,
+                                        conditionLabel = day.conditionLabel,
+                                        isLocating = isLocating,
+                                        compact = showAllPrayers,
+                                        onRefresh = onRefresh,
+                                    )
+                                }
+                            }
                         }
-                        item {
-                            LocationWeatherRow(
-                                placeName = placeName,
-                                temperatureCelsius = day.temperatureCelsius,
-                                conditionLabel = day.conditionLabel,
-                                isLocating = isLocating,
-                                compact = showAllPrayers,
-                                onRefresh = onRefresh,
-                            )
-                        }
-                    }
-                }
                     }
 
                     if (useSideNavigation) {

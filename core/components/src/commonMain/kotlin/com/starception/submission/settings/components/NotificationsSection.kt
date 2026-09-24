@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -15,21 +31,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -37,7 +45,6 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,7 +90,7 @@ fun NotificationsSection(
                 Text(
                     "Prayer Notifications",
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 )
             },
             supportingContent = {
@@ -95,15 +102,16 @@ fun NotificationsSection(
                         else -> "Disabled"
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             leadingContent = {
                 FlaticonIcon(
-                    glyph = if (notificationsActive)
+                    glyph = if (notificationsActive) {
                         FlaticonIcons.NOTIFICATIONS_ACTIVE
-                    else
-                        FlaticonIcons.NOTIFICATIONS,
+                    } else {
+                        FlaticonIcons.NOTIFICATIONS
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     fontSize = 23.sp,
@@ -120,25 +128,25 @@ fun NotificationsSection(
                         } else {
                             onPreferencesChanged(preferences.copy(notificationsEnabled = false))
                         }
-                    }
+                    },
                 )
-            }
+            },
         )
 
         // Sub-settings - only visible when notifications enabled
         AnimatedVisibility(
             visible = notificationsActive,
             enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
+            exit = fadeOut() + shrinkVertically(),
         ) {
             Column(
                 modifier = Modifier.padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Prior Notification Section
                 CollapsibleSubSection(
                     title = "Prior Notification",
-                    subtitle = "Minutes before prayer"
+                    subtitle = "Minutes before prayer",
                 ) {
                     SliderItem("Fajr", preferences.fajrPriorMinutes, 60) { value ->
                         onPreferencesChanged(preferences.copy(fajrPriorMinutes = value))
@@ -160,7 +168,7 @@ fun NotificationsSection(
                 // Go to Mosque Section
                 CollapsibleSubSection(
                     title = "Go to Mosque Phase",
-                    subtitle = "Duration after prayer starts"
+                    subtitle = "Duration after prayer starts",
                 ) {
                     SliderItem("Fajr", preferences.fajrGoToMosqueDuration, 45) { value ->
                         onPreferencesChanged(preferences.copy(fajrGoToMosqueDuration = value))
@@ -182,7 +190,7 @@ fun NotificationsSection(
                 // Per-prayer toggles
                 CollapsibleSubSection(
                     title = "Prayer Toggles",
-                    subtitle = "Enable for specific prayers"
+                    subtitle = "Enable for specific prayers",
                 ) {
                     ToggleItem("Fajr", preferences.fajrNotificationEnabled) { enabled ->
                         onPreferencesChanged(preferences.copy(fajrNotificationEnabled = enabled))
@@ -294,7 +302,7 @@ private fun CollapsibleSubSection(
     subtitle: String,
     modifier: Modifier = Modifier,
     initiallyExpanded: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
 
@@ -302,8 +310,8 @@ private fun CollapsibleSubSection(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
     ) {
         Column {
             // Clickable header
@@ -313,27 +321,28 @@ private fun CollapsibleSubSection(
                     .clickable { isExpanded = !isExpanded }
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
                 FlaticonIcon(
-                    glyph = if (isExpanded)
+                    glyph = if (isExpanded) {
                         FlaticonIcons.ANGLE_UP
-                    else
-                        FlaticonIcons.ANGLE_DOWN,
+                    } else {
+                        FlaticonIcons.ANGLE_DOWN
+                    },
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 18.sp,
@@ -344,12 +353,12 @@ private fun CollapsibleSubSection(
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 Column {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     content()
@@ -367,7 +376,7 @@ private fun SliderItem(
     value: Int,
     maxValue: Int,
     modifier: Modifier = Modifier,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var previousValue by remember { mutableStateOf(value) }
@@ -378,14 +387,14 @@ private fun SliderItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
             text = prayerName,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.width(70.dp),
-            maxLines = 1
+            maxLines = 1,
         )
 
         Slider(
@@ -409,37 +418,39 @@ private fun SliderItem(
                         .height(28.dp)
                         .shadow(
                             elevation = 4.dp,
-                            shape = RoundedCornerShape(14.dp)
+                            shape = RoundedCornerShape(14.dp),
                         )
                         .clip(RoundedCornerShape(14.dp))
                         .background(
-                            if (value > 0)
+                            if (value > 0) {
                                 MaterialTheme.colorScheme.primary
-                            else
+                            } else {
                                 MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
                         )
                         .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = if (value == 0) "Off" else "${value}m",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            lineHeight = 14.sp
+                            lineHeight = 14.sp,
                         ),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = if (value > 0)
+                        color = if (value > 0) {
                             MaterialTheme.colorScheme.onPrimary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        textAlign = TextAlign.Center,
                     )
                 }
             },
             colors = SliderDefaults.colors(
                 activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-            )
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
         )
     }
 }
@@ -449,23 +460,23 @@ private fun ToggleItem(
     prayerName: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    onEnabledChange: (Boolean) -> Unit
+    onEnabledChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = prayerName,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Switch(
             checked = enabled,
-            onCheckedChange = onEnabledChange
+            onCheckedChange = onEnabledChange,
         )
     }
 }

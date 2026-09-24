@@ -25,5 +25,5 @@ data class SearchNote(
     val surahNumber: Int,
     val ayahNumber: Int,
     val noteText: String,
-    val updatedAt: Long
+    val updatedAt: Long,
 )

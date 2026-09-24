@@ -58,7 +58,7 @@ fun LazyListScope.userNewsResourceCardItems(
         val surahNumber = extractSurahNumber(
             title = userNewsResource.title,
             url = userNewsResource.url,
-            type = userNewsResource.type
+            type = userNewsResource.type,
         )
 
         // Check if this is a Dua item

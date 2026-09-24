@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.contentdatabase
 
 import android.content.Context
@@ -21,10 +37,10 @@ import java.io.File
 @Database(
     entities = [
         NewsResourceEntity::class,
-        NewsTopicCrossRef::class
+        NewsTopicCrossRef::class,
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class NewsDatabase : RoomDatabase() {
 
@@ -36,7 +52,7 @@ abstract class NewsDatabase : RoomDatabase() {
         private const val TAG = "NewsDatabase"
 
         @Volatile
-        private var INSTANCE: NewsDatabase? = null
+        private var dbInstance: NewsDatabase? = null
 
         // Store resolved DB file for internal re-creation (refreshFromAssets)
         private var resolvedDbFile: File? = null
@@ -47,11 +63,11 @@ abstract class NewsDatabase : RoomDatabase() {
          */
         fun getInstance(context: Context, preResolvedDbFile: File? = null): NewsDatabase {
             if (preResolvedDbFile != null) resolvedDbFile = preResolvedDbFile
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     NewsDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
 
                 // Try pre-resolved file first; if unavailable, let Room create empty DB
@@ -77,7 +93,7 @@ abstract class NewsDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }
@@ -86,8 +102,8 @@ abstract class NewsDatabase : RoomDatabase() {
          * Close database instance
          */
         fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+            dbInstance?.close()
+            dbInstance = null
             Log.d(TAG, "News database closed")
         }
 
@@ -166,7 +182,7 @@ abstract class NewsDatabase : RoomDatabase() {
                     name = "News",
                     itemCount = count,
                     lastModified = dbFile.lastModified(),
-                    sizeBytes = dbFile.length()
+                    sizeBytes = dbFile.length(),
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting database info", e)
@@ -183,5 +199,5 @@ data class DatabaseInfo(
     val name: String,
     val itemCount: Int,
     val lastModified: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )

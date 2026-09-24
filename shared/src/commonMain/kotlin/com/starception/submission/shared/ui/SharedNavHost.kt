@@ -49,19 +49,33 @@ object PrayerTimesRoute
 object PrayerSettingsRoute
 
 @Serializable object ForYouRoute
+
 @Serializable object SavedRoute
+
 @Serializable object CourseRoute
+
 @Serializable object InterestsRoute
+
 @Serializable object SearchRoute
+
 @Serializable object ProfileRoute
+
 @Serializable object QuranLibraryRoute
+
 @Serializable data class QuranDetailRoute(val number: Int)
+
 @Serializable data class NewsDetailRoute(val id: Int)
+
 @Serializable data class BukhariBookRoute(val id: Int)
+
 @Serializable data class BukhariHadithRoute(val id: Int)
+
 @Serializable data class TopicRoute(val id: Int)
+
 @Serializable data class TopicArticleRoute(val topicId: Int, val articleId: Int)
+
 @Serializable object QiblaRoute
+
 @Serializable object RecommendationRoute
 
 data class SharedHomeActions(

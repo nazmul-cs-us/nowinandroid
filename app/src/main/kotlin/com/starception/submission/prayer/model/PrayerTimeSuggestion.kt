@@ -10,11 +10,14 @@ import java.time.LocalTime
  */
 data class PrayerTimeSuggestion(
     val prayerName: String,
-    val suggestedOffset: Int,       // Suggested offset in minutes
-    val currentOffset: Int,          // User's current offset
+    // Suggested offset in minutes
+    val suggestedOffset: Int,       
+    // User's current offset
+    val currentOffset: Int,          
     val ourCalculatedTime: LocalTime,
     val referenceTime: LocalTime,
-    val differenceMinutes: Int       // referenceTime - ourCalculatedTime
+    // referenceTime - ourCalculatedTime
+    val differenceMinutes: Int       
 ) {
     /**
      * Returns true if the suggestion differs from current user offset.

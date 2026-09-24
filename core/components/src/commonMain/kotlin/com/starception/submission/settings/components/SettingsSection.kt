@@ -1,7 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
-import com.starception.submission.core.designsystem.animation.NiaMotion
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -25,15 +40,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.ripple
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -48,6 +61,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.animation.NiaMotion
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 
@@ -61,15 +75,15 @@ fun SettingsSection(
     onToggleExpanded: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "chevronRotation"
+        label = "chevronRotation",
     )
 
     Card(
@@ -79,7 +93,7 @@ fun SettingsSection(
                 elevation = if (isExpanded) 4.dp else 0.dp,
                 shape = RoundedCornerShape(20.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -107,12 +121,12 @@ fun SettingsSection(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(
                             bounded = true,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         ),
-                        onClick = onToggleExpanded
+                        onClick = onToggleExpanded,
                     )
                     .padding(horizontal = 14.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Icon with gradient background
                 if (icon != null || iconGlyph != null || iconContent != null) {
@@ -121,7 +135,7 @@ fun SettingsSection(
                             .size(44.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (iconContent != null) {
                             iconContent()
@@ -137,7 +151,7 @@ fun SettingsSection(
                                 imageVector = icon,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(21.dp)
+                                modifier = Modifier.size(21.dp),
                             )
                         }
                     }
@@ -147,19 +161,19 @@ fun SettingsSection(
                 // Title and subtitle
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -168,19 +182,21 @@ fun SettingsSection(
                 Surface(
                     modifier = Modifier.size(30.dp),
                     shape = CircleShape,
-                    color = if (isExpanded)
+                    color = if (isExpanded) {
                         MaterialTheme.colorScheme.primaryContainer
-                    else
+                    } else {
                         MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         FlaticonIcon(
                             glyph = FlaticonIcons.ANGLE_DOWN,
                             contentDescription = if (isExpanded) "Collapse" else "Expand",
-                            tint = if (isExpanded)
+                            tint = if (isExpanded) {
                                 MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                             modifier = Modifier.rotate(rotationAngle),
                             fontSize = 18.sp,
                         )
@@ -192,22 +208,22 @@ fun SettingsSection(
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically(
-                    animationSpec = NiaMotion.spatialDefault()
+                    animationSpec = NiaMotion.spatialDefault(),
                 ) + fadeIn(
-                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4)
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_4),
                 ),
                 exit = shrinkVertically(
-                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1)
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1),
                 ) + fadeOut(
-                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_3)
-                )
+                    animationSpec = NiaMotion.standardTween(NiaMotion.Duration.SHORT_3),
+                ),
             ) {
                 Column {
                     // Modern divider with gradient
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 16.dp),
                     ) {
                         Box(
                             modifier = Modifier
@@ -218,11 +234,11 @@ fun SettingsSection(
                                             Color.Transparent,
                                             MaterialTheme.colorScheme.outlineVariant,
                                             MaterialTheme.colorScheme.outlineVariant,
-                                            Color.Transparent
-                                        )
-                                    )
+                                            Color.Transparent,
+                                        ),
+                                    ),
                                 )
-                                .padding(vertical = 0.5.dp)
+                                .padding(vertical = 0.5.dp),
                         )
                     }
                     Column(
@@ -230,8 +246,8 @@ fun SettingsSection(
                             start = 16.dp,
                             end = 16.dp,
                             top = 12.dp,
-                            bottom = 16.dp
-                        )
+                            bottom = 16.dp,
+                        ),
                     ) {
                         content()
                     }

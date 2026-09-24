@@ -260,14 +260,22 @@ data class DuaItem(
     val explanation: String,
     val quranReference: String?,
     val duaNumber: Int,
-    val surahNumber: Int = 0,  // Extracted from quranReference for database lookup
-    val ayahNumber: Int = 0,   // Extracted from quranReference for database lookup
-    val surahName: String = "", // Surah name fetched from database (e.g., "Al-Baqarah")
-    val context: String = "",  // When/why to recite (before the dua)
-    val instruction: String = "",  // Special instructions (e.g., "Recite 3 times")
-    val note: String = "",  // Additional scholarly notes
-    val postContext: String = "",  // Context after the dua text
-    val reference: String = ""  // Hadith references
+    // Extracted from quranReference for database lookup
+    val surahNumber: Int = 0,  
+    // Extracted from quranReference for database lookup
+    val ayahNumber: Int = 0,   
+    // Surah name fetched from database (e.g., "Al-Baqarah")
+    val surahName: String = "", 
+    // When/why to recite (before the dua)
+    val context: String = "",  
+    // Special instructions (e.g., "Recite 3 times")
+    val instruction: String = "",  
+    // Additional scholarly notes
+    val note: String = "",  
+    // Context after the dua text
+    val postContext: String = "",  
+    // Hadith references
+    val reference: String = ""  
 )
 
 /**
@@ -279,11 +287,16 @@ data class ParsedDuaContent(
     val translation: String,
     val explanation: String,
     val quranReference: String?,
-    val context: String = "",  // When/why to recite (before the dua)
-    val instruction: String = "",  // Special instructions (e.g., "Recite 3 times")
-    val note: String = "",  // Additional scholarly notes
-    val postContext: String = "",  // Context after the dua text
-    val reference: String = ""  // Hadith references
+    // When/why to recite (before the dua)
+    val context: String = "",  
+    // Special instructions (e.g., "Recite 3 times")
+    val instruction: String = "",  
+    // Additional scholarly notes
+    val note: String = "",  
+    // Context after the dua text
+    val postContext: String = "",  
+    // Hadith references
+    val reference: String = ""  
 )
 
 /**

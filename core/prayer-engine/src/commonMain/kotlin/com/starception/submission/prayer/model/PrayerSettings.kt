@@ -1,18 +1,34 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.model
 
 import com.starception.submission.core.logging.SharedLog
-import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonIgnoreUnknownKeys
+import kotlin.time.Clock
 
 /**
  * CALCULATION METHOD SETTINGS: Core astronomical parameters for prayer time calculations
- * 
+ *
  * This stores calculation-specific settings that determine how prayer times are computed.
- * 
+ *
  * INCLUDED SETTINGS:
  * - Method selection (Muslim World League, ISNA, etc.)
- * - Madhab for Asr calculation (Standard vs Hanafi)  
+ * - Madhab for Asr calculation (Standard vs Hanafi)
  * - High latitude adjustments for polar regions
  * - Custom angle overrides for advanced users
  * - Per-prayer minute offsets for local customs
@@ -20,18 +36,26 @@ import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 @Serializable
 @JsonIgnoreUnknownKeys
 data class PrayerCalculationSettings(
-    val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,  // Primary calculation standard
-    val asrMadhhab: AsrMadhhab = AsrMadhhab.STANDARD,                                   // Asr shadow calculation method
-    val highLatitudeAdjustment: HighLatitudeAdjustment = HighLatitudeAdjustment.NONE,   // For polar regions
-    
+    // Primary calculation standard
+    val calculationMethod: CalculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+    // Asr shadow calculation method
+    val asrMadhhab: AsrMadhhab = AsrMadhhab.STANDARD,
+    // For polar regions
+    val highLatitudeAdjustment: HighLatitudeAdjustment = HighLatitudeAdjustment.NONE,
+
     // CUSTOM ANGLE OVERRIDES - Advanced user customizations
-    val customFajrAngle: Double? = null,        // Override Fajr sun angle (degrees below horizon)
-    val customIshaAngle: Double? = null,        // Override Isha sun angle (degrees below horizon)
-    val customIshaDelay: Int? = null,           // Override Isha delay (minutes after Maghrib)
-    val customMaghribOffset: Int? = null,       // Override Maghrib offset (minutes after sunset)
+    // Override Fajr sun angle (degrees below horizon)
+    val customFajrAngle: Double? = null,
+    // Override Isha sun angle (degrees below horizon)
+    val customIshaAngle: Double? = null,
+    // Override Isha delay (minutes after Maghrib)
+    val customIshaDelay: Int? = null,
+    // Override Maghrib offset (minutes after sunset)
+    val customMaghribOffset: Int? = null,
 
     // TIME ADJUSTMENTS - Local custom offsets
-    val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets()  // Per-prayer minute adjustments
+    // Per-prayer minute adjustments
+    val timeOffsets: PrayerTimeOffsets = PrayerTimeOffsets(),
 ) {
     /**
      * EFFECTIVE FAJR ANGLE: Gets the actual Fajr angle to use in calculations
@@ -39,7 +63,7 @@ data class PrayerCalculationSettings(
     fun getEffectiveFajrAngle(): Double {
         return customFajrAngle ?: calculationMethod.fajrAngle
     }
-    
+
     /**
      * EFFECTIVE ISHA ANGLE: Gets the actual Isha angle to use in calculations
      * NOTE: 0.0 is treated as null (meaning use delay-based calculation instead)
@@ -55,9 +79,9 @@ data class PrayerCalculationSettings(
         val result = if (angle == 0.0) null else angle
         SharedLog.i("PrayerSettings", "   Final result (after 0.0 check) = $result")
 
-        return result  // 0.0 means "use delay instead"
+        return result // 0.0 means "use delay instead"
     }
-    
+
     /**
      * EFFECTIVE ISHA DELAY: Gets the actual Isha delay to use in calculations
      */
@@ -75,14 +99,16 @@ data class PrayerCalculationSettings(
 
 /**
  * LOCATION PREFERENCES: Where to calculate prayer times for
- * 
+ *
  * This stores location-specific settings for prayer time calculations.
  */
 @Serializable
 @JsonIgnoreUnknownKeys
 data class PrayerLocationPreferences(
-    val location: Location? = null,             // User's saved location (overrides GPS)
-    val useGpsLocation: Boolean = true          // Whether to use GPS when no saved location
+    // User's saved location (overrides GPS)
+    val location: Location? = null,
+    // Whether to use GPS when no saved location
+    val useGpsLocation: Boolean = true,
 )
 
 /**
@@ -93,35 +119,53 @@ data class PrayerLocationPreferences(
 @Serializable
 @JsonIgnoreUnknownKeys
 data class PrayerNotificationPreferences(
-    val notificationsEnabled: Boolean = true,   // Master notification toggle
-    val notificationSound: String = "default",  // Notification sound selection
-    val vibrationEnabled: Boolean = true,       // Vibration for notifications
+    // Master notification toggle
+    val notificationsEnabled: Boolean = true,
+    // Notification sound selection
+    val notificationSound: String = "default",
+    // Vibration for notifications
+    val vibrationEnabled: Boolean = true,
 
     // PER-PRAYER NOTIFICATION TOGGLES - Individual control for each prayer
-    val fajrNotificationEnabled: Boolean = true,    // Fajr notification toggle
-    val dhuhrNotificationEnabled: Boolean = true,   // Dhuhr notification toggle
-    val asrNotificationEnabled: Boolean = true,     // Asr notification toggle
-    val maghribNotificationEnabled: Boolean = true, // Maghrib notification toggle
-    val ishaNotificationEnabled: Boolean = true,    // Isha notification toggle
+    // Fajr notification toggle
+    val fajrNotificationEnabled: Boolean = true,
+    // Dhuhr notification toggle
+    val dhuhrNotificationEnabled: Boolean = true,
+    // Asr notification toggle
+    val asrNotificationEnabled: Boolean = true,
+    // Maghrib notification toggle
+    val maghribNotificationEnabled: Boolean = true,
+    // Isha notification toggle
+    val ishaNotificationEnabled: Boolean = true,
 
     // PER-PRAYER PRIOR NOTIFICATION TIME (minutes before prayer to send reminder)
-    val fajrPriorMinutes: Int = 10,     // Minutes before Fajr to send reminder
-    val dhuhrPriorMinutes: Int = 10,    // Minutes before Dhuhr to send reminder
-    val asrPriorMinutes: Int = 10,      // Minutes before Asr to send reminder
-    val maghribPriorMinutes: Int = 10,  // Minutes before Maghrib to send reminder
-    val ishaPriorMinutes: Int = 10,     // Minutes before Isha to send reminder
+    // Minutes before Fajr to send reminder
+    val fajrPriorMinutes: Int = 10,
+    // Minutes before Dhuhr to send reminder
+    val dhuhrPriorMinutes: Int = 10,
+    // Minutes before Asr to send reminder
+    val asrPriorMinutes: Int = 10,
+    // Minutes before Maghrib to send reminder
+    val maghribPriorMinutes: Int = 10,
+    // Minutes before Isha to send reminder
+    val ishaPriorMinutes: Int = 10,
 
     // PER-PRAYER "GO TO MOSQUE" PHASE DURATION (minutes after prayer starts)
-    val fajrGoToMosqueDuration: Int = 20,     // Fajr go-to-mosque phase duration
-    val dhuhrGoToMosqueDuration: Int = 20,    // Dhuhr go-to-mosque phase duration
-    val asrGoToMosqueDuration: Int = 20,      // Asr go-to-mosque phase duration
-    val maghribGoToMosqueDuration: Int = 10,  // Maghrib go-to-mosque phase duration (shorter due to short window)
-    val ishaGoToMosqueDuration: Int = 20,     // Isha go-to-mosque phase duration
+    // Fajr go-to-mosque phase duration
+    val fajrGoToMosqueDuration: Int = 20,
+    // Dhuhr go-to-mosque phase duration
+    val dhuhrGoToMosqueDuration: Int = 20,
+    // Asr go-to-mosque phase duration
+    val asrGoToMosqueDuration: Int = 20,
+    // Maghrib go-to-mosque phase duration (shorter due to short window)
+    val maghribGoToMosqueDuration: Int = 10,
+    // Isha go-to-mosque phase duration
+    val ishaGoToMosqueDuration: Int = 20,
 
     // SILENT-DURING-PRAYER: auto-enable DND when prayer time arrives, restore after N minutes.
     // Defaults ON — fresh installs silence during prayer once the user grants DND access.
     val silentDuringPrayerEnabled: Boolean = true,
-    val silentDuringPrayerMinutes: Int = 20
+    val silentDuringPrayerMinutes: Int = 20,
 ) {
     /**
      * Check if notifications are enabled for a specific prayer
@@ -181,7 +225,7 @@ data class PrayerNotificationPreferences(
 
 /**
  * LEGACY PRAYER SETTINGS: Composite model for backward compatibility
- * 
+ *
  * @deprecated This composite model is being phased out in favor of separate preference classes.
  * Use PrayerCalculationSettings, PrayerLocationPreferences, and PrayerNotificationPreferences instead.
  */
@@ -202,12 +246,12 @@ data class PrayerSettings(
     // Location preferences
     val location: Location? = null,
     val useGpsLocation: Boolean = true,
-    
+
     // Notification preferences
     val notificationsEnabled: Boolean = true,
     val notificationSound: String = "default",
     val vibrationEnabled: Boolean = true,
-    
+
     // AUTO-DETECTION INFO - Kept for backward compatibility (deprecated)
     @Deprecated("Auto-detection moved to separate system")
     val isMethodAutoDetected: Boolean = false,
@@ -220,7 +264,7 @@ data class PrayerSettings(
     @Deprecated("Auto-detection moved to separate system")
     val areCustomAnglesAutoDetected: Boolean = false,
     @Deprecated("Auto-detection moved to separate system")
-    val originalAutoDetectedSettingsJson: String? = null
+    val originalAutoDetectedSettingsJson: String? = null,
 ) {
     fun getEffectiveFajrAngle(): Double {
         return customFajrAngle ?: calculationMethod.fajrAngle
@@ -237,7 +281,7 @@ data class PrayerSettings(
         val result = if (angle == 0.0) null else angle
         SharedLog.i("PrayerSettings_Legacy", "   Final result (after 0.0 check) = $result")
 
-        return result  // 0.0 means "use delay instead"
+        return result // 0.0 means "use delay instead"
     }
 
     fun getEffectiveIshaDelay(): Int? {
@@ -261,7 +305,7 @@ data class PrayerSettings(
             customIshaAngle = customIshaAngle,
             customIshaDelay = customIshaDelay,
             customMaghribOffset = customMaghribOffset,
-            timeOffsets = timeOffsets
+            timeOffsets = timeOffsets,
         )
     }
 
@@ -271,28 +315,28 @@ data class PrayerSettings(
     fun toLocationPreferences(): PrayerLocationPreferences {
         return PrayerLocationPreferences(
             location = location,
-            useGpsLocation = useGpsLocation
+            useGpsLocation = useGpsLocation,
         )
     }
 }
 
 /**
  * PRAYER TIME OFFSETS: Fine-tune prayer times with custom minute adjustments
- * 
+ *
  * This allows users to adjust calculated prayer times to match local customs,
  * mosque schedules, or personal preferences.
- * 
+ *
  * COMMON USE CASES:
  * - Match local mosque timetables (+/- few minutes)
  * - Account for local geographic factors
  * - Personal preference adjustments
  * - Community-specific timings
- * 
+ *
  * OFFSET VALUES:
  * - Positive values = later time (e.g., +5 = 5 minutes after calculated time)
  * - Negative values = earlier time (e.g., -3 = 3 minutes before calculated time)
  * - Zero = no adjustment (use calculated time exactly)
- * 
+ *
  * EDIT THIS TO:
  * - Add offset validation (reasonable ranges like -30 to +30 minutes)
  * - Include seasonal offset support
@@ -300,18 +344,24 @@ data class PrayerSettings(
  */
 @Serializable
 data class PrayerTimeOffsets(
-    val fajr: Int = 0,      // Fajr (Dawn) offset in minutes
-    val sunrise: Int = 0,   // Sunrise offset in minutes
-    val dhuhr: Int = 0,     // Dhuhr (Noon) offset in minutes
-    val asr: Int = 0,       // Asr (Afternoon) offset in minutes
-    val maghrib: Int = 0,   // Maghrib (Sunset) offset in minutes
-    val isha: Int = 0       // Isha (Night) offset in minutes
+    // Fajr (Dawn) offset in minutes
+    val fajr: Int = 0,
+    // Sunrise offset in minutes
+    val sunrise: Int = 0,
+    // Dhuhr (Noon) offset in minutes
+    val dhuhr: Int = 0,
+    // Asr (Afternoon) offset in minutes
+    val asr: Int = 0,
+    // Maghrib (Sunset) offset in minutes
+    val maghrib: Int = 0,
+    // Isha (Night) offset in minutes
+    val isha: Int = 0,
 ) {
     /**
      * OFFSET LOOKUP: Get offset value for any prayer by name
-     * 
+     *
      * This provides a convenient way to get offset values programmatically.
-     * 
+     *
      * EDIT THIS TO:
      * - Add validation for prayer names
      * - Support alternative prayer name spellings
@@ -320,19 +370,19 @@ data class PrayerTimeOffsets(
     fun getOffset(prayer: String): Int {
         return when (prayer.lowercase()) {
             "fajr" -> fajr
-            "sunrise" -> sunrise  
+            "sunrise" -> sunrise
             "dhuhr" -> dhuhr
             "asr" -> asr
             "maghrib" -> maghrib
             "isha" -> isha
-            else -> 0  // No offset for unrecognized prayer names
+            else -> 0 // No offset for unrecognized prayer names
         }
     }
 }
 
 /**
  * BACKUP DATA FOR RESTORE FUNCTIONALITY
- * 
+ *
  * Stores the original auto-detected calculation settings for restore functionality.
  * Only stores calculation-related settings as location and notification preferences
  * are not auto-detected.
@@ -349,5 +399,5 @@ data class AutoDetectedSettingsBackup(
     val countryCode: String,
     // kotlin.time.Clock rather than System.currentTimeMillis(), which is
     // JVM-only. Same value, available on both platforms.
-    val backupTimestamp: Long = Clock.System.now().toEpochMilliseconds()
+    val backupTimestamp: Long = Clock.System.now().toEpochMilliseconds(),
 )

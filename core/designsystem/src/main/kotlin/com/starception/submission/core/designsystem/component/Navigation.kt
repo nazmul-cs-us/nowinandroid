@@ -241,7 +241,6 @@ fun NiaNavigationSuiteScaffold(
     }
 }
 
-
 /**
  * A wrapper around [NavigationSuiteScope] to declare navigation items.
  */

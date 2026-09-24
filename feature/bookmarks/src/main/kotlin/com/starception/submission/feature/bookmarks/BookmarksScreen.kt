@@ -19,8 +19,6 @@ package com.starception.submission.feature.bookmarks
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,15 +30,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +64,7 @@ import com.starception.submission.core.designsystem.component.NiaLoadingWheel
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.designsystem.theme.LocalTintTheme
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.UserNewsResource
@@ -76,7 +75,6 @@ import com.starception.submission.core.ui.TrackScreenViewEvent
 import com.starception.submission.core.ui.TrackScrollJank
 import com.starception.submission.core.ui.UserNewsResourcePreviewParameterProvider
 import com.starception.submission.core.ui.newsFeed
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun BookmarksRoute(

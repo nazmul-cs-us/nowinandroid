@@ -31,13 +31,13 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
         private const val TAG = "QuranicDuaDatabase"
 
         @Volatile
-        private var INSTANCE: QuranicDuaDatabase? = null
+        private var dbInstance: QuranicDuaDatabase? = null
 
         /**
          * Get the singleton instance of QuranicDuaDatabase
          */
         fun getInstance(context: Context): QuranicDuaDatabase {
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     QuranicDuaDatabase::class.java,
@@ -58,7 +58,7 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }
@@ -83,8 +83,8 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
          * Close database instance
          */
         fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+            dbInstance?.close()
+            dbInstance = null
             android.util.Log.d(TAG, "Quranic Duas database closed")
         }
 

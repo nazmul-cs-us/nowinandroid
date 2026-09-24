@@ -3,6 +3,15 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.starception.submission.core.assets
@@ -13,7 +22,6 @@ import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
-import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.Foundation.NSApplicationSupportDirectory
@@ -28,7 +36,6 @@ import platform.Foundation.NSNumber
 import platform.Foundation.NSString
 import platform.Foundation.NSURL
 import platform.Foundation.NSURLIsExcludedFromBackupKey
-import platform.Foundation.NSURLResponse
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionConfiguration
 import platform.Foundation.NSURLSessionDownloadDelegateProtocol
@@ -39,11 +46,11 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.NSUUID
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.create
-import platform.Foundation.dataUsingEncoding
 import platform.Foundation.dataTaskWithRequest
+import platform.Foundation.dataUsingEncoding
 import platform.Foundation.dataWithContentsOfFile
-import platform.Foundation.downloadTaskWithResumeData
 import platform.Foundation.downloadTaskWithRequest
+import platform.Foundation.downloadTaskWithResumeData
 import platform.Foundation.setHTTPMethod
 import platform.Foundation.writeToFile
 import platform.darwin.NSObject
@@ -52,6 +59,7 @@ import platform.posix.ferror
 import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.rename
+import kotlin.coroutines.resume
 
 private const val ASSET_DIRECTORY = "StarceptionAssets"
 private const val RESUME_DATA_DIRECTORY = ".resume-data"

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.contentdatabase
 
 import androidx.room.Dao
@@ -17,7 +33,8 @@ interface NewsDao {
 
     // ============= Read Operations =============
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -26,10 +43,12 @@ interface NewsDao {
         LEFT JOIN news_topics nt ON n.id = nt.news_id
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     suspend fun getAllNewsResources(): List<NewsResourceWithTopics>
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -38,10 +57,12 @@ interface NewsDao {
         LEFT JOIN news_topics nt ON n.id = nt.news_id
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     fun getAllNewsResourcesFlow(): Flow<List<NewsResourceWithTopics>>
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -50,10 +71,12 @@ interface NewsDao {
         LEFT JOIN news_topics nt ON n.id = nt.news_id
         WHERE n.id = :newsId
         GROUP BY n.id
-    """)
+    """,
+    )
     suspend fun getNewsResourceById(newsId: Int): NewsResourceWithTopics?
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -64,10 +87,12 @@ interface NewsDao {
         WHERE nt.topic_id = :topicId
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     suspend fun getNewsResourcesByTopic(topicId: Int): List<NewsResourceWithTopics>
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -78,7 +103,8 @@ interface NewsDao {
         WHERE nt.topic_id = :topicId
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     fun getNewsResourcesByTopicFlow(topicId: Int): Flow<List<NewsResourceWithTopics>>
 
     /**
@@ -86,7 +112,8 @@ interface NewsDao {
      * Uses DISTINCT to avoid duplicates when a news resource belongs to multiple matching topics.
      * This is the efficient DB-level filtering for followed topics.
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -95,14 +122,16 @@ interface NewsDao {
         INNER JOIN news_topics nt ON n.id = nt.news_id
         WHERE nt.topic_id IN (:topicIds)
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     fun getNewsResourcesByTopicIdsFlow(topicIds: List<Int>): Flow<List<NewsResourceWithTopics>>
 
     /**
      * Get news resources that belong to ANY of the provided topic IDs with pagination.
      * Uses LIMIT and OFFSET for efficient loading of large datasets.
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -112,22 +141,26 @@ interface NewsDao {
         WHERE nt.topic_id IN (:topicIds)
         ORDER BY n.id ASC
         LIMIT :limit OFFSET :offset
-    """)
+    """,
+    )
     fun getNewsResourcesByTopicIdsPaginated(topicIds: List<Int>, limit: Int, offset: Int): Flow<List<NewsResourceWithTopics>>
 
     /**
      * Get count of news resources for the provided topic IDs.
      * Useful for pagination to know total count.
      */
-    @Query("""
+    @Query(
+        """
         SELECT COUNT(DISTINCT n.id)
         FROM news_resources n
         INNER JOIN news_topics nt ON n.id = nt.news_id
         WHERE nt.topic_id IN (:topicIds)
-    """)
+    """,
+    )
     suspend fun getNewsResourceCountByTopicIds(topicIds: List<Int>): Int
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -137,10 +170,12 @@ interface NewsDao {
         WHERE n.type LIKE '%' || :type || '%'
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     suspend fun getNewsResourcesByType(type: String): List<NewsResourceWithTopics>
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -152,10 +187,12 @@ interface NewsDao {
         GROUP BY n.id
         ORDER BY n.id ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchNewsResources(query: String, limit: Int = 100): List<NewsResourceWithTopics>
 
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -165,14 +202,16 @@ interface NewsDao {
         WHERE n.id IN (:ids)
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     fun getNewsResourcesByIdsFlow(ids: List<Int>): Flow<List<NewsResourceWithTopics>>
 
     /**
      * Fetch news resources by IDs (suspend version for paginated queries).
      * This version is more efficient for single fetches without Flow overhead.
      */
-    @Query("""
+    @Query(
+        """
         SELECT n.id, n.title, n.content, n.url, n.header_image_url as headerImageUrl,
                n.publish_date as publishDate, n.type, n.is_system as isSystem,
                n.is_user_created as isUserCreated, n.source,
@@ -182,7 +221,8 @@ interface NewsDao {
         WHERE n.id IN (:ids)
         GROUP BY n.id
         ORDER BY n.id ASC
-    """)
+    """,
+    )
     suspend fun getNewsResourcesByIds(ids: List<Int>): List<NewsResourceWithTopics>
 
     @Query("SELECT COUNT(*) FROM news_resources")
@@ -247,7 +287,7 @@ interface NewsDao {
     @Transaction
     suspend fun insertNewsResourceWithTopics(
         newsResource: NewsResourceEntity,
-        topicIds: List<Int>
+        topicIds: List<Int>,
     ) {
         insertNewsResource(newsResource)
         val crossRefs = topicIds.map { NewsTopicCrossRef(newsResource.id, it) }
@@ -258,12 +298,14 @@ interface NewsDao {
      * Gets the news resource ID for a surah by looking for content with surah reference
      * News resources for surahs typically have content like "surah:1" or "Surah 1"
      */
-    @Query("""
+    @Query(
+        """
         SELECT id FROM news_resources
         WHERE content LIKE '%surah:' || :surahNumber || '%'
            OR content LIKE '%Surah ' || :surahNumber || '%'
            OR title LIKE '%Surah ' || :surahNumber || '%'
         LIMIT 1
-    """)
+    """,
+    )
     suspend fun getNewsResourceIdForSurah(surahNumber: Int): Int?
 }

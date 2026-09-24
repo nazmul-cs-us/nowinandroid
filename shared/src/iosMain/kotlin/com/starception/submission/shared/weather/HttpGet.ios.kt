@@ -17,22 +17,22 @@
 package com.starception.submission.shared.weather
 
 import com.starception.submission.core.logging.SharedLog
-import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.Foundation.NSData
 import platform.Foundation.NSError
 import platform.Foundation.NSHTTPURLResponse
-import platform.Foundation.NSURLResponse
 import platform.Foundation.NSMutableURLRequest
+import platform.Foundation.NSString
 import platform.Foundation.NSURL
+import platform.Foundation.NSURLResponse
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionConfiguration
 import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.NSString
 import platform.Foundation.create
 import platform.Foundation.dataTaskWithRequest
 import platform.Foundation.setHTTPMethod
 import platform.Foundation.setValue
+import kotlin.coroutines.resume
 
 private const val TAG = "HttpGet"
 private const val TIMEOUT_SECONDS = 5.0

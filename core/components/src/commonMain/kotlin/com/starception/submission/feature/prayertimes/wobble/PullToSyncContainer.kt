@@ -1,10 +1,24 @@
 /*
- * Wobble Pull-to-Refresh Implementation
- * Fitbit-inspired elastic pull-down: content pushes down revealing a flat background
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.starception.submission.feature.prayertimes.wobble
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -13,15 +27,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -31,19 +42,20 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.Refresh
@@ -53,6 +65,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -61,6 +74,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -75,18 +89,15 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlinx.coroutines.delay
 
 /**
@@ -110,7 +121,6 @@ data class SyncBarRow(
     val progress: Float = 0f,
     val content: @Composable (statusText: String?) -> Unit,
 )
-
 
 /**
  * Sync container state forwarded to the content lambda. `pullModifier` carries
@@ -173,7 +183,7 @@ fun PullToSyncContainer(
     onIslamicEventClick: (IslamicEventState) -> Unit = {},
     /** Fills the bar row while a Mushaf page is open. */
     mushafBar: SyncBarRow? = null,
-    content: @Composable (syncState: SyncContainerState) -> Unit
+    content: @Composable (syncState: SyncContainerState) -> Unit,
 ) {
     val resolvedIdleContainerColor = if (idleContainerColor == Color.Unspecified) {
         MaterialTheme.colorScheme.background
@@ -231,7 +241,7 @@ fun PullToSyncContainer(
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
-                source: NestedScrollSource
+                source: NestedScrollSource,
             ): Offset {
                 if (!enabled) return Offset.Zero
                 // When content can't scroll up anymore (at top) and user pulls DOWN
@@ -273,8 +283,8 @@ fun PullToSyncContainer(
         targetValue = if (dragDistance > 0f) dragDistance else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        )
+            stiffness = Spring.StiffnessMediumLow,
+        ),
     )
 
     // ── One standard bar height, for every kind of information ──────────────
@@ -353,8 +363,8 @@ fun PullToSyncContainer(
         targetValue = downloadProgress.coerceIn(0f, 1f),
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        )
+            stiffness = Spring.StiffnessMediumLow,
+        ),
     )
     val animatedMushafPageProgress by animateFloatAsState(
         targetValue = if (mushafBar != null) {
@@ -373,7 +383,7 @@ fun PullToSyncContainer(
             syncProgress.snapTo(0f)
             syncProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
+                animationSpec = tween(durationMillis = 3000, easing = LinearEasing),
             )
         } else {
             syncProgress.snapTo(0f)
@@ -415,9 +425,9 @@ fun PullToSyncContainer(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "spin_angle"
+        label = "spin_angle",
     )
 
     // Every status line that is live right now, most urgent first. They all
@@ -526,7 +536,7 @@ fun PullToSyncContainer(
         modifier = modifier
             .fillMaxSize()
             .nestedScroll(nestedScrollConnection)
-            .then(idleBackgroundModifier)
+            .then(idleBackgroundModifier),
     ) {
         if (revealColorAlpha > 0f) {
             Box(
@@ -577,7 +587,7 @@ fun PullToSyncContainer(
                     .height((contentOffsetY + cornerRadius).coerceAtLeast(1.dp))
                     .graphicsLayer { alpha = revealColorAlpha }
                     .background(fitbitBgColor)
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopStart),
             )
         }
 
@@ -607,10 +617,10 @@ fun PullToSyncContainer(
                         topStart = cornerRadius,
                         topEnd = cornerRadius,
                         bottomStart = 0.dp,
-                        bottomEnd = 0.dp
-                    )
+                        bottomEnd = 0.dp,
+                    ),
                 )
-                .then(idleBackgroundModifier)
+                .then(idleBackgroundModifier),
         ) {
             // Main screen content
             content(syncState)
@@ -676,22 +686,26 @@ fun PullToSyncContainer(
                                         fadeIn(tween(150, delayMillis = 35)) togetherWith
                                             fadeOut(tween(90))
                                     } else {
-                                        (fadeIn(
-                                            animationSpec = tween(220, delayMillis = 55),
-                                        ) + slideInVertically(
-                                            animationSpec = tween(
-                                                300,
-                                                easing = FastOutSlowInEasing,
-                                            ),
-                                            initialOffsetY = { height -> height / 2 },
-                                        )) togetherWith
-                                            (fadeOut(tween(150)) + slideOutVertically(
+                                        (
+                                            fadeIn(
+                                                animationSpec = tween(220, delayMillis = 55),
+                                            ) + slideInVertically(
                                                 animationSpec = tween(
-                                                    230,
+                                                    300,
                                                     easing = FastOutSlowInEasing,
                                                 ),
-                                                targetOffsetY = { height -> -height / 2 },
-                                            ))
+                                                initialOffsetY = { height -> height / 2 },
+                                            )
+                                            ) togetherWith
+                                            (
+                                                fadeOut(tween(150)) + slideOutVertically(
+                                                    animationSpec = tween(
+                                                        230,
+                                                        easing = FastOutSlowInEasing,
+                                                    ),
+                                                    targetOffsetY = { height -> -height / 2 },
+                                                )
+                                                )
                                     }
                                 },
                                 modifier = Modifier
@@ -745,7 +759,7 @@ private data class SyncBarStatus(
 )
 
 /** How long each status holds the row before the next one takes over. */
-private const val SyncBarStatusCycleMillis = 3_500L
+private const val SYNC_BAR_STATUS_CYCLE_MILLIS = 3_500L
 
 /**
  * Index of the status currently holding the row. Restarts from the top whenever
@@ -760,7 +774,7 @@ private fun rememberCyclingStatusIndex(statuses: List<SyncBarStatus>): Int {
         index = 0
         if (statuses.size > 1) {
             while (true) {
-                delay(SyncBarStatusCycleMillis)
+                delay(SYNC_BAR_STATUS_CYCLE_MILLIS)
                 index = (index + 1) % statuses.size
             }
         }

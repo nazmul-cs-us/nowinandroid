@@ -1,24 +1,40 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.model
 
 import kotlinx.serialization.Serializable
 
 /**
  * LOCATION MODEL: Represents a geographical location for prayer time calculations
- * 
+ *
  * This data class stores all location information needed for accurate prayer time calculations.
- * 
+ *
  * KEY COMPONENTS:
  * - GPS coordinates (latitude/longitude)
  * - Timezone offset for local time calculations
  * - Human-readable location names
  * - Altitude for more accurate astronomical calculations
- * 
+ *
  * USAGE:
  * - Prayer time calculations (core requirement)
  * - Location caching and storage
  * - User location preferences
  * - Fallback location definitions
- * 
+ *
  * EDIT THIS TO:
  * - Add new location properties (region, postal code, etc.)
  * - Modify validation rules
@@ -27,46 +43,57 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Location(
     // GPS COORDINATES - Core data for astronomical calculations
-    val latitude: Double,        // North/South position (-90 to +90 degrees)
-    val longitude: Double,       // East/West position (-180 to +180 degrees)
-    
+    // North/South position (-90 to +90 degrees)
+    val latitude: Double,
+    // East/West position (-180 to +180 degrees)
+    val longitude: Double,
+
     // TIMEZONE INFORMATION - Essential for local prayer times
-    val timeZoneOffset: Double,  // Hours from UTC (e.g., +4.0 for UAE, -5.0 for EST)
-    
+    // Hours from UTC (e.g., +4.0 for UAE, -5.0 for EST)
+    val timeZoneOffset: Double,
+
     // HUMAN-READABLE NAMES - For display in UI
-    val city: String = "",       // City name (e.g., "Dubai", "New York")
-    val country: String = "",    // Country name (e.g., "United Arab Emirates", "United States")
-    val countryCode: String = "",// ISO 3166-1 alpha-2 country code (e.g., "AE", "US")
-    
+    // City name (e.g., "Dubai", "New York")
+    val city: String = "",
+    // Country name (e.g., "United Arab Emirates", "United States")
+    val country: String = "",
+    // ISO 3166-1 alpha-2 country code (e.g., "AE", "US")
+    val countryCode: String = "",
+
     // DETAILED AREA INFORMATION - For enhanced location display
-    val area: String = "",       // Neighborhood/area/district (e.g., "Downtown Dubai", "Manhattan")
-    val subLocality: String = "",// Sub-locality within city (e.g., "Business Bay", "SoHo")
-    val thoroughfare: String = "",// Street name or main road (e.g., "Sheikh Zayed Road", "Broadway")
-    val administrativeArea: String = "", // State/province/emirate (e.g., "Dubai", "New York")
-    
+    // Neighborhood/area/district (e.g., "Downtown Dubai", "Manhattan")
+    val area: String = "",
+    // Sub-locality within city (e.g., "Business Bay", "SoHo")
+    val subLocality: String = "",
+    // Street name or main road (e.g., "Sheikh Zayed Road", "Broadway")
+    val thoroughfare: String = "",
+    // State/province/emirate (e.g., "Dubai", "New York")
+    val administrativeArea: String = "",
+
     // OPTIONAL PRECISION DATA - For enhanced accuracy
-    val altitude: Double = 0.0   // Meters above sea level (affects sunrise/sunset times)
+    // Meters above sea level (affects sunrise/sunset times)
+    val altitude: Double = 0.0,
 ) {
     /**
      * COORDINATE VALIDATOR: Ensures location coordinates are within valid Earth bounds
-     * 
+     *
      * This prevents calculation errors from invalid GPS coordinates.
-     * 
+     *
      * VALIDATION RULES:
      * - Latitude: -90 to +90 degrees (South Pole to North Pole)
      * - Longitude: -180 to +180 degrees (around the Earth)
-     * 
+     *
      * EDIT THIS TO:
      * - Add altitude validation
      * - Add timezone offset validation
      * - Add coordinate precision checks
      */
     fun isValid(): Boolean {
-        return latitude in -90.0..90.0 &&     // Valid latitude range
-               longitude in -180.0..180.0      // Valid longitude range
+        return latitude in -90.0..90.0 && // Valid latitude range
+            longitude in -180.0..180.0 // Valid longitude range
         // TODO: Consider adding timezone validation: timeZoneOffset in -12.0..14.0
     }
-    
+
     /**
      * DISPLAY NAME FORMATTER: Creates user-friendly location names with detailed area information
      *

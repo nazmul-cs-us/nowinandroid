@@ -22,8 +22,8 @@ import com.starception.submission.core.database.dao.RecentSearchQueryDao
 import com.starception.submission.core.database.model.RecentSearchQueryEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlin.time.Clock
 import javax.inject.Inject
+import kotlin.time.Clock
 
 internal class DefaultRecentSearchRepository @Inject constructor(
     private val recentSearchQueryDao: RecentSearchQueryDao,

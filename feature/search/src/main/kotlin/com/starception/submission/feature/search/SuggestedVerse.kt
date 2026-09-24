@@ -26,7 +26,7 @@ data class SuggestedVerse(
     val surahNumber: Int,
     val ayahNumber: Int,
     val description: String,
-    val category: String
+    val category: String,
 )
 
 /**
@@ -42,7 +42,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 255,
             description = "The Throne Verse - Greatest verse in the Quran",
-            category = "Protection"
+            category = "Protection",
         ),
         SuggestedVerse(
             name = "Al-Fatiha",
@@ -50,7 +50,7 @@ object SuggestedVerses {
             surahNumber = 1,
             ayahNumber = 1,
             description = "The Opening - Essential prayer surah",
-            category = "Prayer"
+            category = "Prayer",
         ),
 
         // ==================== LAST 3 SURAHS (MU'AWWIDHAT) ====================
@@ -60,7 +60,7 @@ object SuggestedVerses {
             surahNumber = 112,
             ayahNumber = 1,
             description = "The Sincerity - Equal to 1/3 of Quran",
-            category = "Tawheed"
+            category = "Tawheed",
         ),
         SuggestedVerse(
             name = "Al-Falaq",
@@ -68,7 +68,7 @@ object SuggestedVerses {
             surahNumber = 113,
             ayahNumber = 1,
             description = "The Daybreak - Protection from evil",
-            category = "Protection"
+            category = "Protection",
         ),
         SuggestedVerse(
             name = "An-Nas",
@@ -76,7 +76,7 @@ object SuggestedVerses {
             surahNumber = 114,
             ayahNumber = 1,
             description = "Mankind - Protection from whispers",
-            category = "Protection"
+            category = "Protection",
         ),
 
         // ==================== COMFORT & EASE ====================
@@ -86,7 +86,7 @@ object SuggestedVerses {
             surahNumber = 94,
             ayahNumber = 5,
             description = "Verily, with hardship comes ease",
-            category = "Comfort"
+            category = "Comfort",
         ),
         SuggestedVerse(
             name = "Allah Does Not Burden",
@@ -94,7 +94,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 286,
             description = "Allah does not burden a soul beyond its capacity",
-            category = "Comfort"
+            category = "Comfort",
         ),
         SuggestedVerse(
             name = "Hearts Find Peace",
@@ -102,7 +102,7 @@ object SuggestedVerses {
             surahNumber = 13,
             ayahNumber = 28,
             description = "Verily, in the remembrance of Allah do hearts find rest",
-            category = "Peace"
+            category = "Peace",
         ),
         SuggestedVerse(
             name = "Quran as Healing",
@@ -110,7 +110,7 @@ object SuggestedVerses {
             surahNumber = 17,
             ayahNumber = 82,
             description = "We send down the Quran as healing and mercy",
-            category = "Healing"
+            category = "Healing",
         ),
         SuggestedVerse(
             name = "Allah Will Not Forsake",
@@ -118,7 +118,7 @@ object SuggestedVerses {
             surahNumber = 93,
             ayahNumber = 3,
             description = "Your Lord has not forsaken you nor is He displeased",
-            category = "Comfort"
+            category = "Comfort",
         ),
 
         // ==================== MERCY & FORGIVENESS ====================
@@ -128,7 +128,7 @@ object SuggestedVerses {
             surahNumber = 39,
             ayahNumber = 53,
             description = "Do not despair of Allah's mercy - He forgives all sins",
-            category = "Mercy"
+            category = "Mercy",
         ),
         SuggestedVerse(
             name = "Mercy Encompasses All",
@@ -136,7 +136,7 @@ object SuggestedVerses {
             surahNumber = 7,
             ayahNumber = 156,
             description = "My mercy encompasses all things",
-            category = "Mercy"
+            category = "Mercy",
         ),
         SuggestedVerse(
             name = "Peace Upon Repentant",
@@ -144,7 +144,7 @@ object SuggestedVerses {
             surahNumber = 6,
             ayahNumber = 54,
             description = "Peace be upon you - Lord has decreed mercy upon Himself",
-            category = "Mercy"
+            category = "Mercy",
         ),
         SuggestedVerse(
             name = "Allah Pardons Much",
@@ -152,7 +152,7 @@ object SuggestedVerses {
             surahNumber = 42,
             ayahNumber = 30,
             description = "Whatever misfortune befalls you is from yourself, and He pardons much",
-            category = "Forgiveness"
+            category = "Forgiveness",
         ),
 
         // ==================== PATIENCE & PERSEVERANCE ====================
@@ -162,7 +162,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 153,
             description = "Indeed, Allah is with the patient",
-            category = "Patience"
+            category = "Patience",
         ),
         SuggestedVerse(
             name = "Blessings on Patient",
@@ -170,7 +170,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 157,
             description = "Upon them are blessings and mercy from their Lord",
-            category = "Patience"
+            category = "Patience",
         ),
         SuggestedVerse(
             name = "Unlimited Reward",
@@ -178,7 +178,7 @@ object SuggestedVerses {
             surahNumber = 39,
             ayahNumber = 10,
             description = "The patient will be given their reward without account",
-            category = "Patience"
+            category = "Patience",
         ),
         SuggestedVerse(
             name = "Divine Help Is Near",
@@ -186,7 +186,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 214,
             description = "Indeed, the help of Allah is near",
-            category = "Hope"
+            category = "Hope",
         ),
 
         // ==================== TRUST & RELIANCE ====================
@@ -196,7 +196,7 @@ object SuggestedVerses {
             surahNumber = 65,
             ayahNumber = 3,
             description = "Whoever relies upon Allah - He is sufficient for him",
-            category = "Trust"
+            category = "Trust",
         ),
         SuggestedVerse(
             name = "Don't Despair of Relief",
@@ -204,7 +204,7 @@ object SuggestedVerses {
             surahNumber = 12,
             ayahNumber = 87,
             description = "Do not despair of relief from Allah",
-            category = "Hope"
+            category = "Hope",
         ),
         SuggestedVerse(
             name = "Success From Allah",
@@ -212,7 +212,7 @@ object SuggestedVerses {
             surahNumber = 11,
             ayahNumber = 88,
             description = "My success is only through Allah",
-            category = "Trust"
+            category = "Trust",
         ),
 
         // ==================== DIVINE RESPONSE ====================
@@ -222,7 +222,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 186,
             description = "I am near. I respond to the invocation of the supplicant",
-            category = "Dua"
+            category = "Dua",
         ),
         SuggestedVerse(
             name = "Call Upon Me",
@@ -230,7 +230,7 @@ object SuggestedVerses {
             surahNumber = 40,
             ayahNumber = 60,
             description = "Call upon Me; I will respond to you",
-            category = "Dua"
+            category = "Dua",
         ),
         SuggestedVerse(
             name = "Allah Is With You",
@@ -238,7 +238,7 @@ object SuggestedVerses {
             surahNumber = 20,
             ayahNumber = 46,
             description = "Fear not. Indeed, I am with you both",
-            category = "Comfort"
+            category = "Comfort",
         ),
 
         // ==================== GRATITUDE ====================
@@ -248,7 +248,7 @@ object SuggestedVerses {
             surahNumber = 14,
             ayahNumber = 7,
             description = "If you are grateful, I will surely increase you",
-            category = "Gratitude"
+            category = "Gratitude",
         ),
 
         // ==================== PERSONAL CHANGE ====================
@@ -258,7 +258,7 @@ object SuggestedVerses {
             surahNumber = 13,
             ayahNumber = 11,
             description = "Allah will not change a people until they change themselves",
-            category = "Change"
+            category = "Change",
         ),
 
         // ==================== IMPORTANT SURAHS ====================
@@ -268,7 +268,7 @@ object SuggestedVerses {
             surahNumber = 24,
             ayahNumber = 35,
             description = "Allah is the Light of the heavens and earth",
-            category = "Reflection"
+            category = "Reflection",
         ),
         SuggestedVerse(
             name = "Last 2 Ayahs of Baqarah",
@@ -276,7 +276,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 285,
             description = "Protection when recited at night",
-            category = "Protection"
+            category = "Protection",
         ),
         SuggestedVerse(
             name = "Surah Al-Mulk",
@@ -284,7 +284,7 @@ object SuggestedVerses {
             surahNumber = 67,
             ayahNumber = 1,
             description = "The Sovereignty - Protection in grave",
-            category = "Protection"
+            category = "Protection",
         ),
         SuggestedVerse(
             name = "Surah Yasin",
@@ -292,7 +292,7 @@ object SuggestedVerses {
             surahNumber = 36,
             ayahNumber = 1,
             description = "The Heart of the Quran",
-            category = "Blessings"
+            category = "Blessings",
         ),
         SuggestedVerse(
             name = "Surah Ar-Rahman",
@@ -300,7 +300,7 @@ object SuggestedVerses {
             surahNumber = 55,
             ayahNumber = 1,
             description = "The Most Merciful - Beauty of Allah's blessings",
-            category = "Gratitude"
+            category = "Gratitude",
         ),
         SuggestedVerse(
             name = "Surah Al-Kahf",
@@ -308,7 +308,7 @@ object SuggestedVerses {
             surahNumber = 18,
             ayahNumber = 1,
             description = "The Cave - Protection from Dajjal (Friday)",
-            category = "Friday"
+            category = "Friday",
         ),
         SuggestedVerse(
             name = "Surah Al-Waqiah",
@@ -316,7 +316,7 @@ object SuggestedVerses {
             surahNumber = 56,
             ayahNumber = 1,
             description = "Protection from poverty when recited daily",
-            category = "Provision"
+            category = "Provision",
         ),
 
         // ==================== PARADISE ====================
@@ -326,7 +326,7 @@ object SuggestedVerses {
             surahNumber = 89,
             ayahNumber = 27,
             description = "O reassured soul, return to your Lord well-pleased",
-            category = "Paradise"
+            category = "Paradise",
         ),
         SuggestedVerse(
             name = "Eternal Paradise",
@@ -334,7 +334,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 82,
             description = "Those who believe shall be companions of Paradise",
-            category = "Paradise"
+            category = "Paradise",
         ),
         SuggestedVerse(
             name = "Two Gardens",
@@ -342,7 +342,7 @@ object SuggestedVerses {
             surahNumber = 55,
             ayahNumber = 46,
             description = "For those who fear their Lord are two gardens",
-            category = "Paradise"
+            category = "Paradise",
         ),
 
         // ==================== PROTECTION & STRENGTH ====================
@@ -352,7 +352,7 @@ object SuggestedVerses {
             surahNumber = 3,
             ayahNumber = 150,
             description = "Allah is your protector, and He is the best of helpers",
-            category = "Protection"
+            category = "Protection",
         ),
         SuggestedVerse(
             name = "Believers Prevail",
@@ -360,7 +360,7 @@ object SuggestedVerses {
             surahNumber = 3,
             ayahNumber = 139,
             description = "Do not weaken or grieve - you will be superior",
-            category = "Strength"
+            category = "Strength",
         ),
         SuggestedVerse(
             name = "Allah Protects Believers",
@@ -368,7 +368,7 @@ object SuggestedVerses {
             surahNumber = 47,
             ayahNumber = 11,
             description = "Allah is the protector of those who believe",
-            category = "Protection"
+            category = "Protection",
         ),
 
         // ==================== TRIALS & TESTS ====================
@@ -378,7 +378,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 216,
             description = "Perhaps you hate something that is good for you",
-            category = "Wisdom"
+            category = "Wisdom",
         ),
         SuggestedVerse(
             name = "Testing Through All",
@@ -386,7 +386,7 @@ object SuggestedVerses {
             surahNumber = 21,
             ayahNumber = 35,
             description = "We test you with evil and good as trial",
-            category = "Tests"
+            category = "Tests",
         ),
 
         // ==================== GOOD DEEDS ====================
@@ -396,7 +396,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 110,
             description = "Whatever good you send forth, you will find it with Allah",
-            category = "Deeds"
+            category = "Deeds",
         ),
         SuggestedVerse(
             name = "Reward Not Wasted",
@@ -404,7 +404,7 @@ object SuggestedVerses {
             surahNumber = 11,
             ayahNumber = 115,
             description = "Allah does not waste the reward of those who do good",
-            category = "Deeds"
+            category = "Deeds",
         ),
 
         // ==================== MORNING & EVENING ====================
@@ -414,7 +414,7 @@ object SuggestedVerses {
             surahNumber = 3,
             ayahNumber = 26,
             description = "Say: O Allah, Owner of Sovereignty...",
-            category = "Dhikr"
+            category = "Dhikr",
         ),
 
         // ==================== PROVISION ====================
@@ -424,7 +424,7 @@ object SuggestedVerses {
             surahNumber = 65,
             ayahNumber = 3,
             description = "He will provide for him from where he does not expect",
-            category = "Provision"
+            category = "Provision",
         ),
 
         // ==================== TAWBAH (REPENTANCE) ====================
@@ -434,7 +434,7 @@ object SuggestedVerses {
             surahNumber = 2,
             ayahNumber = 222,
             description = "Indeed, Allah loves those who repent constantly",
-            category = "Repentance"
+            category = "Repentance",
         ),
 
         // ==================== FEAR OF ALLAH ====================
@@ -444,7 +444,7 @@ object SuggestedVerses {
             surahNumber = 65,
             ayahNumber = 2,
             description = "Whoever fears Allah - He will make a way out for him",
-            category = "Taqwa"
+            category = "Taqwa",
         ),
     )
 
@@ -456,10 +456,10 @@ object SuggestedVerses {
         val lowerQuery = query.lowercase()
         return verses.filter { verse ->
             verse.name.lowercase().contains(lowerQuery) ||
-            verse.arabicName.contains(query) ||
-            verse.description.lowercase().contains(lowerQuery) ||
-            verse.category.lowercase().contains(lowerQuery) ||
-            "${verse.surahNumber}:${verse.ayahNumber}".contains(query)
+                verse.arabicName.contains(query) ||
+                verse.description.lowercase().contains(lowerQuery) ||
+                verse.category.lowercase().contains(lowerQuery) ||
+                "${verse.surahNumber}:${verse.ayahNumber}".contains(query)
         }
     }
 }

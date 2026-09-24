@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,17 +37,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.starception.submission.core.designsystem.component.DynamicAsyncImage
-import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.designsystem.component.NiaIconToggleButton
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.icon.isMonochromeTopicIcon
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.designsystem.theme.NiaTheme
+import com.starception.submission.core.designsystem.theme.QuranFonts
 import com.starception.submission.core.ui.R.string
 
 @Composable
@@ -102,11 +101,11 @@ fun InterestsItem(
                 style = if (nameContainsArabic && arabicFontFamily != null) {
                     MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = arabicFontFamily,
-                        fontWeight = FontWeight.Normal
+                        fontWeight = FontWeight.Normal,
                     )
                 } else {
                     MaterialTheme.typography.bodyLarge
-                }
+                },
             )
         },
         supportingContent = {
@@ -115,11 +114,11 @@ fun InterestsItem(
                 style = if (descriptionContainsArabic && arabicFontFamily != null) {
                     MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = arabicFontFamily,
-                        fontWeight = FontWeight.Normal
+                        fontWeight = FontWeight.Normal,
                     )
                 } else {
                     MaterialTheme.typography.bodyMedium
-                }
+                },
             )
         },
         trailingContent = {

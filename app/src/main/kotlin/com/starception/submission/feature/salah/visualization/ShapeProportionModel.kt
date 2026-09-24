@@ -15,12 +15,18 @@ enum class BodyShapeStyle(val displayName: String) {
  * Angles are expressed in degrees; ratios and shoulderCurve are unitless.
  */
 data class BodyProportionFeatures(
-    val headToBody: Float,          // k1 = lh / (lu + ll)
-    val shoulderToAbdomen: Float,   // k2 = bs / bh
-    val upperToLowerBody: Float,    // k3 = lu / ll
-    val shoulderCurve: Float,       // k4
-    val armAngle: Float,            // k5 = theta-a
-    val legAngle: Float,            // k6 = theta-l
+    // k1 = lh / (lu + ll)
+    val headToBody: Float,          
+    // k2 = bs / bh
+    val shoulderToAbdomen: Float,   
+    // k3 = lu / ll
+    val upperToLowerBody: Float,    
+    // k4
+    val shoulderCurve: Float,       
+    // k5 = theta-a
+    val armAngle: Float,            
+    // k6 = theta-l
+    val legAngle: Float,            
 )
 
 data class BodyMeasurements(

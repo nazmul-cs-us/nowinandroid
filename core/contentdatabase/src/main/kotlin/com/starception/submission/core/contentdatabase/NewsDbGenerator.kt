@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.contentdatabase
 
 import android.content.Context
@@ -127,7 +143,7 @@ object NewsDbGenerator {
         68 to TOPIC_SACRIFICE_WORSHIP, 74 to TOPIC_SACRIFICE_WORSHIP, 75 to TOPIC_SACRIFICE_WORSHIP,
         127 to TOPIC_SACRIFICE_WORSHIP, 122 to TOPIC_SACRIFICE_WORSHIP, 123 to TOPIC_SACRIFICE_WORSHIP,
         89 to TOPIC_SACRIFICE_WORSHIP, 90 to TOPIC_SACRIFICE_WORSHIP, 91 to TOPIC_SACRIFICE_WORSHIP,
-        92 to TOPIC_SACRIFICE_WORSHIP, 93 to TOPIC_SACRIFICE_WORSHIP, 94 to TOPIC_SACRIFICE_WORSHIP
+        92 to TOPIC_SACRIFICE_WORSHIP, 93 to TOPIC_SACRIFICE_WORSHIP, 94 to TOPIC_SACRIFICE_WORSHIP,
     )
 
     /**
@@ -139,8 +155,8 @@ object NewsDbGenerator {
         // asset resolvers. These files survive an APK update and are still valid app data.
         val cdnPaths = listOf(
             "databases/hadith/$dbName", // For downloadable Hadith collections
-            "databases/quran/$dbName",  // For quran.db, quran_enhanced.db
-            "databases/$dbName"          // For quranic_duas.db, fortress_of_the_muslim_v2.db
+            "databases/quran/$dbName", // For quran.db, quran_enhanced.db
+            "databases/$dbName", // For quranic_duas.db, fortress_of_the_muslim_v2.db
         )
 
         for (storageRoot in RESOLVED_ASSET_ROOTS) {
@@ -233,7 +249,7 @@ object NewsDbGenerator {
                 try {
                     val cursor = quranDb.rawQuery(
                         "SELECT number, name_en, name_en_translation, name_ar, type, total_verses FROM surahs ORDER BY number",
-                        null
+                        null,
                     )
                     while (cursor.moveToNext()) {
                         val number = cursor.getInt(0)
@@ -259,7 +275,7 @@ object NewsDbGenerator {
                         // 1 only when there is no second ayah.
                         val firstAyah: String? = quranDb.rawQuery(
                             "SELECT text FROM ayahs WHERE surah_number = ? AND number_in_surah >= 2 ORDER BY number_in_surah ASC LIMIT 6",
-                            arrayOf(number.toString())
+                            arrayOf(number.toString()),
                         ).use { ac ->
                             val parts = mutableListOf<String>()
                             while (ac.moveToNext()) {
@@ -268,7 +284,7 @@ object NewsDbGenerator {
                             parts.joinToString(separator = " ").takeIf { it.isNotBlank() }
                         } ?: quranDb.rawQuery(
                             "SELECT text FROM ayahs WHERE surah_number = ? ORDER BY number_in_surah ASC LIMIT 1",
-                            arrayOf(number.toString())
+                            arrayOf(number.toString()),
                         ).use { ac ->
                             if (ac.moveToFirst()) ac.getString(0)?.takeIf { it.isNotBlank() } else null
                         }
@@ -284,20 +300,22 @@ object NewsDbGenerator {
                             append("Read and listen to Surah $nameEn, the $nameTranslation. This is the $ordinal chapter of the Holy Quran with $totalVerses verses.")
                         }
 
-                        newsResources.add(NewsResourceEntity(
-                            id = newsId,
-                            title = title,
-                            content = content,
-                            url = "",
-                            headerImageUrl = mosqueImage,
-                            publishDate = now,
-                            type = "Surah 📖",
-                            isSystem = 1,
-                            isUserCreated = 0,
-                            source = null,
-                            createdAt = now,
-                            updatedAt = now
-                        ))
+                        newsResources.add(
+                            NewsResourceEntity(
+                                id = newsId,
+                                title = title,
+                                content = content,
+                                url = "",
+                                headerImageUrl = mosqueImage,
+                                publishDate = now,
+                                type = "Surah 📖",
+                                isSystem = 1,
+                                isUserCreated = 0,
+                                source = null,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        )
                         crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_HOLY_QURAN))
                         surahCount++
                     }
@@ -315,7 +333,7 @@ object NewsDbGenerator {
                 try {
                     val cursor = duaDb.rawQuery(
                         "SELECT dua_number, title, surah_reference, arabic, transliteration, translation, explanation FROM quranic_duas ORDER BY dua_number",
-                        null
+                        null,
                     )
                     while (cursor.moveToNext()) {
                         val duaNumber = cursor.getInt(0)
@@ -343,20 +361,22 @@ object NewsDbGenerator {
                         // Use Masjid Al-Nawabi for all Quranic Duas
                         val mosqueImage = "drawable://masjid_al_nawabi"
 
-                        newsResources.add(NewsResourceEntity(
-                            id = newsId,
-                            title = fullTitle,
-                            content = content,
-                            url = "",
-                            headerImageUrl = mosqueImage,
-                            publishDate = now,
-                            type = "Dua 🤲",
-                            isSystem = 1,
-                            isUserCreated = 0,
-                            source = null,
-                            createdAt = now,
-                            updatedAt = now
-                        ))
+                        newsResources.add(
+                            NewsResourceEntity(
+                                id = newsId,
+                                title = fullTitle,
+                                content = content,
+                                url = "",
+                                headerImageUrl = mosqueImage,
+                                publishDate = now,
+                                type = "Dua 🤲",
+                                isSystem = 1,
+                                isUserCreated = 0,
+                                source = null,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        )
                         crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_QURANIC_DUAS))
                         quranicDuaCount++
                     }
@@ -400,7 +420,7 @@ object NewsDbGenerator {
                            FROM chapters c
                            JOIN invocations i ON c.id = i.chapter_id
                            ORDER BY c.id, i.position""",
-                        null
+                        null,
                     )
                     while (cursor.moveToNext()) {
                         val chapterId = cursor.getInt(0)
@@ -435,20 +455,22 @@ object NewsDbGenerator {
                         // Use Masjid Al-Nawabi for all Fortress of the Muslim duas
                         val mosqueImage = "drawable://masjid_al_nawabi"
 
-                        newsResources.add(NewsResourceEntity(
-                            id = newsId,
-                            title = title,
-                            content = content,
-                            url = "",
-                            headerImageUrl = mosqueImage,
-                            publishDate = now,
-                            type = "Dua 🤲",
-                            isSystem = 1,
-                            isUserCreated = 0,
-                            source = null,
-                            createdAt = now,
-                            updatedAt = now
-                        ))
+                        newsResources.add(
+                            NewsResourceEntity(
+                                id = newsId,
+                                title = title,
+                                content = content,
+                                url = "",
+                                headerImageUrl = mosqueImage,
+                                publishDate = now,
+                                type = "Dua 🤲",
+                                isSystem = 1,
+                                isUserCreated = 0,
+                                source = null,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        )
 
                         val topicId = CHAPTER_TO_TOPIC[chapterId]
                         if (topicId != null) {
@@ -514,20 +536,22 @@ object NewsDbGenerator {
                             }
                             val url = "hadith://sahih_bukhari/$hadithNumber"
 
-                            newsResources.add(NewsResourceEntity(
-                                id = newsId,
-                                title = title,
-                                content = content,
-                                url = url,
-                                headerImageUrl = "drawable://masjid_al_nawabi",
-                                publishDate = now,
-                                type = "Hadith 📖",
-                                isSystem = 1,
-                                isUserCreated = 0,
-                                source = "Sahih Bukhari",
-                                createdAt = now,
-                                updatedAt = now
-                            ))
+                            newsResources.add(
+                                NewsResourceEntity(
+                                    id = newsId,
+                                    title = title,
+                                    content = content,
+                                    url = url,
+                                    headerImageUrl = "drawable://masjid_al_nawabi",
+                                    publishDate = now,
+                                    type = "Hadith 📖",
+                                    isSystem = 1,
+                                    isUserCreated = 0,
+                                    source = "Sahih Bukhari",
+                                    createdAt = now,
+                                    updatedAt = now,
+                                ),
+                            )
                             crossRefs.add(NewsTopicCrossRef(newsId, TOPIC_SAHIH_BUKHARI))
                             newsId++
                             bukhariCount++
@@ -641,13 +665,13 @@ object NewsDbGenerator {
                 bukhariHadithCount = bukhariCount,
                 shamayeleHadithCount = shamayeleCount,
                 topicMappings = crossRefs.size,
-                durationMs = duration
+                durationMs = duration,
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to regenerate news.db with Room", e)
             RegenerationResult(
                 success = false,
-                error = e.message
+                error = e.message,
             )
         }
     }
@@ -665,7 +689,7 @@ data class RegenerationResult(
     val shamayeleHadithCount: Int = 0,
     val topicMappings: Int = 0,
     val durationMs: Long = 0,
-    val error: String? = null
+    val error: String? = null,
 ) {
     val totalNewsResources: Int
         get() = surahCount + quranicDuaCount + fortressDuaCount + bukhariHadithCount +

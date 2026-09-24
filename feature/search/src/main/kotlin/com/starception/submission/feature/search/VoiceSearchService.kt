@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Uses Google's cloud-based speech recognition for best results.
  */
 class VoiceSearchService(
-    private val context: Context
+    private val context: Context,
 ) {
     companion object {
         private const val TAG = "VoiceSearchService"
@@ -81,7 +81,7 @@ class VoiceSearchService(
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -89,7 +89,7 @@ class VoiceSearchService(
      * Start listening for voice input
      */
     fun startListening(
-        onResult: (VoiceSearchResult) -> Unit
+        onResult: (VoiceSearchResult) -> Unit,
     ) {
         if (!isAvailable()) {
             Log.e(TAG, "Speech recognition not available")
@@ -210,7 +210,6 @@ class VoiceSearchService(
 
             speechRecognizer?.startListening(intent)
             Log.i(TAG, "Started listening for voice input")
-
         } catch (e: Exception) {
             Log.e(TAG, "Error starting speech recognition", e)
             _isListening.value = false

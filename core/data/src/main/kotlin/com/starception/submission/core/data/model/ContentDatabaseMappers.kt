@@ -17,13 +17,13 @@
 package com.starception.submission.core.data.model
 
 import com.starception.submission.core.contentdatabase.NewsResourceWithTopics
-import com.starception.submission.core.contentdatabase.TopicEntity as ContentTopicEntity
 import com.starception.submission.core.model.data.NewsResource
 import com.starception.submission.core.model.data.Topic
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
+import com.starception.submission.core.contentdatabase.TopicEntity as ContentTopicEntity
 
 /**
  * Extension function to convert ContentDatabase TopicEntity to external Topic model

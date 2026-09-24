@@ -77,11 +77,11 @@ class IndoPakTextRepository private constructor(context: Context) {
         private const val TAG = "IndoPakTextRepository"
         private const val DB_NAME = "quran_indopak.db"
 
-        @Volatile private var INSTANCE: IndoPakTextRepository? = null
+        @Volatile private var dbInstance: IndoPakTextRepository? = null
 
         fun getInstance(context: Context): IndoPakTextRepository =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: IndoPakTextRepository(context).also { INSTANCE = it }
+            dbInstance ?: synchronized(this) {
+                dbInstance ?: IndoPakTextRepository(context).also { dbInstance = it }
             }
     }
 }

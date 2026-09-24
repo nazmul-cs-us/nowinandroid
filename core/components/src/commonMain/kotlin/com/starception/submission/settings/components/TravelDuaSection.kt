@@ -1,8 +1,23 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -22,28 +37,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.Traffic
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,18 +53,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 
@@ -103,7 +101,7 @@ fun TravelDuaSection(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Master toggle with modern switch
         ModernSwitchRow(
@@ -123,7 +121,7 @@ fun TravelDuaSection(
                 } else {
                     onSettingsChanged(settings.copy(enabled = false))
                 }
-            }
+            },
         )
 
         // Sub-settings - only visible when enabled
@@ -132,13 +130,13 @@ fun TravelDuaSection(
             enter = fadeIn() + expandVertically(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             ),
-            exit = fadeOut() + shrinkVertically()
+            exit = fadeOut() + shrinkVertically(),
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 ResponsiveCompactSliderGrid(
                     items = listOf(
@@ -207,18 +205,18 @@ fun TravelDuaSection(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(48.dp),
                 ) {
                     AnimatedContent(
                         targetState = isPlaying,
                         transitionSpec = {
                             fadeIn() togetherWith fadeOut()
                         },
-                        label = "play_pause"
+                        label = "play_pause",
                     ) { playing ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                            horizontalArrangement = Arrangement.Center,
                         ) {
                             FlaticonIcon(
                                 glyph = if (playing) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
@@ -229,7 +227,7 @@ fun TravelDuaSection(
                             Text(
                                 text = if (playing) "Stop" else testButtonLabel,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                     }
@@ -240,7 +238,7 @@ fun TravelDuaSection(
                     text = playbackDescription,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 )
             }
         }
@@ -302,7 +300,7 @@ private fun CompactSliderCard(
     maxValue: Int,
     unit: String,
     modifier: Modifier = Modifier,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var previousValue by remember { mutableStateOf(value) }
@@ -312,11 +310,11 @@ private fun CompactSliderCard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
         ) {
             Column(
                 modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 // Header row with icon, label, and value
                 Row(
@@ -324,7 +322,7 @@ private fun CompactSliderCard(
                         .fillMaxWidth()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = null
+                            indication = null,
                         ) {
                             if (description.isNotEmpty()) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -332,11 +330,11 @@ private fun CompactSliderCard(
                             }
                         },
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         FlaticonIcon(
                             glyph = iconGlyph,
@@ -348,7 +346,7 @@ private fun CompactSliderCard(
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (description.isNotEmpty()) {
                             FlaticonIcon(
@@ -365,13 +363,13 @@ private fun CompactSliderCard(
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.primary)
                             .padding(horizontal = 6.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = "$value$unit",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = MaterialTheme.colorScheme.onPrimary,
                         )
                     }
                 }
@@ -395,8 +393,8 @@ private fun CompactSliderCard(
                     colors = SliderDefaults.colors(
                         activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        thumbColor = MaterialTheme.colorScheme.primary
-                    )
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                    ),
                 )
             }
         }
@@ -406,7 +404,7 @@ private fun CompactSliderCard(
             Popup(
                 alignment = Alignment.TopCenter,
                 onDismissRequest = { showTooltip = false },
-                properties = PopupProperties(focusable = true)
+                properties = PopupProperties(focusable = true),
             ) {
                 Surface(
                     modifier = Modifier
@@ -414,13 +412,13 @@ private fun CompactSliderCard(
                         .width(180.dp),
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.inverseSurface,
-                    shadowElevation = 4.dp
+                    shadowElevation = 4.dp,
                 ) {
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(10.dp)
+                        modifier = Modifier.padding(10.dp),
                     )
                 }
             }

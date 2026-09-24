@@ -29,11 +29,11 @@ import javax.inject.Inject
 class NiaPreferencesDataSource @Inject constructor(
     private val userPreferences: DataStore<UserPreferences>,
 ) {
-    
+
     companion object {
         private const val TAG = "NiaPreferencesDataSource"
     }
-    
+
     /**
      * ENHANCED DATASTORE LOGGING
      * Comprehensive logging for all DataStore operations with detailed metadata
@@ -41,7 +41,7 @@ class NiaPreferencesDataSource @Inject constructor(
     private fun logDataStoreOperation(operation: String, key: String, value: Any?, details: String = "") {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
-        
+
         Log.i(TAG, "")
         Log.i(TAG, "💾 DATASTORE OPERATION")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -54,11 +54,11 @@ class NiaPreferencesDataSource @Inject constructor(
         Log.i(TAG, "📁 Storage: Proto DataStore")
         Log.i(TAG, "")
     }
-    
+
     private fun verifyDataStoreWrite(operation: String, expectedResult: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault())
             .format(java.util.Date())
-            
+
         Log.i(TAG, "")
         Log.i(TAG, "🔍 DATASTORE WRITE VERIFICATION")
         Log.i(TAG, "⏰ Timestamp: $timestamp")
@@ -113,11 +113,11 @@ class NiaPreferencesDataSource @Inject constructor(
     suspend fun setFollowedTopicIds(topicIds: Set<String>) {
         logDataStoreOperation(
             operation = "SET_FOLLOWED_TOPICS",
-            key = "followedTopicIds", 
+            key = "followedTopicIds",
             value = topicIds,
-            details = "Setting ${topicIds.size} topics as followed, clearing previous selections"
+            details = "Setting ${topicIds.size} topics as followed, clearing previous selections",
         )
-        
+
         try {
             userPreferences.updateData {
                 it.copy {
@@ -126,10 +126,10 @@ class NiaPreferencesDataSource @Inject constructor(
                     updateShouldHideOnboardingIfNecessary()
                 }
             }
-            
+
             verifyDataStoreWrite(
                 operation = "SET_FOLLOWED_TOPICS",
-                expectedResult = "${topicIds.size} topics stored as followed"
+                expectedResult = "${topicIds.size} topics stored as followed",
             )
         } catch (ioException: IOException) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update followed topic IDs", ioException)
@@ -142,9 +142,9 @@ class NiaPreferencesDataSource @Inject constructor(
             operation = if (followed) "FOLLOW_TOPIC" else "UNFOLLOW_TOPIC",
             key = "followedTopicIds[$topicId]",
             value = followed,
-            details = "${if (followed) "Adding" else "Removing"} topic from followed list"
+            details = "${if (followed) "Adding" else "Removing"} topic from followed list",
         )
-        
+
         try {
             userPreferences.updateData {
                 it.copy {
@@ -156,10 +156,10 @@ class NiaPreferencesDataSource @Inject constructor(
                     updateShouldHideOnboardingIfNecessary()
                 }
             }
-            
+
             verifyDataStoreWrite(
                 operation = if (followed) "FOLLOW_TOPIC" else "UNFOLLOW_TOPIC",
-                expectedResult = "Topic $topicId ${if (followed) "added to" else "removed from"} followed list"
+                expectedResult = "Topic $topicId ${if (followed) "added to" else "removed from"} followed list",
             )
         } catch (ioException: IOException) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update topic follow status", ioException)
@@ -172,9 +172,9 @@ class NiaPreferencesDataSource @Inject constructor(
             operation = "SET_THEME_BRAND",
             key = "themeBrand",
             value = themeBrand.name,
-            details = "Changing app theme brand preference"
+            details = "Changing app theme brand preference",
         )
-        
+
         try {
             userPreferences.updateData {
                 it.copy {
@@ -187,10 +187,10 @@ class NiaPreferencesDataSource @Inject constructor(
                     }
                 }
             }
-            
+
             verifyDataStoreWrite(
                 operation = "SET_THEME_BRAND",
-                expectedResult = "Theme brand set to ${themeBrand.name}"
+                expectedResult = "Theme brand set to ${themeBrand.name}",
             )
         } catch (exception: Exception) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update theme brand", exception)
@@ -203,17 +203,17 @@ class NiaPreferencesDataSource @Inject constructor(
             operation = "SET_DYNAMIC_COLOR",
             key = "useDynamicColor",
             value = useDynamicColor,
-            details = "${if (useDynamicColor) "Enabling" else "Disabling"} dynamic color theming"
+            details = "${if (useDynamicColor) "Enabling" else "Disabling"} dynamic color theming",
         )
-        
+
         try {
             userPreferences.updateData {
                 it.copy { this.dynamicColorDisabled = !useDynamicColor }
             }
-            
+
             verifyDataStoreWrite(
                 operation = "SET_DYNAMIC_COLOR",
-                expectedResult = "Dynamic color preference set to $useDynamicColor"
+                expectedResult = "Dynamic color preference set to $useDynamicColor",
             )
         } catch (exception: Exception) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update dynamic color preference", exception)
@@ -239,9 +239,9 @@ class NiaPreferencesDataSource @Inject constructor(
             operation = if (bookmarked) "BOOKMARK_ARTICLE" else "UNBOOKMARK_ARTICLE",
             key = "bookmarkedNewsResourceIds[$newsResourceId]",
             value = bookmarked,
-            details = "${if (bookmarked) "Adding" else "Removing"} article bookmark"
+            details = "${if (bookmarked) "Adding" else "Removing"} article bookmark",
         )
-        
+
         try {
             userPreferences.updateData {
                 it.copy {
@@ -252,10 +252,10 @@ class NiaPreferencesDataSource @Inject constructor(
                     }
                 }
             }
-            
+
             verifyDataStoreWrite(
                 operation = if (bookmarked) "BOOKMARK_ARTICLE" else "UNBOOKMARK_ARTICLE",
-                expectedResult = "Article $newsResourceId ${if (bookmarked) "bookmarked" else "unbookmarked"}"
+                expectedResult = "Article $newsResourceId ${if (bookmarked) "bookmarked" else "unbookmarked"}",
             )
         } catch (ioException: IOException) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update bookmark status", ioException)
@@ -351,7 +351,7 @@ class NiaPreferencesDataSource @Inject constructor(
             operation = "SET_TOPIC_ORDER",
             key = "topicOrderIds",
             value = topicIds,
-            details = "Setting custom topic order with ${topicIds.size} topics"
+            details = "Setting custom topic order with ${topicIds.size} topics",
         )
 
         try {
@@ -364,7 +364,7 @@ class NiaPreferencesDataSource @Inject constructor(
 
             verifyDataStoreWrite(
                 operation = "SET_TOPIC_ORDER",
-                expectedResult = "Topic order saved with ${topicIds.size} topics"
+                expectedResult = "Topic order saved with ${topicIds.size} topics",
             )
         } catch (ioException: IOException) {
             Log.e(TAG, "❌ DATASTORE ERROR: Failed to update topic order", ioException)

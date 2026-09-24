@@ -23,10 +23,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,12 +43,11 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.core.model.data.FollowableTopic
 import com.starception.submission.core.ui.InterestsItem
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
-import androidx.compose.foundation.layout.height
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @Composable
 fun TopicsTabContent(
@@ -93,7 +91,7 @@ fun TopicsTabContent(
         ) {
             items(
                 items = localTopics,
-                key = { item -> item.topic.id }
+                key = { item -> item.topic.id },
             ) { followableTopic ->
                 val topicId = followableTopic.topic.id
                 val isSelected = shouldHighlightSelectedTopic && topicId == selectedTopicId
@@ -117,7 +115,7 @@ fun TopicsTabContent(
                                         onReorderComplete?.invoke(localTopics.map { it.topic.id })
                                         wasReordered = false
                                     }
-                                }
+                                },
                             )
                         } else {
                             Modifier
@@ -131,7 +129,7 @@ fun TopicsTabContent(
                                         onReorderComplete?.invoke(localTopics.map { it.topic.id })
                                         wasReordered = false
                                     }
-                                }
+                                },
                             ),
                     )
                 }

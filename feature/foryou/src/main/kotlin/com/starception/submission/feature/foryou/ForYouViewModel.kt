@@ -51,7 +51,6 @@ class ForYouViewModel @Inject constructor(
     getFollowableTopics: GetFollowableTopicsUseCase,
 ) : ViewModel() {
 
-
     private val shouldShowOnboarding: Flow<Boolean> =
         userDataRepository.userData.map { !it.shouldHideOnboarding }
 

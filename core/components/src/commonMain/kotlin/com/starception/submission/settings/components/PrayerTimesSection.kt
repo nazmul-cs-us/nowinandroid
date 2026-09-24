@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +31,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -28,8 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,7 +63,7 @@ fun PrayerTimesSection(
     autoDetectedCountryName: String?,
     onSettingsChange: (PrayerSettings) -> Unit,
     onRestoreClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -60,7 +75,7 @@ fun PrayerTimesSection(
             onMethodSelected = { method ->
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onSettingsChange(prayerSettings.copy(calculationMethod = method))
-            }
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -75,7 +90,7 @@ fun PrayerTimesSection(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onSettingsChange(prayerSettings.copy(asrMadhhab = AsrMadhhab.STANDARD))
-                }
+                },
             )
             MadhhabRow(
                 text = "Hanafi",
@@ -84,7 +99,7 @@ fun PrayerTimesSection(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onSettingsChange(prayerSettings.copy(asrMadhhab = AsrMadhhab.HANAFI))
-                }
+                },
             )
         }
 
@@ -97,7 +112,7 @@ fun PrayerTimesSection(
             onAdjustmentSelected = { adjustment ->
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onSettingsChange(prayerSettings.copy(highLatitudeAdjustment = adjustment))
-            }
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -114,7 +129,7 @@ fun PrayerTimesSection(
             },
             onIshaAngleChange = { angle ->
                 onSettingsChange(prayerSettings.copy(customIshaAngle = angle))
-            }
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -131,7 +146,7 @@ fun PrayerTimesSection(
             },
             onMaghribOffsetChange = { offset ->
                 onSettingsChange(prayerSettings.copy(customMaghribOffset = offset))
-            }
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -142,7 +157,7 @@ fun PrayerTimesSection(
             offsets = prayerSettings.timeOffsets,
             onOffsetsChange = { newOffsets ->
                 onSettingsChange(prayerSettings.copy(timeOffsets = newOffsets))
-            }
+            },
         )
 
         // Restore Button (if available)
@@ -150,7 +165,7 @@ fun PrayerTimesSection(
             Spacer(modifier = Modifier.height(16.dp))
             RestoreButton(
                 countryName = autoDetectedCountryName,
-                onClick = onRestoreClick
+                onClick = onRestoreClick,
             )
         }
     }
@@ -163,7 +178,7 @@ private fun SectionLabel(text: String) {
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 8.dp),
     )
 }
 
@@ -171,13 +186,13 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun CalculationMethodDropdown(
     selectedMethod: CalculationMethod,
-    onMethodSelected: (CalculationMethod) -> Unit
+    onMethodSelected: (CalculationMethod) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it }
+        onExpandedChange = { expanded = it },
     ) {
         OutlinedTextField(
             value = selectedMethod.displayName,
@@ -186,12 +201,12 @@ private fun CalculationMethodDropdown(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
         ) {
             CalculationMethod.entries.forEach { method ->
                 DropdownMenuItem(
@@ -199,19 +214,19 @@ private fun CalculationMethodDropdown(
                         Column {
                             Text(
                                 text = method.displayName,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
                                 text = method.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     },
                     onClick = {
                         onMethodSelected(method)
                         expanded = false
-                    }
+                    },
                 )
             }
         }
@@ -222,13 +237,13 @@ private fun CalculationMethodDropdown(
 @Composable
 private fun HighLatitudeDropdown(
     selectedAdjustment: HighLatitudeAdjustment,
-    onAdjustmentSelected: (HighLatitudeAdjustment) -> Unit
+    onAdjustmentSelected: (HighLatitudeAdjustment) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = it }
+        onExpandedChange = { expanded = it },
     ) {
         OutlinedTextField(
             value = selectedAdjustment.displayName,
@@ -237,12 +252,12 @@ private fun HighLatitudeDropdown(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
         ) {
             HighLatitudeAdjustment.entries.forEach { adjustment ->
                 DropdownMenuItem(
@@ -250,19 +265,19 @@ private fun HighLatitudeDropdown(
                         Column {
                             Text(
                                 text = adjustment.displayName,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                             Text(
                                 text = adjustment.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     },
                     onClick = {
                         onAdjustmentSelected(adjustment)
                         expanded = false
-                    }
+                    },
                 )
             }
         }
@@ -274,7 +289,7 @@ private fun MadhhabRow(
     text: String,
     description: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Row(
         Modifier
@@ -282,26 +297,26 @@ private fun MadhhabRow(
             .selectable(
                 selected = selected,
                 role = Role.RadioButton,
-                onClick = onClick
+                onClick = onClick,
             )
             .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.Top,
     ) {
         RadioButton(
             selected = selected,
-            onClick = null
+            onClick = null,
         )
         Spacer(Modifier.width(8.dp))
         Column {
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -310,7 +325,7 @@ private fun MadhhabRow(
 @Composable
 private fun TimeOffsetsGrid(
     offsets: PrayerTimeOffsets,
-    onOffsetsChange: (PrayerTimeOffsets) -> Unit
+    onOffsetsChange: (PrayerTimeOffsets) -> Unit,
 ) {
     val fields = listOf(
         OffsetFieldSpec("Fajr", offsets.fajr) { onOffsetsChange(offsets.copy(fajr = it)) },
@@ -353,7 +368,7 @@ private fun OffsetField(
     label: String,
     value: Int,
     onValueChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var textValue by remember(value) { mutableStateOf(if (value == 0) "" else value.toString()) }
 
@@ -369,7 +384,7 @@ private fun OffsetField(
         },
         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
         singleLine = true,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -380,7 +395,7 @@ private fun CustomAnglesGrid(
     defaultFajrAngle: Double,
     defaultIshaAngle: Double?,
     onFajrAngleChange: (Double?) -> Unit,
-    onIshaAngleChange: (Double?) -> Unit
+    onIshaAngleChange: (Double?) -> Unit,
 ) {
     // Use 18.0 as fallback for Isha if method uses time-based delay instead of angle
     val effectiveDefaultIshaAngle = defaultIshaAngle ?: 18.0
@@ -407,9 +422,9 @@ private fun CustomAnglesGrid(
             },
         )
         Text(
-            text = "Leave empty to use method defaults (Fajr: ${defaultFajrAngle}°, Isha: ${effectiveDefaultIshaAngle}°)",
+            text = "Leave empty to use method defaults (Fajr: $defaultFajrAngle°, Isha: $effectiveDefaultIshaAngle°)",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -420,7 +435,7 @@ private fun AngleField(
     value: Double?,
     defaultValue: Double,
     onValueChange: (Double?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var textValue by remember(value) {
         mutableStateOf(value?.toString() ?: "")
@@ -438,13 +453,13 @@ private fun AngleField(
         },
         label = {
             Text(
-                text = if (value == null) "$label (${defaultValue}°)" else label,
-                style = MaterialTheme.typography.labelSmall
+                text = if (value == null) "$label ($defaultValue°)" else label,
+                style = MaterialTheme.typography.labelSmall,
             )
         },
-        placeholder = { Text("${defaultValue}°") },
+        placeholder = { Text("$defaultValue°") },
         singleLine = true,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -455,7 +470,7 @@ private fun AdvancedOverridesGrid(
     defaultIshaDelay: Int?,
     defaultMaghribOffset: Int,
     onIshaDelayChange: (Int?) -> Unit,
-    onMaghribOffsetChange: (Int?) -> Unit
+    onMaghribOffsetChange: (Int?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ResponsiveSettingsFieldPair(
@@ -486,7 +501,7 @@ private fun AdvancedOverridesGrid(
                 append("Maghrib offset: minutes after sunset (used by some Shia methods).")
             },
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -521,7 +536,7 @@ private fun MinuteField(
     defaultValue: Int?,
     onValueChange: (Int?) -> Unit,
     hint: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var textValue by remember(value) {
         mutableStateOf(value?.toString() ?: "")
@@ -542,23 +557,23 @@ private fun MinuteField(
         label = {
             Text(
                 text = if (value == null) "$label ($displayDefault)" else label,
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelSmall,
             )
         },
         placeholder = { Text(hint) },
         singleLine = true,
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
 @Composable
 private fun RestoreButton(
     countryName: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     NiaOutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text("Restore settings for $countryName")
     }

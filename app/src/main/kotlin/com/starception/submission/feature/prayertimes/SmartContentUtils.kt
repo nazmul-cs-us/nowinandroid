@@ -600,7 +600,10 @@ object SmartContentUtils {
  * Data class to hold notification-synchronized content
  */
 data class NotificationSyncContent(
-    val title: String,          // e.g., "Best Time to Pray Fajr"
-    val content: String,        // e.g., "6h 51m since Fajr"
-    val nextPrayerInfo: String  // e.g., "Next • Dhuhr in 2h 15m"
+    // e.g., "Best Time to Pray Fajr"
+    val title: String,          
+    // e.g., "6h 51m since Fajr"
+    val content: String,        
+    // e.g., "Next • Dhuhr in 2h 15m"
+    val nextPrayerInfo: String  
 )

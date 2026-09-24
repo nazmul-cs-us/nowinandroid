@@ -20,32 +20,32 @@ import kotlinx.datetime.Instant
 
 /**
  * NEWS RESOURCE MODEL: Complete representation of a news article
- * 
+ *
  * This data class represents a news article with all its associated metadata,
  * content, and relationships. It serves as the core content model throughout
  * the app's data and UI layers.
- * 
+ *
  * CONTENT STRUCTURE:
  * - Basic metadata: ID, title, publish date
  * - Content: Full article text and external URL
  * - Media: Optional header image
  * - Classification: Type and associated topics
- * 
+ *
  * DATA SOURCES:
  * - Network API: Fetched from remote content management system
  * - Local database: Cached for offline access
  * - Demo data: Static content for development/testing
- * 
+ *
  * UI INTEGRATION:
  * - Used in article lists, detail views, search results
  * - Supports bookmarking and read status tracking
  * - Enables content filtering by topics
- * 
+ *
  * IMMUTABILITY:
  * - Immutable data class for thread-safe operations
  * - Changes require creating new instances
  * - Safe to share across multiple UI components
- * 
+ *
  * @param id Unique identifier for the news article
  * @param title Display title for the article
  * @param content Full article text content

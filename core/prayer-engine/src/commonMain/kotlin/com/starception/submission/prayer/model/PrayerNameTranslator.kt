@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.model
 
 // No date type here on purpose. Naming is the shared concern; deciding whether
@@ -31,10 +47,10 @@ private fun getJumuahNameInLocalLanguage(countryCode: String?): String = when (c
 
 /**
  * Prayer Name Translator - Location-based prayer name translations
- * 
+ *
  * This utility provides prayer name translations based on the user's current location.
  * It automatically detects the country code and returns appropriate local language names.
- * 
+ *
  * Supported Languages:
  * - Arabic (Middle East countries)
  * - Turkish (Turkey)
@@ -42,14 +58,14 @@ private fun getJumuahNameInLocalLanguage(countryCode: String?): String = when (c
  * - Persian (Iran)
  * - Malay (Malaysia, Indonesia, Brunei)
  * - Bengali (Bangladesh)
- * 
+ *
  * Usage:
  * val localName = getPrayerNameInLocalLanguage("Dhuhr", "AE") // Returns "الظهر"
  */
 
 /**
  * Get prayer names in local language based on location country code
- * 
+ *
  * @param englishName The English prayer name (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha)
  * @param countryCode The ISO 3166-1 alpha-2 country code (e.g., "AE", "TR", "PK")
  * @return The prayer name in the local language, or Arabic as default

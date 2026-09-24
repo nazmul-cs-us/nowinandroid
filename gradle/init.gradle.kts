@@ -14,7 +14,11 @@
  *   limitations under the License.
  */
 
-val ktlintVersion = "1.4.0"
+// Pinned to 1.3.1: 1.4.0's rewritten property-naming rule demands SCREAMING_SNAKE
+// for effectively-constant vals (and PascalCase singles) across the codebase
+// and ignores its editorconfig disable. The disabled rules in .editorconfig
+// target 1.3.x behavior.
+val ktlintVersion = "1.3.1"
 
 initscript {
     val spotlessVersion = "6.25.0"

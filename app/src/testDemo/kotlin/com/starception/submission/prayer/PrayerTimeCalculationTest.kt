@@ -1,7 +1,10 @@
 package com.starception.submission.prayer
 
 import com.starception.submission.prayer.calculator.AstronomicalCalculator
-import com.starception.submission.prayer.model.*
+import com.starception.submission.prayer.model.CalculationMethod
+import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.Location
+import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue

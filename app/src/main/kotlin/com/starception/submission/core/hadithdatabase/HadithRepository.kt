@@ -198,12 +198,12 @@ class HadithRepository(
         private const val SHAMAYEL_DATABASE = "shamayele_tirmidhi_complete.db"
 
         @Volatile
-        private var INSTANCE: HadithRepository? = null
+        private var dbInstance: HadithRepository? = null
 
         fun getInstance(context: Context, assetRepository: AssetRepository? = null): HadithRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: HadithRepository(context.applicationContext, assetRepository).also {
-                    INSTANCE = it
+            return dbInstance ?: synchronized(this) {
+                dbInstance ?: HadithRepository(context.applicationContext, assetRepository).also {
+                    dbInstance = it
                 }
             }
         }

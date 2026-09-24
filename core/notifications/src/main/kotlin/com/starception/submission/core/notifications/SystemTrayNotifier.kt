@@ -38,7 +38,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val MAX_NUM_NOTIFICATIONS = 5
-    private const val TARGET_ACTIVITY_NAME = "com.starception.submission.MainActivity"
+private const val TARGET_ACTIVITY_NAME = "com.starception.submission.MainActivity"
 private const val NEWS_NOTIFICATION_REQUEST_CODE = 0
 private const val NEWS_NOTIFICATION_SUMMARY_ID = 1
 private const val NEWS_NOTIFICATION_CHANNEL_ID = ""

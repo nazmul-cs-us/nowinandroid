@@ -142,173 +142,173 @@ fun PrayerSettingsScreen(
                 ) {
                     SettingsGroupLabel("Prayer & personalization")
 
-            SettingsSection(
-                title = "Appearance",
-                subtitle = "Theme, colors & display mode",
-                iconGlyph = FlaticonIcons.APPEARANCE,
-                isExpanded = expanded == SECTION_APPEARANCE,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_APPEARANCE) null else SECTION_APPEARANCE
-                },
-            ) {
-                AppearanceSection(
-                    themeSettings = themeSettings,
-                    onChangeThemeBrand = onThemeBrandChange,
-                    onChangeDynamicColorPreference = {},
-                    onChangeDarkThemeConfig = onDarkThemeConfigChange,
-                    supportDynamicColor = false,
-                    showCustomTheme = false,
-                    colorPickerDialog = null,
-                )
-            }
+                    SettingsSection(
+                        title = "Appearance",
+                        subtitle = "Theme, colors & display mode",
+                        iconGlyph = FlaticonIcons.APPEARANCE,
+                        isExpanded = expanded == SECTION_APPEARANCE,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_APPEARANCE) null else SECTION_APPEARANCE
+                        },
+                    ) {
+                        AppearanceSection(
+                            themeSettings = themeSettings,
+                            onChangeThemeBrand = onThemeBrandChange,
+                            onChangeDynamicColorPreference = {},
+                            onChangeDarkThemeConfig = onDarkThemeConfigChange,
+                            supportDynamicColor = false,
+                            showCustomTheme = false,
+                            colorPickerDialog = null,
+                        )
+                    }
 
-            SettingsSection(
-                title = "Prayer Times",
-                subtitle = "Calculation method & adjustments",
-                iconGlyph = FlaticonIcons.SCHEDULE,
-                isExpanded = expanded == SECTION_PRAYER,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_PRAYER) null else SECTION_PRAYER
-                },
-            ) {
-                PrayerTimesSection(
-                    prayerSettings = settings,
-                    showRestoreOption = showRestoreOption,
-                    autoDetectedCountryName = countryName,
-                    onSettingsChange = onSettingsChange,
-                    onRestoreClick = onRestore,
-                )
-            }
+                    SettingsSection(
+                        title = "Prayer Times",
+                        subtitle = "Calculation method & adjustments",
+                        iconGlyph = FlaticonIcons.SCHEDULE,
+                        isExpanded = expanded == SECTION_PRAYER,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_PRAYER) null else SECTION_PRAYER
+                        },
+                    ) {
+                        PrayerTimesSection(
+                            prayerSettings = settings,
+                            showRestoreOption = showRestoreOption,
+                            autoDetectedCountryName = countryName,
+                            onSettingsChange = onSettingsChange,
+                            onRestoreClick = onRestore,
+                        )
+                    }
 
-            SettingsSection(
-                title = "Notifications",
-                subtitle = "Prayer alerts & reminders",
-                iconGlyph = FlaticonIcons.NOTIFICATIONS,
-                isExpanded = expanded == SECTION_NOTIFICATIONS,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_NOTIFICATIONS) null else SECTION_NOTIFICATIONS
-                },
-            ) {
-                NotificationsSection(
-                    preferences = notifications,
-                    onPreferencesChanged = onNotificationsChange,
-                    hasDndAccess = true,
-                    showSilentDuringPrayer = false,
-                )
-            }
+                    SettingsSection(
+                        title = "Notifications",
+                        subtitle = "Prayer alerts & reminders",
+                        iconGlyph = FlaticonIcons.NOTIFICATIONS,
+                        isExpanded = expanded == SECTION_NOTIFICATIONS,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_NOTIFICATIONS) null else SECTION_NOTIFICATIONS
+                        },
+                    ) {
+                        NotificationsSection(
+                            preferences = notifications,
+                            onPreferencesChanged = onNotificationsChange,
+                            hasDndAccess = true,
+                            showSilentDuringPrayer = false,
+                        )
+                    }
 
-            SettingsSection(
-                title = "Travel Dua",
-                subtitle = "Auto-play while driving in the foreground",
-                iconGlyph = FlaticonIcons.TRAVEL,
-                isExpanded = expanded == SECTION_TRAVEL,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_TRAVEL) null else SECTION_TRAVEL
-                },
-            ) {
-                TravelDuaSection(
-                    settings = audioState.travelDua,
-                    onSettingsChanged = audioActions.onTravelDuaChange,
-                    onTriggerAudioChain = audioActions.onTestTravelDua,
-                    onStopAudioChain = audioActions.onStopTravelDua,
-                    isPlaying = audioState.isTravelDuaPlaying,
-                    testButtonLabel = "Test Travel Dua",
-                    playbackDescription = "Automatic playback works only while the app is in the foreground.",
-                )
-            }
+                    SettingsSection(
+                        title = "Travel Dua",
+                        subtitle = "Auto-play while driving in the foreground",
+                        iconGlyph = FlaticonIcons.TRAVEL,
+                        isExpanded = expanded == SECTION_TRAVEL,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_TRAVEL) null else SECTION_TRAVEL
+                        },
+                    ) {
+                        TravelDuaSection(
+                            settings = audioState.travelDua,
+                            onSettingsChanged = audioActions.onTravelDuaChange,
+                            onTriggerAudioChain = audioActions.onTestTravelDua,
+                            onStopAudioChain = audioActions.onStopTravelDua,
+                            isPlaying = audioState.isTravelDuaPlaying,
+                            testButtonLabel = "Test Travel Dua",
+                            playbackDescription = "Automatic playback works only while the app is in the foreground.",
+                        )
+                    }
 
-            SettingsGroupLabel("Voice")
+                    SettingsGroupLabel("Voice")
 
-            SettingsSection(
-                title = "Voice Recognition",
-                subtitle = "Speech detection engine",
-                iconGlyph = FlaticonIcons.MICROPHONE,
-                isExpanded = expanded == SECTION_VOICE,
-                onToggleExpanded = {
-                    if (expanded != SECTION_VOICE) contentStorageActions.onRefresh()
-                    expanded = if (expanded == SECTION_VOICE) null else SECTION_VOICE
-                },
-            ) {
-                VoiceRecognitionSettingsSection(
-                    selectedMode = audioState.recognitionMode,
-                    testState = audioState.recognitionTestState,
-                    testText = audioState.recognitionTestText,
-                    onModeSelected = audioActions.onRecognitionModeSelected,
-                    onStartTest = audioActions.onStartRecognitionTest,
-                    onStopTest = audioActions.onStopRecognitionTest,
-                    modelCategoryKey = when (audioState.recognitionMode) {
-                        VoiceRecognitionMode.KEYWORDS -> "model_kws"
-                        VoiceRecognitionMode.TRANSCRIPTION -> "model_asr"
-                    },
-                    contentStorageState = contentStorageState,
-                    contentStorageActions = contentStorageActions,
-                )
-            }
+                    SettingsSection(
+                        title = "Voice Recognition",
+                        subtitle = "Speech detection engine",
+                        iconGlyph = FlaticonIcons.MICROPHONE,
+                        isExpanded = expanded == SECTION_VOICE,
+                        onToggleExpanded = {
+                            if (expanded != SECTION_VOICE) contentStorageActions.onRefresh()
+                            expanded = if (expanded == SECTION_VOICE) null else SECTION_VOICE
+                        },
+                    ) {
+                        VoiceRecognitionSettingsSection(
+                            selectedMode = audioState.recognitionMode,
+                            testState = audioState.recognitionTestState,
+                            testText = audioState.recognitionTestText,
+                            onModeSelected = audioActions.onRecognitionModeSelected,
+                            onStartTest = audioActions.onStartRecognitionTest,
+                            onStopTest = audioActions.onStopRecognitionTest,
+                            modelCategoryKey = when (audioState.recognitionMode) {
+                                VoiceRecognitionMode.KEYWORDS -> "model_kws"
+                                VoiceRecognitionMode.TRANSCRIPTION -> "model_asr"
+                            },
+                            contentStorageState = contentStorageState,
+                            contentStorageActions = contentStorageActions,
+                        )
+                    }
 
-            SettingsSection(
-                title = "Text-to-Speech",
-                subtitle = "Voice output settings",
-                iconGlyph = FlaticonIcons.VOLUME,
-                isExpanded = expanded == SECTION_NARRATION,
-                onToggleExpanded = {
-                    if (expanded != SECTION_NARRATION) contentStorageActions.onRefresh()
-                    expanded = if (expanded == SECTION_NARRATION) null else SECTION_NARRATION
-                },
-            ) {
-                NarrationSettingsSection(
-                    voices = audioState.narrationVoices,
-                    selectedIdentifier = audioState.selectedNarrationVoiceIdentifier,
-                    selectedSpeakerId = audioState.selectedNarrationSpeakerId,
-                    isSpeaking = audioState.isNarrationSpeaking,
-                    status = audioState.narrationStatus,
-                    error = audioState.narrationError,
-                    onVoiceSelected = audioActions.onNarrationVoiceSelected,
-                    onSpeakerSelected = audioActions.onNarrationSpeakerSelected,
-                    onPreview = audioActions.onPreviewNarration,
-                    onStop = audioActions.onStopNarration,
-                    modelCategoryKey = when (audioState.selectedNarrationVoiceIdentifier) {
-                        "SHERPA_VITS_VCTK" -> "model_tts_vits"
-                        "SHERPA_KOKORO", null -> "model_tts_kokoro"
-                        else -> null
-                    },
-                    contentStorageState = contentStorageState,
-                    contentStorageActions = contentStorageActions,
-                )
-            }
+                    SettingsSection(
+                        title = "Text-to-Speech",
+                        subtitle = "Voice output settings",
+                        iconGlyph = FlaticonIcons.VOLUME,
+                        isExpanded = expanded == SECTION_NARRATION,
+                        onToggleExpanded = {
+                            if (expanded != SECTION_NARRATION) contentStorageActions.onRefresh()
+                            expanded = if (expanded == SECTION_NARRATION) null else SECTION_NARRATION
+                        },
+                    ) {
+                        NarrationSettingsSection(
+                            voices = audioState.narrationVoices,
+                            selectedIdentifier = audioState.selectedNarrationVoiceIdentifier,
+                            selectedSpeakerId = audioState.selectedNarrationSpeakerId,
+                            isSpeaking = audioState.isNarrationSpeaking,
+                            status = audioState.narrationStatus,
+                            error = audioState.narrationError,
+                            onVoiceSelected = audioActions.onNarrationVoiceSelected,
+                            onSpeakerSelected = audioActions.onNarrationSpeakerSelected,
+                            onPreview = audioActions.onPreviewNarration,
+                            onStop = audioActions.onStopNarration,
+                            modelCategoryKey = when (audioState.selectedNarrationVoiceIdentifier) {
+                                "SHERPA_VITS_VCTK" -> "model_tts_vits"
+                                "SHERPA_KOKORO", null -> "model_tts_kokoro"
+                                else -> null
+                            },
+                            contentStorageState = contentStorageState,
+                            contentStorageActions = contentStorageActions,
+                        )
+                    }
 
-            SettingsGroupLabel("App & support")
+                    SettingsGroupLabel("App & support")
 
-            SettingsSection(
-                title = "Content & Storage",
-                subtitle = "Manage downloaded content",
-                iconGlyph = FlaticonIcons.STORAGE,
-                isExpanded = expanded == SECTION_CONTENT,
-                onToggleExpanded = {
-                    if (expanded != SECTION_CONTENT) contentStorageActions.onRefresh()
-                    expanded = if (expanded == SECTION_CONTENT) null else SECTION_CONTENT
-                },
-            ) {
-                ContentStorageSettingsSection(
-                    state = contentStorageState,
-                    actions = contentStorageActions,
-                )
-            }
+                    SettingsSection(
+                        title = "Content & Storage",
+                        subtitle = "Manage downloaded content",
+                        iconGlyph = FlaticonIcons.STORAGE,
+                        isExpanded = expanded == SECTION_CONTENT,
+                        onToggleExpanded = {
+                            if (expanded != SECTION_CONTENT) contentStorageActions.onRefresh()
+                            expanded = if (expanded == SECTION_CONTENT) null else SECTION_CONTENT
+                        },
+                    ) {
+                        ContentStorageSettingsSection(
+                            state = contentStorageState,
+                            actions = contentStorageActions,
+                        )
+                    }
 
-            SettingsSection(
-                title = "About",
-                subtitle = "Version & attributions",
-                iconGlyph = FlaticonIcons.INFO,
-                isExpanded = expanded == SECTION_ABOUT,
-                onToggleExpanded = {
-                    expanded = if (expanded == SECTION_ABOUT) null else SECTION_ABOUT
-                },
-            ) {
-                AboutSection(
-                    versionName = "$appVersion (iOS)",
-                    showLicenses = false,
-                    showProjectLinks = false,
-                )
-            }
+                    SettingsSection(
+                        title = "About",
+                        subtitle = "Version & attributions",
+                        iconGlyph = FlaticonIcons.INFO,
+                        isExpanded = expanded == SECTION_ABOUT,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_ABOUT) null else SECTION_ABOUT
+                        },
+                    ) {
+                        AboutSection(
+                            versionName = "$appVersion (iOS)",
+                            showLicenses = false,
+                            showProjectLinks = false,
+                        )
+                    }
 
                     Spacer(Modifier.fillMaxWidth().height(32.dp))
                 }

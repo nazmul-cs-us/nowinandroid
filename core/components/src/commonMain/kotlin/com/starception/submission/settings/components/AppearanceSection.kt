@@ -1,7 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -10,7 +25,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,38 +34,33 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.SettingsBrightness
-import androidx.compose.material3.ripple
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.core.ui.FlaticonIcon
-import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.settings.ThemeSettingsState
 
 @Composable
@@ -74,13 +83,15 @@ fun AppearanceSection(
      * Paint, which do not cross, so the dialog comes from the caller. When null
      * the custom colours option simply does not open one.
      */
-    colorPickerDialog: (@Composable (
-        initialPrimary: Color,
-        initialSecondary: Color,
-        initialTertiary: Color,
-        onConfirm: (Color, Color, Color) -> Unit,
-        onDismiss: () -> Unit,
-    ) -> Unit)? = null,
+    colorPickerDialog: (
+        @Composable (
+            initialPrimary: Color,
+            initialSecondary: Color,
+            initialTertiary: Color,
+            onConfirm: (Color, Color, Color) -> Unit,
+            onDismiss: () -> Unit,
+        ) -> Unit
+    )? = null,
 ) {
     val haptic = LocalHapticFeedback.current
     val showColorPickerState = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -90,7 +101,7 @@ fun AppearanceSection(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Theme Brand Section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -103,7 +114,7 @@ fun AppearanceSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ThemePill(
                     label = "Default",
@@ -135,7 +146,7 @@ fun AppearanceSection(
                 ThemePill(
                     label = "Royal",
                     selected = themeSettings.brand == ThemeBrand.ROYAL,
-                    color = Color(0xFF2D5DA8),  // Lapis
+                    color = Color(0xFF2D5DA8), // Lapis
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onChangeThemeBrand(ThemeBrand.ROYAL)
@@ -170,7 +181,7 @@ fun AppearanceSection(
 
         // Dynamic Color Section (only visible when Default theme and Android 12+)
         AnimatedVisibility(
-            visible = themeSettings.brand == ThemeBrand.DEFAULT && supportDynamicColor
+            visible = themeSettings.brand == ThemeBrand.DEFAULT && supportDynamicColor,
         ) {
             ModernSwitchRow(
                 title = "Dynamic Colors",
@@ -179,7 +190,7 @@ fun AppearanceSection(
                 onCheckedChange = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onChangeDynamicColorPreference(it)
-                }
+                },
             )
         }
 
@@ -192,18 +203,18 @@ fun AppearanceSection(
                     SegmentOption(
                         label = "System",
                         iconGlyph = FlaticonIcons.SYSTEM_THEME,
-                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.FOLLOW_SYSTEM
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.FOLLOW_SYSTEM,
                     ),
                     SegmentOption(
                         label = "Light",
                         iconGlyph = FlaticonIcons.LIGHT_THEME,
-                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.LIGHT
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.LIGHT,
                     ),
                     SegmentOption(
                         label = "Dark",
                         iconGlyph = FlaticonIcons.DARK_THEME,
-                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.DARK
-                    )
+                        selected = themeSettings.darkThemeConfig == DarkThemeConfig.DARK,
+                    ),
                 ),
                 onOptionSelected = { index ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -212,7 +223,7 @@ fun AppearanceSection(
                         1 -> onChangeDarkThemeConfig(DarkThemeConfig.LIGHT)
                         2 -> onChangeDarkThemeConfig(DarkThemeConfig.DARK)
                     }
-                }
+                },
             )
         }
     }
@@ -224,7 +235,7 @@ private fun ModernSectionTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.primary
+        color = MaterialTheme.colorScheme.primary,
     )
 }
 
@@ -234,24 +245,26 @@ private fun ThemePill(
     selected: Boolean,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (selected)
+        targetValue = if (selected) {
             color.copy(alpha = 0.15f)
-        else
-            MaterialTheme.colorScheme.surfaceContainerHighest,
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "pillBackground"
+        label = "pillBackground",
     )
 
     val borderColor by animateColorAsState(
-        targetValue = if (selected)
+        targetValue = if (selected) {
             color
-        else
-            Color.Transparent,
+        } else {
+            Color.Transparent
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "pillBorder"
+        label = "pillBorder",
     )
 
     Surface(
@@ -261,27 +274,27 @@ private fun ThemePill(
             .border(
                 width = 2.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = color),
-                onClick = onClick
+                onClick = onClick,
             ),
         color = backgroundColor,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
         ) {
             // Color dot
             Box(
                 modifier = Modifier
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(color)
+                    .background(color),
             )
 
             Spacer(modifier = Modifier.size(6.dp))
@@ -311,32 +324,33 @@ private fun ThemePill(
 data class SegmentOption(
     val label: String,
     val iconGlyph: String? = null,
-    val selected: Boolean = false
+    val selected: Boolean = false,
 )
 
 @Composable
 fun ModernSegmentedButtons(
     options: List<SegmentOption>,
     onOptionSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
     ) {
         Row(
             modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             options.forEachIndexed { index, option ->
                 val backgroundColor by animateColorAsState(
-                    targetValue = if (option.selected)
+                    targetValue = if (option.selected) {
                         MaterialTheme.colorScheme.primaryContainer
-                    else
-                        Color.Transparent,
+                    } else {
+                        Color.Transparent
+                    },
                     animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                    label = "segmentBackground"
+                    label = "segmentBackground",
                 )
 
                 Surface(
@@ -348,26 +362,27 @@ fun ModernSegmentedButtons(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = ripple(
                                 bounded = true,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
                             ),
-                            onClick = { onOptionSelected(index) }
+                            onClick = { onOptionSelected(index) },
                         ),
                     color = backgroundColor,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         if (option.iconGlyph != null) {
                             FlaticonIcon(
                                 glyph = option.iconGlyph,
                                 contentDescription = null,
-                                tint = if (option.selected)
+                                tint = if (option.selected) {
                                     MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                                 fontSize = 18.sp,
                             )
                             Spacer(modifier = Modifier.size(6.dp))
@@ -376,10 +391,11 @@ fun ModernSegmentedButtons(
                             text = option.label,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (option.selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (option.selected)
+                            color = if (option.selected) {
                                 MaterialTheme.colorScheme.primary
-                            else
+                            } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
                 }
@@ -394,12 +410,12 @@ fun ModernSwitchRow(
     subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
     ) {
         Row(
             modifier = Modifier
@@ -407,24 +423,24 @@ fun ModernSwitchRow(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = ripple(bounded = true),
-                    onClick = { onCheckedChange(!checked) }
+                    onClick = { onCheckedChange(!checked) },
                 )
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (subtitle != null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -436,8 +452,8 @@ fun ModernSwitchRow(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
                     checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
                     uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
             )
         }
     }

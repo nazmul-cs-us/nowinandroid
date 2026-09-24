@@ -31,7 +31,8 @@ interface TopicFtsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(topics: List<TopicFtsEntity>)
 
-    @Query("""
+    @Query(
+        """
         SELECT topicId FROM topicsFts
         WHERE topicsFts MATCH :query
         ORDER BY CASE
@@ -40,7 +41,8 @@ interface TopicFtsDao {
             WHEN lower(name) LIKE '%' || lower(:rawQuery) || '%' THEN 2
             ELSE 3
         END, length(name), rowid
-    """)
+    """,
+    )
     fun searchAllTopics(query: String, rawQuery: String): Flow<List<String>>
 
     /**
@@ -49,7 +51,8 @@ interface TopicFtsDao {
      * @param limit Maximum number of results to return
      * @param offset Number of results to skip
      */
-    @Query("""
+    @Query(
+        """
         SELECT topicId FROM topicsFts
         WHERE topicsFts MATCH :query
         ORDER BY CASE
@@ -59,7 +62,8 @@ interface TopicFtsDao {
             ELSE 3
         END, length(name), rowid
         LIMIT :limit OFFSET :offset
-    """)
+    """,
+    )
     suspend fun searchTopicsPaginated(
         query: String,
         rawQuery: String,

@@ -100,8 +100,10 @@ fun QiblaGlobeView(
     userLatitude: Double,
     userLongitude: Double,
     modifier: Modifier = Modifier,
-    showControls: Boolean = true,  // Set to false to hide overlay buttons and info cards
-    isActiveTile: Boolean = true,  // When this becomes true, plays a one-time day/night sweep
+    // Set to false to hide overlay buttons and info cards
+    showControls: Boolean = true,  
+    // When this becomes true, plays a one-time day/night sweep
+    isActiveTile: Boolean = true,  
     surfaceCornerRadius: Dp = 16.dp,
 ) {
     val context = LocalContext.current
@@ -846,7 +848,8 @@ private fun createWorldWindow(
 
     // 2. User location marker with heading shadow is handled by the placemark itself
     // No separate heading indicator - we'll rotate the user marker bitmap instead
-    val headingCone: Polygon? = null  // Not used - heading shown via rotated marker
+    // Not used - heading shown via rotated marker
+    val headingCone: Polygon? = null  
 
     // 3. Add Kaaba Placemark with emoji icon
     val kaabaPlacemark = Placemark.createWithImage(

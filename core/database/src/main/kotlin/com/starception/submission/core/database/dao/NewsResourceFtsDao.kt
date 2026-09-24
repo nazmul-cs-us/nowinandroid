@@ -31,7 +31,8 @@ interface NewsResourceFtsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(newsResources: List<NewsResourceFtsEntity>)
 
-    @Query("""
+    @Query(
+        """
         SELECT newsResourceId FROM newsResourcesFts
         WHERE newsResourcesFts MATCH :query
         ORDER BY CASE
@@ -40,7 +41,8 @@ interface NewsResourceFtsDao {
             WHEN lower(title) LIKE '%' || lower(:rawQuery) || '%' THEN 2
             ELSE 3
         END, length(title), rowid
-    """)
+    """,
+    )
     fun searchAllNewsResources(query: String, rawQuery: String): Flow<List<String>>
 
     /**
@@ -49,7 +51,8 @@ interface NewsResourceFtsDao {
      * @param limit Maximum number of results to return
      * @param offset Number of results to skip
      */
-    @Query("""
+    @Query(
+        """
         SELECT newsResourceId FROM newsResourcesFts
         WHERE newsResourcesFts MATCH :query
         ORDER BY CASE
@@ -59,7 +62,8 @@ interface NewsResourceFtsDao {
             ELSE 3
         END, length(title), rowid
         LIMIT :limit OFFSET :offset
-    """)
+    """,
+    )
     suspend fun searchNewsResourcesPaginated(
         query: String,
         rawQuery: String,

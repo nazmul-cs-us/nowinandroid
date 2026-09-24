@@ -43,7 +43,6 @@ enum class MeteoconStyle {
     Monochrome,
 }
 
-
 /** Returns every noteworthy visual in preparation-first priority order. */
 fun prayerWeatherVisuals(summary: String?): List<PrayerWeatherVisual> {
     if (summary.isNullOrBlank()) return emptyList()
@@ -138,18 +137,21 @@ fun prayerWeatherThresholdLevel(
     if (summary.isNullOrBlank()) return WeatherThresholdLevel.Normal
     val conditions = summary.split('·').map(String::trim)
     return when (visual) {
-        PrayerWeatherVisual.Rain -> conditions
-            .firstOrNull { it.contains("rain", ignoreCase = true) }
-            ?.firstNumber()
-            ?.let { rainThresholdLevel(it.toInt(), thresholds.rainProbability) }
-        PrayerWeatherVisual.Heat -> conditions
-            .firstOrNull { it.contains("hot", ignoreCase = true) || '°' in it }
-            ?.firstNumber()
-            ?.let { temperatureThresholdLevel(it, thresholds.temperatureCelsius) }
-        PrayerWeatherVisual.Humidity -> conditions
-            .firstOrNull { it.contains("humidity", ignoreCase = true) }
-            ?.firstNumber()
-            ?.let { humidityThresholdLevel(it.toInt(), thresholds.humidity) }
+        PrayerWeatherVisual.Rain ->
+            conditions
+                .firstOrNull { it.contains("rain", ignoreCase = true) }
+                ?.firstNumber()
+                ?.let { rainThresholdLevel(it.toInt(), thresholds.rainProbability) }
+        PrayerWeatherVisual.Heat ->
+            conditions
+                .firstOrNull { it.contains("hot", ignoreCase = true) || '°' in it }
+                ?.firstNumber()
+                ?.let { temperatureThresholdLevel(it, thresholds.temperatureCelsius) }
+        PrayerWeatherVisual.Humidity ->
+            conditions
+                .firstOrNull { it.contains("humidity", ignoreCase = true) }
+                ?.firstNumber()
+                ?.let { humidityThresholdLevel(it.toInt(), thresholds.humidity) }
     } ?: WeatherThresholdLevel.Normal
 }
 

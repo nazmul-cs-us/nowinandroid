@@ -1,20 +1,19 @@
 /*
- * SURAH FLOATING TOOLBAR COMPONENT
+ * Copyright 2026 The Android Open Source Project
  *
- * Inspired by Material Components Android FloatingToolbar
- * Based on: /Users/smarterai/Documents/GitHub/material-components-android-master/catalog/java/io/material/catalog/floatingtoolbar/
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This floating toolbar appears when users touch/long-press a Surah news card,
- * providing quick actions for Quran interaction.
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- * FEATURES:
- * - Material 3 design with vibrant style
- * - Floating above content with elevation
- * - Horizontal layout with icon buttons
- * - Actions: Play Audio, Bookmark, Share, Download, Info
- * - Smooth entrance/exit animations
- * - Auto-dismiss on outside click
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.starception.submission.core.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -29,12 +28,34 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Divider
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -54,7 +75,7 @@ import kotlinx.coroutines.launch
 data class SurahAction(
     val icon: ImageVector,
     val contentDescription: String,
-    val onClick: () -> Unit
+    val onClick: () -> Unit,
 )
 
 /**
@@ -80,7 +101,7 @@ fun SurahFloatingToolbar(
     onBookmark: () -> Unit = {},
     onShare: () -> Unit = {},
     onDownload: () -> Unit = {},
-    onInfo: () -> Unit = {}
+    onInfo: () -> Unit = {},
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
@@ -101,7 +122,7 @@ fun SurahFloatingToolbar(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onPlayAudio()
-                }
+                },
             ),
             SurahAction(
                 icon = Icons.Default.Favorite,
@@ -109,7 +130,7 @@ fun SurahFloatingToolbar(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onBookmark()
-                }
+                },
             ),
             SurahAction(
                 icon = Icons.Default.Share,
@@ -117,7 +138,7 @@ fun SurahFloatingToolbar(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onShare()
-                }
+                },
             ),
             SurahAction(
                 icon = Icons.Default.Download,
@@ -125,7 +146,7 @@ fun SurahFloatingToolbar(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onDownload()
-                }
+                },
             ),
             SurahAction(
                 icon = Icons.Default.Info,
@@ -133,8 +154,8 @@ fun SurahFloatingToolbar(
                 onClick = {
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onInfo()
-                }
-            )
+                },
+            ),
         )
     }
 
@@ -144,9 +165,9 @@ fun SurahFloatingToolbar(
             properties = PopupProperties(
                 dismissOnBackPress = true,
                 dismissOnClickOutside = true,
-                focusable = true
+                focusable = true,
             ),
-            alignment = Alignment.BottomCenter
+            alignment = Alignment.BottomCenter,
         ) {
             // The if(visible) guard removes the Popup instantly on dismiss, so exit specs
             // can't play; a transition state seeded false->true makes the ENTER animate
@@ -155,7 +176,7 @@ fun SurahFloatingToolbar(
             AnimatedVisibility(
                 visibleState = enterState,
                 enter = fadeIn(tween(200)),
-                exit = fadeOut(tween(150))
+                exit = fadeOut(tween(150)),
             ) {
                 // Background scrim
                 Box(
@@ -164,37 +185,37 @@ fun SurahFloatingToolbar(
                         .background(Color.Black.copy(alpha = 0.3f))
                         .clickable(
                             indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
+                            interactionSource = remember { MutableInteractionSource() },
                         ) {
                             coroutineScope.launch {
                                 delay(100)
                                 onDismiss()
                             }
                         },
-                    contentAlignment = Alignment.BottomCenter
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     AnimatedVisibility(
-                    visibleState = enterState,
-                    enter = fadeIn(
-                        spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
+                        visibleState = enterState,
+                        enter = fadeIn(
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                        ) + scaleIn(
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                        ),
+                        exit = fadeOut(tween(150)) + scaleOut(tween(150)),
+                    ) {
+                        FloatingToolbarContent(
+                            surahNumber = surahNumber,
+                            surahName = surahName,
+                            actions = actions,
+                            onDismiss = onDismiss,
                         )
-                    ) + scaleIn(
-                        spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ),
-                    exit = fadeOut(tween(150)) + scaleOut(tween(150))
-                ) {
-                    FloatingToolbarContent(
-                        surahNumber = surahNumber,
-                        surahName = surahName,
-                        actions = actions,
-                        onDismiss = onDismiss
-                    )
-                }
+                    }
                 }
             }
         }
@@ -209,28 +230,28 @@ private fun FloatingToolbarContent(
     surahNumber: Int,
     surahName: String,
     actions: List<SurahAction>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .padding(16.dp)
             .shadow(
                 elevation = 8.dp,
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(28.dp),
             )
             .clickable(
                 indication = null,
-                interactionSource = remember { MutableInteractionSource() }
+                interactionSource = remember { MutableInteractionSource() },
             ) {
                 // Prevent click propagation
             },
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 3.dp
+        tonalElevation = 3.dp,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Surah title header
             Row(
@@ -238,42 +259,42 @@ private fun FloatingToolbarContent(
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Surah $surahNumber",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = surahName,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             Divider(
                 modifier = Modifier.padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
+                color = MaterialTheme.colorScheme.outlineVariant,
             )
 
             // Horizontal action buttons (Material FloatingToolbar style)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 actions.forEach { action ->
                     FilledIconButton(
@@ -284,13 +305,13 @@ private fun FloatingToolbarContent(
                         modifier = Modifier.size(48.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
                     ) {
                         Icon(
                             imageVector = action.icon,
                             contentDescription = action.contentDescription,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.designsystem.theme
 
 import androidx.compose.ui.text.font.Font
@@ -24,7 +40,7 @@ object QuranFonts {
      */
     val PDMSSaleem = FontFamily(
         Font(R.font.pdms_saleem_quran, FontWeight.Normal),
-        Font(R.font.pdms_saleem_quran_bold, FontWeight.Bold)
+        Font(R.font.pdms_saleem_quran_bold, FontWeight.Bold),
     )
 
     /**
@@ -34,7 +50,7 @@ object QuranFonts {
      */
     val NoorEHidayat = FontFamily(
         Font(R.font.noor_hidayat_quran, FontWeight.Normal),
-        Font(R.font.noor_hidayat_quran_bold, FontWeight.Bold)
+        Font(R.font.noor_hidayat_quran_bold, FontWeight.Bold),
     )
 
     /**
@@ -44,7 +60,7 @@ object QuranFonts {
      */
     val Thabit = FontFamily(
         Font(R.font.thabit_quran, FontWeight.Normal),
-        Font(R.font.thabit_quran_bold, FontWeight.Bold)
+        Font(R.font.thabit_quran_bold, FontWeight.Bold),
     )
 
     /**
@@ -54,7 +70,7 @@ object QuranFonts {
      * Matches the traditional Mushaf Uthmani style used in most printed Qurans
      */
     val UthmanicScript = FontFamily(
-        Font(R.font.amiri_quran, FontWeight.Normal)
+        Font(R.font.amiri_quran, FontWeight.Normal),
     )
 
     /**
@@ -63,7 +79,7 @@ object QuranFonts {
      */
     val Amiri = FontFamily(
         Font(R.font.amiri_regular, FontWeight.Normal),
-        Font(R.font.amiri_bold, FontWeight.Bold)
+        Font(R.font.amiri_bold, FontWeight.Bold),
     )
 
     /**
@@ -72,7 +88,7 @@ object QuranFonts {
      */
     val Scheherazade = FontFamily(
         Font(R.font.scheherazade_regular, FontWeight.Normal),
-        Font(R.font.scheherazade_bold, FontWeight.Bold)
+        Font(R.font.scheherazade_bold, FontWeight.Bold),
     )
 
     /**
@@ -83,7 +99,7 @@ object QuranFonts {
      * Source: https://islamicstudies.info/quran/arabic/fonts/
      */
     val IndoPakScript = FontFamily(
-        Font(R.font.indopak_quran, FontWeight.Normal)
+        Font(R.font.indopak_quran, FontWeight.Normal),
     )
 
     /**
@@ -94,6 +110,6 @@ object QuranFonts {
         Font(R.font.poppins_regular, FontWeight.Normal),
         Font(R.font.poppins_medium, FontWeight.Medium),
         Font(R.font.poppins_semibold, FontWeight.SemiBold),
-        Font(R.font.poppins_bold, FontWeight.Bold)
+        Font(R.font.poppins_bold, FontWeight.Bold),
     )
 }

@@ -62,7 +62,8 @@ class SalahDetectionEngine(context: Context) : Closeable {
         val posture: SalahPosture,
         val confidence: Float,
         val allProbabilities: FloatArray,
-        val isPartialSequence: Boolean = false  // true when using < sequenceLength windows
+        // true when using < sequenceLength windows
+        val isPartialSequence: Boolean = false  
     )
 
     private val interpreter: Interpreter

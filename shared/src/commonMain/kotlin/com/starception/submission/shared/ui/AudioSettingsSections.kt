@@ -49,10 +49,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import com.starception.submission.config.TravelDuaSettings
 import com.starception.submission.shared.settings.VoiceRecognitionMode
 import com.starception.submission.shared.voice.NarrationVoice
 

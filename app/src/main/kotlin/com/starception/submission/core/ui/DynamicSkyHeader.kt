@@ -183,11 +183,15 @@ data class Star(
 data class ShootingStar(
     val startX: Float,
     val startY: Float,
-    val angle: Float,  // Angle in radians
+    // Angle in radians
+    val angle: Float,  
     val length: Float,
-    val speed: Float,  // Animation speed multiplier
-    val delay: Float,  // Delay before appearing (0-1)
-    val seed: Int = 0  // Seed for this shooting star instance
+    // Animation speed multiplier
+    val speed: Float,  
+    // Delay before appearing (0-1)
+    val delay: Float,  
+    // Seed for this shooting star instance
+    val seed: Int = 0  
 )
 
 /**

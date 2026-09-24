@@ -24,8 +24,8 @@ import platform.CoreLocation.CLLocationManagerDelegateProtocol
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
 import platform.CoreLocation.kCLLocationAccuracyHundredMeters
-import platform.Foundation.NSError
 import platform.Foundation.NSDate
+import platform.Foundation.NSError
 import platform.Foundation.timeIntervalSince1970
 import platform.darwin.NSObject
 
@@ -54,8 +54,10 @@ internal class IosTravelDuaMonitor(private val onTrigger: () -> Unit) {
 
         override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
             val status = manager.authorizationStatus
-            if (running && (status == kCLAuthorizationStatusAuthorizedWhenInUse ||
-                    status == kCLAuthorizationStatusAuthorizedAlways)
+            if (running && (
+                    status == kCLAuthorizationStatusAuthorizedWhenInUse ||
+                        status == kCLAuthorizationStatusAuthorizedAlways
+                    )
             ) {
                 manager.startUpdatingLocation()
             }

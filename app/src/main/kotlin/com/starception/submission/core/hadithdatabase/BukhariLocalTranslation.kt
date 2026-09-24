@@ -135,12 +135,12 @@ class BukhariLocalTranslationRepository private constructor(
         private const val TAG = "BukhariLocalTranslation"
 
         @Volatile
-        private var INSTANCE: BukhariLocalTranslationRepository? = null
+        private var dbInstance: BukhariLocalTranslationRepository? = null
 
         fun getInstance(context: Context, assetRepository: AssetRepository? = null): BukhariLocalTranslationRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: BukhariLocalTranslationRepository(context.applicationContext, assetRepository).also {
-                    INSTANCE = it
+            return dbInstance ?: synchronized(this) {
+                dbInstance ?: BukhariLocalTranslationRepository(context.applicationContext, assetRepository).also {
+                    dbInstance = it
                 }
             }
         }

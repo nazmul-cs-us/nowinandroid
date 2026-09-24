@@ -34,13 +34,13 @@ abstract class TopicsDatabase : RoomDatabase() {
         private const val TAG = "TopicsDatabase"
 
         @Volatile
-        private var INSTANCE: TopicsDatabase? = null
+        private var dbInstance: TopicsDatabase? = null
 
         /**
          * Get the singleton instance of TopicsDatabase
          */
         fun getInstance(context: Context): TopicsDatabase {
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     TopicsDatabase::class.java,
@@ -62,7 +62,7 @@ abstract class TopicsDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }
@@ -96,8 +96,8 @@ abstract class TopicsDatabase : RoomDatabase() {
          * Close database instance
          */
         fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+            dbInstance?.close()
+            dbInstance = null
             android.util.Log.d(TAG, "Topics database closed")
         }
 

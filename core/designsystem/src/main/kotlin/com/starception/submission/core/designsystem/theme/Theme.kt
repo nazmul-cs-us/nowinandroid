@@ -19,7 +19,6 @@ package com.starception.submission.core.designsystem.theme
 import android.content.Context
 import android.os.Build
 import androidx.annotation.ChecksSdkIntAtLeast
-import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -94,7 +93,7 @@ val DarkCoastalBackgroundTheme = BackgroundTheme(color = Color(0xFF0A0F0C))
  * @param darkTheme Whether the theme should use a dark color scheme (follows system by default).
  * @param themeBrand Which theme brand to use:
  *        - DEFAULT: Custom purple/orange theme
- *        - ANDROID: Green-based Android theme  
+ *        - ANDROID: Green-based Android theme
  *        - COASTAL: Ocean-inspired blue/seafoam theme
  * @param disableDynamicTheming If `true`, disables the use of dynamic theming, even when it is
  *        supported. This parameter has no effect if [themeBrand] is not DEFAULT.
@@ -204,7 +203,6 @@ fun niaColorScheme(
         colorSchemeFromSeeds(primary, secondary, tertiary, darkTheme)
     }
 }
-
 
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 fun supportsDynamicTheming() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

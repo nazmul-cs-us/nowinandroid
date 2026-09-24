@@ -63,7 +63,7 @@ class SherpaOnnxTtsService @Inject constructor(
         private const val TAG = "SherpaOnnxTtsService"
         private const val DEFAULT_SPEAKER_ID = 0
         private const val DEFAULT_SPEED = 1.0f
-        private val KOKORO_REQUIRED_DATA_FILES = listOf(
+        private val kokoroRequiredDataFiles = listOf(
             "phontab",
             "phonindex",
             "phondata",
@@ -72,7 +72,7 @@ class SherpaOnnxTtsService @Inject constructor(
             "lang/gmw/en",
             "lang/gmw/en-US",
         )
-        private val INFERENCE_THREADS = Runtime.getRuntime()
+        private val inferenceThreads = Runtime.getRuntime()
             .availableProcessors()
             .coerceIn(2, 4)
     }
@@ -146,7 +146,7 @@ class SherpaOnnxTtsService @Inject constructor(
         voice.lexiconFile.takeIf(String::isNotEmpty)?.let { add(root + it) }
         if (voice.modelType == TtsModelType.KOKORO) {
             val dataRoot = root + voice.dataDir.trimEnd('/') + "/"
-            KOKORO_REQUIRED_DATA_FILES.forEach { add(dataRoot + it) }
+            kokoroRequiredDataFiles.forEach { add(dataRoot + it) }
         }
     }
 
@@ -263,19 +263,19 @@ class SherpaOnnxTtsService @Inject constructor(
                 // model files, and native signals bypass Kotlin try/catch.
                 val modelFile = java.io.File(modelPath)
                 val tokensFile = java.io.File(tokensPath)
-                val MIN_MODEL_SIZE = 100_000L // ONNX models should be at least 100KB
-                val MIN_TOKENS_SIZE = 100L    // tokens.txt should be at least 100 bytes
+                val minModelSize = 100_000L // ONNX models should be at least 100KB
+                val minTokensSize = 100L    // tokens.txt should be at least 100 bytes
 
-                if (!modelFile.exists() || modelFile.length() < MIN_MODEL_SIZE) {
-                    Log.e(TAG, "Model file validation failed: exists=${modelFile.exists()}, size=${modelFile.length()} bytes (min=$MIN_MODEL_SIZE)")
+                if (!modelFile.exists() || modelFile.length() < minModelSize) {
+                    Log.e(TAG, "Model file validation failed: exists=${modelFile.exists()}, size=${modelFile.length()} bytes (min=$minModelSize)")
                     // Delete stale/corrupt extracted file so next attempt re-extracts
                     modelFile.delete()
                     isInitializing = false
                     return@withContext false
                 }
 
-                if (!tokensFile.exists() || tokensFile.length() < MIN_TOKENS_SIZE) {
-                    Log.e(TAG, "Tokens file validation failed: exists=${tokensFile.exists()}, size=${tokensFile.length()} bytes (min=$MIN_TOKENS_SIZE)")
+                if (!tokensFile.exists() || tokensFile.length() < minTokensSize) {
+                    Log.e(TAG, "Tokens file validation failed: exists=${tokensFile.exists()}, size=${tokensFile.length()} bytes (min=$minTokensSize)")
                     tokensFile.delete()
                     isInitializing = false
                     return@withContext false
@@ -288,7 +288,7 @@ class SherpaOnnxTtsService @Inject constructor(
                     val extractedDataDir = dataDir
                         ?.takeIf(String::isNotEmpty)
                         ?.let(::File)
-                    val missingDataFiles = KOKORO_REQUIRED_DATA_FILES.filter { relativePath ->
+                    val missingDataFiles = kokoroRequiredDataFiles.filter { relativePath ->
                         val file = extractedDataDir?.let { java.io.File(it, relativePath) }
                         file == null || !file.isFile || file.length() == 0L
                     }
@@ -316,8 +316,8 @@ class SherpaOnnxTtsService @Inject constructor(
                 // Validate voices file for Kokoro (required, ~4MB)
                 if (currentVoice.modelType == TtsModelType.KOKORO && !voicesPath.isNullOrEmpty()) {
                     val voicesFile = java.io.File(voicesPath)
-                    if (!voicesFile.exists() || voicesFile.length() < MIN_MODEL_SIZE) {
-                        Log.e(TAG, "Voices file validation failed: exists=${voicesFile.exists()}, size=${voicesFile.length()} bytes (min=$MIN_MODEL_SIZE)")
+                    if (!voicesFile.exists() || voicesFile.length() < minModelSize) {
+                        Log.e(TAG, "Voices file validation failed: exists=${voicesFile.exists()}, size=${voicesFile.length()} bytes (min=$minModelSize)")
                         voicesFile.delete()
                         isInitializing = false
                         return@withContext false
@@ -343,7 +343,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         )
                         OfflineTtsModelConfig(
                             kokoro = kokoroConfig,
-                            numThreads = INFERENCE_THREADS,
+                            numThreads = inferenceThreads,
                             debug = false,
                             provider = "cpu"
                         )
@@ -361,7 +361,7 @@ class SherpaOnnxTtsService @Inject constructor(
                         )
                         OfflineTtsModelConfig(
                             vits = vitsConfig,
-                            numThreads = INFERENCE_THREADS,
+                            numThreads = inferenceThreads,
                             debug = false,
                             provider = "cpu"
                         )
@@ -1391,7 +1391,7 @@ class SherpaOnnxTtsService @Inject constructor(
 
     private fun isExtractedDataDirUsable(directory: File): Boolean =
         when (currentVoice.modelType) {
-            TtsModelType.KOKORO -> KOKORO_REQUIRED_DATA_FILES.all { relativePath ->
+            TtsModelType.KOKORO -> kokoroRequiredDataFiles.all { relativePath ->
                 File(directory, relativePath).let { it.isFile && it.length() > 0L }
             }
             TtsModelType.VITS -> true

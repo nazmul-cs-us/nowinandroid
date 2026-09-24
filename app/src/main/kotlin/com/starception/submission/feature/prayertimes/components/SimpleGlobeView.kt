@@ -285,7 +285,8 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     var userLongitude:     Double  = 0.0
     var makkahLatitude:    Double  = 21.4225
     var makkahLongitude:   Double  = 39.8262
-    var globeViewportHalf: Float   = 0f  // half of the WorldWindow viewport size in pixels
+    // half of the WorldWindow viewport size in pixels
+    var globeViewportHalf: Float   = 0f  
     var coneColor:         Int     = 0xFF10B981.toInt()  // default green, overridden by theme
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

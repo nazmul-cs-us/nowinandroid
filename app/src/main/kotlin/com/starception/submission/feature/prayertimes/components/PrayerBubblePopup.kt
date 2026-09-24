@@ -73,7 +73,8 @@ data class PrayerBubbleData(
     val time: String,
     val isPrayed: Boolean,
     val initial: String,
-    val prayerTime: LocalTime? = null  // Actual prayer time for countdown
+    // Actual prayer time for countdown
+    val prayerTime: LocalTime? = null  
 )
 
 /**

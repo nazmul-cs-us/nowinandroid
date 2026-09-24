@@ -21,13 +21,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font as GoogleFontFont
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.LineHeightStyle.Alignment
 import androidx.compose.ui.text.style.LineHeightStyle.Trim
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.R
+import androidx.compose.ui.text.googlefonts.Font as GoogleFontFont
 
 // Ubuntu Sans font family from Google Fonts (designed by Dalton Maag).
 // Ubuntu Sans is Dalton Maag's newer reinterpretation of Ubuntu with tighter
@@ -36,7 +36,7 @@ import com.starception.submission.core.designsystem.R
 private val provider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
+    certificates = R.array.com_google_android_gms_fonts_certs,
 )
 
 private val ubuntuFontName = GoogleFont("Ubuntu Sans")

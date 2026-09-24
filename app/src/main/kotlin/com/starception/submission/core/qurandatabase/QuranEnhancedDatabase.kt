@@ -34,13 +34,13 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
         private const val CDN_KEY = "databases/quran/quran_enhanced.db"
 
         @Volatile
-        private var INSTANCE: QuranEnhancedDatabase? = null
+        private var dbInstance: QuranEnhancedDatabase? = null
 
         /**
          * Get the singleton instance of QuranEnhancedDatabase
          */
         fun getInstance(context: Context, assetRepository: AssetRepository? = null): QuranEnhancedDatabase {
-            return INSTANCE ?: synchronized(this) {
+            return dbInstance ?: synchronized(this) {
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranEnhancedDatabase::class.java,
@@ -78,7 +78,7 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
                         }
                     })
                     .build()
-                INSTANCE = instance
+                dbInstance = instance
                 instance
             }
         }
@@ -121,8 +121,8 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
          * Close database instance (for testing or cleanup)
          */
         fun closeDatabase() {
-            INSTANCE?.close()
-            INSTANCE = null
+            dbInstance?.close()
+            dbInstance = null
             android.util.Log.d("QuranEnhancedDB", "🔒 Enhanced Quran database closed")
         }
     }

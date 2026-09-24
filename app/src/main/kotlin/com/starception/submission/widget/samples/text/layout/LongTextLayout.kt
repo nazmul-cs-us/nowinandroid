@@ -572,7 +572,7 @@ internal object WidgetTextDimensions {
   internal val maxPrimaryTextFontSize = 28.sp // GM3 Headline Medium
 
   // For a font size 16 of primary text, we want caption to be of size 14.
-  internal const val captionToPrimaryTextRatio = 0.875f
+  internal const val CAPTION_TO_PRIMARY_TEXT_RATIO = 0.875f
 
   @Composable
   fun primaryTextFontSizeAndMaxLines(text: String): Pair<TextUnit, Int> {
@@ -587,13 +587,13 @@ internal object WidgetTextDimensions {
       text = text,
       availableWidth = availableWidthForPrimaryText,
       availableHeight = availableHeightForPrimaryText,
-      minFontSize = (minCaptionFontSize.value / captionToPrimaryTextRatio).sp,
+      minFontSize = (minCaptionFontSize.value / CAPTION_TO_PRIMARY_TEXT_RATIO).sp,
       maxFontSize = maxPrimaryTextFontSize
     )
   }
 
   fun captionFontSizeAndMaxLines(primaryFontSize: TextUnit): Pair<TextUnit, Int> {
-    val estimatedFontSize = primaryFontSize.value * captionToPrimaryTextRatio
+    val estimatedFontSize = primaryFontSize.value * CAPTION_TO_PRIMARY_TEXT_RATIO
     val captionMaxLines = 1 // Caption is always 1 line.
     return estimatedFontSize.coerceAtMost(maxCaptionFontSize.value).sp to captionMaxLines
   }

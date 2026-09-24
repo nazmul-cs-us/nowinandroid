@@ -63,10 +63,12 @@ fun LiquidBottomTabs(
     backdrop: Backdrop,
     tabsCount: Int,
     modifier: Modifier = Modifier,
-    initialPosition: Float? = null, // null = use selectedTabIndex, or specify 0.5f for middle
+    // null = use selectedTabIndex, or specify 0.5f for middle
+    initialPosition: Float? = null, 
     onDragStarted: () -> Unit = {},
     onDragStopped: () -> Unit = {},
-    onAnimateToTab: ((animateTo: (Int) -> Unit) -> Unit)? = null, // Callback to expose animation function
+    // Callback to expose animation function
+    onAnimateToTab: ((animateTo: (Int) -> Unit) -> Unit)? = null, 
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()

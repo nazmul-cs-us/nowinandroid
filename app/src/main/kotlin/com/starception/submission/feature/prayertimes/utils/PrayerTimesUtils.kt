@@ -45,7 +45,8 @@ fun getCurrentDate(): String {
  */
 fun calculateQiblaDirection(
     lat1: Double, lon1: Double,
-    lat2: Double = 21.4225, // Kaaba coordinates
+    // Kaaba coordinates
+    lat2: Double = 21.4225, 
     lon2: Double = 39.8262
 ): Double {
     val lat1Rad = Math.toRadians(lat1)

@@ -29,6 +29,10 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -39,12 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.starception.submission.core.analytics.LocalAnalyticsHelper
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.UserNewsResource
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 /**
  * An extension on [LazyListScope] defining a feed with news resources.
@@ -56,11 +54,15 @@ fun LazyStaggeredGridScope.newsFeed(
     onNewsResourceViewed: (String) -> Unit,
     onTopicClick: (String) -> Unit,
     onExpandedCardClick: () -> Unit = {},
-    onSurahClick: (Int, String?) -> Unit = { _, _ -> }, // surahNumber, newsResourceId
-    onDuaClick: (UserNewsResource) -> Unit = { _ -> }, // Dua news resource
-    onHadithClick: (String, Int) -> Unit = { _, _ -> }, // databaseFile, hadithNumber
+    // surahNumber, newsResourceId
+    onSurahClick: (Int, String?) -> Unit = { _, _ -> },
+    // Dua news resource
+    onDuaClick: (UserNewsResource) -> Unit = { _ -> },
+    // databaseFile, hadithNumber
+    onHadithClick: (String, Int) -> Unit = { _, _ -> },
     onNewsClick: ((UserNewsResource) -> Unit)? = null,
-    searchQuery: String = "", // Search query for highlighting
+    // Search query for highlighting
+    searchQuery: String = "",
 ) {
     when (feedState) {
         NewsFeedUiState.Loading -> Unit
@@ -78,7 +80,7 @@ fun LazyStaggeredGridScope.newsFeed(
                 val surahNumber = extractSurahNumber(
                     title = userNewsResource.title,
                     url = userNewsResource.url,
-                    type = userNewsResource.type
+                    type = userNewsResource.type,
                 )
 
                 // State for floating toolbar
@@ -98,15 +100,17 @@ fun LazyStaggeredGridScope.newsFeed(
                         onBookmark = {
                             onNewsResourcesCheckedChanged(
                                 userNewsResource.id,
-                                !userNewsResource.isSaved
+                                !userNewsResource.isSaved,
                             )
                         },
                         onShare = {
                             // Share Surah
                             val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_TEXT,
-                                    "Check out Surah ${userNewsResource.title}: ${userNewsResource.url}")
+                                putExtra(
+                                    android.content.Intent.EXTRA_TEXT,
+                                    "Check out Surah ${userNewsResource.title}: ${userNewsResource.url}",
+                                )
                             }
                             context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Surah"))
                         },
@@ -116,7 +120,7 @@ fun LazyStaggeredGridScope.newsFeed(
                         },
                         onInfo = {
                             onSurahClick(surahNumber, userNewsResource.id)
-                        }
+                        },
                     )
                 }
 
@@ -212,7 +216,7 @@ fun extractHadithInfo(url: String): Pair<String, Int>? {
         if (match != null) {
             val dbName = match.groupValues[1]
             val hadithNumber = match.groupValues[2].toInt()
-            Pair("${dbName}.db", hadithNumber)
+            Pair("$dbName.db", hadithNumber)
         } else {
             null
         }
@@ -240,7 +244,7 @@ fun launchCustomChromeTab(context: Context, uri: Uri, @ColorInt toolbarColor: In
             android.widget.Toast.makeText(
                 context,
                 "No browser available to open link",
-                android.widget.Toast.LENGTH_SHORT
+                android.widget.Toast.LENGTH_SHORT,
             ).show()
         }
     }

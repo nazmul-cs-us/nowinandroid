@@ -6,15 +6,21 @@
  * You may obtain a copy of the License at
  *
  *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package com.starception.submission.shared.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,8 +29,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -34,12 +40,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,10 +54,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
@@ -80,8 +85,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.model.data.BukhariBook
@@ -93,27 +98,25 @@ import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
 import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
-import com.starception.submission.shared.content.LocalProfile
 import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedTopic
 import com.starception.submission.shared.content.SharedTopicArticle
-import com.starception.submission.shared.content.SharedTopics
 import com.starception.submission.shared.content.createSharedNewsRepository
 import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
 import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.content.sharedTopic
+import com.starception.submission.shared.hadith.SharedHadith
+import com.starception.submission.shared.hadith.createSharedHadithRepository
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
-import com.starception.submission.shared.hadith.SharedHadith
-import com.starception.submission.shared.hadith.createSharedHadithRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 internal data class CourseLesson(val number: Int, val title: String, val summary: String)
 
@@ -237,7 +240,10 @@ internal fun ProfileScreen(
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         value = profile.displayName,
-                        onValueChange = { profile = profile.copy(displayName = it.take(40)); saved = false },
+                        onValueChange = {
+                            profile = profile.copy(displayName = it.take(40))
+                            saved = false
+                        },
                         label = { Text("Display name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -259,7 +265,11 @@ internal fun ProfileScreen(
                         modifier = Modifier.semantics { contentDescription = "Daily Quran reading goal" },
                     )
                     Button(
-                        onClick = { store.saveProfile(profile); profile = store.profile(); saved = true },
+                        onClick = {
+                            store.saveProfile(profile)
+                            profile = store.profile()
+                            saved = true
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(if (saved) "Saved locally" else "Save preferences")
@@ -492,8 +502,8 @@ private fun QuranAyahReadingBlock(
             .fillMaxWidth()
             .combinedClickable(onClick = {}, onDoubleClick = onToggleTranslation)
             .semantics {
-            contentDescription = verse.metadataLabel()
-        }
+                contentDescription = verse.metadataLabel()
+            }
             .padding(horizontal = 4.dp, vertical = 14.dp),
     ) {
         Text(
@@ -549,8 +559,11 @@ internal fun BukhariBookDetailScreen(
     LaunchedEffect(id, loadAttempt) {
         state = try {
             val hadiths = repository.getHadiths(book.firstHadithId, book.lastHadithId)
-            if (hadiths.isEmpty()) HadithsState.Error("No narrations were found for this book.")
-            else HadithsState.Loaded(hadiths)
+            if (hadiths.isEmpty()) {
+                HadithsState.Error("No narrations were found for this book.")
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
@@ -613,8 +626,12 @@ internal fun BukhariBookDetailScreen(
             is HadithsState.Loaded -> {
                 val filtered = remember(current.hadiths, query) {
                     val term = query.trim().lowercase()
-                    if (term.isEmpty()) current.hadiths else current.hadiths.filter {
-                        it.id.toString() == term || it.english.lowercase().contains(term) || it.arabic.contains(query.trim())
+                    if (term.isEmpty()) {
+                        current.hadiths
+                    } else {
+                        current.hadiths.filter {
+                            it.id.toString() == term || it.english.lowercase().contains(term) || it.arabic.contains(query.trim())
+                        }
                     }
                 }
                 OutlinedTextField(
@@ -730,25 +747,31 @@ internal fun BukhariHadithDetailScreen(
                             }
                         }
                     }
-                    if (hadith.arabic.isNotBlank()) item {
-                        ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
-                            Text(
-                                hadith.arabic,
-                                modifier = Modifier.fillMaxWidth(),
-                                fontSize = 29.sp,
-                                lineHeight = 46.sp,
-                                textAlign = TextAlign.End,
-                            )
+                    if (hadith.arabic.isNotBlank()) {
+                        item {
+                            ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                                Text(
+                                    hadith.arabic,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    fontSize = 29.sp,
+                                    lineHeight = 46.sp,
+                                    textAlign = TextAlign.End,
+                                )
+                            }
                         }
                     }
-                    if (hadith.english.isNotBlank()) item {
-                        ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
-                            Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                    if (hadith.english.isNotBlank()) {
+                        item {
+                            ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
+                                Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                            }
                         }
                     }
-                    if (hadith.explanation.isNotBlank()) item {
-                        ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
-                            Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                    if (hadith.explanation.isNotBlank()) {
+                        item {
+                            ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
+                                Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                            }
                         }
                     }
                 }
@@ -1929,9 +1952,11 @@ internal fun TopicArticleDetailScreen(
                                 }
                             }
                         }
-                        if (article.context.isNotBlank()) item {
-                            ReaderSection("Context", MaterialTheme.colorScheme.secondary) {
-                                Text(article.context, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                        if (article.context.isNotBlank()) {
+                            item {
+                                ReaderSection("Context", MaterialTheme.colorScheme.secondary) {
+                                    Text(article.context, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                                }
                             }
                         }
                         if (article.arabic.isNotBlank()) {

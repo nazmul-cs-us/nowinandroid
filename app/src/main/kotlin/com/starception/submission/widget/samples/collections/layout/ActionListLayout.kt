@@ -36,7 +36,7 @@ import com.starception.submission.widget.samples.collections.data.FakeActionList
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.circularCornerRadius
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.filledItemCornerRadius
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.filledItemPadding
-import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.gridCells
+import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.GRID_CELLS
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.itemContentSpacing
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.stateIconBackgroundSize
 import com.starception.submission.widget.samples.collections.layout.ActionListLayoutDimensions.stateIconSize
@@ -198,7 +198,7 @@ private fun GridView(
   actionButtonOnClick: (String) -> Unit,
 ) {
   RoundedScrollingLazyVerticalGrid(
-    gridCells = gridCells,
+    gridCells = GRID_CELLS,
     items = items,
     cellSpacing = itemContentSpacing,
     itemContentProvider = { item ->
@@ -501,7 +501,7 @@ private object ActionListLayoutTextStyles {
 
 private object ActionListLayoutDimensions {
   /** Number of cells in the grid, when items are displayed as a grid. */
-  const val gridCells = 2
+  const val GRID_CELLS = 2
 
   /** Padding applied at bottom of the widget content */
   val widgetPadding = 12.dp

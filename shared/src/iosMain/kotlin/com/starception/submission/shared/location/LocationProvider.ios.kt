@@ -17,7 +17,6 @@
 package com.starception.submission.shared.location
 
 import com.starception.submission.core.logging.SharedLog
-import kotlin.coroutines.resume
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -34,6 +33,7 @@ import platform.Foundation.NSTimeZone
 import platform.Foundation.localTimeZone
 import platform.Foundation.secondsFromGMT
 import platform.darwin.NSObject
+import kotlin.coroutines.resume
 
 private const val TAG = "LocationProvider"
 private const val FIX_TIMEOUT_MS = 8_000L
