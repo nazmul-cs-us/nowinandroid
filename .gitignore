@@ -78,8 +78,8 @@ app/src/main/assets/fortress_of_the_muslim.json
 app/src/main/assets/tts/*.onnx
 app/src/main/assets/tts/espeak-ng-data/
 
-# Local AAR libraries
-app/libs/*.aar
+# Local AAR libraries must be committed — CI needs them to build
+# (whisper/libs/whisper-cpp.aar is already tracked; app/libs AARs too)
 
 # Release keystore and signing credentials
 app/keystore.properties
