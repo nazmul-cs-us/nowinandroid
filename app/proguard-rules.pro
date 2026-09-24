@@ -68,10 +68,22 @@
 }
 
 # ============================================================================
-# NASA WorldWind (3D Globe)
+# WorldWind Kotlin (3D Globe) — earth.worldwind.* v2 API
 # ============================================================================
--keep class gov.nasa.worldwind.** { *; }
--dontwarn gov.nasa.worldwind.**
+-keep class earth.worldwind.** { *; }
+-keepclassmembers class earth.worldwind.** {
+    native <methods>;
+}
+-dontwarn earth.worldwind.**
+
+# ============================================================================
+# Whisper TFLite (on-device speech recognition, JNI)
+# ============================================================================
+-keep class com.whispertflite.** { *; }
+-keepclassmembers class com.whispertflite.** {
+    native <methods>;
+}
+-dontwarn com.whispertflite.**
 
 # ============================================================================
 # LibGDX (3D Visualization)

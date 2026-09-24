@@ -1,0 +1,7 @@
+# Geotab SafeCommit configuration.
+secrets_allow = [
+    # Firebase Android config: google-services.json contains API keys that are
+    # public-by-design identifiers (Google documents committing this file to the
+    # repo; the keys are restricted server-side by package name + SHA fingerprint).
+    "app/google-services.json",
+]

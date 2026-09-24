@@ -1,52 +1,83 @@
 {
   "project_info": {
-    "project_number": "647708860321",
-    "project_id": "submission-f8b2b",
-    "storage_bucket": "submission-f8b2b.firebasestorage.app"
+    "project_number": "314046586292",
+    "project_id": "dua-45e8ba51",
+    "storage_bucket": "dua-45e8ba51.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:647708860321:android:f30e2a9ab50ff860b4f5e0",
+        "mobilesdk_app_id": "1:314046586292:android:f401036fb8096a7bda66e1",
         "android_client_info": {
-          "package_name": "com.starception.submission.demo.debug"
+          "package_name": "com.starception.submission.debug"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "647708860321-0one6farj2krasm9939s7tlok2ute187.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.starception.submission.demo.debug",
-            "certificate_hash": "0893a32138da5837d6b25a23f72cff98420f9676"
-          }
-        },
-        {
-          "client_id": "647708860321-ududrde2tiei739oba1mu8n8rmj75k5h.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.starception.submission.demo.debug",
-            "certificate_hash": "07a9e6461424dbbaa3c8e98851e6f9af3333681d"
-          }
-        },
-        {
-          "client_id": "647708860321-mb74a9rshuj3hurj2i1pii9etbr88uk0.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDugaNfvHfNcRyHjUdojFl8iXFG3vcdgCI"
+          "current_key": "AIzaSyBpW-PUZUODolvWGLcCvJX0MRrNADzp6xM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "647708860321-mb74a9rshuj3hurj2i1pii9etbr88uk0.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314046586292:android:f401036fb8096a7bda66e1",
+        "android_client_info": {
+          "package_name": "com.starception.submission"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpW-PUZUODolvWGLcCvJX0MRrNADzp6xM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314046586292:android:f401036fb8096a7bda66e1",
+        "android_client_info": {
+          "package_name": "com.starception.submission.demo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpW-PUZUODolvWGLcCvJX0MRrNADzp6xM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:314046586292:android:f401036fb8096a7bda66e1",
+        "android_client_info": {
+          "package_name": "com.starception.submission.demo.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpW-PUZUODolvWGLcCvJX0MRrNADzp6xM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
         }
       }
     }

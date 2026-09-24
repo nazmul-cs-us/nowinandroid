@@ -211,6 +211,7 @@ fun HadithDetailScreen(
     initialAutoAdvance: Boolean = false,
     playbackRangeStart: Int? = null,
     playbackRangeEnd: Int? = null,
+    shufflePlayback: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Capture the route-provided value, then shadow with mutable state so navigation
@@ -667,6 +668,7 @@ fun HadithDetailScreen(
         bookPlaylistEnabled,
         playbackRangeStart,
         playbackRangeEnd,
+        shufflePlayback,
         selectedLanguage,
         selectedVoice,
         selectedSpeakerId,
@@ -690,20 +692,25 @@ fun HadithDetailScreen(
         sherpaOnnxTts.setVoice(selectedVoice)
 
         try {
-            var playlistNumber = rangeStart
+            val playlistOrder = if (shufflePlayback) {
+                (rangeStart..rangeEnd).shuffled()
+            } else {
+                (rangeStart..rangeEnd).toList()
+            }
+            var playlistIndex = 0
             var offlineNotified = false
-            while (playlistNumber <= rangeEnd) {
+            while (playlistIndex < playlistOrder.size) {
                 if (!bookPlaylistEnabled) break
-                val number = playlistNumber
+                val number = playlistOrder[playlistIndex]
                 val nextHadith = repository.getHadith(databaseFile, number)
                 if (nextHadith == null) {
-                    playlistNumber += 1
+                    playlistIndex += 1
                     continue
                 }
                 val englishText = bukhariTranslationRepo.getEnglishText(number)
                     ?: nextHadith.textPlain
                 if (englishText == null) {
-                    playlistNumber += 1
+                    playlistIndex += 1
                     continue
                 }
                 val spokenText = if (selectedLanguage == "en") {
@@ -733,21 +740,25 @@ fun HadithDetailScreen(
                 // Once this hadith starts playing, Sherpa's native engine is idle. Use
                 // that playback window to prepare the next English fallback as one clip,
                 // so Play All normally pays the preparation cost only for the first item.
-                val nextSherpaText = if (number < rangeEnd) {
-                    val nextNumber = number + 1
-                    val nextHasBengaliRecording = selectedLanguage == "bn" &&
-                        audioDownloadHelper.resolveHadithAudioFile(nextNumber) != null
-                    if (nextHasBengaliRecording) {
-                        EnglishTtsTextNormalizer.bukhariIntro(nextNumber)
-                    } else {
-                        val nextEnglishText = bukhariTranslationRepo.getEnglishText(nextNumber)
-                            ?: repository.getHadith(databaseFile, nextNumber)?.textPlain
-                        nextEnglishText?.let {
-                            "${EnglishTtsTextNormalizer.bukhariIntro(nextNumber)} $it"
-                        }
-                    }
+                val nextNumber = if (shufflePlayback) {
+                    playlistOrder.getOrNull(playlistIndex + 1)
+                } else if (number < rangeEnd) {
+                    number + 1
                 } else {
                     null
+                }
+                val nextSherpaText = nextNumber?.let { upcoming ->
+                    val nextHasBengaliRecording = selectedLanguage == "bn" &&
+                        audioDownloadHelper.resolveHadithAudioFile(upcoming) != null
+                    if (nextHasBengaliRecording) {
+                        EnglishTtsTextNormalizer.bukhariIntro(upcoming)
+                    } else {
+                        val nextEnglishText = bukhariTranslationRepo.getEnglishText(upcoming)
+                            ?: repository.getHadith(databaseFile, upcoming)?.textPlain
+                        nextEnglishText?.let {
+                            "${EnglishTtsTextNormalizer.bukhariIntro(upcoming)} $it"
+                        }
+                    }
                 }
 
                 val preGenerateNext: () -> Unit = {
@@ -830,11 +841,13 @@ fun HadithDetailScreen(
                 val requestedHadith = bookPlaylistJumpTarget
                 if (requestedHadith != null) {
                     bookPlaylistJumpTarget = null
-                    playlistNumber = requestedHadith
+                    val jumpIndex = playlistOrder.indexOf(requestedHadith)
+                    if (jumpIndex < 0) break
+                    playlistIndex = jumpIndex
                     continue
                 }
                 if (!completed || !bookPlaylistEnabled) break
-                playlistNumber += 1
+                playlistIndex += 1
             }
         } finally {
             isBookPlaylistPlayback = false
