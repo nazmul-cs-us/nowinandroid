@@ -1,20 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Location pin, for the prayer widget's title bar beside the place name.
+     Copyright 9394 The Android Open Source Project
 
-  MingCute "location-fill" (Apache-2.0, github.com/Richard9394/MingCute) — the same
-  licence as the Material Symbols already in this project, so it carries no attribution
-  obligation of its own.
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
 
-  Filled and single-path, because Glance tints a title bar icon with a ColorFilter over
-  the whole image: only a shape that reads by its silhouette survives that at 24dp. The
-  earlier ic_go_to_mosque_pin draws hairline 0.8-1.5dp strokes that disappear at this
-  size, and Material's own location_on is drawn noticeably more slender, so it read as
-  thin next to the bolder type this title bar sits above.
+          http://www.apache.org/licenses/LICENSE-2.0
 
-  The trailing subpath is the inner circle. It is wound opposite to the body, so the
-  default nonZero fill rule punches it out as a hole rather than filling it — do not
-  "tidy" its sweep flags.
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

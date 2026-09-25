@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.hadith
 
 import androidx.navigation.NavController
@@ -5,12 +21,12 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.starception.submission.core.model.data.BukhariBooks
+import com.starception.submission.core.model.data.ShamayelBooks
 import com.starception.submission.navigation.detailEnterTransition
 import com.starception.submission.navigation.detailExitTransition
 import com.starception.submission.navigation.detailPopEnterTransition
 import com.starception.submission.navigation.detailPopExitTransition
-import com.starception.submission.core.model.data.BukhariBooks
-import com.starception.submission.core.model.data.ShamayelBooks
 import kotlinx.serialization.Serializable
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -113,7 +129,7 @@ fun NavController.navigateToHadithDetail(
     playbackRangeStart: Int? = null,
     playbackRangeEnd: Int? = null,
     shufflePlayback: Boolean = false,
-    navOptions: NavOptions? = null
+    navOptions: NavOptions? = null,
 ) {
     val encodedCollection = URLEncoder.encode(collectionName, "UTF-8")
     val encodedDbFile = URLEncoder.encode(databaseFile, "UTF-8")
@@ -128,7 +144,7 @@ fun NavController.navigateToHadithDetail(
             playbackRangeEnd = playbackRangeEnd,
             shufflePlayback = shufflePlayback,
         ),
-        navOptions = navOptions
+        navOptions = navOptions,
     )
 }
 
@@ -138,7 +154,7 @@ fun NavController.navigateToHadithDetail(
 fun NavGraphBuilder.hadithDetailScreen(
     onBackClick: () -> Unit,
     onNavigateToPreviousHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> },
-    onNavigateToNextHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> }
+    onNavigateToNextHadith: (collectionName: String, currentHadithNumber: Int, databaseFile: String) -> Unit = { _, _, _ -> },
 ) {
     composable<HadithDetailRoute>(
         enterTransition = { detailEnterTransition() },
@@ -165,7 +181,7 @@ fun NavGraphBuilder.hadithDetailScreen(
             },
             onNavigateToNextHadith = {
                 onNavigateToNextHadith(decodedCollection, route.hadithNumber, decodedDbFile)
-            }
+            },
         )
     }
 }

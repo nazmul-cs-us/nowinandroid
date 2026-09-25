@@ -1,12 +1,26 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.service
 
 import android.content.Context
 import android.location.Geocoder
-import android.location.Location as AndroidLocation
 import android.util.Log
-import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.AsrMadhhab
-import com.starception.submission.prayer.model.Location
+import com.starception.submission.prayer.model.CalculationMethod
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -17,26 +31,27 @@ import java.io.IOException
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.location.Location as AndroidLocation
 
 /**
  * Country-Based Prayer Method Service
- * 
+ *
  * Provides automatic prayer calculation method and madhhab selection based on user's location.
  * Uses comprehensive database of 80+ countries with region-specific Islamic calculation preferences.
- * 
+ *
  * ## Key Features:
  * - **Automatic Detection**: Determines calculation method from GPS coordinates
  * - **Country Database**: 80+ countries with appropriate calculation methods and madhhab
  * - **Regional Accuracy**: Uses location-specific Islamic traditions and scholarly preferences
  * - **Fallback System**: Defaults to widely-accepted methods when country is unidentified
  * - **Offline Support**: JSON data loaded from app assets, no network required
- * 
+ *
  * ## Usage Examples:
  * - UAE Location → Umm al-Qura University method + Maliki madhhab
  * - Pakistan Location → University of Karachi method + Hanafi madhhab
  * - Egypt Location → Egyptian General Authority + Shafi madhhab
  * - USA Location → ISNA method + Hanafi madhhab
- * 
+ *
  * ## Data Source:
  * - `country_prayer_methods.json` - Contains country-specific preferences
  * - Based on regional Islamic scholarly traditions and government recommendations
@@ -44,13 +59,13 @@ import javax.inject.Singleton
  */
 @Singleton
 class CountryPrayerMethodService @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
 ) {
-    
+
     companion object {
         private const val TAG = "CountryPrayerMethodService"
         private const val JSON_FILE = "country_prayer_methods.json"
-        
+
         // Logging levels for different operations
         private fun logInfo(message: String) = Log.i(TAG, message)
         private fun logDebug(message: String) = Log.d(TAG, message)
@@ -65,10 +80,10 @@ class CountryPrayerMethodService @Inject constructor(
      * Get prayer calculation method and madhhab based on location
      */
     suspend fun getPrayerMethodForLocation(
-        location: AndroidLocation
+        location: AndroidLocation,
     ): LocationBasedPrayerSettings = withContext(Dispatchers.IO) {
         logInfo("🌍 Starting auto-detection for coordinates: ${String.format("%.6f", location.latitude)}, ${String.format("%.6f", location.longitude)}")
-        
+
         try {
             // Load country data if not already loaded
             if (countryData == null) {
@@ -82,13 +97,13 @@ class CountryPrayerMethodService @Inject constructor(
             // Get country code from coordinates
             logDebug("🔍 Performing reverse geocoding...")
             val countryCode = getCountryCodeFromLocation(location)
-            
+
             if (countryCode != null) {
                 logInfo("🏳️ Country detected: $countryCode")
             } else {
                 logWarning("⚠️ Unable to detect country from coordinates")
             }
-            
+
             // Get country-specific settings
             val countrySettings = if (countryCode != null) {
                 val settings = countryData?.countries?.get(countryCode)
@@ -104,18 +119,18 @@ class CountryPrayerMethodService @Inject constructor(
                 logDebug("🌐 Falling back to regional defaults")
                 null
             }
-            
+
             if (countrySettings != null) {
                 // Get calculation method details from JSON
                 val calculationMethodDetails = countryData?.calculationMethods?.get(countrySettings.calculationMethod)
-                
+
                 // Map the calculation method and madhhab
                 val mappedCalculationMethod = mapCalculationMethod(countrySettings.calculationMethod)
                 val mappedMadhhab = mapMadhhab(countrySettings.madhhab)
-                
+
                 logDebug("🔄 Mapping calculation method: ${countrySettings.calculationMethod} → ${mappedCalculationMethod.displayName}")
                 logDebug("🔄 Mapping madhhab: ${countrySettings.madhhab} → $mappedMadhhab")
-                
+
                 val result = LocationBasedPrayerSettings(
                     calculationMethod = mappedCalculationMethod,
                     madhhab = mappedMadhhab,
@@ -127,7 +142,13 @@ class CountryPrayerMethodService @Inject constructor(
                     customIshaAngle = calculationMethodDetails?.let { method ->
                         // If ishaOffset is set (delay-based), set ishaAngle to 0.0 so getEffectiveIshaAngle() returns null
                         // This forces delay-based calculation instead of using enum's default ishaAngle
-                        if (method.ishaOffset > 0) 0.0 else if (method.ishaAngle > 0) method.ishaAngle else null
+                        if (method.ishaOffset > 0) {
+                            0.0
+                        } else if (method.ishaAngle > 0) {
+                            method.ishaAngle
+                        } else {
+                            null
+                        }
                     },
                     customMaghribOffset = calculationMethodDetails?.let { method ->
                         if (method.maghribOffset != 0.0) method.maghribOffset.toInt() else null
@@ -136,7 +157,7 @@ class CountryPrayerMethodService @Inject constructor(
                         if (method.ishaOffset != 0.0) method.ishaOffset.toInt() else null
                     },
                     // Include country-specific default time offsets to match official times
-                    timeOffsets = countrySettings.timeOffsets
+                    timeOffsets = countrySettings.timeOffsets,
                 )
 
                 // Log comprehensive result
@@ -145,13 +166,13 @@ class CountryPrayerMethodService @Inject constructor(
                 logDebug("   - Method: ${result.calculationMethod.displayName}")
                 logDebug("   - Madhhab: ${result.madhhab}")
                 logDebug("   - Fajr Angle: ${result.customFajrAngle ?: "default"}°")
-                logDebug("   - Isha: ${result.customIshaAngle?.let { "${it}°" } ?: result.customIshaOffset?.let { "${it}min offset" } ?: "default"}")
+                logDebug("   - Isha: ${result.customIshaAngle?.let { "$it°" } ?: result.customIshaOffset?.let { "${it}min offset" } ?: "default"}")
                 logDebug("   - Maghrib Offset: ${result.customMaghribOffset ?: "default"}min")
                 // Log time offsets if present
                 countrySettings.timeOffsets?.let { offsets ->
                     logDebug("   - Time Offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
                 }
-                
+
                 result
             } else {
                 // Fallback to regional defaults based on coordinates
@@ -164,13 +185,13 @@ class CountryPrayerMethodService @Inject constructor(
             logError("   - Error type: ${e.javaClass.simpleName}")
             logError("   - Message: ${e.message}")
             logWarning("🔧 Using Muslim World League method as safe default")
-            
+
             LocationBasedPrayerSettings(
                 calculationMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE,
                 madhhab = AsrMadhhab.STANDARD,
                 countryName = "Unknown",
                 countryCode = "UNKNOWN",
-                isAutoDetected = false
+                isAutoDetected = false,
             )
         }
     }
@@ -183,15 +204,14 @@ class CountryPrayerMethodService @Inject constructor(
             logDebug("📂 Reading $JSON_FILE from assets...")
             val inputStream = context.assets.open(JSON_FILE)
             val jsonString = inputStream.bufferedReader().use { it.readText() }
-            
+
             logDebug("🔍 Parsing JSON data...")
             countryData = json.decodeFromString<CountryPrayerData>(jsonString)
-            
+
             logInfo("✅ Successfully loaded prayer methods database")
             logDebug("   - Countries: ${countryData?.countries?.size}")
             logDebug("   - Calculation Methods: ${countryData?.calculationMethods?.size}")
             logDebug("   - Madhhab Options: ${countryData?.madhhabOptions?.size}")
-            
         } catch (e: IOException) {
             logError("❌ Failed to read $JSON_FILE from assets", e)
             logError("   - Check if file exists in app/src/main/assets/")
@@ -215,7 +235,7 @@ class CountryPrayerMethodService @Inject constructor(
             logDebug("🌐 Performing reverse geocoding for coordinates...")
             val geocoder = Geocoder(context, Locale.getDefault())
             val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-            
+
             val countryCode = addresses?.firstOrNull()?.countryCode
             if (countryCode != null) {
                 val countryName = addresses.firstOrNull()?.countryName
@@ -223,7 +243,7 @@ class CountryPrayerMethodService @Inject constructor(
             } else {
                 logWarning("⚠️ Geocoding returned no results for location")
             }
-            
+
             return@withContext countryCode
         } catch (e: IOException) {
             logError("❌ Geocoding failed due to network/service issue", e)
@@ -250,7 +270,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.STANDARD,
                     countryName = "Middle East Region",
                     countryCode = "ME_REGION",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
             // South Asia
@@ -260,7 +280,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.HANAFI,
                     countryName = "South Asia Region",
                     countryCode = "SA_REGION",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
             // Southeast Asia
@@ -270,7 +290,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.STANDARD,
                     countryName = "Southeast Asia Region",
                     countryCode = "SEA_REGION",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
             // North America
@@ -280,7 +300,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.HANAFI,
                     countryName = "North America Region",
                     countryCode = "NA_REGION",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
             // Africa & North Africa
@@ -290,7 +310,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.STANDARD,
                     countryName = "Africa Region",
                     countryCode = "AF_REGION",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
             // Europe & rest of world
@@ -300,7 +320,7 @@ class CountryPrayerMethodService @Inject constructor(
                     madhhab = AsrMadhhab.HANAFI,
                     countryName = "Global Region",
                     countryCode = "GLOBAL",
-                    isAutoDetected = false
+                    isAutoDetected = false,
                 )
             }
         }
@@ -349,7 +369,7 @@ data class LocationBasedPrayerSettings(
     val customMaghribOffset: Int? = null,
     val customIshaOffset: Int? = null,
     // Country-specific default time offsets (in minutes) to match official times
-    val timeOffsets: TimeOffsetsJson? = null
+    val timeOffsets: TimeOffsetsJson? = null,
 )
 
 /**
@@ -359,7 +379,7 @@ data class LocationBasedPrayerSettings(
 data class CountryPrayerData(
     val countries: Map<String, CountryPrayerInfo>,
     val calculationMethods: Map<String, CalculationMethodInfo>,
-    val madhhabOptions: Map<String, MadhhabInfo>
+    val madhhabOptions: Map<String, MadhhabInfo>,
 )
 
 @Serializable
@@ -368,7 +388,7 @@ data class CountryPrayerInfo(
     val calculationMethod: String,
     val madhhab: String,
     val coordinates: Coordinates,
-    val timeOffsets: TimeOffsetsJson? = null
+    val timeOffsets: TimeOffsetsJson? = null,
 )
 
 @Serializable
@@ -378,7 +398,7 @@ data class TimeOffsetsJson(
     val dhuhr: Int = 0,
     val asr: Int = 0,
     val maghrib: Int = 0,
-    val isha: Int = 0
+    val isha: Int = 0,
 ) {
     /**
      * Convert JSON time offsets to PrayerTimeOffsets model
@@ -389,14 +409,14 @@ data class TimeOffsetsJson(
         dhuhr = dhuhr,
         asr = asr,
         maghrib = maghrib,
-        isha = isha
+        isha = isha,
     )
 }
 
 @Serializable
 data class Coordinates(
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
 )
 
 @Serializable
@@ -406,12 +426,12 @@ data class CalculationMethodInfo(
     val ishaAngle: Double,
     val maghribOffset: Double,
     val ishaOffset: Double,
-    val region: String
+    val region: String,
 )
 
 @Serializable
 data class MadhhabInfo(
     val name: String,
     val asrShadowRatio: Int,
-    val regions: List<String>
+    val regions: List<String>,
 )

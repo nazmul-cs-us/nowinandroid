@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.visualization
 
 import androidx.compose.animation.animateContentSize
@@ -25,13 +41,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,17 +61,17 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.icon.topicIconResFor
 import com.starception.submission.core.ui.ChapterAudioController
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.MissingContentCard
 import com.starception.submission.feature.dua.getArabicFontFamilyForDua
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
 
 /**
  * The prayer words paired with the currently animated phase.
@@ -167,27 +183,27 @@ fun TwoRakahDuaPanel(
     }
 
     val panelModifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring())
-            .then(
-                if (glassBackdrop != null) {
-                    Modifier.drawBackdrop(
-                        backdrop = glassBackdrop,
-                        shape = { panelShape },
-                        effects = {
-                            vibrancy()
-                            blur(with(density) { 8.dp.toPx() })
-                            lens(
-                                with(density) { 6.dp.toPx() },
-                                with(density) { 12.dp.toPx() },
-                            )
-                        },
-                        onDrawSurface = { drawRect(glassSurfaceColor) },
-                    )
-                } else {
-                    Modifier
-                },
-            )
+        .fillMaxWidth()
+        .animateContentSize(animationSpec = spring())
+        .then(
+            if (glassBackdrop != null) {
+                Modifier.drawBackdrop(
+                    backdrop = glassBackdrop,
+                    shape = { panelShape },
+                    effects = {
+                        vibrancy()
+                        blur(with(density) { 8.dp.toPx() })
+                        lens(
+                            with(density) { 6.dp.toPx() },
+                            with(density) { 12.dp.toPx() },
+                        )
+                    },
+                    onDrawSurface = { drawRect(glassSurfaceColor) },
+                )
+            } else {
+                Modifier
+            },
+        )
 
     Surface(
         modifier = panelModifier,

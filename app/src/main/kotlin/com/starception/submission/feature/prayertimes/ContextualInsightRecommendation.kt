@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes
 
 import com.starception.submission.core.duadatabase.Dua
@@ -14,17 +30,17 @@ import java.util.Locale
 
 /** Fortress chapters used by the contextual dashboard recommendation. */
 internal val CONTEXTUAL_DUA_CHAPTER_IDS = setOf(
-    1,   // Waking up
-    27,  // Morning and evening remembrance
-    28,  // Before sleeping
-    29,  // Stirring in the night
-    30,  // Fear or loneliness before sleep
-    34,  // Worry and grief
-    35,  // Anguish
-    43,  // Difficulty
-    44,  // After committing a sin
-    46,  // An unwanted outcome
-    82,  // Anger
+    1, // Waking up
+    27, // Morning and evening remembrance
+    28, // Before sleeping
+    29, // Stirring in the night
+    30, // Fear or loneliness before sleep
+    34, // Worry and grief
+    35, // Anguish
+    43, // Difficulty
+    44, // After committing a sin
+    46, // An unwanted outcome
+    82, // Anger
     106, // Pleasing or displeasing news
     123, // Something pleasing happens
     126, // Fright
@@ -145,7 +161,6 @@ internal fun buildContextualInsightRecommendation(
                 )
             }
         }
-
     }
 
     val candidateIndex = Math.floorMod(

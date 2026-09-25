@@ -138,6 +138,37 @@ data class PrayerNotificationPreferences(
     // Isha notification toggle
     val ishaNotificationEnabled: Boolean = true,
 
+    // PER-PRAYER ADHAN TOGGLES - Whether the Adhan sound plays when that
+    // prayer's notification fires. Defaults keep the previous always-on behavior.
+    // Fajr adhan toggle
+    val fajrAdhanEnabled: Boolean = true,
+    // Dhuhr adhan toggle
+    val dhuhrAdhanEnabled: Boolean = true,
+    // Asr adhan toggle
+    val asrAdhanEnabled: Boolean = true,
+    // Maghrib adhan toggle
+    val maghribAdhanEnabled: Boolean = true,
+    // Isha adhan toggle
+    val ishaAdhanEnabled: Boolean = true,
+
+    // ADHAN PLAYBACK VOLUME - 0 (silent) to 100 (full), applied to the adhan
+    // player independently of the device's notification volume. This is the
+    // master volume; per-prayer values below override it for that prayer.
+    val adhanVolume: Int = 100,
+
+    // PER-PRAYER ADHAN VOLUME - overrides [adhanVolume] for that prayer;
+    // null means "follow the master volume".
+    // Fajr adhan volume override
+    val fajrAdhanVolume: Int? = null,
+    // Dhuhr adhan volume override
+    val dhuhrAdhanVolume: Int? = null,
+    // Asr adhan volume override
+    val asrAdhanVolume: Int? = null,
+    // Maghrib adhan volume override
+    val maghribAdhanVolume: Int? = null,
+    // Isha adhan volume override
+    val ishaAdhanVolume: Int? = null,
+
     // PER-PRAYER PRIOR NOTIFICATION TIME (minutes before prayer to send reminder)
     // Minutes before Fajr to send reminder
     val fajrPriorMinutes: Int = 10,
@@ -181,6 +212,50 @@ data class PrayerNotificationPreferences(
             "maghrib" -> maghribNotificationEnabled
             "isha" -> ishaNotificationEnabled
             else -> false // Unknown prayer = no notification
+        }
+    }
+
+    /**
+     * Check if the Adhan sound is enabled for a specific prayer.
+     * The Adhan plays alongside the prayer-time notification; this toggle
+     * only controls whether it sounds for that prayer.
+     */
+    fun isAdhanEnabledForPrayer(prayerName: String): Boolean {
+        return when (prayerName.lowercase()) {
+            "fajr" -> fajrAdhanEnabled
+            "dhuhr" -> dhuhrAdhanEnabled
+            "asr" -> asrAdhanEnabled
+            "maghrib" -> maghribAdhanEnabled
+            "isha" -> ishaAdhanEnabled
+            else -> false // Unknown prayer = no Adhan
+        }
+    }
+
+    /**
+     * Effective adhan volume for a specific prayer (0-100): the prayer's
+     * individual override when set, otherwise the master [adhanVolume].
+     */
+    fun getAdhanVolumeForPrayer(prayerName: String): Int {
+        val override = when (prayerName.lowercase()) {
+            "fajr" -> fajrAdhanVolume
+            "dhuhr" -> dhuhrAdhanVolume
+            "asr" -> asrAdhanVolume
+            "maghrib" -> maghribAdhanVolume
+            "isha" -> ishaAdhanVolume
+            else -> null
+        }
+        return (override ?: adhanVolume).coerceIn(0, 100)
+    }
+
+    /** Whether [prayerName] has an individual adhan volume override (not following master). */
+    fun hasAdhanVolumeOverride(prayerName: String): Boolean {
+        return when (prayerName.lowercase()) {
+            "fajr" -> fajrAdhanVolume != null
+            "dhuhr" -> dhuhrAdhanVolume != null
+            "asr" -> asrAdhanVolume != null
+            "maghrib" -> maghribAdhanVolume != null
+            "isha" -> ishaAdhanVolume != null
+            else -> false
         }
     }
 

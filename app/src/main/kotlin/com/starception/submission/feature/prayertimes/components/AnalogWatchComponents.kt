@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.animation.core.*
@@ -16,7 +32,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,7 +48,7 @@ import kotlin.math.*
 fun PremiumHourMarkers(watchSize: Dp) {
     val center = watchSize.value / 2f
     val radius = watchSize.value / 2f - 20.dp.value
-    
+
     // Cardinal and intercardinal directions with Islamic compass styling
     val directions = listOf(
         "N" to 0f,
@@ -43,21 +58,21 @@ fun PremiumHourMarkers(watchSize: Dp) {
         "S" to 180f,
         "SW" to 225f,
         "W" to 270f,
-        "NW" to 315f
+        "NW" to 315f,
     )
-    
+
     directions.forEach { (direction, angle) ->
         val angleRad = Math.toRadians(angle.toDouble())
         val isCardinal = angle % 90f == 0f
-        
+
         Box(
             modifier = Modifier
                 .offset(
                     x = (center + (cos(angleRad) * (radius - 50.dp.value)) - if (isCardinal) 20.dp.value else 16.dp.value).dp,
-                    y = (center + (sin(angleRad) * (radius - 50.dp.value)) - if (isCardinal) 20.dp.value else 16.dp.value).dp
+                    y = (center + (sin(angleRad) * (radius - 50.dp.value)) - if (isCardinal) 20.dp.value else 16.dp.value).dp,
                 )
                 .size(if (isCardinal) 40.dp else 32.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             // Luxury multi-layer background with Islamic pattern inspiration
             Box(
@@ -69,13 +84,13 @@ fun PremiumHourMarkers(watchSize: Dp) {
                             colors = listOf(
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                             ),
-                            radius = if (isCardinal) 60f else 48f
-                        )
-                    )
+                            radius = if (isCardinal) 60f else 48f,
+                        ),
+                    ),
             )
-            
+
             // Inner glow ring
             Box(
                 modifier = Modifier
@@ -85,21 +100,21 @@ fun PremiumHourMarkers(watchSize: Dp) {
                         Brush.radialGradient(
                             colors = listOf(
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                Color.Transparent
-                            )
-                        )
-                    )
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
             )
-            
+
             // Direction text with enhanced Islamic styling
             Text(
                 text = direction,
                 style = MaterialTheme.typography.labelLarge,
                 color = if (isCardinal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.Bold,
-                fontSize = if (isCardinal) 20.sp else 16.sp
+                fontSize = if (isCardinal) 20.sp else 16.sp,
             )
-            
+
             // Special Qibla indicator for North
             if (direction == "N") {
                 Box(
@@ -111,10 +126,10 @@ fun PremiumHourMarkers(watchSize: Dp) {
                             Brush.radialGradient(
                                 colors = listOf(
                                     Color(0xFF10B981),
-                                    Color(0xFF059669)
-                                )
-                            )
-                        )
+                                    Color(0xFF059669),
+                                ),
+                            ),
+                        ),
                 )
             }
         }
@@ -132,18 +147,18 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         prayerTimes.dhuhr,
         prayerTimes.asr,
         prayerTimes.maghrib,
-        prayerTimes.isha
+        prayerTimes.isha,
     )
-    
+
     // Find current prayer period
     val currentPrayerIndex = prayers.indexOfFirst { time ->
         val nextPrayerTime = prayers.getOrNull(prayers.indexOf(time) + 1) ?: prayers[0]
         currentTime >= time && (if (nextPrayerTime > time) currentTime < nextPrayerTime else true)
     }.let { if (it == -1) 0 else it }
-    
+
     val currentPrayerTime = prayers[currentPrayerIndex]
     val nextPrayerTime = prayers.getOrNull(currentPrayerIndex + 1) ?: prayers[0]
-    
+
     val progress = if (nextPrayerTime > currentPrayerTime) {
         val totalDuration = Duration.between(currentPrayerTime, nextPrayerTime)
         val elapsed = Duration.between(currentPrayerTime, currentTime)
@@ -153,33 +168,33 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         val elapsed = Duration.between(currentPrayerTime, currentTime)
         (elapsed.toMinutes().toFloat() / totalDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
     }
-    
+
     // Smooth animation for progress
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
     )
-    
+
     Canvas(modifier = Modifier.size(watchSize)) {
         val center = Offset(size.width / 2, size.height / 2)
         val outerRadius = size.width / 2 - 40f
         val innerRadius = size.width / 2 - 60f
-        
+
         // Multi-layer background rings for depth
         // Outer shadow ring
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
                     Color(0xFF000000).copy(alpha = 0.2f),
-                    Color.Transparent
+                    Color.Transparent,
                 ),
-                radius = outerRadius + 10f
+                radius = outerRadius + 10f,
             ),
             center = center,
             radius = outerRadius + 5f,
-            style = Stroke(width = 20f, cap = StrokeCap.Round)
+            style = Stroke(width = 20f, cap = StrokeCap.Round),
         )
-        
+
         // Main background ring with Islamic pattern colors
         drawCircle(
             brush = Brush.sweepGradient(
@@ -187,27 +202,27 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                     Color(0xFF1E293B).copy(alpha = 0.8f),
                     Color(0xFF334155).copy(alpha = 0.6f),
                     Color(0xFF475569).copy(alpha = 0.7f),
-                    Color(0xFF1E293B).copy(alpha = 0.8f)
+                    Color(0xFF1E293B).copy(alpha = 0.8f),
                 ),
-                center = center
+                center = center,
             ),
             center = center,
             radius = outerRadius,
-            style = Stroke(width = 18f, cap = StrokeCap.Round)
+            style = Stroke(width = 18f, cap = StrokeCap.Round),
         )
-        
+
         // Inner highlight ring
         drawCircle(
             color = Color(0xFFFFD700).copy(alpha = 0.3f),
             center = center,
             radius = innerRadius,
-            style = Stroke(width = 2f, cap = StrokeCap.Round)
+            style = Stroke(width = 2f, cap = StrokeCap.Round),
         )
-        
+
         // Enhanced progress arc with Islamic green and gold gradient
         val startAngle = -90f
         val sweepAngle = 360f * animatedProgress
-        
+
         if (sweepAngle > 0f) {
             // Progress glow effect
             drawArc(
@@ -215,36 +230,36 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                     colors = listOf(
                         Color(0xFF10B981).copy(alpha = 0.3f),
                         Color(0xFFFFD700).copy(alpha = 0.5f),
-                        Color(0xFF059669).copy(alpha = 0.3f)
+                        Color(0xFF059669).copy(alpha = 0.3f),
                     ),
-                    center = center
+                    center = center,
                 ),
                 startAngle = startAngle,
                 sweepAngle = sweepAngle,
                 useCenter = false,
                 topLeft = Offset(center.x - outerRadius - 5f, center.y - outerRadius - 5f),
                 size = Size((outerRadius + 5f) * 2, (outerRadius + 5f) * 2),
-                style = Stroke(width = 28f, cap = StrokeCap.Round)
+                style = Stroke(width = 28f, cap = StrokeCap.Round),
             )
-            
+
             // Main progress arc with Islamic colors
             drawArc(
                 brush = Brush.sweepGradient(
                     colors = listOf(
                         Color(0xFF10B981),
                         Color(0xFFFFD700),
-                        Color(0xFF059669)
+                        Color(0xFF059669),
                     ),
-                    center = center
+                    center = center,
                 ),
                 startAngle = startAngle,
                 sweepAngle = sweepAngle,
                 useCenter = false,
                 topLeft = Offset(center.x - outerRadius, center.y - outerRadius),
                 size = Size(outerRadius * 2, outerRadius * 2),
-                style = Stroke(width = 18f, cap = StrokeCap.Round)
+                style = Stroke(width = 18f, cap = StrokeCap.Round),
             )
-            
+
             // Inner bright highlight
             drawArc(
                 color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
@@ -253,7 +268,7 @@ fun PremiumPrayerProgressRing(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                 useCenter = false,
                 topLeft = Offset(center.x - innerRadius, center.y - innerRadius),
                 size = Size(innerRadius * 2, innerRadius * 2),
-                style = Stroke(width = 3f, cap = StrokeCap.Round)
+                style = Stroke(width = 3f, cap = StrokeCap.Round),
             )
         }
     }
@@ -269,11 +284,11 @@ fun PremiumPrayerIndicators(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         "Dhuhr" to prayerTimes.dhuhr,
         "Asr" to prayerTimes.asr,
         "Maghrib" to prayerTimes.maghrib,
-        "Isha" to prayerTimes.isha
+        "Isha" to prayerTimes.isha,
     )
-    
+
     val currentTime = LocalTime.now()
-    
+
     prayers.forEach { (name, time) ->
         val hour = time.hour
         val minute = time.minute
@@ -281,18 +296,18 @@ fun PremiumPrayerIndicators(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         val angle = (timeInHours * 15f) - 90f
         val radius = (watchSize.value * 0.36f).dp
         val angleRad = Math.toRadians(angle.toDouble())
-        
-        val isActive = currentTime >= time && 
+
+        val isActive = currentTime >= time &&
             prayers.find { it.second > time }?.let { currentTime < it.second } ?: true
-        
+
         Box(
             modifier = Modifier
                 .offset(
                     x = (cos(angleRad) * radius.value).dp,
-                    y = (sin(angleRad) * radius.value).dp
+                    y = (sin(angleRad) * radius.value).dp,
                 )
                 .size(if (isActive) 20.dp else 12.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             // Premium background with glow
             Box(
@@ -304,18 +319,18 @@ fun PremiumPrayerIndicators(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                             Brush.radialGradient(
                                 colors = listOf(
                                     Color(0xFFFF4444),
-                                    Color(0xFFFF6B6B)
-                                )
+                                    Color(0xFFFF6B6B),
+                                ),
                             )
                         } else {
                             Brush.radialGradient(
                                 colors = listOf(
                                     Color(0xFF60A5FA),
-                                    Color(0xFF3B82F6)
-                                )
+                                    Color(0xFF3B82F6),
+                                ),
                             )
-                        }
-                    )
+                        },
+                    ),
             )
         }
     }
@@ -329,162 +344,162 @@ fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
     // Smooth animated rotation with Islamic aesthetic
     val animatedDirection by animateFloatAsState(
         targetValue = qiblaDirection,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 800f)
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 800f),
     )
-    
+
     Canvas(modifier = Modifier.size(watchSize)) {
         val center = Offset(size.width / 2, size.height / 2)
         val handLength = size.width / 2 - 60f
         val angle = Math.toRadians((animatedDirection - 90).toDouble())
-        
+
         val endPoint = Offset(
             (center.x + cos(angle) * handLength).toFloat(),
-            (center.y + sin(angle) * handLength).toFloat()
+            (center.y + sin(angle) * handLength).toFloat(),
         )
-        
+
         // Sacred Qibla direction indicator with multiple layers
-        
+
         // Shadow/glow effect for the main hand
         drawLine(
             color = Color(0xFF10B981).copy(alpha = 0.3f),
             start = center,
             end = endPoint,
             strokeWidth = 16f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         // Main sacred hand with Islamic green and gold gradient effect
         drawLine(
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color(0xFFFFD700),
                     Color(0xFF10B981),
-                    Color(0xFFFFD700)
+                    Color(0xFFFFD700),
                 ),
                 start = center,
-                end = endPoint
+                end = endPoint,
             ),
             start = center,
             end = endPoint,
             strokeWidth = 10f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         // Inner highlight line
         drawLine(
             color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
             start = center,
             end = endPoint,
             strokeWidth = 2f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         // Enhanced center design with Islamic geometric pattern
         // Outer glow ring
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
                     Color(0xFFFFD700).copy(alpha = 0.4f),
-                    Color.Transparent
+                    Color.Transparent,
                 ),
-                radius = 20f
+                radius = 20f,
             ),
             radius = 15f,
-            center = center
+            center = center,
         )
-        
+
         // Main center circle with gradient
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
                     Color(0xFFFFD700),
                     Color(0xFF10B981),
-                    Color(0xFF1E293B)
-                )
+                    Color(0xFF1E293B),
+                ),
             ),
             radius = 10f,
-            center = center
+            center = center,
         )
-        
+
         // Inner bright center
         drawCircle(
             color = Color(0xFFFFFFFF).copy(alpha = 0.9f),
             radius = 4f,
-            center = center
+            center = center,
         )
-        
+
         // Sacred Kaaba-inspired arrowhead design
         val arrowLength = 35f
-        val arrowAngle = PI / 4.5  // Slightly narrower for elegance
-        
+        val arrowAngle = PI / 4.5 // Slightly narrower for elegance
+
         val leftArrow = Offset(
             (endPoint.x - cos(angle - arrowAngle) * arrowLength).toFloat(),
-            (endPoint.y - sin(angle - arrowAngle) * arrowLength).toFloat()
+            (endPoint.y - sin(angle - arrowAngle) * arrowLength).toFloat(),
         )
-        
+
         val rightArrow = Offset(
             (endPoint.x - cos(angle + arrowAngle) * arrowLength).toFloat(),
-            (endPoint.y - sin(angle + arrowAngle) * arrowLength).toFloat()
+            (endPoint.y - sin(angle + arrowAngle) * arrowLength).toFloat(),
         )
-        
+
         // Arrowhead shadow/glow
         drawLine(
             color = Color(0xFF10B981).copy(alpha = 0.3f),
             start = endPoint,
             end = leftArrow,
             strokeWidth = 10f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
         drawLine(
             color = Color(0xFF10B981).copy(alpha = 0.3f),
             start = endPoint,
             end = rightArrow,
             strokeWidth = 10f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         // Main arrowhead with Islamic colors
         drawLine(
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color(0xFFFFD700),
-                    Color(0xFF10B981)
-                )
+                    Color(0xFF10B981),
+                ),
             ),
             start = endPoint,
             end = leftArrow,
             strokeWidth = 7f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         drawLine(
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color(0xFFFFD700),
-                    Color(0xFF10B981)
-                )
+                    Color(0xFF10B981),
+                ),
             ),
             start = endPoint,
             end = rightArrow,
             strokeWidth = 7f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         // Bright arrowhead highlights
         drawLine(
             color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
             start = endPoint,
             end = leftArrow,
             strokeWidth = 1.5f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
-        
+
         drawLine(
             color = Color(0xFFFFFFFF).copy(alpha = 0.8f),
             start = endPoint,
             end = rightArrow,
             strokeWidth = 1.5f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
     }
 }
@@ -496,10 +511,10 @@ fun PremiumQiblaCompassHand(qiblaDirection: Float, watchSize: Dp) {
 fun PremiumCenterDesign(watchSize: Dp) {
     Box(
         modifier = Modifier.size(watchSize),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Multi-layered center design inspired by Islamic architecture
-        
+
         // Outer shadow ring
         Box(
             modifier = Modifier
@@ -509,12 +524,12 @@ fun PremiumCenterDesign(watchSize: Dp) {
                     Brush.radialGradient(
                         colors = listOf(
                             Color(0xFF000000).copy(alpha = 0.2f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
         )
-        
+
         // Main center with Islamic geometric pattern colors
         Box(
             modifier = Modifier
@@ -525,12 +540,12 @@ fun PremiumCenterDesign(watchSize: Dp) {
                         colors = listOf(
                             Color(0xFF1E293B),
                             Color(0xFF334155),
-                            Color(0xFF475569)
-                        )
-                    )
-                )
+                            Color(0xFF475569),
+                        ),
+                    ),
+                ),
         )
-        
+
         // Inner golden ring
         Box(
             modifier = Modifier
@@ -540,81 +555,81 @@ fun PremiumCenterDesign(watchSize: Dp) {
                     Brush.radialGradient(
                         colors = listOf(
                             Color(0xFFFFD700).copy(alpha = 0.3f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
         )
-        
+
         // Islamic compass crosshair with enhanced design
         Canvas(modifier = Modifier.size(50.dp)) {
             val center = Offset(size.width / 2, size.height / 2)
             val crossLength = size.width / 2 - 5f
-            
+
             // Horizontal crosshair with gradient
             drawLine(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         Color.Transparent,
                         Color(0xFFFFD700).copy(alpha = 0.8f),
-                        Color.Transparent
-                    )
+                        Color.Transparent,
+                    ),
                 ),
                 start = Offset(center.x - crossLength, center.y),
                 end = Offset(center.x + crossLength, center.y),
                 strokeWidth = 3f,
-                cap = StrokeCap.Round
+                cap = StrokeCap.Round,
             )
-            
+
             // Vertical crosshair with gradient
             drawLine(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         Color.Transparent,
                         Color(0xFFFFD700).copy(alpha = 0.8f),
-                        Color.Transparent
-                    )
+                        Color.Transparent,
+                    ),
                 ),
                 start = Offset(center.x, center.y - crossLength),
                 end = Offset(center.x, center.y + crossLength),
                 strokeWidth = 3f,
-                cap = StrokeCap.Round
+                cap = StrokeCap.Round,
             )
-            
+
             // Diagonal crosshairs for 8-point Islamic star pattern
             val diagonalLength = crossLength * 0.7f
-            
+
             // NE-SW diagonal
             drawLine(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         Color.Transparent,
                         Color(0xFF10B981).copy(alpha = 0.6f),
-                        Color.Transparent
-                    )
+                        Color.Transparent,
+                    ),
                 ),
                 start = Offset(center.x - diagonalLength * cos(PI / 4).toFloat(), center.y - diagonalLength * sin(PI / 4).toFloat()),
                 end = Offset(center.x + diagonalLength * cos(PI / 4).toFloat(), center.y + diagonalLength * sin(PI / 4).toFloat()),
                 strokeWidth = 2f,
-                cap = StrokeCap.Round
+                cap = StrokeCap.Round,
             )
-            
+
             // NW-SE diagonal
             drawLine(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         Color.Transparent,
                         Color(0xFF10B981).copy(alpha = 0.6f),
-                        Color.Transparent
-                    )
+                        Color.Transparent,
+                    ),
                 ),
                 start = Offset(center.x - diagonalLength * cos(PI / 4).toFloat(), center.y + diagonalLength * sin(PI / 4).toFloat()),
                 end = Offset(center.x + diagonalLength * cos(PI / 4).toFloat(), center.y - diagonalLength * sin(PI / 4).toFloat()),
                 strokeWidth = 2f,
-                cap = StrokeCap.Round
+                cap = StrokeCap.Round,
             )
         }
-        
+
         // Sacred center dot with Islamic styling
         Box(
             modifier = Modifier
@@ -625,18 +640,18 @@ fun PremiumCenterDesign(watchSize: Dp) {
                         colors = listOf(
                             Color(0xFFFFD700),
                             Color(0xFF10B981),
-                            Color(0xFF1E293B)
-                        )
-                    )
-                )
+                            Color(0xFF1E293B),
+                        ),
+                    ),
+                ),
         )
-        
+
         // Inner bright center
         Box(
             modifier = Modifier
                 .size(6.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFFFFFF).copy(alpha = 0.9f))
+                .background(Color(0xFFFFFFFF).copy(alpha = 0.9f)),
         )
     }
 }
@@ -652,21 +667,21 @@ fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, 
         "Dhuhr" to prayerTimes.dhuhr,
         "Asr" to prayerTimes.asr,
         "Maghrib" to prayerTimes.maghrib,
-        "Isha" to prayerTimes.isha
+        "Isha" to prayerTimes.isha,
     )
-    
+
     val currentPrayer = prayers.find { (_, time) ->
         val nextPrayer = prayers.find { it.second > time }
         currentTime >= time && (nextPrayer?.let { currentTime < it.second } ?: true)
     }?.first ?: "Fajr"
-    
+
     // Enhanced Material 3 styled container
     Surface(
         modifier = Modifier
             .offset(y = (watchSize.value * 0.25f).dp),
         shape = RoundedCornerShape(28.dp),
         color = Color.Transparent,
-        shadowElevation = 8.dp
+        shadowElevation = 8.dp,
     ) {
         Box(
             modifier = Modifier
@@ -675,21 +690,21 @@ fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, 
                         colors = listOf(
                             Color(0xFF1E293B).copy(alpha = 0.98f),
                             Color(0xFF334155).copy(alpha = 0.95f),
-                            Color(0xFF475569).copy(alpha = 0.92f)
-                        )
-                    )
+                            Color(0xFF475569).copy(alpha = 0.92f),
+                        ),
+                    ),
                 )
                 .padding(horizontal = 24.dp, vertical = 16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 // Current prayer with enhanced Islamic styling
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Islamic geometric accent
                     Box(
@@ -700,19 +715,19 @@ fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, 
                                 Brush.radialGradient(
                                     colors = listOf(
                                         Color(0xFFFFD700),
-                                        Color(0xFF10B981)
-                                    )
-                                )
-                            )
+                                        Color(0xFF10B981),
+                                    ),
+                                ),
+                            ),
                     )
-                    
+
                     Text(
                         text = "🕌 $currentPrayer",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color(0xFFFFD700),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
-                    
+
                     // Matching accent
                     Box(
                         modifier = Modifier
@@ -722,28 +737,28 @@ fun PremiumCurrentTimeInfo(prayerTimes: DayPrayerTimes, timeUntilNext: String?, 
                                 Brush.radialGradient(
                                     colors = listOf(
                                         Color(0xFFFFD700),
-                                        Color(0xFF10B981)
-                                    )
-                                )
-                            )
+                                        Color(0xFF10B981),
+                                    ),
+                                ),
+                            ),
                     )
                 }
-                
+
                 if (timeUntilNext != null) {
                     // Enhanced time display with subtle background
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .background(
-                                Color(0xFF10B981).copy(alpha = 0.2f)
+                                Color(0xFF10B981).copy(alpha = 0.2f),
                             )
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
                     ) {
                         Text(
                             text = "Next in $timeUntilNext",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color(0xFF10B981),
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
@@ -762,11 +777,11 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         "Dhuhr" to prayerTimes.dhuhr,
         "Asr" to prayerTimes.asr,
         "Maghrib" to prayerTimes.maghrib,
-        "Isha" to prayerTimes.isha
+        "Isha" to prayerTimes.isha,
     )
-    
+
     val currentTime = LocalTime.now()
-    
+
     prayers.forEach { (name, time) ->
         val hour = time.hour
         val minute = time.minute
@@ -774,21 +789,21 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
         val angle = (timeInHours * 15f) - 90f
         val radius = (watchSize.value * 0.28f).dp
         val angleRad = Math.toRadians(angle.toDouble())
-        
-        val isActive = currentTime >= time && 
+
+        val isActive = currentTime >= time &&
             prayers.find { it.second > time }?.let { currentTime < it.second } ?: true
-        
+
         // Enhanced Material 3 Surface with elevation
         Surface(
             modifier = Modifier
                 .offset(
                     x = (cos(angleRad) * radius.value).dp,
-                    y = (sin(angleRad) * radius.value).dp
+                    y = (sin(angleRad) * radius.value).dp,
                 )
                 .size(if (isActive) 80.dp else 60.dp),
             shape = RoundedCornerShape(20.dp),
             shadowElevation = if (isActive) 12.dp else 6.dp,
-            color = Color.Transparent
+            color = Color.Transparent,
         ) {
             Box(
                 modifier = Modifier
@@ -798,24 +813,24 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                                 colors = listOf(
                                     Color(0xFF10B981).copy(alpha = 0.95f),
                                     Color(0xFF059669).copy(alpha = 0.9f),
-                                    Color(0xFF047857).copy(alpha = 0.85f)
-                                )
+                                    Color(0xFF047857).copy(alpha = 0.85f),
+                                ),
                             )
                         } else {
                             Brush.radialGradient(
                                 colors = listOf(
                                     Color(0xFF1E293B).copy(alpha = 0.9f),
                                     Color(0xFF334155).copy(alpha = 0.8f),
-                                    Color(0xFF475569).copy(alpha = 0.7f)
-                                )
+                                    Color(0xFF475569).copy(alpha = 0.7f),
+                                ),
                             )
-                        }
+                        },
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     // Prayer name with enhanced typography
                     Text(
@@ -823,9 +838,9 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                         style = MaterialTheme.typography.labelLarge,
                         color = if (isActive) Color.White else Color(0xFFFFD700),
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                        fontSize = if (isActive) 16.sp else 13.sp
+                        fontSize = if (isActive) 16.sp else 13.sp,
                     )
-                    
+
                     // Time display with subtle background
                     Box(
                         modifier = Modifier
@@ -835,16 +850,16 @@ fun FloatingPrayerLabels(prayerTimes: DayPrayerTimes, watchSize: Dp) {
                                     Color.White.copy(alpha = 0.2f)
                                 } else {
                                     Color(0xFFFFD700).copy(alpha = 0.2f)
-                                }
+                                },
                             )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = time.format(DateTimeFormatter.ofPattern("h:mm a")),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (isActive) Color.White else Color(0xFFFFD700),
                             fontWeight = FontWeight.Medium,
-                            fontSize = if (isActive) 12.sp else 10.sp
+                            fontSize = if (isActive) 12.sp else 10.sp,
                         )
                     }
                 }

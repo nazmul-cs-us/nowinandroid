@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.ui
 
 import android.Manifest
@@ -10,24 +26,25 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.TypedValue
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.util.TypedValue
-import android.view.Gravity
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -36,7 +53,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -62,12 +78,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -84,13 +97,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
-import coil.imageLoader
-import coil.request.ImageRequest
-import coil.size.Size as CoilSize
 import androidx.core.widget.NestedScrollView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.material.R as MaterialR
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.search.SearchBar
@@ -105,13 +116,16 @@ import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.feature.search.VoiceSearchService
 import com.starception.submission.feature.search.WhisperVoiceService
 import com.starception.submission.ui.search.InMemorySearchResult
-import com.starception.submission.ui.search.SearchTokenizer
 import com.starception.submission.ui.search.PopularSuggestion
 import com.starception.submission.ui.search.SearchHintAnimator
 import com.starception.submission.ui.search.SearchHints
+import com.starception.submission.ui.search.SearchTokenizer
 import com.starception.submission.ui.search.shouldSuppressAmbiguousAllahPrefixVerses
 import kotlinx.coroutines.delay
 import kotlin.math.absoluteValue
+import androidx.compose.ui.graphics.Color as ComposeColor
+import coil.size.Size as CoilSize
+import com.google.android.material.R as MaterialR
 
 @Composable
 fun AppTopSearchBar(
@@ -146,14 +160,14 @@ fun AppTopSearchBar(
         } else {
             pillContainerColor
         }
-    ).toArgb()
+        ).toArgb()
     val pillTextColor = (
         if (pillContentColor == ComposeColor.Unspecified) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             pillContentColor
         }
-    ).toArgb()
+        ).toArgb()
     // Inflated SearchView ships M3 default lavender — repaint with brand colors.
     val searchViewBg = MaterialTheme.colorScheme.surface.toArgb()
     val accentColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -330,486 +344,486 @@ fun AppTopSearchBar(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            val themed = ContextThemeWrapper(
-                ctx,
-                MaterialR.style.Theme_Material3Expressive_DayNight_NoActionBar,
-            )
-            val root = LayoutInflater.from(themed)
-                .inflate(R.layout.app_top_search_bar, null, false) as ViewGroup
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                val themed = ContextThemeWrapper(
+                    ctx,
+                    MaterialR.style.Theme_Material3Expressive_DayNight_NoActionBar,
+                )
+                val root = LayoutInflater.from(themed)
+                    .inflate(R.layout.app_top_search_bar, null, false) as ViewGroup
 
-            val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
-            val searchView = root.findViewById<SearchView>(R.id.app_search_view)
-            searchViewHolder.value = searchView
-            val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
-            val leading = root.findViewById<MaterialButton>(R.id.leading_button)
-            val settings = root.findViewById<MaterialButton>(R.id.settings_button)
-            val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
+                val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
+                val searchView = root.findViewById<SearchView>(R.id.app_search_view)
+                searchViewHolder.value = searchView
+                val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
+                val leading = root.findViewById<MaterialButton>(R.id.leading_button)
+                val settings = root.findViewById<MaterialButton>(R.id.settings_button)
+                val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
 
-            root.background = ColorDrawable(Color.TRANSPARENT)
-            appBar.background = ColorDrawable(Color.TRANSPARENT)
-            appBar.backgroundTintList = null
-            searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
+                root.background = ColorDrawable(Color.TRANSPARENT)
+                appBar.background = ColorDrawable(Color.TRANSPARENT)
+                appBar.backgroundTintList = null
+                searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
 
-            // Track the SearchBar's position so the listening glow overlay can
-            // be drawn precisely around the pill. Bounds are reported relative
-            // to the inflated CoordinatorLayout (= the AndroidView's own coord
-            // space), which matches the overlay Canvas's coordinate space.
-            searchBar.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-                val loc = IntArray(2)
-                val rootLoc = IntArray(2)
-                v.getLocationInWindow(loc)
-                root.getLocationInWindow(rootLoc)
-                val l = (loc[0] - rootLoc[0]).toFloat()
-                val t = (loc[1] - rootLoc[1]).toFloat()
-                searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
-            }
-
-            // Track the expanded SearchView's input toolbar the same way so the
-            // glow can wrap the whole search input on the search page.
-            val searchViewToolbar: View? =
-                searchView.findViewById(MaterialR.id.open_search_view_toolbar)
-                    ?: (searchView.getEditText().parent as? View)
-            searchViewToolbar?.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-                val loc = IntArray(2)
-                val rootLoc = IntArray(2)
-                v.getLocationInWindow(loc)
-                root.getLocationInWindow(rootLoc)
-                val l = (loc[0] - rootLoc[0]).toFloat()
-                val t = (loc[1] - rootLoc[1]).toFloat()
-                searchViewBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
-            }
-            searchView.addTransitionListener { _, _, newState ->
-                isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
-                    newState == SearchView.TransitionState.SHOWING
-                // Ambient surfaces (home Ask bar) hide while search is open.
-                com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(isSearchViewOpen)
-            }
-
-            // Hint will be overwritten on every `update` pass from the
-            // rotating phrase StateFlow; seed it with the current slot's first
-            // phrase so the pill isn't blank for the one frame before the
-            // singleton emits.
-            searchBar.hint = SearchHints.hintFor()
-            // Match the rest of the app — Roboto Serif (downloadable Google Font),
-            // same family Compose uses via NiaTheme. SearchBar/SearchView are View
-            // components so they ignore Compose Typography and default to system sans.
-            val appTypeface = appSearchTypeface(ctx)
-            searchBar.textView?.setHintTextColor(pillTextColor)
-            searchBar.textView?.setTextColor(pillTextColor)
-            searchBar.textView?.typeface = appTypeface
-            searchView.hint = SearchHints.hintFor()
-            searchView.getEditText().typeface = appTypeface
-            // Mic tap: capture straight away when permission is held, otherwise
-            // fire the system permission request (capture resumes in its callback).
-            val onMicTap = {
-                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED
-                ) {
-                    startVoiceCapture(
-                        ctx = ctx,
-                        searchView = searchView,
-                        whisper = whisperService,
-                        onModelMissing = promptVoiceModelDownload,
-                    )
-                } else {
-                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                // Track the SearchBar's position so the listening glow overlay can
+                // be drawn precisely around the pill. Bounds are reported relative
+                // to the inflated CoordinatorLayout (= the AndroidView's own coord
+                // space), which matches the overlay Canvas's coordinate space.
+                searchBar.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                    val loc = IntArray(2)
+                    val rootLoc = IntArray(2)
+                    v.getLocationInWindow(loc)
+                    root.getLocationInWindow(rootLoc)
+                    val l = (loc[0] - rootLoc[0]).toFloat()
+                    val t = (loc[1] - rootLoc[1]).toFloat()
+                    searchBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
                 }
-            }
-            micTapHolder.value = onMicTap
-            searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
-            searchBar.setOnMenuItemClickListener { item ->
-                if (item.itemId == R.id.action_mic) {
-                    onMicTap()
-                } else {
-                    searchView.show()
+
+                // Track the expanded SearchView's input toolbar the same way so the
+                // glow can wrap the whole search input on the search page.
+                val searchViewToolbar: View? =
+                    searchView.findViewById(MaterialR.id.open_search_view_toolbar)
+                        ?: (searchView.getEditText().parent as? View)
+                searchViewToolbar?.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                    val loc = IntArray(2)
+                    val rootLoc = IntArray(2)
+                    v.getLocationInWindow(loc)
+                    root.getLocationInWindow(rootLoc)
+                    val l = (loc[0] - rootLoc[0]).toFloat()
+                    val t = (loc[1] - rootLoc[1]).toFloat()
+                    searchViewBarBoundsPx = Rect(l, t, l + v.width.toFloat(), t + v.height.toFloat())
                 }
-                true
-            }
-            searchView.inflateMenu(R.menu.app_top_search_bar_menu)
-            searchView.setOnMenuItemClickListener { item ->
-                if (item.itemId == R.id.action_mic) {
-                    onMicTap()
+                searchView.addTransitionListener { _, _, newState ->
+                    isSearchViewOpen = newState == SearchView.TransitionState.SHOWN ||
+                        newState == SearchView.TransitionState.SHOWING
+                    // Ambient surfaces (home Ask bar) hide while search is open.
+                    com.starception.submission.ui.search.SearchPrefillBus.setSearchOpen(isSearchViewOpen)
                 }
-                true
-            }
 
-            leading.setOnClickListener { currentOnProfileClick() }
-            settings.setOnClickListener { onSettingsClick() }
-
-            searchView.setupWithSearchBar(searchBar)
-            searchView.getEditText().addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                override fun afterTextChanged(s: Editable?) {
-                    val q = s?.toString().orEmpty()
-                    liveQuery = q
-                    viewModel.onSearchQueryChanged(q)
-                }
-            })
-            searchView.getEditText().setOnEditorActionListener { _, _, _ ->
-                // Pressing Enter / the keyboard search button used to navigate to
-                // the old feature:search results page. Now the SearchView itself
-                // renders inline FTS rows for everything (duas, topics, news,
-                // ayahs), so submit only saves the query as recent and dismisses
-                // the keyboard — the user stays put and taps a row to drill in.
-                val query = searchView.text.toString().trim()
-                if (query.isNotEmpty()) {
-                    viewModel.saveSearchQuery(query)
-                    searchBar.setText(query)
-                }
-                true
-            }
-
-            val composeView = ComposeView(ctx).apply {
-                // setParentCompositionContext is intentionally NOT used here —
-                // it propagates CompositionLocals but loses the inner content's
-                // ability to participate in layout/draw, leaving the body blank.
-                // Re-wrap in NiaTheme inside setContent instead so the user's
-                // selected brand still reaches the inner subtree.
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-                tag = COMPOSE_CONTENT_TAG
-            }
-            contentContainer.addView(
-                composeView,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
-
-            root
-        },
-        update = { root ->
-            val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
-            val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
-            val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
-            val composeView = contentContainer.findViewWithTag<ComposeView>(COMPOSE_CONTENT_TAG)
-            val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
-            val leading = root.findViewById<MaterialButton>(R.id.leading_button)
-            val settings = root.findViewById<MaterialButton>(R.id.settings_button)
-
-            val searchView = root.findViewById<SearchView>(R.id.app_search_view)
-            // Drive the SearchBar's hint from the typewriter state; the
-            // SearchView shows its own static placeholder when expanded.
-            // While voice capture is live the hints are cleared so the centered
-            // voice wave owns the field without text bleeding through it.
-            // Hints stay set through the transition and fade via their text-color
-            // alpha (chromeVisible) so the field hands off to the wave smoothly
-            // instead of blanking instantly.
-            val chromeVisible = (1f - listenProgress).coerceIn(0f, 1f)
-            searchBar.hint = displayedHint
-            searchView.hint = SearchHints.hintFor()
-            val fadedHintColor = (pillTextColor and 0x00FFFFFF) or ((chromeVisible * 255f).toInt() shl 24)
-            searchBar.textView?.setHintTextColor(fadedHintColor)
-            searchBar.textView?.setTextColor(pillTextColor)
-            // Native View icons read tints from the Activity's Configuration
-            // (system dark mode), not from the user's app-level Dark pref — so
-            // we tint them manually to match the active Compose colorScheme.
-            // Buttons outside the pill sit on the AppBar/window surface → onSurface.
-            // Icons inside the SearchBar pill (magnifier + mic) → onPrimaryContainer.
-            // Leading button shows the signed-in user's circular avatar when logged in,
-            // otherwise the default profile glyph (tinted to match the theme). The URL is
-            // stored as a tag so Coil only re-enqueues when the avatar actually changes.
-            val density = root.resources.displayMetrics.density
-            // Leading icon stays a constant 34dp in every auth state (avatar photo
-            // when signed in, profile glyph otherwise) so the pill never shifts on
-            // login/logout. The search bar's asymmetric start/end margins (12dp/8dp
-            // in XML) offset this larger icon against the 26dp settings glyph so the
-            // gaps around the pill stay symmetric.
-            if (profileAvatarUrl != null) {
-                leading.iconTint = null
-                // Larger icon so the gradient ring has room to read clearly.
-                leading.iconSize = (34f * density).toInt()
-                if (leading.getTag(R.id.leading_button) != profileAvatarUrl) {
-                    leading.setTag(R.id.leading_button, profileAvatarUrl)
-                    val iconPx = (34f * density).toInt()
-                    val request = ImageRequest.Builder(root.context)
-                        .data(profileAvatarUrl)
-                        // Decode the source larger than the icon for a crisp photo, but
-                        // let the transform deliver the bitmap at the icon size so the
-                        // MaterialButton draws it 1:1 (no soft/pixelated rescale).
-                        .size(CoilSize(iconPx * 3, iconPx * 3))
-                        // Slightly thicker ring than the default for this small icon.
-                        .transformations(RingAvatarTransformation(ringFraction = 0.06f, outputPx = iconPx))
-                        .target(
-                            onSuccess = { drawable ->
-                                leading.iconTint = null
-                                leading.icon = drawable
-                            },
-                            onError = {
-                                leading.iconTint = ColorStateList.valueOf(titleColor)
-                                leading.iconSize = (34f * density).toInt()
-                                leading.icon = ContextCompat.getDrawable(
-                                    root.context,
-                                    R.drawable.ic_app_top_bar_profile_24,
-                                )
-                            },
+                // Hint will be overwritten on every `update` pass from the
+                // rotating phrase StateFlow; seed it with the current slot's first
+                // phrase so the pill isn't blank for the one frame before the
+                // singleton emits.
+                searchBar.hint = SearchHints.hintFor()
+                // Match the rest of the app — Roboto Serif (downloadable Google Font),
+                // same family Compose uses via NiaTheme. SearchBar/SearchView are View
+                // components so they ignore Compose Typography and default to system sans.
+                val appTypeface = appSearchTypeface(ctx)
+                searchBar.textView?.setHintTextColor(pillTextColor)
+                searchBar.textView?.setTextColor(pillTextColor)
+                searchBar.textView?.typeface = appTypeface
+                searchView.hint = SearchHints.hintFor()
+                searchView.getEditText().typeface = appTypeface
+                // Mic tap: capture straight away when permission is held, otherwise
+                // fire the system permission request (capture resumes in its callback).
+                val onMicTap = {
+                    if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        startVoiceCapture(
+                            ctx = ctx,
+                            searchView = searchView,
+                            whisper = whisperService,
+                            onModelMissing = promptVoiceModelDownload,
                         )
-                        .build()
-                    root.context.imageLoader.enqueue(request)
+                    } else {
+                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
                 }
-            } else {
-                if (leading.getTag(R.id.leading_button) != null) {
-                    leading.setTag(R.id.leading_button, null)
-                    leading.icon = ContextCompat.getDrawable(
-                        root.context,
-                        R.drawable.ic_app_top_bar_profile_24,
-                    )
+                micTapHolder.value = onMicTap
+                searchBar.inflateMenu(R.menu.app_top_search_bar_menu)
+                searchBar.setOnMenuItemClickListener { item ->
+                    if (item.itemId == R.id.action_mic) {
+                        onMicTap()
+                    } else {
+                        searchView.show()
+                    }
+                    true
                 }
-                leading.iconSize = (34f * density).toInt()
-                leading.iconTint = ColorStateList.valueOf(titleColor)
-            }
-            settings.iconTint = ColorStateList.valueOf(titleColor)
-            searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
-            for (i in 0 until searchBar.menu.size()) {
-                searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
-            }
-            for (i in 0 until searchView.toolbar.menu.size()) {
-                searchView.toolbar.menu.getItem(i).icon?.mutate()?.setTint(titleColor)
-            }
-            searchView.toolbar.navigationIcon?.mutate()?.setTint(titleColor)
+                searchView.inflateMenu(R.menu.app_top_search_bar_menu)
+                searchView.setOnMenuItemClickListener { item ->
+                    if (item.itemId == R.id.action_mic) {
+                        onMicTap()
+                    }
+                    true
+                }
 
-            // Fade the pill's chrome (magnifier nav icon, back arrow, and mic menu
-            // icon) in lockstep with the listening transition so it hands off to /
-            // from the wave fluidly. Menu items stay present (just transparent)
-            // until fully listening, so their icons fade rather than pop out.
-            val chromeAlpha = (chromeVisible * 255f).toInt()
-            searchView.toolbar.navigationIcon?.mutate()?.alpha = chromeAlpha
-            searchBar.navigationIcon?.mutate()?.alpha = chromeAlpha
-            val menuHidden = listenProgress > 0.995f
-            for (i in 0 until searchView.toolbar.menu.size()) {
-                val item = searchView.toolbar.menu.getItem(i)
-                item.isVisible = !menuHidden
-                item.icon?.mutate()?.alpha = chromeAlpha
-            }
-            for (i in 0 until searchBar.menu.size()) {
-                val item = searchBar.menu.getItem(i)
-                item.isVisible = !menuHidden
-                item.icon?.mutate()?.alpha = chromeAlpha
-            }
-            // "Dive into the wave": as listening begins, translate the mic,
-            // magnifier / back arrow and hint downward so the chrome appears to
-            // sink into the rising wave — and surface back up on stop. The fade is
-            // the alpha above; this adds the vertical motion where the host views
-            // are reachable (a no-op otherwise, so the fade still applies). The
-            // Toolbar clips its children, so the icons are cut off as they pass the
-            // pill's bottom edge, completing the "vanish" illusion.
-            val sinkPx = searchBar.height * 0.7f * listenProgress
-            searchBar.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
-            searchBar.firstImageButtonChild()?.translationY = sinkPx
-            val hintShiftPx = 7f * density * hintTransition.value
-            searchBar.textView?.translationY = sinkPx + hintShiftPx
-            searchBar.textView?.alpha =
-                (1f - hintTransition.value.absoluteValue).coerceIn(0f, 1f)
-            searchView.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
-            searchView.toolbar.firstImageButtonChild()?.translationY = sinkPx
-            searchView.getEditText().isCursorVisible = !isListening
+                leading.setOnClickListener { currentOnProfileClick() }
+                settings.setOnClickListener { onSettingsClick() }
 
-            appBar.setPadding(0, topInsetPx, 0, 0)
+                searchView.setupWithSearchBar(searchBar)
+                searchView.getEditText().addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                    override fun afterTextChanged(s: Editable?) {
+                        val q = s?.toString().orEmpty()
+                        liveQuery = q
+                        viewModel.onSearchQueryChanged(q)
+                    }
+                })
+                searchView.getEditText().setOnEditorActionListener { _, _, _ ->
+                    // Pressing Enter / the keyboard search button used to navigate to
+                    // the old feature:search results page. Now the SearchView itself
+                    // renders inline FTS rows for everything (duas, topics, news,
+                    // ayahs), so submit only saves the query as recent and dismisses
+                    // the keyboard — the user stays put and taps a row to drill in.
+                    val query = searchView.text.toString().trim()
+                    if (query.isNotEmpty()) {
+                        viewModel.saveSearchQuery(query)
+                        searchBar.setText(query)
+                    }
+                    true
+                }
 
-            // Re-apply the pill tint on every update pass, not just at factory
-            // time: the in-app Dark pref recomposes Compose without re-inflating
-            // this View, so a factory-only tint goes stale on theme flips (and on
-            // cold start, where the pref loads after first inflation).
-            searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
+                val composeView = ComposeView(ctx).apply {
+                    // setParentCompositionContext is intentionally NOT used here —
+                    // it propagates CompositionLocals but loses the inner content's
+                    // ability to participate in layout/draw, leaving the body blank.
+                    // Re-wrap in NiaTheme inside setContent instead so the user's
+                    // selected brand still reaches the inner subtree.
+                    setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+                    tag = COMPOSE_CONTENT_TAG
+                }
+                contentContainer.addView(
+                    composeView,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
 
-            // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
-            // and the toolbar container — those become visible when expanded.
-            // Do NOT call searchView.setBackgroundColor: SearchView itself is sized
-            // match_parent x match_parent and that paints over the body even when collapsed.
-            root.findViewById<View?>(
-                MaterialR.id.open_search_view_background
-            )?.setBackgroundColor(searchViewBg)
-            root.findViewById<View?>(
-                MaterialR.id.open_search_view_toolbar_container
-            )?.setBackgroundColor(searchViewBg)
-            // The expanded input pill is the toolbar's OWN MaterialShapeDrawable
-            // (expressive AppBarWithSearch style) — tint it so the stadium shape
-            // survives while the fill follows the Compose scheme.
-            searchView.toolbar.backgroundTintList = ColorStateList.valueOf(expandedPillColor)
-            root.findViewById<View?>(
-                MaterialR.id.open_search_view_divider
-            )?.setBackgroundColor(chipStroke)
-            searchView.getEditText().setTextColor(titleColor)
-            // Hint + clear (✕) button otherwise keep their DayNight (system)
-            // colors — unreadable when the app-level Dark pref disagrees.
-            searchView.getEditText().setHintTextColor(subtitleColor)
-            searchView.findViewById<ImageButton?>(
-                MaterialR.id.open_search_view_clear_button
-            )?.setColorFilter(titleColor)
+                root
+            },
+            update = { root ->
+                val searchBar = root.findViewById<SearchBar>(R.id.app_search_bar)
+                val appBar = root.findViewById<AppBarLayout>(R.id.app_bar_layout)
+                val contentContainer = root.findViewById<FrameLayout>(R.id.content_container)
+                val composeView = contentContainer.findViewWithTag<ComposeView>(COMPOSE_CONTENT_TAG)
+                val suggestionContainer = root.findViewById<LinearLayout>(R.id.search_suggestion_container)
+                val leading = root.findViewById<MaterialButton>(R.id.leading_button)
+                val settings = root.findViewById<MaterialButton>(R.id.settings_button)
 
-            renderSuggestions(
-                container = suggestionContainer,
-                searchBar = searchBar,
-                searchView = searchView,
-                recentSearches = recentSearches,
-                query = liveQuery,
-                searchResults = searchResults,
-                inMemoryResults = inMemoryResults,
-                ayahResults = ayahResults,
-                fortressDuaResults = fortressDuaResults,
-                bukhariHadithResults = bukhariHadithResults,
-                accentColor = accentColor,
-                titleColor = titleColor,
-                subtitleColor = subtitleColor,
-                chipBackground = chipBackground,
-                chipStroke = chipStroke,
-                onVerseClick = { surah, ayah ->
-                    searchView.hide()
-                    currentOnVerseClick(surah, ayah)
-                },
-                onRecentClick = { query ->
-                    // Refill the SearchView so inline FTS re-runs against the
-                    // chosen recent query — don't dump the user back on the old
-                    // feature:search page.
-                    searchView.setText(query)
-                    // setText leaves the cursor at position 0 — move it to the
-                    // end so the user can immediately edit/extend the query.
-                    searchView.getEditText().setSelection(query.length)
-                },
-                onPopularClick = { suggestion ->
-                    // Tapping a popular-search chip refills the SearchView with the
-                    // chip's visible text (WYSIWYG) so the full ranked-search pipeline
-                    // runs against the same string the user just tapped.
-                    searchView.setText(suggestion.display)
-                    searchView.getEditText().setSelection(suggestion.display.length)
-                },
-                onTopicClick = { id ->
-                    viewModel.saveSearchQuery(liveQuery)
-                    searchView.hide()
-                    currentOnTopicClick(id)
-                },
-                onNewsClick = { news ->
-                    viewModel.saveSearchQuery(liveQuery)
-                    searchView.hide()
-                    currentOnNewsClick(news)
-                },
-                onFortressDuaClick = { dua ->
-                    viewModel.saveSearchQuery(liveQuery)
-                    searchView.hide()
-                    currentOnFortressDuaClick(dua)
-                },
-                onQuranicDuaClick = { dua ->
-                    viewModel.saveSearchQuery(liveQuery)
-                    searchView.hide()
-                    currentOnQuranicDuaClick(dua)
-                },
-                onBukhariHadithClick = { hadithNumber ->
-                    viewModel.saveSearchQuery(liveQuery)
-                    searchView.hide()
-                    currentOnBukhariHadithClick(hadithNumber)
-                },
-            )
+                val searchView = root.findViewById<SearchView>(R.id.app_search_view)
+                // Drive the SearchBar's hint from the typewriter state; the
+                // SearchView shows its own static placeholder when expanded.
+                // While voice capture is live the hints are cleared so the centered
+                // voice wave owns the field without text bleeding through it.
+                // Hints stay set through the transition and fade via their text-color
+                // alpha (chromeVisible) so the field hands off to the wave smoothly
+                // instead of blanking instantly.
+                val chromeVisible = (1f - listenProgress).coerceIn(0f, 1f)
+                searchBar.hint = displayedHint
+                searchView.hint = SearchHints.hintFor()
+                val fadedHintColor = (pillTextColor and 0x00FFFFFF) or ((chromeVisible * 255f).toInt() shl 24)
+                searchBar.textView?.setHintTextColor(fadedHintColor)
+                searchBar.textView?.setTextColor(pillTextColor)
+                // Native View icons read tints from the Activity's Configuration
+                // (system dark mode), not from the user's app-level Dark pref — so
+                // we tint them manually to match the active Compose colorScheme.
+                // Buttons outside the pill sit on the AppBar/window surface → onSurface.
+                // Icons inside the SearchBar pill (magnifier + mic) → onPrimaryContainer.
+                // Leading button shows the signed-in user's circular avatar when logged in,
+                // otherwise the default profile glyph (tinted to match the theme). The URL is
+                // stored as a tag so Coil only re-enqueues when the avatar actually changes.
+                val density = root.resources.displayMetrics.density
+                // Leading icon stays a constant 34dp in every auth state (avatar photo
+                // when signed in, profile glyph otherwise) so the pill never shifts on
+                // login/logout. The search bar's asymmetric start/end margins (12dp/8dp
+                // in XML) offset this larger icon against the 26dp settings glyph so the
+                // gaps around the pill stay symmetric.
+                if (profileAvatarUrl != null) {
+                    leading.iconTint = null
+                    // Larger icon so the gradient ring has room to read clearly.
+                    leading.iconSize = (34f * density).toInt()
+                    if (leading.getTag(R.id.leading_button) != profileAvatarUrl) {
+                        leading.setTag(R.id.leading_button, profileAvatarUrl)
+                        val iconPx = (34f * density).toInt()
+                        val request = ImageRequest.Builder(root.context)
+                            .data(profileAvatarUrl)
+                            // Decode the source larger than the icon for a crisp photo, but
+                            // let the transform deliver the bitmap at the icon size so the
+                            // MaterialButton draws it 1:1 (no soft/pixelated rescale).
+                            .size(CoilSize(iconPx * 3, iconPx * 3))
+                            // Slightly thicker ring than the default for this small icon.
+                            .transformations(RingAvatarTransformation(ringFraction = 0.06f, outputPx = iconPx))
+                            .target(
+                                onSuccess = { drawable ->
+                                    leading.iconTint = null
+                                    leading.icon = drawable
+                                },
+                                onError = {
+                                    leading.iconTint = ColorStateList.valueOf(titleColor)
+                                    leading.iconSize = (34f * density).toInt()
+                                    leading.icon = ContextCompat.getDrawable(
+                                        root.context,
+                                        R.drawable.ic_app_top_bar_profile_24,
+                                    )
+                                },
+                            )
+                            .build()
+                        root.context.imageLoader.enqueue(request)
+                    }
+                } else {
+                    if (leading.getTag(R.id.leading_button) != null) {
+                        leading.setTag(R.id.leading_button, null)
+                        leading.icon = ContextCompat.getDrawable(
+                            root.context,
+                            R.drawable.ic_app_top_bar_profile_24,
+                        )
+                    }
+                    leading.iconSize = (34f * density).toInt()
+                    leading.iconTint = ColorStateList.valueOf(titleColor)
+                }
+                settings.iconTint = ColorStateList.valueOf(titleColor)
+                searchBar.navigationIcon?.mutate()?.setTint(pillTextColor)
+                for (i in 0 until searchBar.menu.size()) {
+                    searchBar.menu.getItem(i).icon?.mutate()?.setTint(pillTextColor)
+                }
+                for (i in 0 until searchView.toolbar.menu.size()) {
+                    searchView.toolbar.menu.getItem(i).icon?.mutate()?.setTint(titleColor)
+                }
+                searchView.toolbar.navigationIcon?.mutate()?.setTint(titleColor)
 
-            composeView?.setContent {
-                // Read from ThemeColorBridge so the inner island honours the user's
-                // app-level Dark/Brand pref instead of NiaTheme's COASTAL/system-dark
-                // defaults — otherwise the body stays light while the outer toolbar
-                // and bottom nav (which sit outside this ComposeView) follow Dark.
-                // A previewOverride (set by the theme-picker preview) wins over the
-                // active theme so the candidate palette reaches this island too.
-                val bridge = com.starception.submission.util.ThemeColorBridge
-                val override = bridge.previewOverride
-                val seedArgb = override?.customSeedArgb ?: bridge.customSeedColor
-                val secondaryArgb = override?.customSecondaryArgb ?: bridge.customSecondaryColor
-                val tertiaryArgb = override?.customTertiaryArgb ?: bridge.customTertiaryColor
-                NiaTheme(
-                    darkTheme = bridge.darkTheme,
-                    themeBrand = override?.brand ?: bridge.themeBrand,
-                    customSeedColor = if (seedArgb != 0) ComposeColor(seedArgb) else ComposeColor.Unspecified,
-                    customSecondaryColor = if (secondaryArgb != 0) ComposeColor(secondaryArgb) else ComposeColor.Unspecified,
-                    customTertiaryColor = if (tertiaryArgb != 0) ComposeColor(tertiaryArgb) else ComposeColor.Unspecified,
-                    disableDynamicTheming = bridge.disableDynamicTheming,
-                ) { currentContent() }
-            }
-        },
-    )
-    // Voice wave overlay: the animated visualization that fills the SearchBar
-    // pill while the mic is capturing. It sits above the AndroidView so the
-    // SearchBar stays interactive when not listening. On the search page it
-    // spans the SearchView's full input bar; on the home page the collapsed pill.
-    val bounds = if (isSearchViewOpen) {
-        searchViewBarBoundsPx ?: searchBarBoundsPx
-    } else {
-        searchBarBoundsPx
-    }
-    // Keep the wave composed through the whole transition (progress > 0), not
-    // just while actively listening, so it can slide and fade out gracefully on
-    // stop instead of vanishing the instant recording ends.
-    if (bounds != null && listenProgress > 0.001f) {
-        // Live microphone level from the Whisper recorder, smoothed so the wave
-        // moves organically rather than jittering. The raw VOICE_RECOGNITION
-        // source registers speech around 0.01-0.03 RMS, so scale up for a
-        // visible wave.
-        val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
-        val smoothedLevel by animateFloatAsState(
-            targetValue = (whisperLevel * 15f).coerceIn(0f, 1f),
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 400f,
-            ),
-            label = "voiceLevel",
-        )
-        VoiceWaveOverlay(
-            bounds = bounds,
-            level = smoothedLevel,
-            appearProgress = listenProgress,
-            modifier = Modifier.matchParentSize(),
-        )
-    }
-    if (showVoiceModelDownload) {
-        // Full-screen missing-content page — same layout as the hadith detail
-        // screen's download prompt: solid surface, centered card, circular back.
-        BackHandler { showVoiceModelDownload = false }
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                MissingContentCard(
-                    resourceName = "Voice Recognition",
-                    category = "model_whisper",
-                    description = "The offline voice recognition model needs to be downloaded. " +
-                        "Voice search then runs fully on-device.",
-                    downloadManager = viewModel.getDownloadManager(),
-                    onDownloadComplete = {
-                        whisperService.initialize()
-                        showVoiceModelDownload = false
-                        Toast.makeText(
-                            context,
-                            "Voice recognition ready — tap the mic to try it",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                // Fade the pill's chrome (magnifier nav icon, back arrow, and mic menu
+                // icon) in lockstep with the listening transition so it hands off to /
+                // from the wave fluidly. Menu items stay present (just transparent)
+                // until fully listening, so their icons fade rather than pop out.
+                val chromeAlpha = (chromeVisible * 255f).toInt()
+                searchView.toolbar.navigationIcon?.mutate()?.alpha = chromeAlpha
+                searchBar.navigationIcon?.mutate()?.alpha = chromeAlpha
+                val menuHidden = listenProgress > 0.995f
+                for (i in 0 until searchView.toolbar.menu.size()) {
+                    val item = searchView.toolbar.menu.getItem(i)
+                    item.isVisible = !menuHidden
+                    item.icon?.mutate()?.alpha = chromeAlpha
+                }
+                for (i in 0 until searchBar.menu.size()) {
+                    val item = searchBar.menu.getItem(i)
+                    item.isVisible = !menuHidden
+                    item.icon?.mutate()?.alpha = chromeAlpha
+                }
+                // "Dive into the wave": as listening begins, translate the mic,
+                // magnifier / back arrow and hint downward so the chrome appears to
+                // sink into the rising wave — and surface back up on stop. The fade is
+                // the alpha above; this adds the vertical motion where the host views
+                // are reachable (a no-op otherwise, so the fade still applies). The
+                // Toolbar clips its children, so the icons are cut off as they pass the
+                // pill's bottom edge, completing the "vanish" illusion.
+                val sinkPx = searchBar.height * 0.7f * listenProgress
+                searchBar.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
+                searchBar.firstImageButtonChild()?.translationY = sinkPx
+                val hintShiftPx = 7f * density * hintTransition.value
+                searchBar.textView?.translationY = sinkPx + hintShiftPx
+                searchBar.textView?.alpha =
+                    (1f - hintTransition.value.absoluteValue).coerceIn(0f, 1f)
+                searchView.findViewById<View>(R.id.action_mic)?.translationY = sinkPx
+                searchView.toolbar.firstImageButtonChild()?.translationY = sinkPx
+                searchView.getEditText().isCursorVisible = !isListening
+
+                appBar.setPadding(0, topInsetPx, 0, 0)
+
+                // Re-apply the pill tint on every update pass, not just at factory
+                // time: the in-app Dark pref recomposes Compose without re-inflating
+                // this View, so a factory-only tint goes stale on theme flips (and on
+                // cold start, where the pref loads after first inflation).
+                searchBar.backgroundTintList = ColorStateList.valueOf(pillBackground)
+
+                // Re-tint only the SearchView's INTERNAL surface (open_search_view_background)
+                // and the toolbar container — those become visible when expanded.
+                // Do NOT call searchView.setBackgroundColor: SearchView itself is sized
+                // match_parent x match_parent and that paints over the body even when collapsed.
+                root.findViewById<View?>(
+                    MaterialR.id.open_search_view_background,
+                )?.setBackgroundColor(searchViewBg)
+                root.findViewById<View?>(
+                    MaterialR.id.open_search_view_toolbar_container,
+                )?.setBackgroundColor(searchViewBg)
+                // The expanded input pill is the toolbar's OWN MaterialShapeDrawable
+                // (expressive AppBarWithSearch style) — tint it so the stadium shape
+                // survives while the fill follows the Compose scheme.
+                searchView.toolbar.backgroundTintList = ColorStateList.valueOf(expandedPillColor)
+                root.findViewById<View?>(
+                    MaterialR.id.open_search_view_divider,
+                )?.setBackgroundColor(chipStroke)
+                searchView.getEditText().setTextColor(titleColor)
+                // Hint + clear (✕) button otherwise keep their DayNight (system)
+                // colors — unreadable when the app-level Dark pref disagrees.
+                searchView.getEditText().setHintTextColor(subtitleColor)
+                searchView.findViewById<ImageButton?>(
+                    MaterialR.id.open_search_view_clear_button,
+                )?.setColorFilter(titleColor)
+
+                renderSuggestions(
+                    container = suggestionContainer,
+                    searchBar = searchBar,
+                    searchView = searchView,
+                    recentSearches = recentSearches,
+                    query = liveQuery,
+                    searchResults = searchResults,
+                    inMemoryResults = inMemoryResults,
+                    ayahResults = ayahResults,
+                    fortressDuaResults = fortressDuaResults,
+                    bukhariHadithResults = bukhariHadithResults,
+                    accentColor = accentColor,
+                    titleColor = titleColor,
+                    subtitleColor = subtitleColor,
+                    chipBackground = chipBackground,
+                    chipStroke = chipStroke,
+                    onVerseClick = { surah, ayah ->
+                        searchView.hide()
+                        currentOnVerseClick(surah, ayah)
+                    },
+                    onRecentClick = { query ->
+                        // Refill the SearchView so inline FTS re-runs against the
+                        // chosen recent query — don't dump the user back on the old
+                        // feature:search page.
+                        searchView.setText(query)
+                        // setText leaves the cursor at position 0 — move it to the
+                        // end so the user can immediately edit/extend the query.
+                        searchView.getEditText().setSelection(query.length)
+                    },
+                    onPopularClick = { suggestion ->
+                        // Tapping a popular-search chip refills the SearchView with the
+                        // chip's visible text (WYSIWYG) so the full ranked-search pipeline
+                        // runs against the same string the user just tapped.
+                        searchView.setText(suggestion.display)
+                        searchView.getEditText().setSelection(suggestion.display.length)
+                    },
+                    onTopicClick = { id ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        currentOnTopicClick(id)
+                    },
+                    onNewsClick = { news ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        currentOnNewsClick(news)
+                    },
+                    onFortressDuaClick = { dua ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        currentOnFortressDuaClick(dua)
+                    },
+                    onQuranicDuaClick = { dua ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        currentOnQuranicDuaClick(dua)
+                    },
+                    onBukhariHadithClick = { hadithNumber ->
+                        viewModel.saveSearchQuery(liveQuery)
+                        searchView.hide()
+                        currentOnBukhariHadithClick(hadithNumber)
                     },
                 )
-            }
-            // Back button
-            Surface(
+
+                composeView?.setContent {
+                    // Read from ThemeColorBridge so the inner island honours the user's
+                    // app-level Dark/Brand pref instead of NiaTheme's COASTAL/system-dark
+                    // defaults — otherwise the body stays light while the outer toolbar
+                    // and bottom nav (which sit outside this ComposeView) follow Dark.
+                    // A previewOverride (set by the theme-picker preview) wins over the
+                    // active theme so the candidate palette reaches this island too.
+                    val bridge = com.starception.submission.util.ThemeColorBridge
+                    val override = bridge.previewOverride
+                    val seedArgb = override?.customSeedArgb ?: bridge.customSeedColor
+                    val secondaryArgb = override?.customSecondaryArgb ?: bridge.customSecondaryColor
+                    val tertiaryArgb = override?.customTertiaryArgb ?: bridge.customTertiaryColor
+                    NiaTheme(
+                        darkTheme = bridge.darkTheme,
+                        themeBrand = override?.brand ?: bridge.themeBrand,
+                        customSeedColor = if (seedArgb != 0) ComposeColor(seedArgb) else ComposeColor.Unspecified,
+                        customSecondaryColor = if (secondaryArgb != 0) ComposeColor(secondaryArgb) else ComposeColor.Unspecified,
+                        customTertiaryColor = if (tertiaryArgb != 0) ComposeColor(tertiaryArgb) else ComposeColor.Unspecified,
+                        disableDynamicTheming = bridge.disableDynamicTheming,
+                    ) { currentContent() }
+                }
+            },
+        )
+        // Voice wave overlay: the animated visualization that fills the SearchBar
+        // pill while the mic is capturing. It sits above the AndroidView so the
+        // SearchBar stays interactive when not listening. On the search page it
+        // spans the SearchView's full input bar; on the home page the collapsed pill.
+        val bounds = if (isSearchViewOpen) {
+            searchViewBarBoundsPx ?: searchBarBoundsPx
+        } else {
+            searchBarBoundsPx
+        }
+        // Keep the wave composed through the whole transition (progress > 0), not
+        // just while actively listening, so it can slide and fade out gracefully on
+        // stop instead of vanishing the instant recording ends.
+        if (bounds != null && listenProgress > 0.001f) {
+            // Live microphone level from the Whisper recorder, smoothed so the wave
+            // moves organically rather than jittering. The raw VOICE_RECOGNITION
+            // source registers speech around 0.01-0.03 RMS, so scale up for a
+            // visible wave.
+            val whisperLevel by whisperService.voiceLevel.collectAsStateWithLifecycle()
+            val smoothedLevel by animateFloatAsState(
+                targetValue = (whisperLevel * 15f).coerceIn(0f, 1f),
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = 400f,
+                ),
+                label = "voiceLevel",
+            )
+            VoiceWaveOverlay(
+                bounds = bounds,
+                level = smoothedLevel,
+                appearProgress = listenProgress,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+        if (showVoiceModelDownload) {
+            // Full-screen missing-content page — same layout as the hadith detail
+            // screen's download prompt: solid surface, centered card, circular back.
+            BackHandler { showVoiceModelDownload = false }
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(8.dp)
-                    .size(40.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
-                IconButton(onClick = { showVoiceModelDownload = false }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MissingContentCard(
+                        resourceName = "Voice Recognition",
+                        category = "model_whisper",
+                        description = "The offline voice recognition model needs to be downloaded. " +
+                            "Voice search then runs fully on-device.",
+                        downloadManager = viewModel.getDownloadManager(),
+                        onDownloadComplete = {
+                            whisperService.initialize()
+                            showVoiceModelDownload = false
+                            Toast.makeText(
+                                context,
+                                "Voice recognition ready — tap the mic to try it",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        },
                     )
+                }
+                // Back button
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(8.dp)
+                        .size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    IconButton(onClick = { showVoiceModelDownload = false }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             }
         }
-    }
     }
 }
 
@@ -886,6 +900,7 @@ private fun VoiceWaveOverlay(
         }
 
         val samples = 140
+
         // Closed fill path plus the open top polyline (for the ridgeline stroke).
         fun ridge(phase: Float, speed: Float, scale: Float): Pair<Path, Path> {
             val fill = Path()
@@ -1015,8 +1030,11 @@ private fun renderSuggestions(
     // felt fussy for a search shortcut. Cap so a chatty history doesn't push
     // the curated verses below the fold.
     val filteredRecent = (
-        if (isFiltering) recentSearches.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
-        else recentSearches
+        if (isFiltering) {
+            recentSearches.filter { it.query.contains(trimmedQuery, ignoreCase = true) }
+        } else {
+            recentSearches
+        }
         ).take(MAX_RECENTS_TOTAL)
     val popularSuggestions = if (isFiltering) emptyList() else SearchHints.popularSuggestions()
     // Curated highlight verses (Ayatul Kursi, Al-Fatiha, Ar-Rahman, etc.) shown
@@ -1131,8 +1149,13 @@ private fun renderSuggestions(
             ) {
                 rankedVerses.forEach { hit ->
                     addVerseItem(
-                        container, inflater, hit.item,
-                        accentColor, titleColor, subtitleColor, onVerseClick,
+                        container,
+                        inflater,
+                        hit.item,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
+                        onVerseClick,
                     )
                 }
             },
@@ -1146,8 +1169,12 @@ private fun renderSuggestions(
             ) {
                 rankedSurahs.forEach { hit ->
                     addSurahItem(
-                        container, inflater, hit.item,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        hit.item,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onVerseClick(hit.item.number, 1) }
                 }
             },
@@ -1161,8 +1188,12 @@ private fun renderSuggestions(
             ) {
                 rankedQuranicDuas.forEach { hit ->
                     addQuranicDuaItem(
-                        container, inflater, hit.item,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        hit.item,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onQuranicDuaClick(hit.item) }
                 }
             },
@@ -1177,8 +1208,12 @@ private fun renderSuggestions(
             ) {
                 cappedAyahs.forEach { ayah ->
                     addAyahItem(
-                        container, inflater, ayah,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        ayah,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onVerseClick(ayah.surahNumber, ayah.numberInSurah) }
                 }
             },
@@ -1195,8 +1230,12 @@ private fun renderSuggestions(
             ) {
                 cappedFortressDuas.forEach { dua ->
                     addFortressDuaItem(
-                        container, inflater, dua,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        dua,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onFortressDuaClick(dua) }
                 }
             },
@@ -1223,8 +1262,13 @@ private fun renderSuggestions(
             RenderableSection(title = "Topics", score = FTS_TOPICS_PRIOR) {
                 ftsTopics.forEach { topic ->
                     addTopicItem(
-                        container, inflater, topic.topic.name, topic.topic.shortDescription,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        topic.topic.name,
+                        topic.topic.shortDescription,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onTopicClick(topic.topic.id) }
                 }
             },
@@ -1235,8 +1279,13 @@ private fun renderSuggestions(
             RenderableSection(title = "Duas & Articles", score = FTS_NEWS_PRIOR) {
                 ftsNews.forEach { news ->
                     addNewsItem(
-                        container, inflater, news.title, news.content,
-                        accentColor, titleColor, subtitleColor,
+                        container,
+                        inflater,
+                        news.title,
+                        news.content,
+                        accentColor,
+                        titleColor,
+                        subtitleColor,
                     ) { onNewsClick(news) }
                 }
             },
@@ -1255,12 +1304,19 @@ private fun renderSuggestions(
     // Empty-state extras: popular-search chips, then recents.
     if (!isFiltering && popularSuggestions.isNotEmpty()) {
         addSectionTitle(
-            container, inflater,
-            ctx.getString(R.string.app_search_section_popular_searches), subtitleColor,
+            container,
+            inflater,
+            ctx.getString(R.string.app_search_section_popular_searches),
+            subtitleColor,
         )
         addPopularChipsRow(
-            container, inflater, popularSuggestions,
-            titleColor, chipBackground, chipStroke, onPopularClick,
+            container,
+            inflater,
+            popularSuggestions,
+            titleColor,
+            chipBackground,
+            chipStroke,
+            onPopularClick,
         )
     }
 
@@ -1270,8 +1326,10 @@ private fun renderSuggestions(
     val hasContentHits = sections.isNotEmpty()
     if (!hasContentHits && filteredRecent.isNotEmpty()) {
         addSectionTitle(
-            container, inflater,
-            ctx.getString(R.string.app_search_section_recent), subtitleColor,
+            container,
+            inflater,
+            ctx.getString(R.string.app_search_section_recent),
+            subtitleColor,
         )
         filteredRecent.forEach { recent ->
             addRecentSearchItem(container, inflater, recent.query, titleColor, subtitleColor, onRecentClick)
@@ -1282,20 +1340,28 @@ private fun renderSuggestions(
     val scrollParent = container.parent as? NestedScrollView
     if (emptyStateVerses.isNotEmpty()) {
         addSectionTitle(
-            container, inflater,
-            ctx.getString(R.string.app_search_section_popular_verses), subtitleColor,
+            container,
+            inflater,
+            ctx.getString(R.string.app_search_section_popular_verses),
+            subtitleColor,
         )
         var rendered = 0
         fun appendNextBatch() {
             val end = minOf(rendered + EMPTY_STATE_VERSES_BATCH, emptyStateVerses.size)
             emptyStateVerses.subList(rendered, end).forEach { verse ->
                 addVerseItem(
-                    container, inflater, verse,
-                    accentColor, titleColor, subtitleColor, onVerseClick,
+                    container,
+                    inflater,
+                    verse,
+                    accentColor,
+                    titleColor,
+                    subtitleColor,
+                    onVerseClick,
                 )
             }
             rendered = end
         }
+
         // Stale-render guard for async callbacks: skip if the container has
         // been re-rendered for a different query/state since we were attached.
         fun isCurrentRender() = container.getTag(SUGGESTION_STATE_TAG.hashCode()) == stateKey
@@ -1410,7 +1476,6 @@ private fun addSearchCorrection(parent: ViewGroup, text: String, accentColor: In
         },
     )
 }
-
 
 private fun addSectionTitle(parent: ViewGroup, inflater: LayoutInflater, text: String, subtitleColor: Int) {
     val view = inflater.inflate(R.layout.app_search_suggestion_title, parent, false) as TextView
@@ -1818,7 +1883,9 @@ private fun addPopularChipsRow(
             // tactile without dragging in extra dependencies.
             val tv = TypedValue()
             ctx.theme.resolveAttribute(
-                android.R.attr.selectableItemBackground, tv, true,
+                android.R.attr.selectableItemBackground,
+                tv,
+                true,
             )
             foreground = ContextCompat.getDrawable(ctx, tv.resourceId)
             setOnClickListener { onClick(suggestion) }

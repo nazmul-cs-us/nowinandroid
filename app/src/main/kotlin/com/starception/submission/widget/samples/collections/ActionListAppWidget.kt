@@ -1,7 +1,20 @@
-package com.starception.submission.widget.samples.collections
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
+package com.starception.submission.widget.samples.collections
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -15,75 +28,77 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
+import com.starception.submission.R
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.collections.data.FakeActionListDataRepository
 import com.starception.submission.widget.samples.collections.data.FakeActionListDataRepository.Companion.getActionListDataRepo
 import com.starception.submission.widget.samples.collections.layout.ActionListItem
 import com.starception.submission.widget.samples.collections.layout.ActionListLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
-import com.starception.submission.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** A sample [GlanceAppWidget] demonstrating the [ActionListLayout]. */
 class ActionListAppWidget : GlanceAppWidget() {
-  // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
-  // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
-  // supported size to be held in the widget host's memory.
-  override val sizeMode: SizeMode = SizeMode.Exact
+    // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
+    // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
+    // supported size to be held in the widget host's memory.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val repo = getActionListDataRepo(id)
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val repo = getActionListDataRepo(id)
 
-    val initialItems = withContext(Dispatchers.Default) {
-      repo.load()
+        val initialItems = withContext(Dispatchers.Default) {
+            repo.load()
+        }
+        val themeSource = loadWidgetThemeSource(context)
+
+        provideContent {
+            val items by repo.items().collectAsState(initial = initialItems)
+            val checkedItems by repo.checkedItems().collectAsState(initial = emptyList())
+
+            StarceptionWidgetTheme(themeSource) {
+                WidgetContent(
+                    items = items,
+                    checkedItems = checkedItems,
+                    checkItemAction = { key -> repo.checkItem(key) },
+                )
+            }
+        }
     }
-    val themeSource = loadWidgetThemeSource(context)
 
-    provideContent {
-      val items by repo.items().collectAsState(initial = initialItems)
-      val checkedItems by repo.checkedItems().collectAsState(initial = emptyList())
+    @Composable
+    fun WidgetContent(
+        items: List<ActionListItem>,
+        checkedItems: List<String>,
+        checkItemAction: (String) -> Unit,
+    ) {
+        val context = LocalContext.current
 
-      StarceptionWidgetTheme(themeSource) {
-        WidgetContent(
-          items = items,
-          checkedItems = checkedItems,
-          checkItemAction = { key -> repo.checkItem(key) }
+        ActionListLayout(
+            title = context.getString(R.string.sample_action_list_app_widget_name),
+            titleIconRes = R.drawable.sample_home_icon,
+            titleBarActionIconRes = R.drawable.sample_power_settings_icon,
+            titleBarActionIconContentDescription = context.getString(
+                R.string.sample_action_list_settings_label,
+            ),
+            titleBarAction = actionStartDemoActivity("Power settings title bar action"),
+            items = items,
+            checkedItems = checkedItems,
+            actionButtonClick = checkItemAction,
         )
-      }
     }
-  }
-
-  @Composable
-  fun WidgetContent(
-    items: List<ActionListItem>,
-    checkedItems: List<String>,
-    checkItemAction: (String) -> Unit,
-  ) {
-    val context = LocalContext.current
-
-    ActionListLayout(
-      title = context.getString(R.string.sample_action_list_app_widget_name),
-      titleIconRes = R.drawable.sample_home_icon,
-      titleBarActionIconRes = R.drawable.sample_power_settings_icon,
-      titleBarActionIconContentDescription = context.getString(
-        R.string.sample_action_list_settings_label
-      ),
-      titleBarAction = actionStartDemoActivity("Power settings title bar action"),
-      items = items,
-      checkedItems = checkedItems,
-      actionButtonClick = checkItemAction,
-    )
-  }
 }
 
 class ActionListAppWidgetAppWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget = ActionListAppWidget()
+    override val glanceAppWidget = ActionListAppWidget()
 
-  @SuppressLint("RestrictedApi")
-  override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-    appWidgetIds.forEach {
-      FakeActionListDataRepository.cleanUp(AppWidgetId(appWidgetId = it))
+    @SuppressLint("RestrictedApi")
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        appWidgetIds.forEach {
+            FakeActionListDataRepository.cleanUp(AppWidgetId(appWidgetId = it))
+        }
+        super.onDeleted(context, appWidgetIds)
     }
-    super.onDeleted(context, appWidgetIds)
-  }
 }

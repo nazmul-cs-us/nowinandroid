@@ -18,30 +18,29 @@ package com.starception.submission
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy.Builder
+import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import com.starception.submission.sync.initializers.Sync
-import com.starception.submission.util.ProfileVerifierLogger
-import com.starception.submission.util.AnrPreventionConfig
-import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
-import android.content.Intent
-import android.os.Build
-import android.util.Log
-import com.starception.submission.services.PrayerNotificationService
-import com.starception.submission.ui.search.InMemorySearchService
-import com.starception.submission.util.PrayerNotificationManager
 import com.starception.submission.prayer.util.FileLogger
-import kotlinx.coroutines.CoroutineScope
+import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.sync.initializers.Sync
+import com.starception.submission.ui.search.InMemorySearchService
+import com.starception.submission.util.AnrPreventionConfig
+import com.starception.submission.util.PrayerNotificationManager
+import com.starception.submission.util.ProfileVerifierLogger
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * [Application] class for Submission
@@ -83,10 +82,10 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
 
         // Verify ANR prevention configuration
         AnrPreventionConfig.isOptimizedForAnrPrevention()
-        
+
         // Clean up any existing service instances to prevent conflicts
         cleanupExistingServices()
-        
+
         setStrictModePolicy()
 
         // Use background thread for heavy initialization to prevent ANR
@@ -100,12 +99,12 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     Log.w("SubmissionApplication", "Sync disabled - interests pages will be empty")
                 }
                 profileVerifierLogger()
-                
+
                 // DISABLE prayer notification manager initialization to prevent ANR
                 if (AnrPreventionConfig.ENABLE_AUTO_SERVICE_START) {
                     PrayerNotificationManager.initialize(this)
                 }
-                
+
                 // Start cloud settings-sync (push on change, pull on login) when signed in.
                 settingsSyncManager.start()
 
@@ -314,7 +313,10 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                                     "Fortress of the Muslim"
                                 }
                                 com.starception.submission.services.ChapterRecitationService.play(
-                                    appCtx, source, title, notifSubtitle,
+                                    appCtx,
+                                    source,
+                                    title,
+                                    notifSubtitle,
                                 )
                             }
                         }
@@ -454,7 +456,7 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
             priority = AnrPreventionConfig.getBackgroundThreadPriority()
             name = "AppInitThread"
         }.start()
-        
+
         // Pre-warm the in-memory search indices (surahs + quranic duas + verses
         // + fortress chapters) on a background coroutine. Without this, the very
         // first keystroke pays ~160ms to build all four indices, so SQL hits
@@ -488,12 +490,12 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
         )
 
         Log.d("SubmissionApplication", "Application onCreate completed")
-        
+
         // DISABLE automatic service startup from Application to prevent service timeout ANR
         // Service will only be started from MainActivity.onResume() after user interaction
         Log.d("SubmissionApplication", "Application initialized, service will start only from MainActivity")
     }
-    
+
     /**
      * Clean up any existing service instances to prevent conflicts when app reopens
      */

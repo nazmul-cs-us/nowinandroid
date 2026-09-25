@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.clickable
@@ -28,7 +44,7 @@ fun RowScope.LiquidBottomTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val scale = LocalLiquidBottomTabScale.current
     Column(
@@ -38,7 +54,7 @@ fun RowScope.LiquidBottomTab(
                 interactionSource = null,
                 indication = null,
                 role = Role.Tab,
-                onClick = onClick
+                onClick = onClick,
             )
             .fillMaxHeight()
             .weight(1f)
@@ -49,6 +65,6 @@ fun RowScope.LiquidBottomTab(
             },
         verticalArrangement = Arrangement.spacedBy(2f.dp, Alignment.CenterVertically),
         horizontalAlignment = horizontalAlignment,
-        content = content
+        content = content,
     )
 }

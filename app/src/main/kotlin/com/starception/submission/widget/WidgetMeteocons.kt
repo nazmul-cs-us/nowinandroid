@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.util.Log
-import androidx.annotation.DrawableRes
 import androidx.annotation.RawRes
 import com.airbnb.lottie.LottieCompositionFactory
 import com.airbnb.lottie.LottieDrawable
@@ -51,6 +50,7 @@ internal object WidgetMeteocons {
 
     /** Four updates per second, with a short crossfade in the widget host. */
     private const val WEATHER_FRAME_COUNT = 18
+
     // Sunrise/sunset has eight identical rays, so its visible artwork repeats every
     // one-eighth of the six-second Lottie loop. Twelve samples across that 45-degree arc
     // produce 3.75-degree steps at ~16fps without storing eight duplicate rotations.

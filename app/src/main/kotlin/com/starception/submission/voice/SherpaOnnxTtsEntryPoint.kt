@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package com.starception.submission.voice
 
+import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetRepository
 import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.download.ContentCoordinator
-import com.starception.submission.core.data.repository.UserDataRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent

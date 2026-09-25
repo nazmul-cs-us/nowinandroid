@@ -1,10 +1,25 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.worker
 
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Process
 import android.util.Log
 import androidx.work.*
 import com.starception.submission.services.PrayerNotificationService
@@ -30,7 +45,7 @@ import java.util.concurrent.TimeUnit
  */
 class ActivityDetectionWorker(
     context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : Worker(context, workerParams) {
 
     companion object {
@@ -48,7 +63,8 @@ class ActivityDetectionWorker(
                     .build()
 
                 val workRequest = PeriodicWorkRequestBuilder<ActivityDetectionWorker>(
-                    15, TimeUnit.MINUTES // Minimum interval for periodic work
+                    15,
+                    TimeUnit.MINUTES, // Minimum interval for periodic work
                 )
                     .setConstraints(constraints)
                     .setInitialDelay(1, TimeUnit.MINUTES) // Start after 1 minute
@@ -58,7 +74,7 @@ class ActivityDetectionWorker(
                 WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                     UNIQUE_WORK_NAME,
                     ExistingPeriodicWorkPolicy.KEEP, // Don't replace if already scheduled
-                    workRequest
+                    workRequest,
                 )
 
                 Log.i(TAG, "📅 Scheduled activity detection keep-alive worker (every 15 minutes)")
@@ -138,8 +154,9 @@ class ActivityDetectionWorker(
         val packageName = applicationContext.packageName
 
         for (appProcess in appProcesses) {
-            if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-                && appProcess.processName == packageName) {
+            if (appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND &&
+                appProcess.processName == packageName
+            ) {
                 return true
             }
         }

@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings
 
-import com.starception.submission.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -8,8 +23,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,33 +38,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.DirectionsCar
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,8 +62,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -72,38 +73,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.ui.ImmersiveFullScreenEffect
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.settings.components.AboutSection
-import com.starception.submission.core.designsystem.theme.supportsDynamicTheming
-import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.AppIconSection
-import com.starception.submission.settings.components.HsvColorWheelDialog
+import com.starception.submission.settings.components.AppearanceSection
+import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.DeveloperSettingsSection
+import com.starception.submission.settings.components.HsvColorWheelDialog
 import com.starception.submission.settings.components.NotificationsSection
-import com.starception.submission.settings.components.rememberAudioChainPermissionGate
-import com.starception.submission.settings.components.rememberNotificationPermissionGate
-import com.starception.submission.settings.components.rememberPhysicalActivityPermissionGate
-import com.starception.submission.settings.components.rememberDndAccess
 import com.starception.submission.settings.components.PrayerTimesSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
-import com.starception.submission.settings.components.ContentManagementSection
 import com.starception.submission.settings.components.TtsSettingsSection
-import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.VoiceSettingsSection
 import com.starception.submission.settings.components.WidgetSettingsSection
-import androidx.compose.material.icons.outlined.Storage
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.settings.components.rememberAudioChainPermissionGate
+import com.starception.submission.settings.components.rememberDndAccess
+import com.starception.submission.settings.components.rememberNotificationPermissionGate
+import com.starception.submission.settings.components.rememberPhysicalActivityPermissionGate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnifiedSettingsScreen(
     onBackClick: () -> Unit,
     onNavigateToSalahDataCollection: () -> Unit = {},
-    viewModel: UnifiedSettingsViewModel = hiltViewModel()
+    viewModel: UnifiedSettingsViewModel = hiltViewModel(),
 ) {
     val themeSettings by viewModel.themeSettings.collectAsStateWithLifecycle()
     val widgetAppearanceSettings by viewModel.widgetAppearanceSettings.collectAsStateWithLifecycle()
@@ -161,8 +161,11 @@ fun UnifiedSettingsScreen(
     val toolbarHeightPx = with(density) { toolbarHeight.toPx() }
     val scrollOffset by remember {
         derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) headerHeightPx
-            else listState.firstVisibleItemScrollOffset.toFloat()
+            if (listState.firstVisibleItemIndex > 0) {
+                headerHeightPx
+            } else {
+                listState.firstVisibleItemScrollOffset.toFloat()
+            }
         }
     }
     val collapseProgress by remember {
@@ -183,7 +186,9 @@ fun UnifiedSettingsScreen(
             val container = containerWindowPos
             if (hero != null && container != null) {
                 Offset(hero.x - container.x, hero.y - container.y)
-            } else null
+            } else {
+                null
+            }
         }
     }
 
@@ -206,7 +211,6 @@ fun UnifiedSettingsScreen(
         }
     }
 
-
     LaunchedEffect(Unit) {
         viewModel.consumePendingSectionRequest()?.let { sectionId ->
             viewModel.expandSection(sectionId)
@@ -226,17 +230,17 @@ fun UnifiedSettingsScreen(
         AnimatedVisibility(
             visible = isLoading,
             enter = fadeIn() + scaleIn(initialScale = 0.8f),
-            exit = fadeOut() + scaleOut(targetScale = 0.8f)
+            exit = fadeOut() + scaleOut(targetScale = 0.8f),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(48.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 4.dp
+                    strokeWidth = 4.dp,
                 )
             }
         }
@@ -246,294 +250,293 @@ fun UnifiedSettingsScreen(
             enter = fadeIn(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
+                    stiffness = Spring.StiffnessLow,
+                ),
             ),
-            exit = fadeOut()
+            exit = fadeOut(),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .onGloballyPositioned { coordinates ->
                         containerWindowPos = coordinates.positionInWindow()
-                    }
+                    },
             ) {
                 LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                // Bottom padding clears the floating nav pill so the last section's
-                // header and content are fully reachable.
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    SettingsHeroSection(
-                        collapseProgress = collapseProgress,
-                        onTitlePositioned = { heroTitleWindowPos = it },
-                    )
-                }
-
-                item { SettingsGroupLabel("Prayer & personalization") }
-
-                // Appearance Section
-                item {
-                    SettingsSection(
-                        title = "Appearance",
-                        subtitle = "Theme, colors & display mode",
-                iconGlyph = FlaticonIcons.APPEARANCE,
-                        isExpanded = expandedSections.contains("appearance"),
-                        onToggleExpanded = { viewModel.toggleSection("appearance") }
-                    ) {
-                        AppearanceSection(
-                            themeSettings = themeSettings,
-                            onChangeThemeBrand = viewModel::updateThemeBrand,
-                            onChangeDynamicColorPreference = viewModel::updateDynamicColorPreference,
-                            onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
-                            onChangeCustomColors = viewModel::updateCustomThemeColors,
-                            // Both of these are Android-only and are supplied
-                            // here so the section itself can be shared: Material
-                            // You is a Build.VERSION check, and the colour wheel
-                            // is drawn with Bitmap, Canvas and Paint.
-                            supportDynamicColor = supportsDynamicTheming(),
-                            colorPickerDialog = { primary, secondary, tertiary, onConfirm, onDismiss ->
-                                HsvColorWheelDialog(
-                                    initialPrimary = primary,
-                                    initialSecondary = secondary,
-                                    initialTertiary = tertiary,
-                                    onConfirm = onConfirm,
-                                    onDismiss = onDismiss,
-                                )
-                            },
-                        )
-                        AppIconSection(modifier = Modifier.padding(top = 20.dp))
-                    }
-                }
-
-                // Widget Section
-                item {
-                    SettingsSection(
-                        title = "Widgets",
-                        subtitle = "Add widgets, background & colors",
-                        iconContent = {
-                            Image(
-                                painter = painterResource(R.drawable.flaticon_widget_8338851),
-                                contentDescription = null,
-                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                                modifier = Modifier.size(22.dp),
-                            )
-                        },
-                        isExpanded = expandedSections.contains("widget"),
-                        onToggleExpanded = { viewModel.toggleSection("widget") },
-                    ) {
-                        WidgetSettingsSection(
-                            settings = widgetAppearanceSettings,
-                            onSettingsChanged = viewModel::updateWidgetAppearanceSettings,
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    // Bottom padding clears the floating nav pill so the last section's
+                    // header and content are fully reachable.
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FloatingNavClearance),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        SettingsHeroSection(
+                            collapseProgress = collapseProgress,
+                            onTitlePositioned = { heroTitleWindowPos = it },
                         )
                     }
-                }
 
-                // Prayer Times Section
-                item {
-                    SettingsSection(
-                        title = "Prayer Times",
-                        subtitle = "Calculation method & location",
-                        iconGlyph = FlaticonIcons.SCHEDULE,
-                        isExpanded = expandedSections.contains("prayer"),
-                        onToggleExpanded = { viewModel.toggleSection("prayer") }
-                    ) {
-                        PrayerTimesSection(
-                            prayerSettings = prayerSettings,
-                            showRestoreOption = showRestoreOption,
-                            autoDetectedCountryName = autoDetectedCountryName,
-                            onSettingsChange = viewModel::updatePrayerSettings,
-                            onRestoreClick = viewModel::restoreAutoDetectedSettings
-                        )
-                    }
-                }
+                    item { SettingsGroupLabel("Prayer & personalization") }
 
-                // Notifications Section
-                item {
-                    SettingsSection(
-                        title = "Notifications",
-                        subtitle = "Prayer alerts & reminders",
-                iconGlyph = FlaticonIcons.NOTIFICATIONS,
-                        isExpanded = expandedSections.contains("notifications"),
-                        onToggleExpanded = { viewModel.toggleSection("notifications") }
-                    ) {
-                        // DND access is checked here rather than inside the
-                        // section: the section is shared with iOS, which has no
-                        // such permission to grant.
-                        val hasDndAccess by rememberDndAccess()
-                        val dndContext = LocalContext.current
-                        NotificationsSection(
-                            preferences = notificationPreferences,
-                            onPreferencesChanged = viewModel::updateNotificationPreferences,
-                            notificationPermissionGranted = notificationPermissionGate.isGranted,
-                            onRequestNotificationPermission = notificationPermissionGate.request,
-                            hasDndAccess = hasDndAccess,
-                            onOpenDndAccessSettings = {
-                                com.starception.submission.prayer.silent
-                                    .openDndAccessSettings(dndContext)
-                            },
-                        )
-                    }
-                }
-
-                // Travel Dua Section
-                item {
-                    SettingsSection(
-                        title = "Travel Dua",
-                        subtitle = "Auto-play dua when driving",
-                iconGlyph = FlaticonIcons.TRAVEL,
-                        isExpanded = expandedSections.contains("traveldua"),
-                        onToggleExpanded = { viewModel.toggleSection("traveldua") }
-                    ) {
-                        val audioChainPermissionGate = rememberAudioChainPermissionGate()
-                        TravelDuaSection(
-                            settings = travelDuaSettings,
-                            onSettingsChanged = viewModel::updateTravelDuaSettings,
-                            onTriggerAudioChain = viewModel::triggerFullAudioChain,
-                            onStopAudioChain = viewModel::stopAudioChain,
-                            isPlaying = isAudioChainPlaying,
-                            activityPermissionGranted = physicalActivityPermissionGate.isGranted,
-                            onRequestActivityPermission = physicalActivityPermissionGate.request,
-                            onRequestPlaybackPermission = audioChainPermissionGate,
-                        )
-                    }
-                }
-
-                item { SettingsGroupLabel("Voice & Salah intelligence") }
-
-                // Voice Settings Section
-                item {
-                    SettingsSection(
-                        title = "Voice Recognition",
-                        subtitle = "Speech detection engine",
-                iconGlyph = FlaticonIcons.MICROPHONE,
-                        isExpanded = expandedSections.contains("voice"),
-                        onToggleExpanded = { viewModel.toggleSection("voice") }
-                    ) {
-                        VoiceSettingsSection(
-                            state = voiceSettings,
-                            onEngineSelected = viewModel::updateVoiceSettings,
-                            onTestVoice = viewModel::startVoiceTest,
-                            onStopTest = viewModel::stopVoiceTest,
-                            downloadManager = viewModel.getDownloadManager(),
-                            onDownloadComplete = viewModel::refreshAfterModelDownload
-                        )
-                    }
-                }
-
-                // TTS Settings Section
-                item {
-                    SettingsSection(
-                        title = "Text-to-Speech",
-                        subtitle = "Voice output settings",
-                iconGlyph = FlaticonIcons.VOLUME,
-                        isExpanded = expandedSections.contains("tts"),
-                        onToggleExpanded = { viewModel.toggleSection("tts") }
-                    ) {
-                        TtsSettingsSection(
-                            state = ttsSettings,
-                            onTestTts = viewModel::startTtsTest,
-                            onStopTts = viewModel::stopTts,
-                            onVoiceChanged = viewModel::updateTtsVoice,
-                            onSpeakerChanged = viewModel::updateTtsSpeakerId,
-                            downloadManager = viewModel.getDownloadManager(),
-                            onDownloadComplete = viewModel::refreshAfterModelDownload
-                        )
-                    }
-                }
-
-                // Salah Training Section
-                item {
-                    SettingsSection(
-                        title = "Salah Training",
-                        subtitle = "Improve on-device posture detection",
-                        iconGlyph = FlaticonIcons.POSTURE_TRAINING,
-                        isExpanded = expandedSections.contains("salah"),
-                        onToggleExpanded = { viewModel.toggleSection("salah") }
-                    ) {
-                        SalahTrainingSection(
-                            onNavigateToDataCollection = onNavigateToSalahDataCollection
-                        )
-                    }
-                }
-
-                item { SettingsGroupLabel("App & support") }
-
-                // Content Management Section
-                if (contentCategories.isNotEmpty()) {
+                    // Appearance Section
                     item {
                         SettingsSection(
-                            title = "Content & Storage",
-                            subtitle = "Manage downloaded content",
-                    iconGlyph = FlaticonIcons.STORAGE,
-                            isExpanded = expandedSections.contains("content"),
-                            onToggleExpanded = { viewModel.toggleSection("content") }
+                            title = "Appearance",
+                            subtitle = "Theme, colors & display mode",
+                            iconGlyph = FlaticonIcons.APPEARANCE,
+                            isExpanded = expandedSections.contains("appearance"),
+                            onToggleExpanded = { viewModel.toggleSection("appearance") },
                         ) {
-                            ContentManagementSection(
-                                categories = contentCategories,
-                                totalDownloadedSize = totalDownloadedSize,
-                                onDownloadCategory = viewModel::downloadContent,
-                                onDeleteCategory = viewModel::deleteContent,
+                            AppearanceSection(
+                                themeSettings = themeSettings,
+                                onChangeThemeBrand = viewModel::updateThemeBrand,
+                                onChangeDynamicColorPreference = viewModel::updateDynamicColorPreference,
+                                onChangeDarkThemeConfig = viewModel::updateDarkThemeConfig,
+                                onChangeCustomColors = viewModel::updateCustomThemeColors,
+                                // Both of these are Android-only and are supplied
+                                // here so the section itself can be shared: Material
+                                // You is a Build.VERSION check, and the colour wheel
+                                // is drawn with Bitmap, Canvas and Paint.
+                                supportDynamicColor = supportsDynamicTheming(),
+                                colorPickerDialog = { primary, secondary, tertiary, onConfirm, onDismiss ->
+                                    HsvColorWheelDialog(
+                                        initialPrimary = primary,
+                                        initialSecondary = secondary,
+                                        initialTertiary = tertiary,
+                                        onConfirm = onConfirm,
+                                        onDismiss = onDismiss,
+                                    )
+                                },
+                            )
+                            AppIconSection(modifier = Modifier.padding(top = 20.dp))
+                        }
+                    }
+
+                    // Widget Section
+                    item {
+                        SettingsSection(
+                            title = "Widgets",
+                            subtitle = "Add widgets, background & colors",
+                            iconContent = {
+                                Image(
+                                    painter = painterResource(R.drawable.flaticon_widget_8338851),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            },
+                            isExpanded = expandedSections.contains("widget"),
+                            onToggleExpanded = { viewModel.toggleSection("widget") },
+                        ) {
+                            WidgetSettingsSection(
+                                settings = widgetAppearanceSettings,
+                                onSettingsChanged = viewModel::updateWidgetAppearanceSettings,
                             )
                         }
                     }
-                }
 
-                // About Section
-                item {
-                    SettingsSection(
-                        title = "About",
-                        subtitle = "Version & legal info",
-                iconGlyph = FlaticonIcons.INFO,
-                        isExpanded = expandedSections.contains("about"),
-                        onToggleExpanded = { viewModel.toggleSection("about") }
-                    ) {
-                        val aboutContext = LocalContext.current
-                        AboutSection(
-                            // OssLicensesMenuActivity is an Activity, so the
-                            // section takes the action rather than the intent.
-                            onOpenLicenses = {
-                                aboutContext.startActivity(
-                                    android.content.Intent(
-                                        aboutContext,
-                                        com.google.android.gms.oss.licenses
-                                            .OssLicensesMenuActivity::class.java,
-                                    ),
+                    // Prayer Times Section
+                    item {
+                        SettingsSection(
+                            title = "Prayer Times",
+                            subtitle = "Calculation method & location",
+                            iconGlyph = FlaticonIcons.SCHEDULE,
+                            isExpanded = expandedSections.contains("prayer"),
+                            onToggleExpanded = { viewModel.toggleSection("prayer") },
+                        ) {
+                            PrayerTimesSection(
+                                prayerSettings = prayerSettings,
+                                showRestoreOption = showRestoreOption,
+                                autoDetectedCountryName = autoDetectedCountryName,
+                                onSettingsChange = viewModel::updatePrayerSettings,
+                                onRestoreClick = viewModel::restoreAutoDetectedSettings,
+                            )
+                        }
+                    }
+
+                    // Notifications Section
+                    item {
+                        SettingsSection(
+                            title = "Notifications",
+                            subtitle = "Prayer alerts & reminders",
+                            iconGlyph = FlaticonIcons.NOTIFICATIONS,
+                            isExpanded = expandedSections.contains("notifications"),
+                            onToggleExpanded = { viewModel.toggleSection("notifications") },
+                        ) {
+                            // DND access is checked here rather than inside the
+                            // section: the section is shared with iOS, which has no
+                            // such permission to grant.
+                            val hasDndAccess by rememberDndAccess()
+                            val dndContext = LocalContext.current
+                            NotificationsSection(
+                                preferences = notificationPreferences,
+                                onPreferencesChanged = viewModel::updateNotificationPreferences,
+                                notificationPermissionGranted = notificationPermissionGate.isGranted,
+                                onRequestNotificationPermission = notificationPermissionGate.request,
+                                hasDndAccess = hasDndAccess,
+                                onOpenDndAccessSettings = {
+                                    com.starception.submission.prayer.silent
+                                        .openDndAccessSettings(dndContext)
+                                },
+                            )
+                        }
+                    }
+
+                    // Travel Dua Section
+                    item {
+                        SettingsSection(
+                            title = "Travel Dua",
+                            subtitle = "Auto-play dua when driving",
+                            iconGlyph = FlaticonIcons.TRAVEL,
+                            isExpanded = expandedSections.contains("traveldua"),
+                            onToggleExpanded = { viewModel.toggleSection("traveldua") },
+                        ) {
+                            val audioChainPermissionGate = rememberAudioChainPermissionGate()
+                            TravelDuaSection(
+                                settings = travelDuaSettings,
+                                onSettingsChanged = viewModel::updateTravelDuaSettings,
+                                onTriggerAudioChain = viewModel::triggerFullAudioChain,
+                                onStopAudioChain = viewModel::stopAudioChain,
+                                isPlaying = isAudioChainPlaying,
+                                activityPermissionGranted = physicalActivityPermissionGate.isGranted,
+                                onRequestActivityPermission = physicalActivityPermissionGate.request,
+                                onRequestPlaybackPermission = audioChainPermissionGate,
+                            )
+                        }
+                    }
+
+                    item { SettingsGroupLabel("Voice & Salah intelligence") }
+
+                    // Voice Settings Section
+                    item {
+                        SettingsSection(
+                            title = "Voice Recognition",
+                            subtitle = "Speech detection engine",
+                            iconGlyph = FlaticonIcons.MICROPHONE,
+                            isExpanded = expandedSections.contains("voice"),
+                            onToggleExpanded = { viewModel.toggleSection("voice") },
+                        ) {
+                            VoiceSettingsSection(
+                                state = voiceSettings,
+                                onEngineSelected = viewModel::updateVoiceSettings,
+                                onTestVoice = viewModel::startVoiceTest,
+                                onStopTest = viewModel::stopVoiceTest,
+                                downloadManager = viewModel.getDownloadManager(),
+                                onDownloadComplete = viewModel::refreshAfterModelDownload,
+                            )
+                        }
+                    }
+
+                    // TTS Settings Section
+                    item {
+                        SettingsSection(
+                            title = "Text-to-Speech",
+                            subtitle = "Voice output settings",
+                            iconGlyph = FlaticonIcons.VOLUME,
+                            isExpanded = expandedSections.contains("tts"),
+                            onToggleExpanded = { viewModel.toggleSection("tts") },
+                        ) {
+                            TtsSettingsSection(
+                                state = ttsSettings,
+                                onTestTts = viewModel::startTtsTest,
+                                onStopTts = viewModel::stopTts,
+                                onVoiceChanged = viewModel::updateTtsVoice,
+                                onSpeakerChanged = viewModel::updateTtsSpeakerId,
+                                downloadManager = viewModel.getDownloadManager(),
+                                onDownloadComplete = viewModel::refreshAfterModelDownload,
+                            )
+                        }
+                    }
+
+                    // Salah Training Section
+                    item {
+                        SettingsSection(
+                            title = "Salah Training",
+                            subtitle = "Improve on-device posture detection",
+                            iconGlyph = FlaticonIcons.POSTURE_TRAINING,
+                            isExpanded = expandedSections.contains("salah"),
+                            onToggleExpanded = { viewModel.toggleSection("salah") },
+                        ) {
+                            SalahTrainingSection(
+                                onNavigateToDataCollection = onNavigateToSalahDataCollection,
+                            )
+                        }
+                    }
+
+                    item { SettingsGroupLabel("App & support") }
+
+                    // Content Management Section
+                    if (contentCategories.isNotEmpty()) {
+                        item {
+                            SettingsSection(
+                                title = "Content & Storage",
+                                subtitle = "Manage downloaded content",
+                                iconGlyph = FlaticonIcons.STORAGE,
+                                isExpanded = expandedSections.contains("content"),
+                                onToggleExpanded = { viewModel.toggleSection("content") },
+                            ) {
+                                ContentManagementSection(
+                                    categories = contentCategories,
+                                    totalDownloadedSize = totalDownloadedSize,
+                                    onDownloadCategory = viewModel::downloadContent,
+                                    onDeleteCategory = viewModel::deleteContent,
                                 )
-                            },
-                        )
+                            }
+                        }
+                    }
+
+                    // About Section
+                    item {
+                        SettingsSection(
+                            title = "About",
+                            subtitle = "Version & legal info",
+                            iconGlyph = FlaticonIcons.INFO,
+                            isExpanded = expandedSections.contains("about"),
+                            onToggleExpanded = { viewModel.toggleSection("about") },
+                        ) {
+                            val aboutContext = LocalContext.current
+                            AboutSection(
+                                // OssLicensesMenuActivity is an Activity, so the
+                                // section takes the action rather than the intent.
+                                onOpenLicenses = {
+                                    aboutContext.startActivity(
+                                        android.content.Intent(
+                                            aboutContext,
+                                            com.google.android.gms.oss.licenses
+                                                .OssLicensesMenuActivity::class.java,
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    }
+
+                    // Developer Section
+                    item {
+                        SettingsSection(
+                            title = "Developer Options",
+                            subtitle = "Debug & testing tools",
+                            iconGlyph = FlaticonIcons.DEVELOPER,
+                            isExpanded = expandedSections.contains("developer"),
+                            onToggleExpanded = { viewModel.toggleSection("developer") },
+                        ) {
+                            DeveloperSettingsSection(
+                                state = developerSettings,
+                                onRefreshNews = viewModel::refreshNewsDatabase,
+                                onRefreshTopics = viewModel::refreshTopicsDatabase,
+                                onRefreshDuas = viewModel::refreshDuasDatabase,
+                                onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
+                                onRefreshAll = viewModel::refreshAllDatabases,
+                            )
+                        }
+                    }
+
+                    // Bottom spacing
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
-
-                // Developer Section
-                item {
-                    SettingsSection(
-                        title = "Developer Options",
-                        subtitle = "Debug & testing tools",
-                iconGlyph = FlaticonIcons.DEVELOPER,
-                        isExpanded = expandedSections.contains("developer"),
-                        onToggleExpanded = { viewModel.toggleSection("developer") }
-                    ) {
-                        DeveloperSettingsSection(
-                            state = developerSettings,
-                            onRefreshNews = viewModel::refreshNewsDatabase,
-                            onRefreshTopics = viewModel::refreshTopicsDatabase,
-                            onRefreshDuas = viewModel::refreshDuasDatabase,
-                            onRefreshQuranicDuas = viewModel::refreshQuranicDuasDatabase,
-                            onRefreshAll = viewModel::refreshAllDatabases
-                        )
-                    }
-                }
-
-                // Bottom spacing
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
-
             }
         }
 
@@ -730,21 +733,21 @@ private fun SettingsGroupLabel(title: String) {
 @Composable
 private fun SalahTrainingSection(
     onNavigateToDataCollection: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         Text(
             text = "Build a more reliable on-device prayer model with guided posture recordings and clear quality checks.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         NiaOutlinedButton(
             onClick = onNavigateToDataCollection,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(56.dp),
         ) {
             FlaticonIcon(
                 glyph = FlaticonIcons.DEVELOPER,
@@ -754,7 +757,7 @@ private fun SalahTrainingSection(
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = "Open Training Lab",
-                style = MaterialTheme.typography.labelLarge
+                style = MaterialTheme.typography.labelLarge,
             )
         }
     }

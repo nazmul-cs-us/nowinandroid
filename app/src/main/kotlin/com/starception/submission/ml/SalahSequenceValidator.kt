@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.ml
 
 import android.util.Log
@@ -53,59 +69,59 @@ class SalahSequenceValidator {
         private val VALID_TRANSITIONS: Map<SalahPosture, Set<SalahPosture>> = mapOf(
             SalahPosture.QIYAM to setOf(
                 SalahPosture.RUKU,
-                SalahPosture.QIYAM_RISING     // Model may alternate between QIYAM/QIYAM_RISING
+                SalahPosture.QIYAM_RISING, // Model may alternate between QIYAM/QIYAM_RISING
             ),
             SalahPosture.RUKU to setOf(
                 SalahPosture.QIYAM_RISING,
-                SalahPosture.GOING_TO_SUJUD   // May go directly to sujud from ruku
+                SalahPosture.GOING_TO_SUJUD, // May go directly to sujud from ruku
             ),
             SalahPosture.QIYAM_RISING to setOf(
                 SalahPosture.QIYAM,
                 SalahPosture.GOING_TO_SUJUD,
-                SalahPosture.RUKU
+                SalahPosture.RUKU,
             ),
             SalahPosture.GOING_TO_SUJUD to setOf(
                 SalahPosture.SUJUD,
-                SalahPosture.QIYAM_RISING     // Rising back up (aborted sujud)
+                SalahPosture.QIYAM_RISING, // Rising back up (aborted sujud)
             ),
             SalahPosture.SUJUD to setOf(
                 SalahPosture.JALSA,
                 SalahPosture.TASHAHHUD,
-                SalahPosture.RISING_TO_QIYAM  // Rising after the second sujud
+                SalahPosture.RISING_TO_QIYAM, // Rising after the second sujud
             ),
             SalahPosture.JALSA to setOf(
                 SalahPosture.GOING_TO_SUJUD, // Descent into the second sujud
-                SalahPosture.SUJUD,           // Second sujud
+                SalahPosture.SUJUD, // Second sujud
                 SalahPosture.RISING_TO_QIYAM, // Rising for next rak'ah
-                SalahPosture.TASHAHHUD         // Model may confuse JALSA/TASHAHHUD
+                SalahPosture.TASHAHHUD, // Model may confuse JALSA/TASHAHHUD
             ),
             SalahPosture.TASHAHHUD to setOf(
-                SalahPosture.QIYAM,           // Next rak'ah
-                SalahPosture.RISING_TO_QIYAM  // Rising for next rak'ah
+                SalahPosture.QIYAM, // Next rak'ah
+                SalahPosture.RISING_TO_QIYAM, // Rising for next rak'ah
             ),
             SalahPosture.RISING_TO_QIYAM to setOf(
                 SalahPosture.QIYAM,
-                SalahPosture.RUKU
-            )
+                SalahPosture.RUKU,
+            ),
         )
 
         // Adjacent transitions (one step away in prayer flow) - used for high-confidence override
         // These are transitions that skip exactly one step and are plausible in real prayers
         private val ADJACENT_OVERRIDES: Map<SalahPosture, Set<SalahPosture>> = mapOf(
-            SalahPosture.QIYAM to setOf(SalahPosture.GOING_TO_SUJUD),      // Skipped RUKU detection
-            SalahPosture.RUKU to setOf(SalahPosture.SUJUD),                 // Skipped GOING_TO_SUJUD
-            SalahPosture.SUJUD to setOf(SalahPosture.QIYAM),               // Legacy model skips rise class
-            SalahPosture.JALSA to setOf(SalahPosture.GOING_TO_SUJUD),      // Going to second sujud
-            SalahPosture.GOING_TO_SUJUD to setOf(SalahPosture.JALSA)       // Brief transition
+            SalahPosture.QIYAM to setOf(SalahPosture.GOING_TO_SUJUD), // Skipped RUKU detection
+            SalahPosture.RUKU to setOf(SalahPosture.SUJUD), // Skipped GOING_TO_SUJUD
+            SalahPosture.SUJUD to setOf(SalahPosture.QIYAM), // Legacy model skips rise class
+            SalahPosture.JALSA to setOf(SalahPosture.GOING_TO_SUJUD), // Going to second sujud
+            SalahPosture.GOING_TO_SUJUD to setOf(SalahPosture.JALSA), // Brief transition
         )
     }
 
     /** Current prayer session state */
     enum class PrayerState {
-        IDLE,           // Not detecting prayer
-        DETECTING,      // Potential prayer started (first posture seen)
-        CONFIRMED,      // Prayer confirmed (valid rak'ah pattern detected)
-        COMPLETED       // Prayer completed (salaam detected via TASHAHHUD end)
+        IDLE, // Not detecting prayer
+        DETECTING, // Potential prayer started (first posture seen)
+        CONFIRMED, // Prayer confirmed (valid rak'ah pattern detected)
+        COMPLETED, // Prayer completed (salaam detected via TASHAHHUD end)
     }
 
     /** Result from processing a new posture detection */
@@ -114,7 +130,7 @@ class SalahSequenceValidator {
         val confirmedPosture: SalahPosture?,
         val prayerState: PrayerState,
         val rakahCount: Int,
-        val message: String
+        val message: String,
     )
 
     // Current state
@@ -148,9 +164,8 @@ class SalahSequenceValidator {
     fun processDetection(
         detectedPosture: SalahPosture,
         confidence: Float,
-        timestampMs: Long
+        timestampMs: Long,
     ): ValidationResult {
-
         // Prayer timeout: auto-complete if no posture change for 10 minutes
         if (prayerState == PrayerState.CONFIRMED && lastPostureChangeTime > 0L) {
             val timeSinceLastChange = timestampMs - lastPostureChangeTime
@@ -175,7 +190,7 @@ class SalahSequenceValidator {
                 confirmedPosture = currentPosture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Stabilizing: $detectedPosture ($stableCount/$MIN_STABLE_COUNT)"
+                message = "Stabilizing: $detectedPosture ($stableCount/$MIN_STABLE_COUNT)",
             )
         }
 
@@ -186,7 +201,7 @@ class SalahSequenceValidator {
                 confirmedPosture = currentPosture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Sustaining: ${detectedPosture.displayName}"
+                message = "Sustaining: ${detectedPosture.displayName}",
             )
         }
 
@@ -199,7 +214,7 @@ class SalahSequenceValidator {
                 confirmedPosture = currentPosture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Sustaining (standing): ${detectedPosture.displayName}"
+                message = "Sustaining (standing): ${detectedPosture.displayName}",
             )
         }
 
@@ -216,7 +231,7 @@ class SalahSequenceValidator {
                 confirmedPosture = currentPosture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Too fast: ${currentPosture?.displayName} held ${elapsed}ms (min ${MIN_POSTURE_DURATION_MS}ms)"
+                message = "Too fast: ${currentPosture?.displayName} held ${elapsed}ms (min ${MIN_POSTURE_DURATION_MS}ms)",
             )
         }
 
@@ -243,7 +258,7 @@ class SalahSequenceValidator {
                 confirmedPosture = currentPosture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Invalid transition: ${currentPosture?.displayName} → ${detectedPosture.displayName}"
+                message = "Invalid transition: ${currentPosture?.displayName} → ${detectedPosture.displayName}",
             )
         }
 
@@ -270,7 +285,7 @@ class SalahSequenceValidator {
                 confirmedPosture = posture,
                 prayerState = prayerState,
                 rakahCount = rakahCount,
-                message = "Prayer may be starting: ${posture.displayName}"
+                message = "Prayer may be starting: ${posture.displayName}",
             )
         }
 
@@ -280,7 +295,7 @@ class SalahSequenceValidator {
             confirmedPosture = null,
             prayerState = PrayerState.IDLE,
             rakahCount = 0,
-            message = "Waiting for Qiyam/QiyamRising to start prayer detection"
+            message = "Waiting for Qiyam/QiyamRising to start prayer detection",
         )
     }
 
@@ -329,14 +344,13 @@ class SalahSequenceValidator {
                     } else if (sujudCountInRakah >= 1) {
                         // Count partial rak'ah too (model may miss one sujud)
                         rakahCount++
-                        Log.d(TAG, "Rak'ah $rakahCount completed (partial: ${sujudCountInRakah} sujud detected)")
+                        Log.d(TAG, "Rak'ah $rakahCount completed (partial: $sujudCountInRakah sujud detected)")
                     }
                     // Reset rak'ah tracking
                     sujudCountInRakah = 0
                     seenRukuInRakah = false
                     seenSujudInRakah = false
-                }
-                else if (oldPosture == SalahPosture.SUJUD) {
+                } else if (oldPosture == SalahPosture.SUJUD) {
                     if (sujudCountInRakah >= 1) {
                         rakahCount++
                         Log.d(TAG, "Rak'ah $rakahCount completed (from sujud)")
@@ -377,7 +391,7 @@ class SalahSequenceValidator {
             confirmedPosture = newPosture,
             prayerState = prayerState,
             rakahCount = rakahCount,
-            message = "${oldPosture?.displayName} → ${newPosture.displayName}"
+            message = "${oldPosture?.displayName} → ${newPosture.displayName}",
         )
     }
 
@@ -394,7 +408,7 @@ class SalahSequenceValidator {
             confirmedPosture = currentPosture,
             prayerState = prayerState,
             rakahCount = rakahCount,
-            message = "Prayer completed: $rakahCount rak'ahs"
+            message = "Prayer completed: $rakahCount rak'ahs",
         )
         return result
     }

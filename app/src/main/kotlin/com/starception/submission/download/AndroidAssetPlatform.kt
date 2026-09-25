@@ -18,9 +18,6 @@ package com.starception.submission.download
 
 import android.content.Context
 import com.starception.submission.core.assetcache.AssetPlatform
-import java.io.File
-import java.io.FileOutputStream
-import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -28,6 +25,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import java.io.File
+import java.io.FileOutputStream
+import java.security.MessageDigest
 
 internal class AndroidAssetPlatform(
     private val context: Context,

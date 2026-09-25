@@ -1,172 +1,174 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.hadith
 
-import com.starception.submission.media.GlobalMediaViewModel
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.PredictiveBackHandler
+import android.content.res.Configuration
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.foundation.background
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.BookmarkBorder
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.CallReceived
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
-import android.content.res.Configuration
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.zIndex
+import com.starception.submission.R
+import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.Hadith
 import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.model.data.BukhariBooks
-import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
-import com.starception.submission.feature.surah.QuranFonts
-import com.starception.submission.util.toLocalizedDigits
-import com.starception.submission.core.designsystem.component.NiaTopicTag
-import com.starception.submission.core.designsystem.component.NiaVerifiedTag
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
-import com.starception.submission.feature.course.CourseCompletionBadgeCompact
+import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.feature.course.CourseProgressTracker
-import java.util.Locale
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.zIndex
-import androidx.compose.runtime.toMutableStateList
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
-import com.starception.submission.R
-import android.content.SharedPreferences
-import android.content.res.AssetFileDescriptor
-import android.media.MediaPlayer
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.scaleIn
-import com.starception.submission.voice.SherpaOnnxTtsService
-import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
-import com.starception.submission.voice.EnglishTtsTextNormalizer
+import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.media.GlobalMediaViewModel
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.TtsVoiceSelectionSheet
 import com.starception.submission.settings.components.isTtsVoiceModelAvailable
-import com.starception.submission.download.AudioDownloadHelper
-import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.util.toLocalizedDigits
+import com.starception.submission.voice.EnglishTtsTextNormalizer
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.EntryPointAccessors
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.FastOutSlowInEasing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.util.Locale
 import kotlin.coroutines.resume
 
 private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
@@ -188,7 +190,11 @@ private fun loadHadithSectionOrder(context: android.content.Context): List<Hadit
     val orderString = prefs.getString(HADITH_SECTION_ORDER_KEY, null) ?: return null
     return try {
         orderString.split(",").mapNotNull { name ->
-            try { HadithSection.valueOf(name) } catch (e: Exception) { null }
+            try {
+                HadithSection.valueOf(name)
+            } catch (e: Exception) {
+                null
+            }
         }
     } catch (e: Exception) {
         null
@@ -212,13 +218,14 @@ fun HadithDetailScreen(
     playbackRangeStart: Int? = null,
     playbackRangeEnd: Int? = null,
     shufflePlayback: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Capture the route-provided value, then shadow with mutable state so navigation
     // between hadiths (swipe or mini-bar prev/next) stays within this composable
     // instance — the same pattern SurahDetailScreen uses to keep the global mini-bar
     // visible across track changes instead of dismissing during a remount.
     val routeHadithNumber = hadithNumber
+
     @Suppress("NAME_SHADOWING")
     var hadithNumber by remember(routeHadithNumber) { mutableStateOf(routeHadithNumber) }
     // Enable immersive full-screen mode (hides status bar)
@@ -245,7 +252,7 @@ fun HadithDetailScreen(
     val entryPoint = remember {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
-            SherpaOnnxTtsEntryPoint::class.java
+            SherpaOnnxTtsEntryPoint::class.java,
         )
     }
     val sherpaOnnxTts = remember { entryPoint.sherpaOnnxTtsService() }
@@ -336,7 +343,7 @@ fun HadithDetailScreen(
     val availableProviders = listOf(
         "auto" to "Auto (Reverso → Google)",
         "google" to "Google Translate",
-        "reverso" to "Reverso"
+        "reverso" to "Reverso",
     )
 
     // Audio playback state
@@ -507,7 +514,7 @@ fun HadithDetailScreen(
 
         // Skip translation only for transliteration (no API support)
         if (selectedLanguage == "transliteration") {
-            translatedArabic = null  // Show original Arabic
+            translatedArabic = null // Show original Arabic
             translatedText = currentHadith.textPlain
             translatedElaboration = currentHadith.elaboration
             return@LaunchedEffect
@@ -515,7 +522,7 @@ fun HadithDetailScreen(
 
         // If Arabic is selected, show original Arabic text without translation
         if (selectedLanguage == "ar") {
-            translatedArabic = null  // Show original Arabic
+            translatedArabic = null // Show original Arabic
             translatedText = currentHadith.textPlain
             translatedElaboration = currentHadith.elaboration
             return@LaunchedEffect
@@ -861,13 +868,13 @@ fun HadithDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,  // Solid background to prevent sky showing through
-        contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, // Solid background to prevent sky showing through
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // No padding for status bar in immersive mode
     ) { _ ->
         HadithSwipeContainer(
             hadithNumber = hadithNumber,
             onNavigateToPreviousHadith = handleSkipPrev,
-            onNavigateToNextHadith = handleSkipNext
+            onNavigateToNextHadith = handleSkipNext,
         ) {
             when {
                 // Play tapped in English with the selected TTS voice model missing —
@@ -876,7 +883,7 @@ fun HadithDetailScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             com.starception.submission.download.MissingContentCard(
                                 resourceName = "${selectedVoice.displayName} Voice",
@@ -900,13 +907,13 @@ fun HadithDetailScreen(
                                 .padding(8.dp)
                                 .size(40.dp),
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
                         ) {
                             IconButton(onClick = { showTtsModelDownload = false }) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -921,7 +928,7 @@ fun HadithDetailScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             com.starception.submission.download.MissingContentCard(
                                 resourceName = "$collectionName Hadith Collection",
@@ -948,13 +955,13 @@ fun HadithDetailScreen(
                                 .padding(8.dp)
                                 .size(40.dp),
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
                         ) {
                             IconButton(onClick = wrappedOnBackClick) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -963,7 +970,7 @@ fun HadithDetailScreen(
                 error != null -> {
                     HadithErrorContent(
                         error = error!!,
-                        onBackClick = wrappedOnBackClick
+                        onBackClick = wrappedOnBackClick,
                     )
                 }
                 hadith != null -> {
@@ -1018,219 +1025,222 @@ fun HadithDetailScreen(
                             }
                         }
                     val handlePlayClick: () -> Unit = {
-                            if (isBookPlaylistPlayback) {
-                                // MediaSession owns pause/resume so the same behavior is used
-                                // by the in-app button, lock screen, Bluetooth and Android Auto.
-                                com.starception.submission.services.ChapterRecitationService
-                                    .toggle(context)
-                            } else if (isPlaying) {
-                                playbackGeneration += 1
-                                // Stop playback (local player, TTS, and the recitation service)
-                                mediaPlayer?.stop()
-                                mediaPlayer?.release()
-                                mediaPlayer = null
-                                textToSpeech?.stop()
-                                sherpaOnnxTts.stopSpeaking()
-                                com.starception.submission.services.ChapterRecitationService.stop(context)
-                                isTtsBackedPlayback = false
-                                isPlaying = false
-                            } else {
-                                // Start playback
-                                playbackGeneration += 1
-                                val playbackId = playbackGeneration
-                                val completeCurrentPlayback: () -> Unit = {
-                                    if (playbackGeneration == playbackId) {
-                                        handlePlaybackCompleted()
-                                    }
+                        if (isBookPlaylistPlayback) {
+                            // MediaSession owns pause/resume so the same behavior is used
+                            // by the in-app button, lock screen, Bluetooth and Android Auto.
+                            com.starception.submission.services.ChapterRecitationService
+                                .toggle(context)
+                        } else if (isPlaying) {
+                            playbackGeneration += 1
+                            // Stop playback (local player, TTS, and the recitation service)
+                            mediaPlayer?.stop()
+                            mediaPlayer?.release()
+                            mediaPlayer = null
+                            textToSpeech?.stop()
+                            sherpaOnnxTts.stopSpeaking()
+                            com.starception.submission.services.ChapterRecitationService.stop(context)
+                            isTtsBackedPlayback = false
+                            isPlaying = false
+                        } else {
+                            // Start playback
+                            playbackGeneration += 1
+                            val playbackId = playbackGeneration
+                            val completeCurrentPlayback: () -> Unit = {
+                                if (playbackGeneration == playbackId) {
+                                    handlePlaybackCompleted()
                                 }
-                                val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
-                                val playBengaliRecordingWithIntro: (source: String) -> Unit =
-                                    playRecording@{ source ->
-                                        val recordingHadithNumber = hadithNumber
-                                        if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                                            showTtsModelDownload = true
-                                            isPlaying = false
-                                            return@playRecording
-                                        }
-                                        CoroutineScope(Dispatchers.Main).launch {
-                                            isPlaying = true
-                                            isTtsBackedPlayback = true
-                                            com.starception.submission.services.ChapterRecitationService
-                                                .showExternalPlayback(
+                            }
+                            val isBukhari = databaseFile.contains("bukhari", ignoreCase = true)
+                            val playBengaliRecordingWithIntro: (source: String) -> Unit =
+                                playRecording@{ source ->
+                                    val recordingHadithNumber = hadithNumber
+                                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
+                                        showTtsModelDownload = true
+                                        isPlaying = false
+                                        return@playRecording
+                                    }
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        isPlaying = true
+                                        isTtsBackedPlayback = true
+                                        com.starception.submission.services.ChapterRecitationService
+                                            .showExternalPlayback(
+                                                context = context,
+                                                title = "Hadith #$recordingHadithNumber",
+                                                subtitle = "Sahih Bukhari",
+                                            )
+                                        sherpaOnnxTts.setVoice(selectedVoice)
+                                        val introCompleted = sherpaOnnxTts.speakCachedOrGenerate(
+                                            text = EnglishTtsTextNormalizer.bukhariIntro(
+                                                recordingHadithNumber,
+                                            ),
+                                            speakerId = selectedSpeakerId,
+                                        )
+                                        if (
+                                            introCompleted &&
+                                            playbackGeneration == playbackId
+                                        ) {
+                                            isTtsBackedPlayback = false
+                                            try {
+                                                com.starception.submission.services.ChapterRecitationService.play(
                                                     context = context,
+                                                    source = source,
                                                     title = "Hadith #$recordingHadithNumber",
                                                     subtitle = "Sahih Bukhari",
                                                 )
-                                            sherpaOnnxTts.setVoice(selectedVoice)
-                                            val introCompleted = sherpaOnnxTts.speakCachedOrGenerate(
-                                                text = EnglishTtsTextNormalizer.bukhariIntro(
-                                                    recordingHadithNumber,
-                                                ),
-                                                speakerId = selectedSpeakerId,
-                                            )
-                                            if (
-                                                introCompleted &&
-                                                playbackGeneration == playbackId
-                                            ) {
-                                                isTtsBackedPlayback = false
-                                                try {
-                                                    com.starception.submission.services.ChapterRecitationService.play(
-                                                        context = context,
-                                                        source = source,
-                                                        title = "Hadith #$recordingHadithNumber",
-                                                        subtitle = "Sahih Bukhari",
-                                                    )
-                                                    android.util.Log.i(
-                                                        "HadithDetailScreen",
-                                                        "Numbered English intro completed; playing Bengali recording: $source",
-                                                    )
-                                                } catch (e: Exception) {
-                                                    android.util.Log.e(
-                                                        "HadithDetailScreen",
-                                                        "Unable to play Bengali recording after intro",
-                                                        e,
-                                                    )
-                                                    playExactEnglishBukhariWithSherpa(
-                                                        completeCurrentPlayback,
-                                                    )
-                                                }
-                                            } else if (playbackGeneration == playbackId) {
-                                                isTtsBackedPlayback = false
-                                                isPlaying = false
-                                                com.starception.submission.services.ChapterRecitationService
-                                                    .stop(context)
-                                            }
-                                        }
-                                    }
-
-                                // Bengali first uses its matching recording. If that exact
-                                // track is unavailable, Bukhari always falls back to the
-                                // exact English entry in the user's selected Sherpa voice.
-                                if (selectedLanguage == "bn" && isBukhari) {
-                                    // Resolve audio: check cdn_assets first, then SD card
-                                    val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
-
-                                    if (audioFile != null) {
-                                        playBengaliRecordingWithIntro(audioFile.absolutePath)
-                                    } else if (!audioDownloadHelper.isOnline()) {
-                                        // Recording isn't cached and there's no network to fetch it.
-                                        // Tell the user why, then fall back to the on-device English
-                                        // Sherpa voice instead of hanging on a network timeout.
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "No internet connection",
-                                            android.widget.Toast.LENGTH_SHORT,
-                                        ).show()
-                                        playExactEnglishBukhariWithSherpa(completeCurrentPlayback)
-                                    } else {
-                                        // File not available locally - attempt on-demand download
-                                        val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
-                                        android.util.Log.i("HadithDetailScreen", "Bengali audio not found for hadith #$hadithNumber, downloading: $cdnKey")
-                                        isDownloadingAudio = true
-                                        downloadProgress = 0f
-
-                                        CoroutineScope(Dispatchers.Main).launch {
-                                            try {
-                                                // Collect download progress in background
-                                                val progressJob = launch {
-                                                    audioDownloadHelper.getDownloadProgress(cdnKey).collect { state ->
-                                                        when (state) {
-                                                            is AssetDownloadManager.DownloadState.Downloading -> {
-                                                                downloadProgress = state.progress
-                                                            }
-                                                            is AssetDownloadManager.DownloadState.Completed -> {
-                                                                downloadProgress = 1f
-                                                            }
-                                                            else -> {}
-                                                        }
-                                                    }
-                                                }
-
-                                                val result = audioDownloadHelper.downloadAudio(cdnKey)
-                                                progressJob.cancel()
-                                                isDownloadingAudio = false
-                                                downloadProgress = 0f
-
-                                                when (result) {
-                                                    is AssetDownloadManager.DownloadState.Completed -> {
-                                                        // Download successful - resolve and play
-                                                        val downloadedFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
-                                                        if (downloadedFile != null) {
-                                                            playBengaliRecordingWithIntro(
-                                                                downloadedFile.absolutePath,
-                                                            )
-                                                        } else {
-                                                            playExactEnglishBukhariWithSherpa(
-                                                                completeCurrentPlayback,
-                                                            )
-                                                        }
-                                                    }
-                                                    is AssetDownloadManager.DownloadState.Failed -> {
-                                                        android.util.Log.w("HadithDetailScreen", "Download failed: ${result.error}, using English Sherpa fallback")
-                                                        playExactEnglishBukhariWithSherpa(
-                                                            completeCurrentPlayback,
-                                                        )
-                                                    }
-                                                    else -> {
-                                                        playExactEnglishBukhariWithSherpa(
-                                                            completeCurrentPlayback,
-                                                        )
-                                                    }
-                                                }
+                                                android.util.Log.i(
+                                                    "HadithDetailScreen",
+                                                    "Numbered English intro completed; playing Bengali recording: $source",
+                                                )
                                             } catch (e: Exception) {
-                                                android.util.Log.e("HadithDetailScreen", "Download error", e)
-                                                isDownloadingAudio = false
-                                                downloadProgress = 0f
+                                                android.util.Log.e(
+                                                    "HadithDetailScreen",
+                                                    "Unable to play Bengali recording after intro",
+                                                    e,
+                                                )
                                                 playExactEnglishBukhariWithSherpa(
                                                     completeCurrentPlayback,
                                                 )
                                             }
+                                        } else if (playbackGeneration == playbackId) {
+                                            isTtsBackedPlayback = false
+                                            isPlaying = false
+                                            com.starception.submission.services.ChapterRecitationService
+                                                .stop(context)
                                         }
                                     }
-                                } else if (isBukhari) {
-                                    // Bukhari has no matching recording for this selected
-                                    // language. Do not route it through a system TTS voice.
-                                    playExactEnglishBukhariWithSherpa(
-                                        completeCurrentPlayback,
-                                    )
+                                }
+
+                            // Bengali first uses its matching recording. If that exact
+                            // track is unavailable, Bukhari always falls back to the
+                            // exact English entry in the user's selected Sherpa voice.
+                            if (selectedLanguage == "bn" && isBukhari) {
+                                // Resolve audio: check cdn_assets first, then SD card
+                                val audioFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
+
+                                if (audioFile != null) {
+                                    playBengaliRecordingWithIntro(audioFile.absolutePath)
+                                } else if (!audioDownloadHelper.isOnline()) {
+                                    // Recording isn't cached and there's no network to fetch it.
+                                    // Tell the user why, then fall back to the on-device English
+                                    // Sherpa voice instead of hanging on a network timeout.
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "No internet connection",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                    playExactEnglishBukhariWithSherpa(completeCurrentPlayback)
                                 } else {
-                                    // Use Sherpa-ONNX TTS (user-selected voice) for English
-                                    // For non-English languages, fall back to Android TTS
-                                    val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
-                                    if (selectedLanguage == "en") {
-                                        if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
-                                            // Selected voice model not downloaded — show the
-                                            // asset download page instead of failing silently.
-                                            android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
-                                            showTtsModelDownload = true
-                                        } else {
-                                            android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
-                                            playWithSherpaOnnxTts(
-                                                sherpaOnnxTts = sherpaOnnxTts,
-                                                text = textToSpeak,
-                                                hadithNumber = hadithNumber,
-                                                selectedVoice = selectedVoice,
-                                                speakerId = selectedSpeakerId,
-                                                onPlayingChanged = updateTtsPlaybackState,
-                                                onPlaybackCompleted = completeCurrentPlayback,
+                                    // File not available locally - attempt on-demand download
+                                    val cdnKey = audioDownloadHelper.getHadithCdnKey(hadithNumber)
+                                    android.util.Log.i("HadithDetailScreen", "Bengali audio not found for hadith #$hadithNumber, downloading: $cdnKey")
+                                    isDownloadingAudio = true
+                                    downloadProgress = 0f
+
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        try {
+                                            // Collect download progress in background
+                                            val progressJob = launch {
+                                                audioDownloadHelper.getDownloadProgress(cdnKey).collect { state ->
+                                                    when (state) {
+                                                        is AssetDownloadManager.DownloadState.Downloading -> {
+                                                            downloadProgress = state.progress
+                                                        }
+                                                        is AssetDownloadManager.DownloadState.Completed -> {
+                                                            downloadProgress = 1f
+                                                        }
+                                                        else -> {}
+                                                    }
+                                                }
+                                            }
+
+                                            val result = audioDownloadHelper.downloadAudio(cdnKey)
+                                            progressJob.cancel()
+                                            isDownloadingAudio = false
+                                            downloadProgress = 0f
+
+                                            when (result) {
+                                                is AssetDownloadManager.DownloadState.Completed -> {
+                                                    // Download successful - resolve and play
+                                                    val downloadedFile = audioDownloadHelper.resolveHadithAudioFile(hadithNumber)
+                                                    if (downloadedFile != null) {
+                                                        playBengaliRecordingWithIntro(
+                                                            downloadedFile.absolutePath,
+                                                        )
+                                                    } else {
+                                                        playExactEnglishBukhariWithSherpa(
+                                                            completeCurrentPlayback,
+                                                        )
+                                                    }
+                                                }
+                                                is AssetDownloadManager.DownloadState.Failed -> {
+                                                    android.util.Log.w("HadithDetailScreen", "Download failed: ${result.error}, using English Sherpa fallback")
+                                                    playExactEnglishBukhariWithSherpa(
+                                                        completeCurrentPlayback,
+                                                    )
+                                                }
+                                                else -> {
+                                                    playExactEnglishBukhariWithSherpa(
+                                                        completeCurrentPlayback,
+                                                    )
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("HadithDetailScreen", "Download error", e)
+                                            isDownloadingAudio = false
+                                            downloadProgress = 0f
+                                            playExactEnglishBukhariWithSherpa(
+                                                completeCurrentPlayback,
                                             )
                                         }
+                                    }
+                                }
+                            } else if (isBukhari) {
+                                // Bukhari has no matching recording for this selected
+                                // language. Do not route it through a system TTS voice.
+                                playExactEnglishBukhariWithSherpa(
+                                    completeCurrentPlayback,
+                                )
+                            } else {
+                                // Use Sherpa-ONNX TTS (user-selected voice) for English
+                                // For non-English languages, fall back to Android TTS
+                                val textToSpeak = translatedText ?: hadith!!.textPlain ?: ""
+                                if (selectedLanguage == "en") {
+                                    if (!isTtsVoiceModelAvailable(context, selectedVoice)) {
+                                        // Selected voice model not downloaded — show the
+                                        // asset download page instead of failing silently.
+                                        android.util.Log.i("HadithDetailScreen", "🔊 ${selectedVoice.displayName} model missing — showing download page")
+                                        showTtsModelDownload = true
                                     } else {
-                                        // Non-English languages use Android TTS (has more language support)
-                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Android TTS for $selectedLanguage")
-                                        playWithTts(
-                                            context = context,
+                                        android.util.Log.i("HadithDetailScreen", "🔊 Using Sherpa-ONNX TTS with ${selectedVoice.displayName}, speaker $selectedSpeakerId")
+                                        playWithSherpaOnnxTts(
+                                            sherpaOnnxTts = sherpaOnnxTts,
                                             text = textToSpeak,
-                                            language = selectedLanguage,
-                                            tts = textToSpeech,
-                                            onTtsCreated = { textToSpeech = it; isTtsInitialized = true },
+                                            hadithNumber = hadithNumber,
+                                            selectedVoice = selectedVoice,
+                                            speakerId = selectedSpeakerId,
                                             onPlayingChanged = updateTtsPlaybackState,
                                             onPlaybackCompleted = completeCurrentPlayback,
                                         )
                                     }
+                                } else {
+                                    // Non-English languages use Android TTS (has more language support)
+                                    android.util.Log.i("HadithDetailScreen", "🔊 Using Android TTS for $selectedLanguage")
+                                    playWithTts(
+                                        context = context,
+                                        text = textToSpeak,
+                                        language = selectedLanguage,
+                                        tts = textToSpeech,
+                                        onTtsCreated = {
+                                            textToSpeech = it
+                                            isTtsInitialized = true
+                                        },
+                                        onPlayingChanged = updateTtsPlaybackState,
+                                        onPlaybackCompleted = completeCurrentPlayback,
+                                    )
                                 }
                             }
                         }
+                    }
 
                     val currentHandlePlayClick by androidx.compose.runtime.rememberUpdatedState(handlePlayClick)
                     val currentSkipNext by androidx.compose.runtime.rememberUpdatedState(handleSkipNext)
@@ -1625,7 +1635,8 @@ private fun HadithContent(
             val fromSectionIndex = from.index - headerOffset
             val toSectionIndex = to.index - headerOffset
             if (fromSectionIndex >= 0 && toSectionIndex >= 0 &&
-                fromSectionIndex < localSections.size && toSectionIndex < localSections.size) {
+                fromSectionIndex < localSections.size && toSectionIndex < localSections.size
+            ) {
                 localSections.apply {
                     add(toSectionIndex, removeAt(fromSectionIndex))
                 }
@@ -1635,7 +1646,7 @@ private fun HadithContent(
 
         LazyColumn(
             state = lazyListState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             // Header with Masjid al-Nawabi image - with parallax effect
             item {
@@ -1653,7 +1664,7 @@ private fun HadithContent(
 
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
                 ) {
                     Column {
                         // Album-style header image with parallax
@@ -1665,8 +1676,8 @@ private fun HadithContent(
                                         Modifier.height(160.dp)
                                     } else {
                                         Modifier.aspectRatio(4f / 3f)
-                                    }
-                                )
+                                    },
+                                ),
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.masjid_al_nawabi),
@@ -1687,7 +1698,7 @@ private fun HadithContent(
                                         alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
                                     },
                                 contentScale = ContentScale.Crop,
-                                alignment = Alignment.Center
+                                alignment = Alignment.Center,
                             )
                         }
 
@@ -1696,7 +1707,7 @@ private fun HadithContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isLandscape) 130.dp else 170.dp)
+                                .height(if (isLandscape) 130.dp else 170.dp),
                         ) {
                             AnimatedContent(
                                 targetState = showMusicPlayer,
@@ -1704,31 +1715,31 @@ private fun HadithContent(
                                     if (targetState) {
                                         slideInVertically(
                                             animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                            initialOffsetY = { it / 3 }
+                                            initialOffsetY = { it / 3 },
                                         ) + fadeIn(
-                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
                                         ) togetherWith slideOutVertically(
                                             animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                            targetOffsetY = { -it / 3 }
+                                            targetOffsetY = { -it / 3 },
                                         ) + fadeOut(
-                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
                                         )
                                     } else {
                                         slideInVertically(
                                             animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                            initialOffsetY = { -it / 3 }
+                                            initialOffsetY = { -it / 3 },
                                         ) + fadeIn(
-                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
                                         ) togetherWith slideOutVertically(
                                             animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                            targetOffsetY = { it / 3 }
+                                            targetOffsetY = { it / 3 },
                                         ) + fadeOut(
-                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
                                         )
                                     }
                                 },
                                 label = "Hadith Player Controls Transition",
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
                             ) { showPlayer ->
                                 if (showPlayer) {
                                     HadithPlayerControls(
@@ -1743,14 +1754,14 @@ private fun HadithContent(
                                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                                            .padding(horizontal = 24.dp, vertical = 16.dp),
                                     ) {
                                         Column {
                                             Text(
                                                 text = hadith.collectionNameEnglish.ifEmpty { collectionName },
                                                 style = MaterialTheme.typography.headlineMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
+                                                color = MaterialTheme.colorScheme.onSurface,
                                             )
 
                                             if (hadith.author.isNotEmpty()) {
@@ -1759,7 +1770,7 @@ private fun HadithContent(
                                                     text = "Compiled by ${hadith.author}",
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    fontStyle = FontStyle.Italic
+                                                    fontStyle = FontStyle.Italic,
                                                 )
                                             }
 
@@ -1768,12 +1779,12 @@ private fun HadithContent(
                                             val courseCompletionInfo = CourseProgressTracker.getHadithCourseCompletion(
                                                 context,
                                                 hadithNumber,
-                                                databaseFile
+                                                databaseFile,
                                             )
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
+                                                verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 NiaTopicTag(
                                                     followed = true,
@@ -1782,9 +1793,9 @@ private fun HadithContent(
                                                     text = {
                                                         Text(
                                                             text = "Hadith #${hadithNumber.toLocalizedDigits(selectedLanguage)}"
-                                                                .uppercase(Locale.getDefault())
+                                                                .uppercase(Locale.getDefault()),
                                                         )
-                                                    }
+                                                    },
                                                 )
 
                                                 if (bukhariBook != null) {
@@ -1812,9 +1823,9 @@ private fun HadithContent(
                                                         enabled = true,
                                                         text = {
                                                             Text(
-                                                                text = courseCompletionInfo.courseName.uppercase(Locale.getDefault())
+                                                                text = courseCompletionInfo.courseName.uppercase(Locale.getDefault()),
                                                             )
-                                                        }
+                                                        },
                                                     )
                                                 }
                                             }
@@ -1830,15 +1841,15 @@ private fun HadithContent(
                     androidx.compose.animation.AnimatedVisibility(
                         visible = showFabVisible,
                         enter = scaleIn(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                         ) + fadeIn(animationSpec = tween(durationMillis = 300)),
                         exit = scaleOut(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                         ) + fadeOut(animationSpec = tween(durationMillis = 300)),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .offset(y = (-142).dp)
-                            .padding(end = 12.dp)
+                            .padding(end = 12.dp),
                     ) {
                         FloatingActionButton(
                             onClick = {
@@ -1850,7 +1861,7 @@ private fun HadithContent(
                                 }
                             },
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                         ) {
                             Icon(
                                 imageVector = when {
@@ -1862,7 +1873,7 @@ private fun HadithContent(
                                     showMusicPlayer -> "Minimize player"
                                     isPlaying -> "Pause"
                                     else -> "Play"
-                                }
+                                },
                             )
                         }
                     }
@@ -1889,11 +1900,11 @@ private fun HadithContent(
                                 showDragHandle = true,
                                 isDragging = isDragging,
                                 dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
                             ) {
                                 Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                 ) {
                                     CompositionLocalProvider(
                                         LocalLayoutDirection provides LayoutDirection.Rtl,
@@ -1915,14 +1926,14 @@ private fun HadithContent(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(1.dp)
-                                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                                .background(MaterialTheme.colorScheme.outlineVariant),
                                         )
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Text(
                                             text = "Hadith (${getLanguageName(selectedLanguage)})",
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         val translationDirection = hadithLayoutDirection(selectedLanguage)
@@ -1957,7 +1968,7 @@ private fun HadithContent(
                                 showDragHandle = true,
                                 isDragging = isDragging,
                                 dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
                             )
                         }
                         HadithSection.EXPLANATION -> {
@@ -1974,7 +1985,7 @@ private fun HadithContent(
                                 showDragHandle = true,
                                 isDragging = isDragging,
                                 dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
+                                modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
                             )
                         }
                     }
@@ -1995,7 +2006,7 @@ private fun HadithContent(
             red = 1f + (surfaceColor.red - 1f) * collapseProgress.value,
             green = 1f + (surfaceColor.green - 1f) * collapseProgress.value,
             blue = 1f + (surfaceColor.blue - 1f) * collapseProgress.value,
-            alpha = 1f
+            alpha = 1f,
         )
 
         // Get center camera cutout bounds to avoid overlapping icons
@@ -2040,7 +2051,7 @@ private fun HadithContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
+                .padding(top = 8.dp), // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier
@@ -2048,19 +2059,19 @@ private fun HadithContent(
                     .height(64.dp)
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 // LEFT SIDE - Back button
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = toolbarContentColor.copy(alpha = 0.15f)
+                    color = toolbarContentColor.copy(alpha = 0.15f),
                 ) {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = toolbarContentColor
+                            tint = toolbarContentColor,
                         )
                     }
                 }
@@ -2068,13 +2079,13 @@ private fun HadithContent(
                 // RIGHT SIDE - Dynamic icons based on available space
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(0.dp)
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     // Bookmark button - same filled/outlined treatment as Surah Details.
                     if (showBookmarkButton) {
                         IconButton(
                             onClick = onBookmarkClick,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(44.dp),
                         ) {
                             Icon(
                                 imageVector = if (isBookmarked) {
@@ -2088,7 +2099,7 @@ private fun HadithContent(
                                     "Add bookmark"
                                 },
                                 tint = toolbarContentColor,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
@@ -2103,22 +2114,22 @@ private fun HadithContent(
                                 Text(
                                     text = collectionName.uppercase(Locale.getDefault()),
                                     fontSize = 10.sp,
-                                    maxLines = 1
+                                    maxLines = 1,
                                 )
-                            }
+                            },
                         )
                     }
 
                     // More options — opens the voice-selection bottom sheet
                     IconButton(
                         onClick = onMoreClick,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(44.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "More options",
                             tint = toolbarContentColor,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }
@@ -2379,7 +2390,7 @@ private fun playWithSherpaOnnxTts(
                 speakerId = speakerId,
                 onComplete = {
                     onPlaybackCompleted()
-                }
+                },
             )
 
             if (!success) {
@@ -2404,20 +2415,20 @@ private fun HadithSectionCard(
     showDragHandle: Boolean = false,
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(isExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        label = "chevronRotation"
+        label = "chevronRotation",
     )
 
     // Background color for the section
     val sectionColor by animateColorAsState(
         targetValue = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         animationSpec = tween(150, easing = FastOutSlowInEasing),
-        label = "sectionColor"
+        label = "sectionColor",
     )
     val sectionShape = RoundedCornerShape(12.dp)
 
@@ -2430,72 +2441,73 @@ private fun HadithSectionCard(
             .shadow(
                 elevation = if (isDragging) 8.dp else 0.dp,
                 shape = sectionShape,
-                clip = false
+                clip = false,
             )
             .clip(sectionShape)
-            .background(sectionColor)
+            .background(sectionColor),
     ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = sectionShape,
-        color = sectionColor,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp
-    ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent border - spans full height including drag handle
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .background(accentColor)
-                    .then(
-                        if (expanded) {
-                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
-                        } else {
-                            Modifier.height(if (showDragHandle) 84.dp else 56.dp)
-                        }
-                    )
-            )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = sectionShape,
+            color = sectionColor,
+            tonalElevation = 1.dp,
+            shadowElevation = 2.dp,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border - spans full height including drag handle
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .background(accentColor)
+                        .then(
+                            if (expanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(if (showDragHandle) 84.dp else 56.dp)
+                            },
+                        ),
+                )
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                // Drag handle at top center - this is the only draggable area
-                if (showDragHandle) {
-                    val dragIconTint by animateColorAsState(
-                        targetValue = if (isDragging)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        animationSpec = tween(150, easing = FastOutSlowInEasing),
-                        label = "dragIconTint"
-                    )
-                    Box(
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    // Drag handle at top center - this is the only draggable area
+                    if (showDragHandle) {
+                        val dragIconTint by animateColorAsState(
+                            targetValue = if (isDragging) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            },
+                            animationSpec = tween(150, easing = FastOutSlowInEasing),
+                            label = "dragIconTint",
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Drag to reorder",
+                                tint = dragIconTint,
+                                modifier = dragHandleModifier.size(24.dp),
+                            )
+                        }
+                    }
+
+                    // Header row - clickable to expand/collapse
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = "Drag to reorder",
-                            tint = dragIconTint,
-                            modifier = dragHandleModifier.size(24.dp)
-                        )
-                    }
-                }
-
-                // Header row - clickable to expand/collapse
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { expanded = !expanded }
-                        .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                            .clickable { expanded = !expanded }
+                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
@@ -2503,14 +2515,14 @@ private fun HadithSectionCard(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .graphicsLayer { rotationZ = rotationAngle }
+                                    .graphicsLayer { rotationZ = rotationAngle },
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                             if (isLoading) {
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -2519,8 +2531,8 @@ private fun HadithSectionCard(
                                         .size(16.dp)
                                         .background(
                                             MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                                            RoundedCornerShape(8.dp)
-                                        )
+                                            RoundedCornerShape(8.dp),
+                                        ),
                                 )
                             }
                         }
@@ -2530,72 +2542,72 @@ private fun HadithSectionCard(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(24.dp)
-                                .graphicsLayer { rotationZ = rotationAngle }
+                                .graphicsLayer { rotationZ = rotationAngle },
                         )
                     }
 
-                // Expandable content with animation
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = expanded,
-                    enter = androidx.compose.animation.expandVertically(
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + androidx.compose.animation.fadeIn(
-                        animationSpec = tween(200, easing = FastOutSlowInEasing)
-                    ),
-                    exit = androidx.compose.animation.shrinkVertically(
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + androidx.compose.animation.fadeOut(
-                        animationSpec = tween(200, easing = FastOutSlowInEasing)
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    // Expandable content with animation
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = expanded,
+                        enter = androidx.compose.animation.expandVertically(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
+                        ) + androidx.compose.animation.fadeIn(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        ),
+                        exit = androidx.compose.animation.shrinkVertically(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
+                        ) + androidx.compose.animation.fadeOut(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        ),
                     ) {
-                        if (isLoading) {
-                            // Shimmer loading effect for text
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                repeat(3) { index ->
-                                    val widthFraction = when (index) {
-                                        0 -> 1f
-                                        1 -> 0.85f
-                                        else -> 0.6f
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        ) {
+                            if (isLoading) {
+                                // Shimmer loading effect for text
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    repeat(3) { index ->
+                                        val widthFraction = when (index) {
+                                            0 -> 1f
+                                            1 -> 0.85f
+                                            else -> 0.6f
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(widthFraction)
+                                                .height(14.dp)
+                                                .background(
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                    RoundedCornerShape(4.dp),
+                                                ),
+                                        )
                                     }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(widthFraction)
-                                            .height(14.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                RoundedCornerShape(4.dp)
-                                            )
+                                }
+                            } else {
+                                CompositionLocalProvider(
+                                    LocalLayoutDirection provides hadithLayoutDirection(contentLanguage),
+                                ) {
+                                    Text(
+                                        text = content,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 15.sp,
+                                            lineHeight = 24.sp,
+                                        ),
+                                        textAlign = hadithTextAlignment(contentLanguage),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                            }
-                        } else {
-                            CompositionLocalProvider(
-                                LocalLayoutDirection provides hadithLayoutDirection(contentLanguage),
-                            ) {
-                                Text(
-                                    text = content,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = 15.sp,
-                                        lineHeight = 24.sp,
-                                    ),
-                                    textAlign = hadithTextAlignment(contentLanguage),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
                     }
                 }
             }
         }
-    }
     }
 }
 
@@ -2611,20 +2623,20 @@ private fun HadithSectionCardWithContent(
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(isExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        label = "chevronRotation"
+        label = "chevronRotation",
     )
 
     // Background color for the section
     val sectionColor by animateColorAsState(
         targetValue = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         animationSpec = tween(150, easing = FastOutSlowInEasing),
-        label = "sectionColor"
+        label = "sectionColor",
     )
     val sectionShape = RoundedCornerShape(12.dp)
 
@@ -2637,72 +2649,73 @@ private fun HadithSectionCardWithContent(
             .shadow(
                 elevation = if (isDragging) 8.dp else 0.dp,
                 shape = sectionShape,
-                clip = false
+                clip = false,
             )
             .clip(sectionShape)
-            .background(sectionColor)
+            .background(sectionColor),
     ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = sectionShape,
-        color = sectionColor,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp
-    ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent border - spans full height including drag handle
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .background(accentColor)
-                    .then(
-                        if (expanded) {
-                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
-                        } else {
-                            Modifier.height(if (showDragHandle) 84.dp else 56.dp)
-                        }
-                    )
-            )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = sectionShape,
+            color = sectionColor,
+            tonalElevation = 1.dp,
+            shadowElevation = 2.dp,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border - spans full height including drag handle
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .background(accentColor)
+                        .then(
+                            if (expanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(if (showDragHandle) 84.dp else 56.dp)
+                            },
+                        ),
+                )
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                // Drag handle at top center - this is the only draggable area
-                if (showDragHandle) {
-                    val dragIconTint by animateColorAsState(
-                        targetValue = if (isDragging)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        animationSpec = tween(150, easing = FastOutSlowInEasing),
-                        label = "dragIconTint"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = "Drag to reorder",
-                            tint = dragIconTint,
-                            modifier = dragHandleModifier.size(24.dp)
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    // Drag handle at top center - this is the only draggable area
+                    if (showDragHandle) {
+                        val dragIconTint by animateColorAsState(
+                            targetValue = if (isDragging) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            },
+                            animationSpec = tween(150, easing = FastOutSlowInEasing),
+                            label = "dragIconTint",
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Drag to reorder",
+                                tint = dragIconTint,
+                                modifier = dragHandleModifier.size(24.dp),
+                            )
+                        }
                     }
-                }
 
-                // Header row - clickable to expand/collapse
-                Row(
+                    // Header row - clickable to expand/collapse
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { expanded = !expanded }
                             .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
@@ -2710,14 +2723,14 @@ private fun HadithSectionCardWithContent(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .graphicsLayer { rotationZ = rotationAngle }
+                                    .graphicsLayer { rotationZ = rotationAngle },
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                         Icon(
@@ -2726,7 +2739,7 @@ private fun HadithSectionCardWithContent(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(24.dp)
-                                .graphicsLayer { rotationZ = rotationAngle }
+                                .graphicsLayer { rotationZ = rotationAngle },
                         )
                     }
 
@@ -2734,20 +2747,20 @@ private fun HadithSectionCardWithContent(
                     androidx.compose.animation.AnimatedVisibility(
                         visible = expanded,
                         enter = androidx.compose.animation.expandVertically(
-                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
                         ) + androidx.compose.animation.fadeIn(
-                            animationSpec = tween(200, easing = FastOutSlowInEasing)
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
                         ),
                         exit = androidx.compose.animation.shrinkVertically(
-                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
                         ) + androidx.compose.animation.fadeOut(
-                            animationSpec = tween(200, easing = FastOutSlowInEasing)
-                        )
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
+                        ),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         ) {
                             content()
                         }
@@ -2764,7 +2777,7 @@ private fun HadithSectionCardWithContent(
 private enum class HadithSection {
     ARABIC,
     TRANSLATION,
-    EXPLANATION
+    EXPLANATION,
 }
 
 /** Keeps paragraph direction and its visual edge consistent for every Hadith language. */
@@ -2810,11 +2823,10 @@ private fun normalizeHadithParagraphs(text: String): String = text
         paragraph.replace(Regex("\\s+"), " ").trim()
     }
 
-
 @Composable
 private fun HadithErrorContent(
     error: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -2822,25 +2834,25 @@ private fun HadithErrorContent(
                 .fillMaxSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
                 imageVector = Icons.Default.MenuBook,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(64.dp),
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Error loading hadith",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
             )
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -2851,13 +2863,13 @@ private fun HadithErrorContent(
                 .padding(8.dp)
                 .size(40.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             IconButton(onClick = onBackClick) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -2867,7 +2879,7 @@ private fun HadithErrorContent(
 @Composable
 private fun HadithShimmerLoading(
     onBackClick: () -> Unit,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -2882,8 +2894,8 @@ private fun HadithShimmerLoading(
                                 Modifier.height(160.dp)
                             } else {
                                 Modifier.aspectRatio(4f / 3f)
-                            }
-                        )
+                            },
+                        ),
                 ) {
                     Image(
                         painter = painterResource(R.drawable.masjid_al_nawabi),
@@ -2891,7 +2903,7 @@ private fun HadithShimmerLoading(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                         alignment = Alignment.Center,
-                        alpha = 0.6f // Slightly dimmed for shimmer effect
+                        alpha = 0.6f, // Slightly dimmed for shimmer effect
                     )
                 }
 
@@ -2899,13 +2911,13 @@ private fun HadithShimmerLoading(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (isLandscape) 130.dp else 170.dp)
+                        .height(if (isLandscape) 130.dp else 170.dp),
                 ) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
                     ) {
                         Column {
                             // Collection name shimmer
@@ -2914,8 +2926,8 @@ private fun HadithShimmerLoading(
                                     .size(width = 200.dp, height = 28.dp)
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        RoundedCornerShape(8.dp)
-                                    )
+                                        RoundedCornerShape(8.dp),
+                                    ),
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             // Author shimmer
@@ -2924,8 +2936,8 @@ private fun HadithShimmerLoading(
                                     .size(width = 260.dp, height = 16.dp)
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                        RoundedCornerShape(6.dp)
-                                    )
+                                        RoundedCornerShape(6.dp),
+                                    ),
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             // Hadith number chip shimmer
@@ -2934,8 +2946,8 @@ private fun HadithShimmerLoading(
                                     .size(width = 100.dp, height = 32.dp)
                                     .background(
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                        RoundedCornerShape(16.dp)
-                                    )
+                                        RoundedCornerShape(16.dp),
+                                    ),
                             )
                         }
                     }
@@ -2945,7 +2957,7 @@ private fun HadithShimmerLoading(
             // Content shimmer
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 repeat(3) {
                     Box(
@@ -2954,8 +2966,8 @@ private fun HadithShimmerLoading(
                             .height(100.dp)
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(12.dp)
-                            )
+                                RoundedCornerShape(12.dp),
+                            ),
                     )
                 }
             }
@@ -2965,25 +2977,25 @@ private fun HadithShimmerLoading(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
+                .padding(top = 8.dp), // Minimal top padding since status bar is hidden by immersive mode
         ) {
             Row(
                 modifier = Modifier
                     .height(64.dp)
                     .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)) // Honor camera cutout horizontally only
                     .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.15f)
+                    color = Color.White.copy(alpha = 0.15f),
                 ) {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                 }
@@ -3001,7 +3013,7 @@ private fun HadithSwipeContainer(
     hadithNumber: Int,
     onNavigateToPreviousHadith: () -> Unit,
     onNavigateToNextHadith: () -> Unit,
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable BoxScope.() -> Unit,
 ) {
     var swipeOffsetX by remember { mutableStateOf(0f) }
     var touchY by remember { mutableStateOf(0f) }
@@ -3050,7 +3062,7 @@ private fun HadithSwipeContainer(
                         change.consume()
                         swipeOffsetX += dragAmount.x
                         touchY = change.position.y
-                    }
+                    },
                 )
             },
     ) {
@@ -3075,7 +3087,7 @@ private fun HadithSwipeContainer(
                     .align(Alignment.TopStart)
                     .offset(
                         x = if (thresholdReachedLeft) detachOffset else 0.dp,
-                        y = verticalOffset
+                        y = verticalOffset,
                     ),
             )
         }
@@ -3089,7 +3101,7 @@ private fun HadithSwipeContainer(
                     .align(Alignment.TopEnd)
                     .offset(
                         x = if (thresholdReachedRight) -detachOffset else 0.dp,
-                        y = verticalOffset
+                        y = verticalOffset,
                     ),
             )
         }
@@ -3155,7 +3167,7 @@ private fun HadithPlayerControls(
     onCollapse: () -> Unit,
     autoAdvance: Boolean,
     onToggleAutoAdvance: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val audioManager = remember {
@@ -3174,9 +3186,9 @@ private fun HadithPlayerControls(
             .fillMaxHeight()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
+                indication = null,
             ) { onCollapse() },
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         val contentColor = MaterialTheme.colorScheme.onSurface
         Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -3193,7 +3205,7 @@ private fun HadithPlayerControls(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(2.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 )
             }
 
@@ -3204,41 +3216,41 @@ private fun HadithPlayerControls(
                     .fillMaxWidth()
                     .padding(horizontal = 28.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Replay,
                         contentDescription = "Replay",
                         tint = contentColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
 
                 IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(56.dp),
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = contentColor,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(44.dp),
                     )
                 }
 
                 IconButton(
                     onClick = onToggleAutoAdvance,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Repeat,
                         contentDescription = if (autoAdvance) "Auto-advance on" else "Auto-advance off",
                         tint = if (autoAdvance) MaterialTheme.colorScheme.primary else contentColor.copy(alpha = 0.5f),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
 
@@ -3247,13 +3259,13 @@ private fun HadithPlayerControls(
                         if (isPlaying) onPlayPauseClick()
                         onCollapse()
                     },
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Stop,
                         contentDescription = "Stop",
                         tint = contentColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
@@ -3265,13 +3277,13 @@ private fun HadithPlayerControls(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.VolumeDown,
                     contentDescription = "Volume down",
                     tint = contentColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
 
                 Slider(
@@ -3281,22 +3293,22 @@ private fun HadithPlayerControls(
                         audioManager.setStreamVolume(
                             android.media.AudioManager.STREAM_MUSIC,
                             (v * maxVolume).toInt(),
-                            0
+                            0,
                         )
                     },
                     modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
                 )
 
                 Icon(
                     imageVector = Icons.Default.VolumeUp,
                     contentDescription = "Volume up",
                     tint = contentColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

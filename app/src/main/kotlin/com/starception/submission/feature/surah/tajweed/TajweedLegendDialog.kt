@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.surah.tajweed
 
 import androidx.compose.foundation.background
@@ -22,13 +38,13 @@ import com.starception.submission.core.designsystem.component.NiaOutlinedButton
  */
 @Composable
 fun TajweedLegendDialog(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
-            usePlatformDefaultWidth = false
-        )
+            usePlatformDefaultWidth = false,
+        ),
     ) {
         Surface(
             modifier = Modifier
@@ -36,33 +52,33 @@ fun TajweedLegendDialog(
                 .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) {
                 // Header
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
                             text = "Tajweed Color Guide",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Learn the meaning of each color",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                         )
                     }
                 }
@@ -73,7 +89,7 @@ fun TajweedLegendDialog(
                         .weight(1f)
                         .fillMaxWidth(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(TajweedRule.entries.toList()) { rule ->
                         TajweedLegendItem(rule = rule)
@@ -82,16 +98,16 @@ fun TajweedLegendDialog(
 
                 // Close button
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.End,
                     ) {
                         NiaOutlinedButton(
-                            onClick = onDismiss
+                            onClick = onDismiss,
                         ) {
                             Text("Got it!")
                         }
@@ -106,14 +122,14 @@ fun TajweedLegendDialog(
 private fun TajweedLegendItem(rule: TajweedRule) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Color indicator
             Box(
@@ -121,39 +137,39 @@ private fun TajweedLegendItem(rule: TajweedRule) {
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(rule.color),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Show a sample Arabic letter
                 Text(
                     text = getSampleLetter(rule),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = androidx.compose.ui.graphics.Color.White
+                    color = androidx.compose.ui.graphics.Color.White,
                 )
             }
 
             // Rule info
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 // Arabic name
                 Text(
                     text = rule.arabicName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 // English name and description
                 Text(
                     text = getEnglishName(rule),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 // Brief description
                 Text(
                     text = getRuleDescription(rule),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
         }

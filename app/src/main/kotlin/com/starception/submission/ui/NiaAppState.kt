@@ -22,7 +22,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -36,21 +35,20 @@ import com.starception.submission.core.data.util.NetworkMonitor
 import com.starception.submission.core.data.util.TimeZoneMonitor
 import com.starception.submission.core.ui.TrackDisposableJank
 import com.starception.submission.feature.bookmarks.navigation.navigateToBookmarks
+import com.starception.submission.feature.course.navigation.CourseDetailRoute
+import com.starception.submission.feature.dua.DuaDetailRoute
 import com.starception.submission.feature.foryou.navigation.navigateToForYou
+import com.starception.submission.feature.hadith.HadithDetailRoute
 import com.starception.submission.feature.interests.navigation.navigateToInterests
 import com.starception.submission.feature.search.navigation.navigateToSearch
-import com.starception.submission.feature.prayertimes.navigation.navigateToPrayerTimes
+import com.starception.submission.feature.surah.navigation.SurahRoute
 import com.starception.submission.navigation.TopLevelDestination
 import com.starception.submission.navigation.TopLevelDestination.BOOKMARKS
 import com.starception.submission.navigation.TopLevelDestination.COURSE
 import com.starception.submission.navigation.TopLevelDestination.FOR_YOU
-import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.navigation.TopLevelDestination.HOME
-import com.starception.submission.feature.surah.navigation.SurahRoute
+import com.starception.submission.navigation.TopLevelDestination.INTERESTS
 import com.starception.submission.settings.navigation.SettingsRoute
-import com.starception.submission.feature.course.navigation.CourseDetailRoute
-import com.starception.submission.feature.dua.DuaDetailRoute
-import com.starception.submission.feature.hadith.HadithDetailRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -67,7 +65,6 @@ fun rememberNiaAppState(
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     navController: NavHostController = rememberNavController(),
 ): NiaAppState {
-    
     NavigationTrackingSideEffect(navController)
     return remember(
         navController,
@@ -125,19 +122,19 @@ class NiaAppState(
         @Composable get() {
             val destination = currentDestination ?: return false
             return destination.hasRoute<SurahRoute>() ||
-                   destination.hasRoute<CourseDetailRoute>() ||
-                   destination.hasRoute<DuaDetailRoute>() ||
-                   destination.hasRoute<HadithDetailRoute>()
+                destination.hasRoute<CourseDetailRoute>() ||
+                destination.hasRoute<DuaDetailRoute>() ||
+                destination.hasRoute<HadithDetailRoute>()
         }
 
     val shouldHideStatusBar: Boolean
         @Composable get() {
             val destination = currentDestination ?: return false
             return destination.hasRoute<SurahRoute>() ||
-                   destination.hasRoute<CourseDetailRoute>() ||
-                   destination.hasRoute<DuaDetailRoute>() ||
-                   destination.hasRoute<HadithDetailRoute>() ||
-                   destination.hasRoute<SettingsRoute>()
+                destination.hasRoute<CourseDetailRoute>() ||
+                destination.hasRoute<DuaDetailRoute>() ||
+                destination.hasRoute<HadithDetailRoute>() ||
+                destination.hasRoute<SettingsRoute>()
         }
 
     val isOffline = networkMonitor.isOnline

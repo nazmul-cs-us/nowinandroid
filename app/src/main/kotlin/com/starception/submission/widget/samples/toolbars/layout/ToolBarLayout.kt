@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.starception.submission.widget.samples.toolbars.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -36,20 +36,19 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
-import com.starception.submission.R
+import com.starception.submission.widget.LocalWidgetHostBackground
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.iconSize
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.itemsSpacing
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.minButtonSize
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutDimens.widgetPadding
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.Companion.canShowHeaderTitle
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.Companion.canUseFilledButtons
-import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.Companion.numberOfItemsThatFit
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.Companion.numberOfContentButtonsInTwoRowGrid
+import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.Companion.numberOfItemsThatFit
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.HeaderTwoRowGrid
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.HorizontalRow
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.TwoRowGrid
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayoutSize.VerticalColumn
-import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
 
 /**
  * A layout focused on presenting a brand icon, a most frequently used entrypoint along with 4
@@ -66,112 +65,111 @@ import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDe
  */
 @Composable
 fun ToolBarLayout(
-  appName: String,
-  @DrawableRes appIconRes: Int,
-  headerButton: ToolBarButton,
-  // 4 items, as a list here for convenience, that you might inline in your implementation.
-  buttons: List<ToolBarButton>,
+    appName: String,
+    @DrawableRes appIconRes: Int,
+    headerButton: ToolBarButton,
+    // 4 items, as a list here for convenience, that you might inline in your implementation.
+    buttons: List<ToolBarButton>,
 ) {
-  // Deconstructed header items shown along side other buttons in smaller widget sizes where
-  // a header isn't shown.
-  val appIconItem: @Composable () -> Unit = {
-    FluidHeaderAppIcon(iconRes = appIconRes)
-  }
-  val headerButtonItem: @Composable () -> Unit = {
-    // Unlike in the combined header case, this header button is fluid & fills the available space
-    // allowing us to display it along with other buttons.
-    FluidHeaderIconButton(
-      button = headerButton
-    )
-  }
-
-  // Combined header item (which shows app icon and header button in the title bar); shown at larger
-  // widget sizes.
-  val header: @Composable () -> Unit = {
-    Header(
-      appIconRes = appIconRes,
-      actionButton = headerButton,
-      title = if (canShowHeaderTitle()) {
-        appName
-      } else {
-        ""
-      },
-    )
-  }
-
-  // Other buttons
-  val buttonItems: List<@Composable () -> Unit> =
-    buttons.map { { FluidContentIconButton(it, filled = canUseFilledButtons()) } }
-
-  when (val layoutSize = ToolBarLayoutSize.fromLocalSize()) {
-    HorizontalRow, VerticalColumn -> {
-
-      Scaffold(
-        backgroundColor = LocalWidgetHostBackground.current,
-        modifier = GlanceModifier
-          .padding(vertical = widgetPadding),
-        horizontalPadding = widgetPadding,
-      ) {
-        val horizontal = layoutSize == HorizontalRow
-        val numberOfItems = numberOfItemsThatFit(
-          horizontal = horizontal,
-          minItemSize = minButtonSize,
-          spacing = itemsSpacing
+    // Deconstructed header items shown along side other buttons in smaller widget sizes where
+    // a header isn't shown.
+    val appIconItem: @Composable () -> Unit = {
+        FluidHeaderAppIcon(iconRes = appIconRes)
+    }
+    val headerButtonItem: @Composable () -> Unit = {
+        // Unlike in the combined header case, this header button is fluid & fills the available space
+        // allowing us to display it along with other buttons.
+        FluidHeaderIconButton(
+            button = headerButton,
         )
-        val allItems = listOf(appIconItem, headerButtonItem) + buttonItems
-        val finalItems = allItems.take(numberOfItems)
+    }
 
-        if (horizontal) {
-          SpacedRow(
-            items = finalItems,
-            spacing = itemsSpacing,
-            modifier = GlanceModifier.fillMaxSize()
-          )
-        } else {
-          SpacedColumn(
-            items = finalItems,
-            spacing = itemsSpacing,
-            modifier = GlanceModifier.fillMaxSize()
-          )
+    // Combined header item (which shows app icon and header button in the title bar); shown at larger
+    // widget sizes.
+    val header: @Composable () -> Unit = {
+        Header(
+            appIconRes = appIconRes,
+            actionButton = headerButton,
+            title = if (canShowHeaderTitle()) {
+                appName
+            } else {
+                ""
+            },
+        )
+    }
+
+    // Other buttons
+    val buttonItems: List<@Composable () -> Unit> =
+        buttons.map { { FluidContentIconButton(it, filled = canUseFilledButtons()) } }
+
+    when (val layoutSize = ToolBarLayoutSize.fromLocalSize()) {
+        HorizontalRow, VerticalColumn -> {
+            Scaffold(
+                backgroundColor = LocalWidgetHostBackground.current,
+                modifier = GlanceModifier
+                    .padding(vertical = widgetPadding),
+                horizontalPadding = widgetPadding,
+            ) {
+                val horizontal = layoutSize == HorizontalRow
+                val numberOfItems = numberOfItemsThatFit(
+                    horizontal = horizontal,
+                    minItemSize = minButtonSize,
+                    spacing = itemsSpacing,
+                )
+                val allItems = listOf(appIconItem, headerButtonItem) + buttonItems
+                val finalItems = allItems.take(numberOfItems)
+
+                if (horizontal) {
+                    SpacedRow(
+                        items = finalItems,
+                        spacing = itemsSpacing,
+                        modifier = GlanceModifier.fillMaxSize(),
+                    )
+                } else {
+                    SpacedColumn(
+                        items = finalItems,
+                        spacing = itemsSpacing,
+                        modifier = GlanceModifier.fillMaxSize(),
+                    )
+                }
+            }
         }
-      }
-    }
 
-    TwoRowGrid -> {
-      val contentButtonsToShow = buttonItems.take(
-        numberOfContentButtonsInTwoRowGrid()
-      )
+        TwoRowGrid -> {
+            val contentButtonsToShow = buttonItems.take(
+                numberOfContentButtonsInTwoRowGrid(),
+            )
 
-      Scaffold(
-        backgroundColor = LocalWidgetHostBackground.current,
-        modifier = GlanceModifier
-          .padding(vertical = widgetPadding),
-        horizontalPadding = widgetPadding
-      ) {
-        TwoRowGrid(
-          items = listOf(appIconItem, headerButtonItem) + contentButtonsToShow,
-          spacing = itemsSpacing,
-          modifier = GlanceModifier.fillMaxSize(),
-        )
-      }
-    }
+            Scaffold(
+                backgroundColor = LocalWidgetHostBackground.current,
+                modifier = GlanceModifier
+                    .padding(vertical = widgetPadding),
+                horizontalPadding = widgetPadding,
+            ) {
+                TwoRowGrid(
+                    items = listOf(appIconItem, headerButtonItem) + contentButtonsToShow,
+                    spacing = itemsSpacing,
+                    modifier = GlanceModifier.fillMaxSize(),
+                )
+            }
+        }
 
-    HeaderTwoRowGrid -> {
-      Scaffold(
-        backgroundColor = LocalWidgetHostBackground.current,
-        modifier = GlanceModifier
-          .padding(bottom = widgetPadding),
-        horizontalPadding = widgetPadding,
-        titleBar = header,
-      ) {
-        TwoRowGrid(
-          items = buttonItems,
-          spacing = itemsSpacing,
-          modifier = GlanceModifier.fillMaxSize()
-        )
-      }
+        HeaderTwoRowGrid -> {
+            Scaffold(
+                backgroundColor = LocalWidgetHostBackground.current,
+                modifier = GlanceModifier
+                    .padding(bottom = widgetPadding),
+                horizontalPadding = widgetPadding,
+                titleBar = header,
+            ) {
+                TwoRowGrid(
+                    items = buttonItems,
+                    spacing = itemsSpacing,
+                    modifier = GlanceModifier.fillMaxSize(),
+                )
+            }
+        }
     }
-  }
 }
 
 /**
@@ -182,30 +180,30 @@ fun ToolBarLayout(
  */
 @Composable
 private fun Header(
-  appIconRes: Int,
-  title: String,
-  actionButton: ToolBarButton,
+    appIconRes: Int,
+    title: String,
+    actionButton: ToolBarButton,
 ) {
-  TitleBar(
-    startIcon = ImageProvider(appIconRes),
-    title = title,
-    iconColor = GlanceTheme.colors.primary,
-    actions = {
-      PillShapedButton(
-        iconImageProvider = ImageProvider(actionButton.iconRes),
-        contentDescription = actionButton.contentDescription,
-        iconSize = iconSize,
-        backgroundColor = if (canUseFilledButtons()) {
-          GlanceTheme.colors.tertiary
-        } else {
-          ColorProvider(Color.Transparent, Color.Transparent)
+    TitleBar(
+        startIcon = ImageProvider(appIconRes),
+        title = title,
+        iconColor = GlanceTheme.colors.primary,
+        actions = {
+            PillShapedButton(
+                iconImageProvider = ImageProvider(actionButton.iconRes),
+                contentDescription = actionButton.contentDescription,
+                iconSize = iconSize,
+                backgroundColor = if (canUseFilledButtons()) {
+                    GlanceTheme.colors.tertiary
+                } else {
+                    ColorProvider(Color.Transparent, Color.Transparent)
+                },
+                contentColor = GlanceTheme.colors.onTertiary,
+                onClick = actionButton.onClick,
+                modifier = GlanceModifier.padding(end = widgetPadding),
+            )
         },
-        contentColor = GlanceTheme.colors.onTertiary,
-        onClick = actionButton.onClick,
-        modifier = GlanceModifier.padding(end = widgetPadding)
-      )
-    }
-  )
+    )
 }
 
 /**
@@ -218,17 +216,17 @@ private fun Header(
  */
 @Composable
 private fun FluidHeaderAppIcon(@DrawableRes iconRes: Int) {
-  Box(
-    modifier = GlanceModifier.fillMaxSize(),
-    contentAlignment = Alignment.Center
-  ) {
-    Image(
-      provider = ImageProvider(iconRes),
-      contentDescription = null,
-      modifier = GlanceModifier.size(iconSize),
-      colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurface)
-    )
-  }
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            provider = ImageProvider(iconRes),
+            contentDescription = null,
+            modifier = GlanceModifier.size(iconSize),
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurface),
+        )
+    }
 }
 
 /**
@@ -240,24 +238,24 @@ private fun FluidHeaderAppIcon(@DrawableRes iconRes: Int) {
  */
 @Composable
 private fun FluidHeaderIconButton(button: ToolBarButton) {
-  RectangularIconButton(
-    imageProvider = ImageProvider(button.iconRes),
-    contentDescription = button.contentDescription,
-    contentColor = if (canUseFilledButtons()) {
-      GlanceTheme.colors.onTertiary
-    } else {
-      GlanceTheme.colors.onSecondaryContainer
-    },
-    backgroundColor = if (canUseFilledButtons()) {
-      GlanceTheme.colors.tertiary
-    } else {
-      ColorProvider(Color.Transparent, Color.Transparent)
-    },
-    roundedCornerShape = RoundedCornerShape.FULL,
-    iconSize = iconSize,
-    modifier = GlanceModifier.fillMaxSize(),
-    onClick = button.onClick
-  )
+    RectangularIconButton(
+        imageProvider = ImageProvider(button.iconRes),
+        contentDescription = button.contentDescription,
+        contentColor = if (canUseFilledButtons()) {
+            GlanceTheme.colors.onTertiary
+        } else {
+            GlanceTheme.colors.onSecondaryContainer
+        },
+        backgroundColor = if (canUseFilledButtons()) {
+            GlanceTheme.colors.tertiary
+        } else {
+            ColorProvider(Color.Transparent, Color.Transparent)
+        },
+        roundedCornerShape = RoundedCornerShape.FULL,
+        iconSize = iconSize,
+        modifier = GlanceModifier.fillMaxSize(),
+        onClick = button.onClick,
+    )
 }
 
 /**
@@ -268,20 +266,20 @@ private fun FluidHeaderIconButton(button: ToolBarButton) {
  */
 @Composable
 private fun FluidContentIconButton(button: ToolBarButton, filled: Boolean = true) {
-  RectangularIconButton(
-    imageProvider = ImageProvider(button.iconRes),
-    contentDescription = button.contentDescription,
-    iconSize = iconSize,
-    roundedCornerShape = RoundedCornerShape.MEDIUM,
-    backgroundColor = if (filled) {
-      GlanceTheme.colors.secondaryContainer
-    } else {
-      ColorProvider(Color.Transparent, Color.Transparent)
-    },
-    contentColor = GlanceTheme.colors.onSecondaryContainer,
-    onClick = button.onClick,
-    modifier = GlanceModifier.fillMaxSize()
-  )
+    RectangularIconButton(
+        imageProvider = ImageProvider(button.iconRes),
+        contentDescription = button.contentDescription,
+        iconSize = iconSize,
+        roundedCornerShape = RoundedCornerShape.MEDIUM,
+        backgroundColor = if (filled) {
+            GlanceTheme.colors.secondaryContainer
+        } else {
+            ColorProvider(Color.Transparent, Color.Transparent)
+        },
+        contentColor = GlanceTheme.colors.onSecondaryContainer,
+        onClick = button.onClick,
+        modifier = GlanceModifier.fillMaxSize(),
+    )
 }
 
 /**
@@ -293,119 +291,121 @@ private fun FluidContentIconButton(button: ToolBarButton, filled: Boolean = true
  * @param text optional text that will be displayed if space suffices.
  */
 data class ToolBarButton(
-  @DrawableRes val iconRes: Int,
-  val contentDescription: String,
-  val onClick: Action,
-  val text: String? = null,
+    @DrawableRes val iconRes: Int,
+    val contentDescription: String,
+    val onClick: Action,
+    val text: String? = null,
 )
 
 // Breakpoints from the UX design
 private enum class ToolBarLayoutSize {
-  // Row of app icon, featured button and regular action buttons that fit horizontally
-  HorizontalRow,
+    // Row of app icon, featured button and regular action buttons that fit horizontally
+    HorizontalRow,
 
-  // Column of app icon, featured button and regular action buttons that fit vertically.
-  VerticalColumn,
+    // Column of app icon, featured button and regular action buttons that fit vertically.
+    VerticalColumn,
 
-  // Two rows, 2-3 columns containing first column of app icon, featured action button and other
-  // columns displaying regular action buttons that fit.
-  TwoRowGrid,
+    // Two rows, 2-3 columns containing first column of app icon, featured action button and other
+    // columns displaying regular action buttons that fit.
+    TwoRowGrid,
 
-  // Header row (containing app icon + featured button) followed by 2 row grid containing the 4
-  // regular action buttons.
-  HeaderTwoRowGrid;
+    // Header row (containing app icon + featured button) followed by 2 row grid containing the 4
+    // regular action buttons.
+    HeaderTwoRowGrid,
 
-  companion object {
-    @Composable
-    fun fromLocalSize(): ToolBarLayoutSize {
-      val size = LocalSize.current
-      val height = size.height
-      val width = size.width
+    ;
 
-      return if (height < 128.dp) {
-        HorizontalRow
-      } else if (width < 128.dp) {
-        VerticalColumn
-      } else if (height < 172.dp) {
-        TwoRowGrid
-      } else {
-        HeaderTwoRowGrid
-      }
+    companion object {
+        @Composable
+        fun fromLocalSize(): ToolBarLayoutSize {
+            val size = LocalSize.current
+            val height = size.height
+            val width = size.width
+
+            return if (height < 128.dp) {
+                HorizontalRow
+            } else if (width < 128.dp) {
+                VerticalColumn
+            } else if (height < 172.dp) {
+                TwoRowGrid
+            } else {
+                HeaderTwoRowGrid
+            }
+        }
+
+        /**
+         * Indicates if buttons with background color can be displayed for the current widget size.
+         *
+         * Background is hidden when we are limited by height / width.
+         */
+        @Composable
+        fun canUseFilledButtons(): Boolean {
+            val localSize = LocalSize.current
+
+            return localSize.height >= 72.dp && localSize.width >= 72.dp
+        }
+
+        /**
+         * Returns how many items to show that would potentially fit in the given orientation
+         * (horizontal / vertical) if we were filling entire space.
+         * @see [HorizontalRow] & [VerticalColumn]
+         */
+        @Composable
+        fun numberOfItemsThatFit(
+            horizontal: Boolean,
+            minItemSize: Dp,
+            spacing: Dp,
+        ): Int {
+            val size = if (horizontal) {
+                LocalSize.current.width
+            } else {
+                LocalSize.current.height
+            }
+
+            // n buttons have n-1 content spacers, so, we add one to total width to make the width division
+            // simpler.
+            val normalizedWidth: Dp = size + spacing
+            val normalizedButtonWidth: Dp = minItemSize + spacing
+            // Number of equally wide buttons that fit in a row
+            return ((normalizedWidth / normalizedButtonWidth)).toInt()
+        }
+
+        /**
+         * Returns number of regular buttons that can fit in a 2-row grid where brand icon and a
+         * featured action button would also be shown.
+         *
+         * @see [TwoRowGrid]
+         */
+        @Composable
+        fun numberOfContentButtonsInTwoRowGrid() =
+            if (LocalSize.current.width >= 240.dp) { // from UX design
+                4 // 1st column (app icon, featured button) and 2nd & 3rd column (4 regular buttons)
+            } else {
+                2 // 1st column (app icon, featured button) and 2nd column (2 regular buttons)
+            }
+
+        /**
+         * Identifies if we should show or hide the title in the header at the current widget size.
+         */
+        @Composable
+        fun canShowHeaderTitle() =
+            LocalSize.current.width >= 240.dp && LocalSize.current.height >= 172.dp // from UX design
     }
-
-    /**
-     * Indicates if buttons with background color can be displayed for the current widget size.
-     *
-     * Background is hidden when we are limited by height / width.
-     */
-    @Composable
-    fun canUseFilledButtons(): Boolean {
-      val localSize = LocalSize.current
-
-      return localSize.height >= 72.dp && localSize.width >= 72.dp
-    }
-
-    /**
-     * Returns how many items to show that would potentially fit in the given orientation
-     * (horizontal / vertical) if we were filling entire space.
-     * @see [HorizontalRow] & [VerticalColumn]
-     */
-    @Composable
-    fun numberOfItemsThatFit(
-      horizontal: Boolean,
-      minItemSize: Dp,
-      spacing: Dp,
-    ): Int {
-      val size = if (horizontal) {
-        LocalSize.current.width
-      } else {
-        LocalSize.current.height
-      }
-
-      // n buttons have n-1 content spacers, so, we add one to total width to make the width division
-      // simpler.
-      val normalizedWidth: Dp = size + spacing
-      val normalizedButtonWidth: Dp = minItemSize + spacing
-      // Number of equally wide buttons that fit in a row
-      return ((normalizedWidth / normalizedButtonWidth)).toInt()
-    }
-
-    /**
-     * Returns number of regular buttons that can fit in a 2-row grid where brand icon and a
-     * featured action button would also be shown.
-     *
-     * @see [TwoRowGrid]
-     */
-    @Composable
-    fun numberOfContentButtonsInTwoRowGrid() =
-      if (LocalSize.current.width >= 240.dp) { // from UX design
-        4 // 1st column (app icon, featured button) and 2nd & 3rd column (4 regular buttons)
-      } else {
-        2 // 1st column (app icon, featured button) and 2nd column (2 regular buttons)
-      }
-
-    /**
-     * Identifies if we should show or hide the title in the header at the current widget size.
-     */
-    @Composable
-    fun canShowHeaderTitle() =
-      LocalSize.current.width >= 240.dp && LocalSize.current.height >= 172.dp // from UX design
-  }
 }
 
 // Dimensions from UX design.
 private object ToolBarLayoutDimens {
-  /** Minimum size needed for buttons / clickable areas for accessibility. */
-  val minButtonSize = 48.dp
+    /** Minimum size needed for buttons / clickable areas for accessibility. */
+    val minButtonSize = 48.dp
 
-  /** Padding around the content within the widget. */
-  val widgetPadding = 12.dp
+    /** Padding around the content within the widget. */
+    val widgetPadding = 12.dp
 
-  /** Spacing between buttons in all layouts. */
-  val itemsSpacing = 8.dp
+    /** Spacing between buttons in all layouts. */
+    val itemsSpacing = 8.dp
 
-  /** Size of icons in all buttons */
-  val iconSize = 24.dp
+    /** Size of icons in all buttons */
+    val iconSize = 24.dp
 }
 
 /**

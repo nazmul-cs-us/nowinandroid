@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.auth
 
 import androidx.compose.foundation.layout.Arrangement
@@ -9,15 +25,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,10 +40,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.starception.submission.ui.RingAvatarTransformation
 import com.starception.submission.auth.AuthViewModel.Companion.PROVIDER_FACEBOOK
 import com.starception.submission.auth.AuthViewModel.Companion.PROVIDER_GOOGLE
 import com.starception.submission.auth.AuthViewModel.Companion.PROVIDER_MICROSOFT
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.ui.RingAvatarTransformation
 
 private data class Provider(val key: String, val label: String)
 
@@ -66,91 +82,91 @@ fun ProfileSheet(
     ) {
         NiaBottomSheetTheme {
             NiaBottomSheetFrame {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 32.dp, top = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-            val avatarUrl = (uiState as? AuthUiState.LoggedIn)?.avatarUrl
-            if (avatarUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(avatarUrl)
-                        .transformations(RingAvatarTransformation())
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Profile picture",
-                    modifier = Modifier.size(84.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(72.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-
-            when (uiState) {
-                is AuthUiState.LoggedIn -> {
-                    Text(
-                        text = uiState.displayName ?: "Signed in",
-                        style = MaterialTheme.typography.titleLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                    if (uiState.email != null) {
-                        Text(
-                            text = uiState.email,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 32.dp, top = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val avatarUrl = (uiState as? AuthUiState.LoggedIn)?.avatarUrl
+                    if (avatarUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(avatarUrl)
+                                .transformations(RingAvatarTransformation())
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Profile picture",
+                            modifier = Modifier.size(84.dp),
                         )
-                    }
-                    NiaOutlinedButton(
-                        onClick = onSignOut,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    ) {
+                    } else {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            imageVector = Icons.Default.AccountCircle,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(72.dp),
+                            tint = MaterialTheme.colorScheme.primary,
                         )
-                        Text(text = "Sign out", modifier = Modifier.padding(start = 8.dp))
                     }
-                }
 
-                else -> {
-                    Text(
-                        text = "Sign in",
-                        style = MaterialTheme.typography.titleLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        text = "Choose how you'd like to continue.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                    PROVIDERS.forEach { provider ->
-                        NiaOutlinedButton(
-                            onClick = { onSignIn(provider.key) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Login,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                    when (uiState) {
+                        is AuthUiState.LoggedIn -> {
+                            Text(
+                                text = uiState.displayName ?: "Signed in",
+                                style = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Center,
                             )
-                            Text(text = provider.label, modifier = Modifier.padding(start = 8.dp))
+                            if (uiState.email != null) {
+                                Text(
+                                    text = uiState.email,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                            NiaOutlinedButton(
+                                onClick = onSignOut,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Text(text = "Sign out", modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+
+                        else -> {
+                            Text(
+                                text = "Sign in",
+                                style = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Center,
+                            )
+                            Text(
+                                text = "Choose how you'd like to continue.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                            PROVIDERS.forEach { provider ->
+                                NiaOutlinedButton(
+                                    onClick = { onSignIn(provider.key) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Login,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Text(text = provider.label, modifier = Modifier.padding(start = 8.dp))
+                                }
+                            }
                         }
                     }
                 }
-            }
-            }
             }
         }
     }

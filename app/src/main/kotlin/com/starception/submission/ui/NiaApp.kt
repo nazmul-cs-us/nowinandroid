@@ -16,75 +16,13 @@
 
 package com.starception.submission.ui
 
-import android.content.res.Configuration
-import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.exclude
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Icon
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration.Indefinite
-import androidx.compose.material3.SnackbarDuration.Short
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult.ActionPerformed
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.adaptive.WindowAdaptiveInfo
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.widget.Toast
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.starception.submission.auth.AuthUiState
-import com.starception.submission.auth.AuthViewModel
-import com.starception.submission.auth.ProfileSheet
-import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
-import com.starception.submission.usersettings.ui.CountrySwitchViewModel
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -94,70 +32,115 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.abs
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration.Short
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult.ActionPerformed
+import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
+import com.starception.submission.MainActivityViewModel
 import com.starception.submission.R
+import com.starception.submission.auth.AuthUiState
+import com.starception.submission.auth.AuthViewModel
+import com.starception.submission.auth.ProfileSheet
 import com.starception.submission.core.designsystem.component.NiaBackground
 import com.starception.submission.core.designsystem.component.NiaGradientBackground
-import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
-import com.starception.submission.core.designsystem.component.NiaTopAppBar
-import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.core.designsystem.theme.GradientColors
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.LocalGradientColors
 import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
-import com.starception.submission.navigation.NiaNavHost
-import com.starception.submission.feature.surah.navigation.navigateToSurah
-import com.starception.submission.navigation.navigateToMediaSourceDetail
-import com.starception.submission.settings.navigation.navigateToSettings
-import com.starception.submission.navigation.TopLevelDestination
-import kotlin.reflect.KClass
-import android.app.Activity
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import com.starception.submission.MainActivityViewModel
 import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
 import com.starception.submission.media.MediaControllerUiState
-import com.starception.submission.feature.settings.R as settingsR
+import com.starception.submission.navigation.NiaNavHost
+import com.starception.submission.navigation.TopLevelDestination
+import com.starception.submission.navigation.navigateToMediaSourceDetail
+import com.starception.submission.settings.navigation.navigateToSettings
+import com.starception.submission.usersettings.ui.CountrySwitchConsentSheet
+import com.starception.submission.usersettings.ui.CountrySwitchViewModel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.reflect.KClass
 
 /** Unwraps the hosting [Activity] from a Compose [Context], needed for Firebase OAuth flows. */
 private fun Context.findActivity(): Activity? {
@@ -933,11 +916,15 @@ private fun NiaMainContent(
         val isDownloadingRaw = if (mainViewModel != null) {
             val d by mainViewModel.isContentDownloading.collectAsStateWithLifecycle()
             d
-        } else false
+        } else {
+            false
+        }
         val rawDownloadProgress = if (mainViewModel != null) {
             val p by mainViewModel.contentDownloadProgress.collectAsStateWithLifecycle()
             p
-        } else 0f
+        } else {
+            0f
+        }
         // Non-download long tasks (e.g. synthesising a guided session's voice lines)
         // share the same banner, but a real CDN download always wins.
         val appTaskProgress by AppTaskProgressBus.state.collectAsStateWithLifecycle()
@@ -963,7 +950,9 @@ private fun NiaMainContent(
         val isRefreshing = if (mainViewModel != null) {
             val state by mainViewModel.isSyncing.collectAsStateWithLifecycle()
             state
-        } else false
+        } else {
+            false
+        }
         // Non-Home tabs run the generic WorkManager sync (Home runs its own
         // location+prayer refresh and is responsible for clearing the flag).
         LaunchedEffect(isRefreshing, isOnHome) {
@@ -1021,8 +1010,11 @@ private fun NiaMainContent(
 
         val rawIslamicEventState = mainViewModel?.islamicEventState?.collectAsStateWithLifecycle()?.value
             ?: com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
-        val appLevelIslamicEventState = if (!isOnHome) rawIslamicEventState
-            else com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
+        val appLevelIslamicEventState = if (!isOnHome) {
+            rawIslamicEventState
+        } else {
+            com.starception.submission.feature.prayertimes.wobble.IslamicEventState()
+        }
         val rawTtsPreparing = if (mainViewModel != null) {
             val preparing by mainViewModel.isTtsPreparing.collectAsStateWithLifecycle()
             preparing
@@ -1096,45 +1088,45 @@ private fun NiaMainContent(
                     // In portrait, apply full horizontal insets
                     if (isLandscape) {
                         Modifier.windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.End)
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.End),
                         )
                     } else {
                         Modifier.windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                         )
-                    }
+                    },
                 ),
         ) { syncState ->
-        Column(
-            Modifier.fillMaxSize(),
-        ) {
-            // Top bar is rendered by each top-level destination itself
-            // (Home via PrayerTimesScreen's inner top bar, others via
-            // TopLevelTopBarScaffold). NavHost height is therefore identical
-            // across tabs, so content does not jump on tab switch.
-            // Provide wobble so TopLevelTopBarScaffold can collapse its status-bar
-            // inset during sync, matching Home and avoiding a tall gap above the title.
-            androidx.compose.runtime.CompositionLocalProvider(
-                com.starception.submission.ui.LocalWobbleIntensity provides syncState.wobbleIntensity,
-                com.starception.submission.ui.LocalPullToSyncModifier provides syncState.pullModifier,
+            Column(
+                Modifier.fillMaxSize(),
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    NiaNavHost(
-                        appState = appState,
-                        onShowSnackbar = { message, action ->
-                            snackbarHostState.showSnackbar(
-                                message = message,
-                                actionLabel = action,
-                                duration = Short,
-                            ) == ActionPerformed
-                        },
-                        onTopAppBarActionClick = onTopAppBarActionClick,
-                        mainViewModel = mainViewModel,
-                        deepLinkCourseId = deepLinkCourseId,
-                    )
+                // Top bar is rendered by each top-level destination itself
+                // (Home via PrayerTimesScreen's inner top bar, others via
+                // TopLevelTopBarScaffold). NavHost height is therefore identical
+                // across tabs, so content does not jump on tab switch.
+                // Provide wobble so TopLevelTopBarScaffold can collapse its status-bar
+                // inset during sync, matching Home and avoiding a tall gap above the title.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.starception.submission.ui.LocalWobbleIntensity provides syncState.wobbleIntensity,
+                    com.starception.submission.ui.LocalPullToSyncModifier provides syncState.pullModifier,
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        NiaNavHost(
+                            appState = appState,
+                            onShowSnackbar = { message, action ->
+                                snackbarHostState.showSnackbar(
+                                    message = message,
+                                    actionLabel = action,
+                                    duration = Short,
+                                ) == ActionPerformed
+                            },
+                            onTopAppBarActionClick = onTopAppBarActionClick,
+                            mainViewModel = mainViewModel,
+                            deepLinkCourseId = deepLinkCourseId,
+                        )
+                    }
                 }
             }
-        }
         }
     }
 }

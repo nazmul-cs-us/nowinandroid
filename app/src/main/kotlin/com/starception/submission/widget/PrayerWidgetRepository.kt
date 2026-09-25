@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.text.format.DateFormat
 import android.util.Log
+import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.feature.prayertimes.SmartContentUtils
 import com.starception.submission.feature.prayertimes.prayerWindowProgress
+import com.starception.submission.feature.prayertimes.utils.applyOffsetToTime
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
-import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.model.Location
-import com.starception.submission.feature.prayertimes.utils.applyOffsetToTime
 import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
@@ -721,7 +721,6 @@ private fun countdownTo(target: LocalTime, now: LocalTime): String {
 private fun Location.shortLabel(): String = listOf(area, subLocality, city, administrativeArea, country)
     .firstOrNull { it.isNotBlank() }
     ?: "Prayer times"
-
 
 /**
  * The current prayer insight, for widgets that render through the ported sample layouts.

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import android.content.Context
@@ -39,8 +55,10 @@ private const val GLOBE_RANGE_MULTIPLIER = 2.0
 // including far-apart points and across the antimeridian — unlike a lat/lon average,
 // so the camera centers on the true mid-arc and both markers stay framed worldwide.
 private fun greatCircleMidpoint(lat1: Double, lon1: Double, lat2: Double, lon2: Double): DoubleArray {
-    val p1 = Math.toRadians(lat1); val l1 = Math.toRadians(lon1)
-    val p2 = Math.toRadians(lat2); val dl = Math.toRadians(lon2 - lon1)
+    val p1 = Math.toRadians(lat1)
+    val l1 = Math.toRadians(lon1)
+    val p2 = Math.toRadians(lat2)
+    val dl = Math.toRadians(lon2 - lon1)
     val bx = Math.cos(p2) * Math.cos(dl)
     val by = Math.cos(p2) * Math.sin(dl)
     val midLat = Math.atan2(
@@ -85,21 +103,21 @@ fun SimpleGlobeView(
     userLongitude: Double,
     modifier: Modifier = Modifier,
     ringStrokeWidthPx: Float = 12f,
-    ringColor:         Int   = 0xFFFFFFFF.toInt(),
-    ringTintColor:     Int   = 0x4D10B981,
-    arcColor:          Int   = 0xFF10B981.toInt(),
-    arcStartAngleDeg:  Float = -90f,
-    arcSweepDeg:       Float = 54f,
-    arcRotationDeg:    Float = 0f,
-    showArc:           Boolean = true,
-    deviceHeadingDeg:  Float = 0f,
+    ringColor: Int = 0xFFFFFFFF.toInt(),
+    ringTintColor: Int = 0x4D10B981,
+    arcColor: Int = 0xFF10B981.toInt(),
+    arcStartAngleDeg: Float = -90f,
+    arcSweepDeg: Float = 54f,
+    arcRotationDeg: Float = 0f,
+    showArc: Boolean = true,
+    deviceHeadingDeg: Float = 0f,
 ) {
     // Cone color matches the arc ring color (adapts to accuracy state + theme)
     val coneColor = arcColor
     val lifecycleOwner = LocalLifecycleOwner.current
-    val density        = LocalDensity.current
+    val density = LocalDensity.current
 
-    val makkahLatitude  = 21.4225
+    val makkahLatitude = 21.4225
     val makkahLongitude = 39.8262
 
     // Stable reference to the overlay so we can push arc updates without recreating views
@@ -119,13 +137,13 @@ fun SimpleGlobeView(
     // Push updated arc params into the overlay on recomposition
     LaunchedEffect(arcRotationDeg, arcSweepDeg, arcColor, ringTintColor, showArc, deviceHeadingDeg, coneColor) {
         overlayRef.value?.apply {
-            this.arcRotationDeg    = arcRotationDeg
-            this.arcSweepDeg       = arcSweepDeg
-            this.arcColor          = arcColor
-            this.showArc           = showArc
-            this.deviceHeadingDeg  = deviceHeadingDeg
-            this.cameraHeadingDeg  = cameraHeadingDeg
-            this.coneColor         = coneColor
+            this.arcRotationDeg = arcRotationDeg
+            this.arcSweepDeg = arcSweepDeg
+            this.arcColor = arcColor
+            this.showArc = showArc
+            this.deviceHeadingDeg = deviceHeadingDeg
+            this.cameraHeadingDeg = cameraHeadingDeg
+            this.coneColor = coneColor
             invalidate()
         }
     }
@@ -149,7 +167,7 @@ fun SimpleGlobeView(
                 factory = { ctx ->
                     // ── FrameLayout: explicit square size ──────────────────
                     val frame = FrameLayout(ctx)
-                    val lp    = ViewGroup.LayoutParams(sidePx, sidePx)
+                    val lp = ViewGroup.LayoutParams(sidePx, sidePx)
 
                     // ── WorldWindow (GLSurfaceView) ────────────────────────
                     // Uses the default controller. Layers/camera live on ww.engine in WWK.
@@ -160,7 +178,7 @@ fun SimpleGlobeView(
                     val markersLayer = RenderableLayer("Markers")
                     ww.engine.layers.addLayer(markersLayer)
 
-                    val userPos  = Position.fromDegrees(userLatitude,  userLongitude,  0.0)
+                    val userPos = Position.fromDegrees(userLatitude, userLongitude, 0.0)
                     val kaabaPos = Position.fromDegrees(makkahLatitude, makkahLongitude, 0.0)
 
                     // User dot is drawn in the overlay (RingOverlayView) for exact
@@ -172,7 +190,7 @@ fun SimpleGlobeView(
                         ).apply {
                             attributes.imageScale = 0.38
                             altitudeMode = AltitudeMode.ABSOLUTE
-                        }
+                        },
                     )
 
                     // Inset the globe by the ring stroke width so the ring sits outside the globe
@@ -193,38 +211,46 @@ fun SimpleGlobeView(
 
                     // ── Ring + arc overlay ─────────────────────────────────
                     val overlay = RingOverlayView(ctx).apply {
-                        this.ringStrokeWidthPx  = ringStrokeWidthPx
-                        this.ringColor          = ringColor
-                        this.ringTintColor      = ringTintColor
-                        this.arcColor           = arcColor
-                        this.arcStartAngleDeg   = arcStartAngleDeg
-                        this.arcSweepDeg        = arcSweepDeg
-                        this.arcRotationDeg     = arcRotationDeg
-                        this.showArc            = showArc
-                        this.deviceHeadingDeg   = deviceHeadingDeg
-                        this.cameraHeadingDeg   = cameraHeadingDeg
-                        this.userLatitude       = userLatitude
-                        this.userLongitude      = userLongitude
-                        this.globeViewportHalf  = globeSizePx / 2f
-                        this.coneColor          = coneColor
+                        this.ringStrokeWidthPx = ringStrokeWidthPx
+                        this.ringColor = ringColor
+                        this.ringTintColor = ringTintColor
+                        this.arcColor = arcColor
+                        this.arcStartAngleDeg = arcStartAngleDeg
+                        this.arcSweepDeg = arcSweepDeg
+                        this.arcRotationDeg = arcRotationDeg
+                        this.showArc = showArc
+                        this.deviceHeadingDeg = deviceHeadingDeg
+                        this.cameraHeadingDeg = cameraHeadingDeg
+                        this.userLatitude = userLatitude
+                        this.userLongitude = userLongitude
+                        this.globeViewportHalf = globeSizePx / 2f
+                        this.coneColor = coneColor
                     }
                     overlayRef.value = overlay
                     frame.addView(overlay, ViewGroup.LayoutParams(sidePx, sidePx))
 
                     // ── Camera on GL thread (no ANR) ───────────────────────
                     ww.queueEvent {
-                        val mid     = greatCircleMidpoint(userLatitude, userLongitude, makkahLatitude, makkahLongitude)
-                        val midLat  = mid[0]
-                        val midLon  = mid[1]
+                        val mid = greatCircleMidpoint(userLatitude, userLongitude, makkahLatitude, makkahLongitude)
+                        val midLat = mid[0]
+                        val midLon = mid[1]
                         // Heading from the midpoint toward the Kaaba → Kaaba on top, user below.
                         val heading = Position.fromDegrees(midLat, midLon, 0.0).greatCircleAzimuth(kaabaPos)
-                        val range   = ww.engine.globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
-                        ww.engine.cameraFromLookAt(LookAt().apply {
-                            set(
-                                midLat.degrees, midLon.degrees, 0.0, AltitudeMode.ABSOLUTE,
-                                range, heading, 0.0.degrees, 0.0.degrees,
-                            )
-                        })
+                        val range = ww.engine.globe.equatorialRadius * GLOBE_RANGE_MULTIPLIER
+                        ww.engine.cameraFromLookAt(
+                            LookAt().apply {
+                                set(
+                                    midLat.degrees,
+                                    midLon.degrees,
+                                    0.0,
+                                    AltitudeMode.ABSOLUTE,
+                                    range,
+                                    heading,
+                                    0.0.degrees,
+                                    0.0.degrees,
+                                )
+                            },
+                        )
                         ww.requestRedraw()
                     }
 
@@ -233,10 +259,10 @@ fun SimpleGlobeView(
                         LifecycleEventObserver { _, event ->
                             when (event) {
                                 Lifecycle.Event.ON_RESUME -> ww.onResume()
-                                Lifecycle.Event.ON_PAUSE  -> ww.onPause()
+                                Lifecycle.Event.ON_PAUSE -> ww.onPause()
                                 else -> {}
                             }
-                        }
+                        },
                     )
 
                     frame.layoutParams = lp
@@ -244,14 +270,14 @@ fun SimpleGlobeView(
                 },
                 modifier = Modifier.size(
                     with(density) { sidePx.toDp() },
-                    with(density) { sidePx.toDp() }
+                    with(density) { sidePx.toDp() },
                 ),
                 update = { _ ->
                     overlayRef.value?.let { ov ->
-                        ov.arcRotationDeg   = arcRotationDeg
-                        ov.arcSweepDeg      = arcSweepDeg
-                        ov.arcColor         = arcColor
-                        ov.showArc          = showArc
+                        ov.arcRotationDeg = arcRotationDeg
+                        ov.arcSweepDeg = arcSweepDeg
+                        ov.arcColor = arcColor
+                        ov.showArc = showArc
                         ov.deviceHeadingDeg = deviceHeadingDeg
                         ov.cameraHeadingDeg = cameraHeadingDeg
                         ov.invalidate()
@@ -260,7 +286,7 @@ fun SimpleGlobeView(
                 onRelease = { frame ->
                     (frame.getChildAt(0) as? WorldWindow)?.onPause()
                     overlayRef.value = null
-                }
+                },
             )
         }
     }
@@ -271,26 +297,27 @@ fun SimpleGlobeView(
  * Lives in the same FrameLayout so the OS compositor always stacks it on top.
  */
 class RingOverlayView(ctx: Context) : View(ctx) {
-    var ringStrokeWidthPx: Float   = 12f
-    var ringColor:         Int     = 0xFFFFFFFF.toInt()
-    var ringTintColor:     Int     = 0x4D10B981
-    var arcColor:          Int     = 0xFF10B981.toInt()
-    var arcStartAngleDeg:  Float   = -90f
-    var arcSweepDeg:       Float   = 54f
-    var arcRotationDeg:    Float   = 0f
-    var showArc:           Boolean = true
-    var deviceHeadingDeg:  Float   = 0f
-    var cameraHeadingDeg:  Float   = 0f
-    var userLatitude:      Double  = 0.0
-    var userLongitude:     Double  = 0.0
-    var makkahLatitude:    Double  = 21.4225
-    var makkahLongitude:   Double  = 39.8262
+    var ringStrokeWidthPx: Float = 12f
+    var ringColor: Int = 0xFFFFFFFF.toInt()
+    var ringTintColor: Int = 0x4D10B981
+    var arcColor: Int = 0xFF10B981.toInt()
+    var arcStartAngleDeg: Float = -90f
+    var arcSweepDeg: Float = 54f
+    var arcRotationDeg: Float = 0f
+    var showArc: Boolean = true
+    var deviceHeadingDeg: Float = 0f
+    var cameraHeadingDeg: Float = 0f
+    var userLatitude: Double = 0.0
+    var userLongitude: Double = 0.0
+    var makkahLatitude: Double = 21.4225
+    var makkahLongitude: Double = 39.8262
+
     // half of the WorldWindow viewport size in pixels
-    var globeViewportHalf: Float   = 0f  
-    var coneColor:         Int     = 0xFF10B981.toInt()  // default green, overridden by theme
+    var globeViewportHalf: Float = 0f
+    var coneColor: Int = 0xFF10B981.toInt() // default green, overridden by theme
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style     = Paint.Style.STROKE
+        style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
     private val radarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -327,10 +354,10 @@ class RingOverlayView(ctx: Context) : View(ctx) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        val sw     = ringStrokeWidthPx
+        val sw = ringStrokeWidthPx
         val radius = (minOf(width, height) / 2f) - sw / 2f - 1f
-        val cx     = width  / 2f
-        val cy     = height / 2f
+        val cx = width / 2f
+        val cy = height / 2f
         oval.set(cx - radius, cy - radius, cx + radius, cy + radius)
 
         // --- Radar direction cone from user location (Google Maps style) ---
@@ -348,8 +375,8 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val dLat = lat2 - lat1
         val dLon = Math.toRadians(makkahLongitude - userLongitude)
         val a = Math.sin(dLat / 2).let { it * it } +
-                Math.cos(lat1) * Math.cos(lat2) *
-                Math.sin(dLon / 2).let { it * it }
+            Math.cos(lat1) * Math.cos(lat2) *
+            Math.sin(dLon / 2).let { it * it }
         val angularDistRad = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         val halfAngDist = angularDistRad / 2.0
 
@@ -380,15 +407,19 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val coneStart = screenHeading - coneSweep / 2f
 
         radarOval.set(
-            userDotX - radarRadius, userDotY - radarRadius,
-            userDotX + radarRadius, userDotY + radarRadius
+            userDotX - radarRadius,
+            userDotY - radarRadius,
+            userDotX + radarRadius,
+            userDotY + radarRadius,
         )
 
         // Clip radar cone to the globe circle so it doesn't bleed into the ring
         canvas.save()
-        canvas.clipPath(android.graphics.Path().apply {
-            addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
-        })
+        canvas.clipPath(
+            android.graphics.Path().apply {
+                addCircle(cx, cy, globeRadius, android.graphics.Path.Direction.CW)
+            },
+        )
 
         // Theme-colored cone with gradient fade
         val cc = coneColor
@@ -396,15 +427,17 @@ class RingOverlayView(ctx: Context) : View(ctx) {
         val ccG = android.graphics.Color.green(cc)
         val ccB = android.graphics.Color.blue(cc)
         val shader = android.graphics.RadialGradient(
-            userDotX, userDotY, radarRadius,
+            userDotX,
+            userDotY,
+            radarRadius,
             intArrayOf(
                 android.graphics.Color.argb(0xFF, ccR, ccG, ccB),
                 android.graphics.Color.argb(0xCC, ccR, ccG, ccB),
                 android.graphics.Color.argb(0x66, ccR, ccG, ccB),
-                android.graphics.Color.argb(0x00, ccR, ccG, ccB)
+                android.graphics.Color.argb(0x00, ccR, ccG, ccB),
             ),
             floatArrayOf(0f, 0.2f, 0.55f, 1f),
-            android.graphics.Shader.TileMode.CLAMP
+            android.graphics.Shader.TileMode.CLAMP,
         )
         radarPaint.shader = shader
         radarPath.reset()
@@ -416,7 +449,7 @@ class RingOverlayView(ctx: Context) : View(ctx) {
 
         // User dot: constant white ring + theme-colored fill that pulses inside it,
         // so the white band breathes from thick (start) to thin (end) like Google.
-        val dotRadius = minOf(width, height) / 30f  // scale with view size
+        val dotRadius = minOf(width, height) / 30f // scale with view size
         radarPaint.color = 0xFFFFFFFF.toInt()
         radarPaint.style = android.graphics.Paint.Style.FILL
         canvas.drawCircle(userDotX, userDotY, dotRadius * WHITE_RING_RATIO, radarPaint)
@@ -447,15 +480,15 @@ class RingOverlayView(ctx: Context) : View(ctx) {
 }
 
 private fun emojiToBitmap(emoji: String, sizeDp: Int): Bitmap {
-    val size  = sizeDp * 3
-    val bmp   = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val cv    = Canvas(bmp)
+    val size = sizeDp * 3
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val cv = Canvas(bmp)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize  = size * 0.72f
+        textSize = size * 0.72f
         textAlign = Paint.Align.CENTER
     }
     val b = android.graphics.Rect()
     paint.getTextBounds(emoji, 0, emoji.length, b)
-    cv.drawText(emoji, size/2f, (size - b.height())/2f - b.top, paint)
+    cv.drawText(emoji, size / 2f, (size - b.height()) / 2f - b.top, paint)
     return bmp
 }

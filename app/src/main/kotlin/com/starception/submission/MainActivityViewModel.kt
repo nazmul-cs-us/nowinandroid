@@ -16,7 +16,6 @@
 
 package com.starception.submission
 
-import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -24,27 +23,26 @@ import androidx.lifecycle.viewModelScope
 import com.starception.submission.MainActivityUiState.Loading
 import com.starception.submission.MainActivityUiState.Success
 import com.starception.submission.core.data.repository.UserDataRepository
-import com.starception.submission.core.model.data.DarkThemeConfig
-import com.starception.submission.core.model.data.ThemeBrand
-import com.starception.submission.core.model.data.UserData
 import com.starception.submission.core.data.util.SyncManager
 import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
 import com.starception.submission.core.hadithdatabase.HadithDatabase
+import com.starception.submission.core.model.data.DarkThemeConfig
+import com.starception.submission.core.model.data.ThemeBrand
+import com.starception.submission.core.model.data.UserData
 import com.starception.submission.download.AssetDownloadManager
-import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.feature.prayertimes.wobble.ForbiddenPrayerTimeState
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
 import com.starception.submission.media.GlobalMediaViewModel
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 @HiltViewModel
@@ -209,7 +207,6 @@ class MainActivityViewModel @Inject constructor(
     fun setSyncing(syncing: Boolean) {
         _isSyncing.value = syncing
     }
-
 
     private val _showMissingBukhariPrompt = MutableStateFlow(false)
     val showMissingBukhariPrompt: StateFlow<Boolean> = _showMissingBukhariPrompt.asStateFlow()
@@ -378,7 +375,7 @@ class MainActivityViewModel @Inject constructor(
                     Log.i("MainActivityViewModel", "🔄 Pre-generating hadith #$hadithNumber (${fullText.length} chars)")
                     sherpaOnnxTts.preGenerateAsync(
                         text = fullText,
-                        speakerId = selectedSpeakerId
+                        speakerId = selectedSpeakerId,
                     )
                     delay(500) // Small delay between generations
                 } else {

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -12,10 +28,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,10 +68,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.prayer.model.DayPrayerSuggestions
 import com.starception.submission.prayer.model.PrayerTimeSuggestion
 import kotlinx.coroutines.launch
@@ -74,7 +88,7 @@ fun AiSuggestionsFab(
     suggestions: DayPrayerSuggestions,
     currentOffsets: Map<String, Int>,
     onApplySuggestion: (String, Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Filter to only suggestions that differ from current offsets
     // Note: DayPrayerSuggestions doesn't include Sunrise as it's not typically adjusted
@@ -84,7 +98,7 @@ fun AiSuggestionsFab(
             suggestions.dhuhr?.takeIf { it.suggestedOffset != currentOffsets["Dhuhr"] },
             suggestions.asr?.takeIf { it.suggestedOffset != currentOffsets["Asr"] },
             suggestions.maghrib?.takeIf { it.suggestedOffset != currentOffsets["Maghrib"] },
-            suggestions.isha?.takeIf { it.suggestedOffset != currentOffsets["Isha"] }
+            suggestions.isha?.takeIf { it.suggestedOffset != currentOffsets["Isha"] },
         )
     }
 
@@ -101,9 +115,9 @@ fun AiSuggestionsFab(
         targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "pulse"
+        label = "pulse",
     )
 
     // Show FAB only when there are pending suggestions
@@ -111,33 +125,33 @@ fun AiSuggestionsFab(
         visible = hasPendingSuggestions,
         enter = scaleIn(spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)) + fadeIn(tween(200)),
         exit = scaleOut(tween(150)) + fadeOut(tween(150)),
-        modifier = modifier
+        modifier = modifier,
     ) {
         BadgedBox(
             badge = {
                 Badge(
                     containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError
+                    contentColor = MaterialTheme.colorScheme.onError,
                 ) {
                     Text(
                         text = "${pendingSuggestions.size}",
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-            }
+            },
         ) {
             FloatingActionButton(
                 onClick = { showBottomSheet = true },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.primary,
                 shape = CircleShape,
-                modifier = Modifier.scale(pulseScale)
+                modifier = Modifier.scale(pulseScale),
             ) {
                 Icon(
                     imageVector = Icons.Default.AutoAwesome,
                     contentDescription = "AI Suggestions",
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -157,28 +171,28 @@ fun AiSuggestionsFab(
         ) {
             NiaBottomSheetTheme {
                 NiaBottomSheetFrame {
-                AiSuggestionsContent(
-                    suggestions = pendingSuggestions,
-                    currentOffsets = currentOffsets,
-                    onApplySuggestion = { prayerName, offset ->
-                        onApplySuggestion(prayerName, offset)
-                    },
-                    onApplyAll = {
-                        pendingSuggestions.forEach { suggestion ->
-                            onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset)
-                        }
-                        scope.launch {
-                            sheetState.hide()
-                            showBottomSheet = false
-                        }
-                    },
-                    onDismiss = {
-                        scope.launch {
-                            sheetState.hide()
-                            showBottomSheet = false
-                        }
-                    },
-                )
+                    AiSuggestionsContent(
+                        suggestions = pendingSuggestions,
+                        currentOffsets = currentOffsets,
+                        onApplySuggestion = { prayerName, offset ->
+                            onApplySuggestion(prayerName, offset)
+                        },
+                        onApplyAll = {
+                            pendingSuggestions.forEach { suggestion ->
+                                onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset)
+                            }
+                            scope.launch {
+                                sheetState.hide()
+                                showBottomSheet = false
+                            }
+                        },
+                        onDismiss = {
+                            scope.launch {
+                                sheetState.hide()
+                                showBottomSheet = false
+                            }
+                        },
+                    )
                 }
             }
         }
@@ -191,41 +205,41 @@ private fun AiSuggestionsContent(
     currentOffsets: Map<String, Int>,
     onApplySuggestion: (String, Int) -> Unit,
     onApplyAll: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
+            .padding(bottom = 32.dp),
     ) {
         // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.AutoAwesome,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(28.dp),
                 )
                 Column {
                     Text(
                         text = "AI Suggestions",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "${suggestions.size} optimization${if (suggestions.size > 1) "s" else ""} available",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -233,7 +247,7 @@ private fun AiSuggestionsContent(
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -245,7 +259,7 @@ private fun AiSuggestionsContent(
             SuggestionCard(
                 suggestion = suggestion,
                 currentOffset = currentOffsets[suggestion.prayerName] ?: 0,
-                onApply = { onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset) }
+                onApply = { onApplySuggestion(suggestion.prayerName, suggestion.suggestedOffset) },
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -256,17 +270,17 @@ private fun AiSuggestionsContent(
         if (suggestions.size > 1) {
             NiaOutlinedButton(
                 onClick = onApplyAll,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Apply All Suggestions",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -277,55 +291,55 @@ private fun AiSuggestionsContent(
 private fun SuggestionCard(
     suggestion: PrayerTimeSuggestion,
     currentOffset: Int,
-    onApply: () -> Unit
+    onApply: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = suggestion.prayerName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // Current offset
                     Text(
                         text = formatOffset(currentOffset),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Arrow
                     Text(
                         text = "→",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Suggested offset with highlight
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
                         Text(
                             text = formatOffset(suggestion.suggestedOffset),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         )
                     }
                 }
@@ -335,7 +349,7 @@ private fun SuggestionCard(
             Surface(
                 modifier = Modifier.clickable { onApply() },
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
@@ -343,7 +357,7 @@ private fun SuggestionCard(
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .padding(10.dp)
-                        .size(20.dp)
+                        .size(20.dp),
                 )
             }
         }

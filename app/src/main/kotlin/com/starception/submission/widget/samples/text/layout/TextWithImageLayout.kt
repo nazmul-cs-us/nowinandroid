@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.text.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -37,6 +52,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.LocalWidgetHostBackground
 import com.starception.submission.widget.samples.collections.layout.NoDataContent
 import com.starception.submission.widget.samples.text.layout.TextWithImageLayoutDimensions.contentSize
 import com.starception.submission.widget.samples.text.layout.TextWithImageLayoutDimensions.contentSpacing
@@ -79,266 +95,266 @@ import com.starception.submission.widget.samples.utils.FontUtils
  */
 @Composable
 fun TextWithImageLayout(
-  title: String,
-  @DrawableRes titleIconRes: Int,
-  @DrawableRes titleBarActionIconRes: Int? = null,
-  titleBarActionIconContentDescription: String? = null,
-  titleBarAction: (() -> Unit)? = null,
-  data: TextWithImageData? = null,
+    title: String,
+    @DrawableRes titleIconRes: Int,
+    @DrawableRes titleBarActionIconRes: Int? = null,
+    titleBarActionIconContentDescription: String? = null,
+    titleBarAction: (() -> Unit)? = null,
+    data: TextWithImageData? = null,
 ) {
-  fun titleBar(): @Composable (() -> Unit) = {
-    TitleBar(
-      startIcon = ImageProvider(titleIconRes),
-      title = title.takeIf { LocalSize.current.width >= 230.dp } ?: "",
-      iconColor = GlanceTheme.colors.primary,
-      textColor = GlanceTheme.colors.onSurface,
-      actions = {
-        if (titleBarAction != null && titleBarActionIconRes != null) {
-          CircleIconButton(
-            imageProvider = ImageProvider(titleBarActionIconRes),
-            contentDescription = titleBarActionIconContentDescription,
-            contentColor = GlanceTheme.colors.secondary,
-            backgroundColor = null, // transparent
-            onClick = titleBarAction
-          )
-        }
-      }
-    )
-  }
-
-  val action = actionStartDemoActivity("TextWithImage: ${data?.textData?.key}")
-  val layoutSize = TextWithImageLayoutSize.fromLocalSize()
-
-  val titleBar = if (layoutSize.showTitleBar()) {
-    titleBar()
-  } else {
-    null
-  }
-  val scaffoldTopPadding = if (layoutSize.showTitleBar()) {
-    0.dp
-  } else {
-    widgetPadding
-  }
-
-  Scaffold(
-    titleBar = titleBar,
-    horizontalPadding = widgetPadding,
-    backgroundColor = LocalWidgetHostBackground.current,
-    modifier = GlanceModifier
-      .maybeClickable(action)
-      .padding(
-        bottom = widgetPadding,
-        top = scaffoldTopPadding
-      ),
-  ) {
-    when (data) {
-      null -> NoDataContent()
-      else -> {
-        when (layoutSize) {
-          VerticalSmall -> VerticalContent(
-            data = data,
-            showImage = true,
-            showSecondaryText = false
-          )
-
-          VerticalLarge -> VerticalContent(
-            data = data,
-            showImage = true,
-            showSecondaryText = true
-          )
-
-          HorizontalSmall -> HorizontalContent(
-            data = data,
-            showImage = false,
-            showSecondaryText = false
-          )
-
-          HorizontalLarge -> HorizontalContent(
-            data = data,
-            showImage = true,
-            showSecondaryText = true
-          )
-        }
-      }
+    fun titleBar(): @Composable (() -> Unit) = {
+        TitleBar(
+            startIcon = ImageProvider(titleIconRes),
+            title = title.takeIf { LocalSize.current.width >= 230.dp } ?: "",
+            iconColor = GlanceTheme.colors.primary,
+            textColor = GlanceTheme.colors.onSurface,
+            actions = {
+                if (titleBarAction != null && titleBarActionIconRes != null) {
+                    CircleIconButton(
+                        imageProvider = ImageProvider(titleBarActionIconRes),
+                        contentDescription = titleBarActionIconContentDescription,
+                        contentColor = GlanceTheme.colors.secondary,
+                        backgroundColor = null, // transparent
+                        onClick = titleBarAction,
+                    )
+                }
+            },
+        )
     }
-  }
+
+    val action = actionStartDemoActivity("TextWithImage: ${data?.textData?.key}")
+    val layoutSize = TextWithImageLayoutSize.fromLocalSize()
+
+    val titleBar = if (layoutSize.showTitleBar()) {
+        titleBar()
+    } else {
+        null
+    }
+    val scaffoldTopPadding = if (layoutSize.showTitleBar()) {
+        0.dp
+    } else {
+        widgetPadding
+    }
+
+    Scaffold(
+        titleBar = titleBar,
+        horizontalPadding = widgetPadding,
+        backgroundColor = LocalWidgetHostBackground.current,
+        modifier = GlanceModifier
+            .maybeClickable(action)
+            .padding(
+                bottom = widgetPadding,
+                top = scaffoldTopPadding,
+            ),
+    ) {
+        when (data) {
+            null -> NoDataContent()
+            else -> {
+                when (layoutSize) {
+                    VerticalSmall -> VerticalContent(
+                        data = data,
+                        showImage = true,
+                        showSecondaryText = false,
+                    )
+
+                    VerticalLarge -> VerticalContent(
+                        data = data,
+                        showImage = true,
+                        showSecondaryText = true,
+                    )
+
+                    HorizontalSmall -> HorizontalContent(
+                        data = data,
+                        showImage = false,
+                        showSecondaryText = false,
+                    )
+
+                    HorizontalLarge -> HorizontalContent(
+                        data = data,
+                        showImage = true,
+                        showSecondaryText = true,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun NoDataContent() {
-  val context = LocalContext.current
+    val context = LocalContext.current
 
-  NoDataContent(
-    noDataText = context.getString(R.string.sample_no_data_text),
-    noDataIconRes = R.drawable.sample_no_data_icon,
-    actionButtonText = context.getString(
-      R.string.sample_learn_more_button_text
-    ),
-    actionButtonIcon = R.drawable.sample_info_icon,
-    actionButtonOnClick = actionStartDemoActivity("on-click of info button in no data view")
-  )
+    NoDataContent(
+        noDataText = context.getString(R.string.sample_no_data_text),
+        noDataIconRes = R.drawable.sample_no_data_icon,
+        actionButtonText = context.getString(
+            R.string.sample_learn_more_button_text,
+        ),
+        actionButtonIcon = R.drawable.sample_info_icon,
+        actionButtonOnClick = actionStartDemoActivity("on-click of info button in no data view"),
+    )
 }
 
 @Composable
 private fun HorizontalContent(
-  data: TextWithImageData,
-  showImage: Boolean,
-  showSecondaryText: Boolean,
+    data: TextWithImageData,
+    showImage: Boolean,
+    showSecondaryText: Boolean,
 ) {
-  val contentWidth = contentSize.width - contentSpacing
-  val contentHeight = contentSize.height - (2 * verticalTextsSpacing)
-  Row(
-    verticalAlignment = Alignment.Vertical.Bottom,
-    horizontalAlignment = Alignment.Horizontal.Start,
-    modifier = GlanceModifier.fillMaxSize()
-  ) {
-    TextStack(
-      data = data.textData,
-      showSecondaryText = showSecondaryText,
-      modifier = GlanceModifier.fillMaxHeight().defaultWeight(),
-      availableSize = DpSize(
-        // Use 40% of available width for text area if showing image on side.
-        width = (0.4 * contentWidth).takeIf { showImage } ?: contentWidth,
-        // Use 80% of vertical space for text area.
-        height = (0.80 * contentHeight).takeIf { showImage } ?: contentHeight
-      )
-    )
-    if (showImage) {
-      Spacer(modifier = GlanceModifier.width(contentSpacing))
-      Image(
-        data = data.imageData,
-        modifier = GlanceModifier.fillMaxHeight().width(contentWidth / 2)
-      )
+    val contentWidth = contentSize.width - contentSpacing
+    val contentHeight = contentSize.height - (2 * verticalTextsSpacing)
+    Row(
+        verticalAlignment = Alignment.Vertical.Bottom,
+        horizontalAlignment = Alignment.Horizontal.Start,
+        modifier = GlanceModifier.fillMaxSize(),
+    ) {
+        TextStack(
+            data = data.textData,
+            showSecondaryText = showSecondaryText,
+            modifier = GlanceModifier.fillMaxHeight().defaultWeight(),
+            availableSize = DpSize(
+                // Use 40% of available width for text area if showing image on side.
+                width = (0.4 * contentWidth).takeIf { showImage } ?: contentWidth,
+                // Use 80% of vertical space for text area.
+                height = (0.80 * contentHeight).takeIf { showImage } ?: contentHeight,
+            ),
+        )
+        if (showImage) {
+            Spacer(modifier = GlanceModifier.width(contentSpacing))
+            Image(
+                data = data.imageData,
+                modifier = GlanceModifier.fillMaxHeight().width(contentWidth / 2),
+            )
+        }
     }
-  }
 }
 
 @Composable
 private fun VerticalContent(
-  data: TextWithImageData,
-  showImage: Boolean,
-  showSecondaryText: Boolean,
+    data: TextWithImageData,
+    showImage: Boolean,
+    showSecondaryText: Boolean,
 ) {
-  Column(
-    verticalAlignment = Alignment.Vertical.Bottom,
-    modifier = GlanceModifier.fillMaxHeight()
-  ) {
-    val contentWidth = contentSize.width
-    val contentHeight = contentSize.height - (2 * verticalTextsSpacing)
+    Column(
+        verticalAlignment = Alignment.Vertical.Bottom,
+        modifier = GlanceModifier.fillMaxHeight(),
+    ) {
+        val contentWidth = contentSize.width
+        val contentHeight = contentSize.height - (2 * verticalTextsSpacing)
 
-    if (showImage) {
-      Image(
-        data = data.imageData,
-        modifier = GlanceModifier.fillMaxWidth().defaultWeight()
-      )
-      Spacer(modifier = GlanceModifier.height(contentSpacing))
+        if (showImage) {
+            Image(
+                data = data.imageData,
+                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+            )
+            Spacer(modifier = GlanceModifier.height(contentSpacing))
+        }
+        TextStack(
+            data = data.textData,
+            showSecondaryText = showSecondaryText,
+            modifier = GlanceModifier.fillMaxWidth(),
+            availableSize = DpSize(
+                // Use 80% of available width to leave some offset for word break differences.
+                width = 0.8 * contentWidth,
+                // Use 40% vertical space for text area if showing image
+                height = (0.4 * contentHeight).takeIf { showImage } ?: contentHeight,
+            ),
+        )
     }
-    TextStack(
-      data = data.textData,
-      showSecondaryText = showSecondaryText,
-      modifier = GlanceModifier.fillMaxWidth(),
-      availableSize = DpSize(
-        // Use 80% of available width to leave some offset for word break differences.
-        width = 0.8 * contentWidth,
-        // Use 40% vertical space for text area if showing image
-        height = (0.4 * contentHeight).takeIf { showImage } ?: contentHeight
-      )
-    )
-  }
 }
 
 @Composable
 private fun TextStack(
-  data: TextData,
-  modifier: GlanceModifier,
-  availableSize: DpSize,
-  showSecondaryText: Boolean,
+    data: TextData,
+    modifier: GlanceModifier,
+    availableSize: DpSize,
+    showSecondaryText: Boolean,
 ) {
-  val (primaryTextFontSize, primaryTextMaxLines) = primaryTextFontValues(
-    text = data.primary,
-    availableSize = availableSize,
-    showSecondaryText = showSecondaryText
-  )
-
-  Column(
-    // Bottom-aligned, as the sample is: the stack fills upward from the foot of the
-    // column, so its last line sits level with the bottom edge of the image beside it
-    // however many lines the content runs to. Centring it instead left that line floating
-    // short of the image's edge.
-    verticalAlignment = Alignment.Bottom,
-    modifier = modifier
-  ) {
-    // Eyebrow, headline, then the reading and its follow-up — the sample's order, with
-    // the app's own content filling the same slots: where the article card carries
-    // "33,822 views" above its headline, this one carries how fresh the reading is. The
-    // three lines below the eyebrow are the "Prayer now" tile's, in the tile's order:
-    // phase headline, elapsed reading, next prayer.
-    Text(
-      text = data.caption,
-      maxLines = 1,
-      style = TextWithImageLayoutTextStyles.caption,
-      modifier = GlanceModifier.fillMaxWidth()
+    val (primaryTextFontSize, primaryTextMaxLines) = primaryTextFontValues(
+        text = data.primary,
+        availableSize = availableSize,
+        showSecondaryText = showSecondaryText,
     )
-    Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
-    Text(
-      text = data.primary,
-      maxLines = primaryTextMaxLines,
-      style = TextWithImageLayoutTextStyles.primary.copy(fontSize = primaryTextFontSize),
-    )
-    data.supporting?.takeIf { it.isNotBlank() }?.let { supporting ->
-      Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
-      Text(
-        text = supporting,
-        // Two, not one: this slot's longest reading is "Just started since Maghrib",
-        // which overruns the column at the size the others settle on, and a single line
-        // has nowhere to go but an ellipsis. The stack fills from the bottom, so a second
-        // line costs space that is empty anyway.
-        maxLines = 2,
-        style = TextWithImageLayoutTextStyles.secondary,
-        modifier = GlanceModifier.fillMaxWidth()
-      )
-    }
-    if (showSecondaryText) {
-      val (secondaryTextFontSize, secondaryTextMaxLines) = secondaryTextFontValues(
-        text = data.secondary,
-        availableSize = availableSize
-      )
 
-      Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
-      Text(
-        text = data.secondary,
-        maxLines = secondaryTextMaxLines,
-        style = TextWithImageLayoutTextStyles.secondary.copy(fontSize = secondaryTextFontSize),
-      )
+    Column(
+        // Bottom-aligned, as the sample is: the stack fills upward from the foot of the
+        // column, so its last line sits level with the bottom edge of the image beside it
+        // however many lines the content runs to. Centring it instead left that line floating
+        // short of the image's edge.
+        verticalAlignment = Alignment.Bottom,
+        modifier = modifier,
+    ) {
+        // Eyebrow, headline, then the reading and its follow-up — the sample's order, with
+        // the app's own content filling the same slots: where the article card carries
+        // "33,822 views" above its headline, this one carries how fresh the reading is. The
+        // three lines below the eyebrow are the "Prayer now" tile's, in the tile's order:
+        // phase headline, elapsed reading, next prayer.
+        Text(
+            text = data.caption,
+            maxLines = 1,
+            style = TextWithImageLayoutTextStyles.caption,
+            modifier = GlanceModifier.fillMaxWidth(),
+        )
+        Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
+        Text(
+            text = data.primary,
+            maxLines = primaryTextMaxLines,
+            style = TextWithImageLayoutTextStyles.primary.copy(fontSize = primaryTextFontSize),
+        )
+        data.supporting?.takeIf { it.isNotBlank() }?.let { supporting ->
+            Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
+            Text(
+                text = supporting,
+                // Two, not one: this slot's longest reading is "Just started since Maghrib",
+                // which overruns the column at the size the others settle on, and a single line
+                // has nowhere to go but an ellipsis. The stack fills from the bottom, so a second
+                // line costs space that is empty anyway.
+                maxLines = 2,
+                style = TextWithImageLayoutTextStyles.secondary,
+                modifier = GlanceModifier.fillMaxWidth(),
+            )
+        }
+        if (showSecondaryText) {
+            val (secondaryTextFontSize, secondaryTextMaxLines) = secondaryTextFontValues(
+                text = data.secondary,
+                availableSize = availableSize,
+            )
+
+            Spacer(modifier = GlanceModifier.height(verticalTextsSpacing))
+            Text(
+                text = data.secondary,
+                maxLines = secondaryTextMaxLines,
+                style = TextWithImageLayoutTextStyles.secondary.copy(fontSize = secondaryTextFontSize),
+            )
+        }
     }
-  }
 }
 
 @Composable
 private fun Image(
-  data: ImageData,
-  modifier: GlanceModifier,
+    data: ImageData,
+    modifier: GlanceModifier,
 ) {
-  val imageProvider = if (data.bitmap != null) {
-    ImageProvider(data.bitmap)
-  } else {
-    ImageProvider(R.drawable.sample_placeholder_image)
-  }
+    val imageProvider = if (data.bitmap != null) {
+        ImageProvider(data.bitmap)
+    } else {
+        ImageProvider(R.drawable.sample_placeholder_image)
+    }
 
-  Image(
-    provider = imageProvider,
-    contentDescription = data.contentDescription,
-    contentScale = ContentScale.Crop,
-    modifier = modifier.cornerRadius(pictureRadius),
-  )
+    Image(
+        provider = imageProvider,
+        contentDescription = data.contentDescription,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.cornerRadius(pictureRadius),
+    )
 }
 
 private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
-  return if (action != null) {
-    this.clickable(action)
-  } else {
-    this
-  }
+    return if (action != null) {
+        this.clickable(action)
+    } else {
+        this
+    }
 }
 
 /**
@@ -346,8 +362,8 @@ private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
  * [com.starception.submission.widget.samples.text.layout.TextWithImageLayout].
  */
 data class TextWithImageData(
-  val textData: TextData,
-  val imageData: ImageData,
+    val textData: TextData,
+    val imageData: ImageData,
 )
 
 /**
@@ -365,16 +381,16 @@ data class TextWithImageData(
  * "article of the day" widget.
  */
 data class TextData(
-  val key: String,
-  val primary: String,
-  val secondary: String,
-  val caption: String,
-  /**
-   * Optional line between [primary] and [secondary], for content that carries a reading
-   * as well as a headline and a follow-up. Absent in the sample's article data, where the
-   * headline is followed straight by its body.
-   */
-  val supporting: String? = null,
+    val key: String,
+    val primary: String,
+    val secondary: String,
+    val caption: String,
+    /**
+     * Optional line between [primary] and [secondary], for content that carries a reading
+     * as well as a headline and a follow-up. Absent in the sample's article data, where the
+     * headline is followed straight by its body.
+     */
+    val supporting: String? = null,
 )
 
 /**
@@ -387,105 +403,106 @@ data class TextData(
  * used by the accessibility services
  */
 data class ImageData(
-  val bitmap: Bitmap? = null,
-  val contentDescription: String? = null,
+    val bitmap: Bitmap? = null,
+    val contentDescription: String? = null,
 )
 
 private enum class TextWithImageLayoutSize {
-  // No title bar or secondary text
-  HorizontalSmall,
+    // No title bar or secondary text
+    HorizontalSmall,
 
-  // No title bar or secondary text
-  VerticalSmall,
+    // No title bar or secondary text
+    VerticalSmall,
 
-  // Text with Image on the side
-  HorizontalLarge,
+    // Text with Image on the side
+    HorizontalLarge,
 
-  // Image with text below it
-  VerticalLarge;
+    // Image with text below it
+    VerticalLarge,
 
-  companion object {
-    @Composable
-    fun fromLocalSize(): TextWithImageLayoutSize {
-      val size = LocalSize.current
-      val isTall = size.height >= size.width
+    ;
 
-      return if (isTall && size.height <= 300.dp) {
-        VerticalSmall
-      } else if (isTall) {
-        VerticalLarge
-      } else if (size.width <= 165.dp) {
-        HorizontalSmall
-      } else {
-        HorizontalLarge
-      }
+    companion object {
+        @Composable
+        fun fromLocalSize(): TextWithImageLayoutSize {
+            val size = LocalSize.current
+            val isTall = size.height >= size.width
+
+            return if (isTall && size.height <= 300.dp) {
+                VerticalSmall
+            } else if (isTall) {
+                VerticalLarge
+            } else if (size.width <= 165.dp) {
+                HorizontalSmall
+            } else {
+                HorizontalLarge
+            }
+        }
     }
-  }
 
     @Composable
     fun showTitleBar() = LocalSize.current.height >= 180.dp
 }
 
-
 private object TextWithImageLayoutTextStyles {
-  val primary: TextStyle
-    @Composable get() = TextStyle(
-      fontWeight = FontWeight.Medium,
-      color = GlanceTheme.colors.onSurface
-    )
+    val primary: TextStyle
+        @Composable get() = TextStyle(
+            fontWeight = FontWeight.Medium,
+            color = GlanceTheme.colors.onSurface,
+        )
 
-  val secondary: TextStyle
-    @Composable get() = TextStyle(
-      color = GlanceTheme.colors.onSurfaceVariant
-    )
+    val secondary: TextStyle
+        @Composable get() = TextStyle(
+            color = GlanceTheme.colors.onSurfaceVariant,
+        )
 
-  val caption: TextStyle
-    @Composable get() =
-      TextStyle(color = GlanceTheme.colors.secondary)
+    val caption: TextStyle
+        @Composable get() =
+            TextStyle(color = GlanceTheme.colors.secondary)
 
-  @Composable
-  fun primaryTextFontValues(
-    text: String,
-    availableSize: DpSize,
-    showSecondaryText: Boolean,
-  ): Pair<TextUnit, Int> {
-    val availableHeight = if (showSecondaryText) {
-      // Within the text area, 30% space is used by primary text.
-      0.30 * availableSize.height
-    } else {
-      0.60 * availableSize.height
+    @Composable
+    fun primaryTextFontValues(
+        text: String,
+        availableSize: DpSize,
+        showSecondaryText: Boolean,
+    ): Pair<TextUnit, Int> {
+        val availableHeight = if (showSecondaryText) {
+            // Within the text area, 30% space is used by primary text.
+            0.30 * availableSize.height
+        } else {
+            0.60 * availableSize.height
+        }
+
+        return FontUtils.calculateFontSizeAndMaxLines(
+            context = LocalContext.current,
+            text = text,
+            availableWidth = availableSize.width,
+            availableHeight = availableHeight,
+            maxFontSize = 24.sp,
+            minFontSize = 16.sp,
+        )
     }
 
-    return FontUtils.calculateFontSizeAndMaxLines(
-      context = LocalContext.current,
-      text = text,
-      availableWidth = availableSize.width,
-      availableHeight = availableHeight,
-      maxFontSize = 24.sp,
-      minFontSize = 16.sp
-    )
-  }
-
-  @Composable
-  fun secondaryTextFontValues(text: String, availableSize: DpSize): Pair<TextUnit, Int> {
-    return FontUtils.calculateFontSizeAndMaxLines(
-      context = LocalContext.current,
-      text = text,
-      availableWidth = availableSize.width,
-      // Within the text area, 25% space is used by secondary text.
-      availableHeight = 0.25 * availableSize.height,
-      maxFontSize = 24.sp,
-      minFontSize = 12.sp
-    )
-  }
+    @Composable
+    fun secondaryTextFontValues(text: String, availableSize: DpSize): Pair<TextUnit, Int> {
+        return FontUtils.calculateFontSizeAndMaxLines(
+            context = LocalContext.current,
+            text = text,
+            availableWidth = availableSize.width,
+            // Within the text area, 25% space is used by secondary text.
+            availableHeight = 0.25 * availableSize.height,
+            maxFontSize = 24.sp,
+            minFontSize = 12.sp,
+        )
+    }
 }
 
 private object TextWithImageLayoutDimensions {
-  /** Padding that visually appears between the widget outline and anything inside. */
-  val widgetPadding = 16.dp
+    /** Padding that visually appears between the widget outline and anything inside. */
+    val widgetPadding = 16.dp
 
-  /** Corner radius to be applied to an image. */
-  val pictureRadius = 16.dp
+    /** Corner radius to be applied to an image. */
+    val pictureRadius = 16.dp
 
     /**
      * Space between larger building blocks within the layout. e.g space between text stack and
@@ -498,22 +515,22 @@ private object TextWithImageLayoutDimensions {
      */
     val verticalTextsSpacing = 4.dp
 
-  /** Height of the title bar. */
-  private val titleBarHeight: Dp
-    @Composable get() = if (TextWithImageLayoutSize.fromLocalSize().showTitleBar()) {
-      0.dp
-    } else {
-      56.dp
-    }
+    /** Height of the title bar. */
+    private val titleBarHeight: Dp
+        @Composable get() = if (TextWithImageLayoutSize.fromLocalSize().showTitleBar()) {
+            0.dp
+        } else {
+            56.dp
+        }
 
-  /** Height and width in dp available to main content (excluding title bar, padding, spacing). */
-  val contentSize: DpSize
-    @Composable get() {
-      val size = LocalSize.current
+    /** Height and width in dp available to main content (excluding title bar, padding, spacing). */
+    val contentSize: DpSize
+        @Composable get() {
+            val size = LocalSize.current
 
-      return DpSize(
-        width = size.width - (2 * widgetPadding),
-        height = size.height - titleBarHeight - widgetPadding
-      )
-    }
+            return DpSize(
+                width = size.width - (2 * widgetPadding),
+                height = size.height - titleBarHeight - widgetPadding,
+            )
+        }
 }

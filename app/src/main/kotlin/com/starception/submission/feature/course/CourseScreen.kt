@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,12 @@
 package com.starception.submission.feature.course
 
 import android.content.Context
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,53 +32,45 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.starception.submission.voice.SherpaOnnxTtsService
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
-import com.starception.submission.core.designsystem.theme.LocalDarkTheme
-import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
-import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
-import com.starception.submission.core.hadithdatabase.HadithDatabase
-import com.starception.submission.core.hadithdatabase.HadithRepository
-import com.starception.submission.download.MissingContentCard
-import com.starception.submission.settings.components.TtsVoice
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.TextUnit
-import kotlinx.coroutines.launch
-import dagger.hilt.android.EntryPointAccessors
-import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
+import com.starception.submission.core.hadithdatabase.BukhariLocalTranslationRepository
+import com.starception.submission.core.hadithdatabase.HadithRepository
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import com.starception.submission.core.ui.FlaticonPlayIcon
+import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.SherpaOnnxTtsService
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.launch
 
 /**
  * Course data model
@@ -155,7 +146,7 @@ fun CourseScreen(
     val entryPoint = remember {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
-            SherpaOnnxTtsEntryPoint::class.java
+            SherpaOnnxTtsEntryPoint::class.java,
         )
     }
     val downloadManager = remember { entryPoint.assetDownloadManager() }
@@ -462,7 +453,7 @@ private fun AllCoursesEnrolledSection(
         data class CourseProgressData(
             val course: Course,
             val color: Color,
-            val history: List<Int>
+            val history: List<Int>,
         )
 
         val courseColors = listOf(
@@ -488,7 +479,7 @@ private fun AllCoursesEnrolledSection(
                 CourseProgressData(
                     course = course,
                     color = courseColors[index % courseColors.size],
-                    history = history
+                    history = history,
                 )
             }
         }
@@ -629,7 +620,7 @@ private fun AllCoursesEnrolledSection(
                                                 Box(
                                                     modifier = Modifier
                                                         .size(8.dp)
-                                                        .background(data.color, CircleShape)
+                                                        .background(data.color, CircleShape),
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
@@ -661,10 +652,10 @@ private fun AllCoursesEnrolledSection(
                                                 val tappedDay = (offset.x / dayWidth).toInt().coerceIn(0, 6)
                                                 selectedDayIndex = if (selectedDayIndex == tappedDay) -1 else tappedDay
                                             }
-                                        }
+                                        },
                                 ) {
                                     Canvas(
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
                                     ) {
                                         val width = size.width
                                         val height = size.height - 10f
@@ -704,7 +695,7 @@ private fun AllCoursesEnrolledSection(
                                             val points = data.history.mapIndexed { index, value ->
                                                 Offset(
                                                     x = index * pointSpacing,
-                                                    y = height - (height * value / maxVal).coerceAtMost(height)
+                                                    y = height - (height * value / maxVal).coerceAtMost(height),
                                                 )
                                             }
 
@@ -818,7 +809,7 @@ private fun AllCoursesEnrolledSection(
                                                             modifier = Modifier
                                                                 .width(3.dp)
                                                                 .height(16.dp)
-                                                                .background(data.color, RoundedCornerShape(2.dp))
+                                                                .background(data.color, RoundedCornerShape(2.dp)),
                                                         )
                                                         Spacer(modifier = Modifier.width(8.dp))
                                                         // Course name
@@ -930,7 +921,9 @@ private fun AllCoursesEnrolledSection(
                                         val progress = courseProgress[course.id] ?: 0
                                         val progressPercent = if (course.totalLessons > 0) {
                                             (progress.toFloat() / course.totalLessons * 100).toInt()
-                                        } else 0
+                                        } else {
+                                            0
+                                        }
 
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Box(
@@ -982,7 +975,9 @@ private fun AllCoursesEnrolledSection(
                                     val progress = courseProgress[course.id] ?: 0
                                     val progressPercent = if (course.totalLessons > 0) {
                                         (progress.toFloat() / course.totalLessons * 100).toInt()
-                                    } else 0
+                                    } else {
+                                        0
+                                    }
                                     val isComplete = progressPercent >= 100
 
                                     Row(
@@ -1180,9 +1175,13 @@ private fun AllCoursesEnrolledSection(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = if (overallProgress >= 100) "Learning Champion!"
-                                                       else if (overallProgress >= 75) "Almost There!"
-                                                       else "Great Progress!",
+                                                text = if (overallProgress >= 100) {
+                                                    "Learning Champion!"
+                                                } else if (overallProgress >= 75) {
+                                                    "Almost There!"
+                                                } else {
+                                                    "Great Progress!"
+                                                },
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.primary,
@@ -1217,7 +1216,7 @@ private fun AllCoursesEnrolledSection(
                                 modifier = Modifier
                                     .size(
                                         width = if (progressPagerState.currentPage == index) 20.dp else 8.dp,
-                                        height = 8.dp
+                                        height = 8.dp,
                                     )
                                     .background(
                                         color = if (progressPagerState.currentPage == index) {
@@ -1226,7 +1225,7 @@ private fun AllCoursesEnrolledSection(
                                             MaterialTheme.colorScheme.surfaceContainerHighest
                                         },
                                         shape = RoundedCornerShape(4.dp),
-                                    )
+                                    ),
                             )
                         }
                     }
@@ -1325,7 +1324,9 @@ private fun AllCoursesEnrolledSection(
                 val progress = courseProgress[course.id] ?: 0
                 val progressPercent = if (course.totalLessons > 0) {
                     (progress.toFloat() / course.totalLessons * 100).toInt()
-                } else 0
+                } else {
+                    0
+                }
                 val isComplete = progress >= course.totalLessons
 
                 CourseProgressRow(
@@ -1503,7 +1504,7 @@ private fun CourseProgressRow(
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             } else {
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            }
+            },
         ),
         shadowElevation = 2.dp,
     ) {
@@ -1807,11 +1808,13 @@ private fun CourseHeader(
             val selected = selectedFilter == filter
             val selectedColor = if (isDarkTheme) {
                 MaterialTheme.colorScheme.primaryContainer
-            } else when (filter) {
-                "QURAN" -> CourseBlue
-                "HADITH" -> CourseRust
-                "MEMORIZATION" -> CourseGold
-                else -> CourseInk
+            } else {
+                when (filter) {
+                    "QURAN" -> CourseBlue
+                    "HADITH" -> CourseRust
+                    "MEMORIZATION" -> CourseGold
+                    else -> CourseInk
+                }
             }
             val selectedContentColor = if (isDarkTheme) {
                 MaterialTheme.colorScheme.onPrimaryContainer
@@ -1906,12 +1909,15 @@ private fun CourseCatalogBottomSheet(
 
                     courses.forEach { course ->
                         val (containerColor, contentColor) = when (course.category) {
-                            CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.primaryContainer to
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            CourseCategory.HADITH -> MaterialTheme.colorScheme.secondaryContainer to
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            CourseCategory.QURAN -> MaterialTheme.colorScheme.tertiaryContainer to
-                                MaterialTheme.colorScheme.onTertiaryContainer
+                            CourseCategory.MEMORIZATION ->
+                                MaterialTheme.colorScheme.primaryContainer to
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                            CourseCategory.HADITH ->
+                                MaterialTheme.colorScheme.secondaryContainer to
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                            CourseCategory.QURAN ->
+                                MaterialTheme.colorScheme.tertiaryContainer to
+                                    MaterialTheme.colorScheme.onTertiaryContainer
                         }
                         Surface(
                             onClick = { onCourseClick(course) },
@@ -2043,17 +2049,21 @@ private fun OngoingCourseList(
             val progress = courseProgress[course.id] ?: 0
             val progressFraction = if (course.totalLessons > 0) {
                 (progress.toFloat() / course.totalLessons).coerceIn(0f, 1f)
-            } else 0f
+            } else {
+                0f
+            }
             val accent = if (isDarkTheme) {
                 when (course.category) {
                     CourseCategory.MEMORIZATION -> MaterialTheme.colorScheme.tertiary
                     CourseCategory.HADITH -> MaterialTheme.colorScheme.secondary
                     CourseCategory.QURAN -> MaterialTheme.colorScheme.primary
                 }
-            } else when (course.category) {
-                CourseCategory.MEMORIZATION -> CourseGold
-                CourseCategory.HADITH -> CourseRust
-                CourseCategory.QURAN -> CourseBlue
+            } else {
+                when (course.category) {
+                    CourseCategory.MEMORIZATION -> CourseGold
+                    CourseCategory.HADITH -> CourseRust
+                    CourseCategory.QURAN -> CourseBlue
+                }
             }
 
             Surface(
@@ -2177,7 +2187,9 @@ private fun TrainingCourseOverviewCard(
     val accent = Color(0xFFD80058)
     val progressFraction = if (course.totalLessons > 0) {
         (progress.toFloat() / course.totalLessons).coerceIn(0f, 1f)
-    } else 0f
+    } else {
+        0f
+    }
 
     Surface(
         modifier = Modifier
@@ -2396,7 +2408,7 @@ private fun EnrolledCourseCard(
                         color = Color.White.copy(alpha = 0.2f),
                     ) {
                         Text(
-                            text = "${progress}/${course.totalLessons}",
+                            text = "$progress/${course.totalLessons}",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -3017,7 +3029,9 @@ private fun CourseBigTile(
 ) {
     val progressPercent = if (course.totalLessons > 0) {
         (progress * 100f / course.totalLessons).coerceIn(0f, 100f)
-    } else 0f
+    } else {
+        0f
+    }
 
     val isCompleted = isEnrolled && progress >= course.totalLessons
     var showMenu by remember { mutableStateOf(false) }
@@ -3027,10 +3041,14 @@ private fun CourseBigTile(
     val cardColor = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerLow else CourseWarmCard
     val contentColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else CourseInk
     val secondaryContentColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else CourseSlate
-    val accentColor = if (isDarkTheme) MaterialTheme.colorScheme.secondary else when (course.category) {
-        CourseCategory.MEMORIZATION -> CourseGold
-        CourseCategory.HADITH -> CourseRust
-        CourseCategory.QURAN -> CourseBlue
+    val accentColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        when (course.category) {
+            CourseCategory.MEMORIZATION -> CourseGold
+            CourseCategory.HADITH -> CourseRust
+            CourseCategory.QURAN -> CourseBlue
+        }
     }
     val actionColor = accentColor
 
@@ -3228,105 +3246,105 @@ private fun CourseBigTile(
         ) {
             NiaBottomSheetTheme {
                 NiaBottomSheetFrame {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .padding(bottom = 30.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(58.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(actionColor),
-                        contentAlignment = Alignment.Center,
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 30.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        FlaticonIcon(
-                            glyph = course.iconGlyph,
-                            contentDescription = null,
-                            tint = Color.White,
-                            fontSize = 29.sp,
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Manage course",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = course.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ) {
-                        Text(
-                            text = "${progressPercent.toInt()}%",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
-                    }
-                }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(58.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(actionColor),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                FlaticonIcon(
+                                    glyph = course.iconGlyph,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    fontSize = 29.sp,
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Manage course",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = course.title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            ) {
+                                Text(
+                                    text = "${progressPercent.toInt()}%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
 
-                if (isEnrolled && !isCompleted) {
-                    CourseOptionRow(
-                        iconGlyph = FlaticonIcons.BOOK,
-                        title = "Continue learning",
-                        description = "Open the next lesson in this course",
-                        iconColor = MaterialTheme.colorScheme.primary,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                        onClick = {
-                            showMenu = false
-                            onContinue()
-                        },
-                    )
-                }
+                        if (isEnrolled && !isCompleted) {
+                            CourseOptionRow(
+                                iconGlyph = FlaticonIcons.BOOK,
+                                title = "Continue learning",
+                                description = "Open the next lesson in this course",
+                                iconColor = MaterialTheme.colorScheme.primary,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                                onClick = {
+                                    showMenu = false
+                                    onContinue()
+                                },
+                            )
+                        }
 
-                CourseOptionRow(
-                    iconGlyph = FlaticonIcons.INFO,
-                    title = "View course details",
-                    description = "Open the overview, outcomes, and lesson plan",
-                    iconColor = MaterialTheme.colorScheme.primary,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                    onClick = {
-                        showMenu = false
-                        onClick()
-                    },
-                )
+                        CourseOptionRow(
+                            iconGlyph = FlaticonIcons.INFO,
+                            title = "View course details",
+                            description = "Open the overview, outcomes, and lesson plan",
+                            iconColor = MaterialTheme.colorScheme.primary,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            onClick = {
+                                showMenu = false
+                                onClick()
+                            },
+                        )
 
-                    if (isEnrolled) {
-                    CourseOptionRow(
-                        iconGlyph = FlaticonIcons.REMOVE,
-                        title = "Unenroll from course",
-                        description = "Remove it from My Learning; your progress stays saved",
-                        iconColor = MaterialTheme.colorScheme.error,
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
-                        onClick = {
-                            showMenu = false
-                            showUnenrollConfirmation = true
-                        },
-                    )
+                        if (isEnrolled) {
+                            CourseOptionRow(
+                                iconGlyph = FlaticonIcons.REMOVE,
+                                title = "Unenroll from course",
+                                description = "Remove it from My Learning; your progress stays saved",
+                                iconColor = MaterialTheme.colorScheme.error,
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
+                                onClick = {
+                                    showMenu = false
+                                    showUnenrollConfirmation = true
+                                },
+                            )
+                        }
                     }
-                }
                 }
             }
         }
@@ -3484,7 +3502,7 @@ private fun getSurahName(surahNumber: Int): String {
         "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat",
         "Al-Qari'ah", "At-Takathur", "Al-Asr", "Al-Humazah", "Al-Fil",
         "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr",
-        "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas"
+        "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas",
     )
     return surahNames.getOrElse(surahNumber - 1) { "Surah $surahNumber" }
 }
@@ -3526,7 +3544,7 @@ private suspend fun preGenerateHadithTts(context: Context, startHadithNumber: In
         // Get SherpaOnnxTtsService via EntryPoint
         val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
             context.applicationContext,
-            HadithTtsEntryPoint::class.java
+            HadithTtsEntryPoint::class.java,
         )
         val sherpaOnnxTts = entryPoint.sherpaOnnxTtsService()
 
@@ -3570,7 +3588,7 @@ private suspend fun preGenerateHadithTts(context: Context, startHadithNumber: In
                 android.util.Log.i("CourseScreen", "🔄 Pre-generating hadith #$hadithNumber (${fullText.length} chars)")
                 sherpaOnnxTts.preGenerateAsync(
                     text = fullText,
-                    speakerId = selectedSpeakerId
+                    speakerId = selectedSpeakerId,
                 )
                 // Small delay between generations
                 kotlinx.coroutines.delay(500)

@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
@@ -9,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.Action
 import androidx.glance.appwidget.components.CircleIconButton
@@ -22,9 +36,9 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
-import com.starception.submission.widget.samples.collections.data.FakeCheckListDataRepository.Companion.demoData
-import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowStartPadding
+import com.starception.submission.widget.LocalWidgetHostBackground
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowEndPadding
+import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.checkListRowStartPadding
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.scaffoldHorizontalPadding
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.verticalItemSpacing
 import com.starception.submission.widget.samples.collections.layout.CheckListLayoutDimensions.widgetPadding
@@ -76,98 +90,98 @@ import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDe
  */
 @Composable
 fun CheckListLayout(
-  title: String,
-  @DrawableRes titleIconRes: Int,
-  @DrawableRes titleBarActionIconRes: Int,
-  titleBarActionIconContentDescription: String,
-  titleBarAction: Action,
-  items: List<CheckListItem>,
-  checkedItems: List<String>,
-  @DrawableRes checkedIconRes: Int,
-  @DrawableRes unCheckedIconRes: Int,
-  checkButtonContentDescription: String,
-  onCheck: (String) -> Unit,
+    title: String,
+    @DrawableRes titleIconRes: Int,
+    @DrawableRes titleBarActionIconRes: Int,
+    titleBarActionIconContentDescription: String,
+    titleBarAction: Action,
+    items: List<CheckListItem>,
+    checkedItems: List<String>,
+    @DrawableRes checkedIconRes: Int,
+    @DrawableRes unCheckedIconRes: Int,
+    checkButtonContentDescription: String,
+    onCheck: (String) -> Unit,
 ) {
-  val checkListLayoutSize = CheckListLayoutSize.fromLocalSize()
+    val checkListLayoutSize = CheckListLayoutSize.fromLocalSize()
 
-  fun titleBar(): @Composable (() -> Unit) = {
-    TitleBar(
-      startIcon = ImageProvider(titleIconRes),
-      // Based on your widget content, you may skip the title in smaller sizes.
-      title = title.takeIf { checkListLayoutSize != Small } ?: "",
-      iconColor = GlanceTheme.colors.primary,
-      textColor = GlanceTheme.colors.onSurface,
-      actions = {
-        CircleIconButton(
-          imageProvider = ImageProvider(titleBarActionIconRes),
-          contentDescription = titleBarActionIconContentDescription,
-          contentColor = GlanceTheme.colors.secondary,
-          backgroundColor = null, // transparent
-          onClick = titleBarAction
+    fun titleBar(): @Composable (() -> Unit) = {
+        TitleBar(
+            startIcon = ImageProvider(titleIconRes),
+            // Based on your widget content, you may skip the title in smaller sizes.
+            title = title.takeIf { checkListLayoutSize != Small } ?: "",
+            iconColor = GlanceTheme.colors.primary,
+            textColor = GlanceTheme.colors.onSurface,
+            actions = {
+                CircleIconButton(
+                    imageProvider = ImageProvider(titleBarActionIconRes),
+                    contentDescription = titleBarActionIconContentDescription,
+                    contentColor = GlanceTheme.colors.secondary,
+                    backgroundColor = null, // transparent
+                    onClick = titleBarAction,
+                )
+            },
         )
-      }
-    )
-  }
-
-  val scaffoldTopPadding = if (showTitleBar()) {
-    0.dp
-  } else {
-    widgetPadding
-  }
-
-  Scaffold(
-    backgroundColor = LocalWidgetHostBackground.current,
-    horizontalPadding = scaffoldHorizontalPadding,
-    modifier = GlanceModifier
-      .padding(
-        top = scaffoldTopPadding,
-        bottom = widgetPadding
-      ),
-    titleBar = if (showTitleBar()) {
-      titleBar()
-    } else {
-      null
     }
-  ) {
-    if (items.isEmpty()) {
-      EmptyListContent()
+
+    val scaffoldTopPadding = if (showTitleBar()) {
+        0.dp
     } else {
-      Content(
-        items = items,
-        checkedItems = checkedItems,
-        onCheck = onCheck,
-        checkedIconRes = checkedIconRes,
-        unCheckedIconRes = unCheckedIconRes,
-        checkButtonContentDescription = checkButtonContentDescription,
-      )
+        widgetPadding
     }
-  }
+
+    Scaffold(
+        backgroundColor = LocalWidgetHostBackground.current,
+        horizontalPadding = scaffoldHorizontalPadding,
+        modifier = GlanceModifier
+            .padding(
+                top = scaffoldTopPadding,
+                bottom = widgetPadding,
+            ),
+        titleBar = if (showTitleBar()) {
+            titleBar()
+        } else {
+            null
+        },
+    ) {
+        if (items.isEmpty()) {
+            EmptyListContent()
+        } else {
+            Content(
+                items = items,
+                checkedItems = checkedItems,
+                onCheck = onCheck,
+                checkedIconRes = checkedIconRes,
+                unCheckedIconRes = unCheckedIconRes,
+                checkButtonContentDescription = checkButtonContentDescription,
+            )
+        }
+    }
 }
 
 @Composable
 private fun Content(
-  items: List<CheckListItem>,
-  checkedItems: List<String>,
-  onCheck: (String) -> Unit,
-  @DrawableRes checkedIconRes: Int,
-  @DrawableRes unCheckedIconRes: Int,
-  checkButtonContentDescription: String,
+    items: List<CheckListItem>,
+    checkedItems: List<String>,
+    onCheck: (String) -> Unit,
+    @DrawableRes checkedIconRes: Int,
+    @DrawableRes unCheckedIconRes: Int,
+    checkButtonContentDescription: String,
 ) {
-  RoundedScrollingLazyColumn(
-    modifier = GlanceModifier.fillMaxSize(),
-    items = items,
-    verticalItemsSpacing = verticalItemSpacing,
-    itemContentProvider = { item ->
-      CheckListItem(
-        item = item,
-        isChecked = checkedItems.contains(item.key),
-        onCheck = onCheck,
-        checkedIconRes = checkedIconRes,
-        unCheckedIconRes = unCheckedIconRes,
-        checkButtonContentDescription = checkButtonContentDescription,
-      )
-    }
-  )
+    RoundedScrollingLazyColumn(
+        modifier = GlanceModifier.fillMaxSize(),
+        items = items,
+        verticalItemsSpacing = verticalItemSpacing,
+        itemContentProvider = { item ->
+            CheckListItem(
+                item = item,
+                isChecked = checkedItems.contains(item.key),
+                onCheck = onCheck,
+                checkedIconRes = checkedIconRes,
+                unCheckedIconRes = unCheckedIconRes,
+                checkButtonContentDescription = checkButtonContentDescription,
+            )
+        },
+    )
 }
 
 /**
@@ -178,13 +192,13 @@ private fun Content(
  */
 @Composable
 private fun CheckListItem(
-  item: CheckListItem,
-  @DrawableRes checkedIconRes: Int,
-  @DrawableRes unCheckedIconRes: Int,
-  checkButtonContentDescription: String,
-  onCheck: (String) -> Unit,
-  modifier: GlanceModifier = GlanceModifier,
-  isChecked: Boolean,
+    item: CheckListItem,
+    @DrawableRes checkedIconRes: Int,
+    @DrawableRes unCheckedIconRes: Int,
+    checkButtonContentDescription: String,
+    onCheck: (String) -> Unit,
+    modifier: GlanceModifier = GlanceModifier,
+    isChecked: Boolean,
 ) {
     val listItemEndPadding = if (item.hasTrailingIcons) {
         0.dp
@@ -192,121 +206,122 @@ private fun CheckListItem(
         checkListRowEndPadding
     }
 
-  @Composable
-  fun CheckButton() {
-    CircleIconButton(
-      imageProvider = if (isChecked) {
-        ImageProvider(checkedIconRes)
-      } else {
-        ImageProvider(unCheckedIconRes)
-      },
-      backgroundColor = null, // to show transparent background
-      contentColor = GlanceTheme.colors.secondary,
-      contentDescription = checkButtonContentDescription,
-      enabled = !isChecked,
-      onClick = { onCheck(item.key) },
-      key = "${LocalSize.current} ${item.key}"
-    )
-  }
+    @Composable
+    fun CheckButton() {
+        CircleIconButton(
+            imageProvider = if (isChecked) {
+                ImageProvider(checkedIconRes)
+            } else {
+                ImageProvider(unCheckedIconRes)
+            },
+            backgroundColor = null, // to show transparent background
+            contentColor = GlanceTheme.colors.secondary,
+            contentDescription = checkButtonContentDescription,
+            enabled = !isChecked,
+            onClick = { onCheck(item.key) },
+            key = "${LocalSize.current} ${item.key}",
+        )
+    }
 
-  @Composable
-  fun Title() {
-    Text(
-      text = item.title,
-      style = CheckListLayoutTextStyles.titleText,
-      maxLines = 2,
-    )
-  }
+    @Composable
+    fun Title() {
+        Text(
+            text = item.title,
+            style = CheckListLayoutTextStyles.titleText,
+            maxLines = 2,
+        )
+    }
 
-  @Composable
-  fun SupportingText() {
-    Text(
-      text = item.supportingText,
-      style = CheckListLayoutTextStyles.supportingText,
-      maxLines = 2,
-    )
-  }
+    @Composable
+    fun SupportingText() {
+        Text(
+            text = item.supportingText,
+            style = CheckListLayoutTextStyles.supportingText,
+            maxLines = 2,
+        )
+    }
 
-  @Composable
-  fun TrailingActions() {
-    TrailingIconButtonSet(
-      leadingButtonRes = R.drawable.sample_edit_icon,
-      leadingButtonContentDescription = "Edit",
-      leadingButtonOnClick = actionStartDemoActivity(message = "Edit click on item: ${item.key}"),
-      middleButtonRes = R.drawable.sample_snooze_icon,
-      middleButtonContentDescription = "Snooze",
-      middleButtonOnClick = actionStartDemoActivity(message = "Snooze click on item: ${item.key}"),
-      trailingButtonRes = R.drawable.sample_delete_icon,
-      trailingButtonContentDescription = "Delete",
-      trailingButtonOnClick = actionStartDemoActivity(message = "Delete click on item: ${item.key}"),
-    )
-  }
+    @Composable
+    fun TrailingActions() {
+        TrailingIconButtonSet(
+            leadingButtonRes = R.drawable.sample_edit_icon,
+            leadingButtonContentDescription = "Edit",
+            leadingButtonOnClick = actionStartDemoActivity(message = "Edit click on item: ${item.key}"),
+            middleButtonRes = R.drawable.sample_snooze_icon,
+            middleButtonContentDescription = "Snooze",
+            middleButtonOnClick = actionStartDemoActivity(message = "Snooze click on item: ${item.key}"),
+            trailingButtonRes = R.drawable.sample_delete_icon,
+            trailingButtonContentDescription = "Delete",
+            trailingButtonOnClick = actionStartDemoActivity(message = "Delete click on item: ${item.key}"),
+        )
+    }
 
-  // List item itself is not clickable, as it contains more trailing actions.
-  ListItem(
-      modifier = modifier.fillMaxWidth()
-          .padding(start = checkListRowStartPadding, end = listItemEndPadding),
-    contentSpacing = 0.dp, // Since check box's tap target covers the needed visual spacing
-    leadingContent = { CheckButton() },
-    headlineContent = { Title() },
-    supportingContent = { SupportingText() },
-    trailingContent = takeComposableIf(item.hasTrailingIcons)
-    { TrailingActions() },
-  )
+    // List item itself is not clickable, as it contains more trailing actions.
+    ListItem(
+        modifier = modifier.fillMaxWidth()
+            .padding(start = checkListRowStartPadding, end = listItemEndPadding),
+        contentSpacing = 0.dp, // Since check box's tap target covers the needed visual spacing
+        leadingContent = { CheckButton() },
+        headlineContent = { Title() },
+        supportingContent = { SupportingText() },
+        trailingContent = takeComposableIf(item.hasTrailingIcons) { TrailingActions() },
+    )
 }
 
 @Composable
 private fun TrailingIconButtonSet(
-  @DrawableRes leadingButtonRes: Int,
-  leadingButtonContentDescription: String,
-  leadingButtonOnClick: Action,
-  @DrawableRes middleButtonRes: Int,
-  middleButtonContentDescription: String,
-  middleButtonOnClick: Action,
-  @DrawableRes trailingButtonRes: Int,
-  trailingButtonContentDescription: String,
-  trailingButtonOnClick: Action,
+    @DrawableRes leadingButtonRes: Int,
+    leadingButtonContentDescription: String,
+    leadingButtonOnClick: Action,
+    @DrawableRes middleButtonRes: Int,
+    middleButtonContentDescription: String,
+    middleButtonOnClick: Action,
+    @DrawableRes trailingButtonRes: Int,
+    trailingButtonContentDescription: String,
+    trailingButtonOnClick: Action,
 ) {
-  val checkListLayoutSize = CheckListLayoutSize.fromLocalSize()
+    val checkListLayoutSize = CheckListLayoutSize.fromLocalSize()
 
-  if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.Medium)) {
-    CircleIconButton(
-      imageProvider = ImageProvider(leadingButtonRes),
-      backgroundColor = null, // to show transparent background
-      contentColor = GlanceTheme.colors.secondary,
-      contentDescription = leadingButtonContentDescription,
-      onClick = leadingButtonOnClick,
-    )
-    if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.Large)) {
-      CircleIconButton(
-        imageProvider = ImageProvider(middleButtonRes),
-        backgroundColor = null, // to show transparent background
-        contentColor = GlanceTheme.colors.secondary,
-        contentDescription = middleButtonContentDescription,
-        onClick = middleButtonOnClick,
-      )
+    if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.Medium)) {
+        CircleIconButton(
+            imageProvider = ImageProvider(leadingButtonRes),
+            backgroundColor = null, // to show transparent background
+            contentColor = GlanceTheme.colors.secondary,
+            contentDescription = leadingButtonContentDescription,
+            onClick = leadingButtonOnClick,
+        )
+        if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.Large)) {
+            CircleIconButton(
+                imageProvider = ImageProvider(middleButtonRes),
+                backgroundColor = null, // to show transparent background
+                contentColor = GlanceTheme.colors.secondary,
+                contentDescription = middleButtonContentDescription,
+                onClick = middleButtonOnClick,
+            )
+        }
+        if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.XLarge)) {
+            CircleIconButton(
+                imageProvider = ImageProvider(trailingButtonRes),
+                backgroundColor = null, // to show transparent background
+                contentColor = GlanceTheme.colors.secondary,
+                contentDescription = trailingButtonContentDescription,
+                onClick = trailingButtonOnClick,
+            )
+        }
     }
-    if (checkListLayoutSize.isWiderThan(CheckListLayoutSize.XLarge)) {
-      CircleIconButton(
-        imageProvider = ImageProvider(trailingButtonRes),
-        backgroundColor = null, // to show transparent background
-        contentColor = GlanceTheme.colors.secondary,
-        contentDescription = trailingButtonContentDescription,
-        onClick = trailingButtonOnClick,
-      )
-    }
-  }
 }
 
 /** Returns the provided [block] composable if [predicate] is true, else returns null */
 @Composable
 private inline fun takeComposableIf(
-  predicate: Boolean,
-  crossinline block: @Composable () -> Unit,
+    predicate: Boolean,
+    crossinline block: @Composable () -> Unit,
 ): (@Composable () -> Unit)? {
-  return if (predicate) {
-    { block() }
-  } else null
+    return if (predicate) {
+        { block() }
+    } else {
+        null
+    }
 }
 
 /**
@@ -320,10 +335,10 @@ private inline fun takeComposableIf(
  *                       widget sizes.
  */
 data class CheckListItem(
-  val key: String,
-  val title: String,
-  val supportingText: String,
-  val hasTrailingIcons: Boolean = false,
+    val key: String,
+    val title: String,
+    val supportingText: String,
+    val hasTrailingIcons: Boolean = false,
 )
 
 /**
@@ -333,87 +348,90 @@ data class CheckListItem(
  * In this layout, only width breakpoints are used to scale the layout.
  */
 private enum class CheckListLayoutSize(val maxWidth: Dp) {
-  // Smaller fonts, no title in title-bar
-  Small(maxWidth = 260.dp),
+    // Smaller fonts, no title in title-bar
+    Small(maxWidth = 260.dp),
 
-  // larger fonts, title present, no trailing actions
-  Medium(maxWidth = 304.dp),
+    // larger fonts, title present, no trailing actions
+    Medium(maxWidth = 304.dp),
 
-  // 1 trailing action
-  Large(maxWidth = 348.dp),
+    // 1 trailing action
+    Large(maxWidth = 348.dp),
 
-  // 2 trailing actions
-  XLarge(maxWidth = 396.dp),
+    // 2 trailing actions
+    XLarge(maxWidth = 396.dp),
 
-  // 3 trailing actions
-  XXLarge(maxWidth = Dp.Infinity);
+    // 3 trailing actions
+    XXLarge(maxWidth = Dp.Infinity),
+    ;
 
-  companion object {
-    /**
-     * Returns the corresponding [CheckListLayoutSize] to be considered for the current widget size.
-     */
-    @Composable
-    fun fromLocalSize(): CheckListLayoutSize {
-      val size = LocalSize.current
+    companion object {
+        /**
+         * Returns the corresponding [CheckListLayoutSize] to be considered for the current widget size.
+         */
+        @Composable
+        fun fromLocalSize(): CheckListLayoutSize {
+            val size = LocalSize.current
 
-      CheckListLayoutSize.values().forEach {
-        if (size.width < it.maxWidth) {
-          return it
+            CheckListLayoutSize.values().forEach {
+                if (size.width < it.maxWidth) {
+                    return it
+                }
+            }
+            throw IllegalStateException("No mapped size ")
         }
-      }
-      throw IllegalStateException("No mapped size ")
-    }
 
-    fun CheckListLayoutSize.isWiderThan(checkListLayoutSize: CheckListLayoutSize): Boolean {
-      return this.maxWidth > checkListLayoutSize.maxWidth
-    }
+        fun CheckListLayoutSize.isWiderThan(checkListLayoutSize: CheckListLayoutSize): Boolean {
+            return this.maxWidth > checkListLayoutSize.maxWidth
+        }
 
-    @Composable
-    fun showTitleBar(): Boolean {
-      return LocalSize.current.height >= 180.dp
+        @Composable
+        fun showTitleBar(): Boolean {
+            return LocalSize.current.height >= 180.dp
+        }
     }
-  }
 }
 
 private object CheckListLayoutTextStyles {
-  /**
-   * Style for the text displayed as title within each item.
-   */
-  val titleText: TextStyle
-    @Composable get() = TextStyle(
-      fontWeight = FontWeight.Medium,
-      fontSize = if (CheckListLayoutSize.fromLocalSize() == Small) {
-        14.sp // M3 Title Small
-      } else {
-        16.sp // M3 Title Medium
-      },
-      color = GlanceTheme.colors.onSurface
-    )
+    /**
+     * Style for the text displayed as title within each item.
+     */
+    val titleText: TextStyle
+        @Composable get() = TextStyle(
+            fontWeight = FontWeight.Medium,
+            fontSize = if (CheckListLayoutSize.fromLocalSize() == Small) {
+                14.sp // M3 Title Small
+            } else {
+                16.sp // M3 Title Medium
+            },
+            color = GlanceTheme.colors.onSurface,
+        )
 
-  /**
-   * Style for the text displayed as supporting text within each item.
-   */
-  val supportingText: TextStyle
-    @Composable get() =
-      TextStyle(
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, // M3 Label Medium
-        color = GlanceTheme.colors.secondary
-      )
+    /**
+     * Style for the text displayed as supporting text within each item.
+     */
+    val supportingText: TextStyle
+        @Composable get() =
+            TextStyle(
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp, // M3 Label Medium
+                color = GlanceTheme.colors.secondary,
+            )
 }
 
 private object CheckListLayoutDimensions {
-  val widgetPadding = 12.dp
+    val widgetPadding = 12.dp
 
-  val verticalItemSpacing = 4.dp
+    val verticalItemSpacing = 4.dp
 
-  // Full width scrollable content
-  val scaffoldHorizontalPadding = 0.dp
-  // Match with the padding applied to the app icon in title bar; this allow us to vertically align
-  // the app icon with check icon button.
-  val checkListRowStartPadding = 2.dp
-  // Padding to be applied on right of each item if there isn't a icon button on right.
-  val checkListRowEndPadding = widgetPadding
+    // Full width scrollable content
+    val scaffoldHorizontalPadding = 0.dp
+
+    // Match with the padding applied to the app icon in title bar; this allow us to vertically align
+    // the app icon with check icon button.
+    val checkListRowStartPadding = 2.dp
+
+    // Padding to be applied on right of each item if there isn't a icon button on right.
+    val checkListRowEndPadding = widgetPadding
 }
 
 /**

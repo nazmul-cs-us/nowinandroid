@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.visualization
 
 import androidx.compose.animation.animateColorAsState
@@ -28,6 +44,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -35,8 +52,6 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -58,15 +73,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starception.submission.ml.SalahPosture
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.ml.SalahPosture
 
 /**
  * Professional Material 3 controls panel for 3D visualization.
@@ -77,11 +91,11 @@ fun VisualizationControls(
     state: VisualizationState,
     onStateChange: (VisualizationState) -> Unit,
     modifier: Modifier = Modifier,
-    onAnalyzePredictions: () -> Unit = {}
+    onAnalyzePredictions: () -> Unit = {},
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (state.mode == VisualizationMode.PHONE_MODEL) {
             SectionHeader("Pose sample")
@@ -152,7 +166,7 @@ fun VisualizationControls(
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (state.predictions == null) {
                     FilterChip(
@@ -161,19 +175,19 @@ fun VisualizationControls(
                         onClick = onAnalyzePredictions,
                         label = {
                             Text(if (state.isAnalyzingPredictions) "Analyzing…" else "Run model analysis")
-                        }
+                        },
                     )
                 } else {
                     FilterChip(
                         selected = state.showDisagreements,
                         onClick = { onStateChange(state.copy(showDisagreements = !state.showDisagreements)) },
-                        label = { Text("Disagreements (${state.flaggedIndices.size})") }
+                        label = { Text("Disagreements (${state.flaggedIndices.size})") },
                     )
                 }
                 FilterChip(
                     selected = state.showEllipsoids,
                     onClick = { onStateChange(state.copy(showEllipsoids = !state.showEllipsoids)) },
-                    label = { Text("Class spread") }
+                    label = { Text("Class spread") },
                 )
             }
             if (state.mode == VisualizationMode.FEATURE_PCA) {
@@ -185,7 +199,7 @@ fun VisualizationControls(
                         else -> "PCA projection not computed yet"
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -194,24 +208,24 @@ fun VisualizationControls(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             SectionHeader("Postures")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickActionButton(
                     label = "All",
-                    onClick = { onStateChange(state.copy(visiblePostures = SalahPosture.classificationLabels.toSet())) }
+                    onClick = { onStateChange(state.copy(visiblePostures = SalahPosture.classificationLabels.toSet())) },
                 )
                 QuickActionButton(
                     label = "None",
-                    onClick = { onStateChange(state.copy(visiblePostures = emptySet<SalahPosture>())) }
+                    onClick = { onStateChange(state.copy(visiblePostures = emptySet<SalahPosture>())) },
                 )
             }
         }
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SalahPosture.classificationLabels.forEach { posture ->
                 val isSelected = state.visiblePostures.contains(posture)
@@ -225,25 +239,25 @@ fun VisualizationControls(
                             state.visiblePostures + posture
                         }
                         onStateChange(state.copy(visiblePostures = newPostures))
-                    }
+                    },
                 )
             }
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.End,
         ) {
             FilledIconButton(
                 onClick = { onStateChange(state.copy(cameraResetToken = state.cameraResetToken + 1)) },
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
             ) {
                 Icon(
                     imageVector = Icons.Default.CenterFocusStrong,
-                    contentDescription = "Reset camera"
+                    contentDescription = "Reset camera",
                 )
             }
         }
@@ -257,13 +271,13 @@ fun VisualizationControls(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
                     text = "Size",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(32.dp)
+                    modifier = Modifier.width(32.dp),
                 )
                 Slider(
                     value = state.pointSize,
@@ -273,8 +287,8 @@ fun VisualizationControls(
                     modifier = Modifier.weight(1f),
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    )
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                    ),
                 )
                 Text(
                     text = "${state.pointSize.toInt()}",
@@ -283,7 +297,7 @@ fun VisualizationControls(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.width(20.dp),
-                    textAlign = TextAlign.End
+                    textAlign = TextAlign.End,
                 )
             }
         }
@@ -293,16 +307,15 @@ fun VisualizationControls(
 @Composable
 private fun QuickActionButton(
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     NiaOutlinedButton(
         onClick = onClick,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
     ) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
 }
-
 
 // ═══════════════════════════════════════════════════════
 // Section Header
@@ -315,7 +328,7 @@ private fun SectionHeader(title: String) {
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        letterSpacing = 1.2.sp
+        letterSpacing = 1.2.sp,
     )
 }
 
@@ -333,7 +346,7 @@ fun VisualizationModePicker(
         Triple(VisualizationMode.SCATTER, "Scatter", Icons.Default.Grain),
         Triple(VisualizationMode.PHONE_MODEL, "Pose", Icons.Default.AccessibilityNew),
         Triple(VisualizationMode.GRAVITY_VECTOR, "Gravity", Icons.Default.Public),
-        Triple(VisualizationMode.FEATURE_PCA, "PCA", Icons.Default.BubbleChart)
+        Triple(VisualizationMode.FEATURE_PCA, "PCA", Icons.Default.BubbleChart),
     )
 
     Column(
@@ -378,27 +391,33 @@ fun VisualizationModePicker(
                 modes.forEach { (mode, label, icon) ->
                     val isSelected = state.mode == mode
                     val bgColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                        else Color.Transparent,
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.Transparent
+                        },
                         animationSpec = tween(200, easing = FastOutSlowInEasing),
                         label = "mode_bg",
                     )
                     val contentColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         animationSpec = tween(200, easing = FastOutSlowInEasing),
                         label = "mode_content",
                     )
 
                     Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onStateChange(state.copy(mode = mode)) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = bgColor,
-                    shadowElevation = if (isSelected) 2.dp else 0.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onStateChange(state.copy(mode = mode)) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = bgColor,
+                        shadowElevation = if (isSelected) 2.dp else 0.dp,
                     ) {
                         Row(
                             modifier = Modifier.fillMaxSize(),
@@ -435,20 +454,26 @@ fun VisualizationModePicker(
 private fun PostureFilterChip(
     posture: SalahPosture,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val postureColor = getPostureColor(posture)
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) postureColor.copy(alpha = 0.15f)
-        else MaterialTheme.colorScheme.surfaceContainerLow,
+        targetValue = if (isSelected) {
+            postureColor.copy(alpha = 0.15f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
         animationSpec = tween(200, easing = FastOutSlowInEasing),
-        label = "chip_bg"
+        label = "chip_bg",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (isSelected) postureColor.copy(alpha = 0.6f)
-        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        targetValue = if (isSelected) {
+            postureColor.copy(alpha = 0.6f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        },
         animationSpec = tween(200, easing = FastOutSlowInEasing),
-        label = "chip_border"
+        label = "chip_border",
     )
 
     Surface(
@@ -458,28 +483,31 @@ private fun PostureFilterChip(
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
-        color = bgColor
+        color = bgColor,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .background(
                         color = if (isSelected) postureColor else postureColor.copy(alpha = 0.4f),
-                        shape = CircleShape
-                    )
+                        shape = CircleShape,
+                    ),
             )
             Text(
                 text = posture.displayName,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
             )
         }
     }
@@ -492,7 +520,7 @@ private fun PostureFilterChip(
 @Composable
 fun PlaybackBar(
     state: VisualizationState,
-    onStateChange: (VisualizationState) -> Unit
+    onStateChange: (VisualizationState) -> Unit,
 ) {
     val isTwoRakah = state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
     val itemCount = if (isTwoRakah) state.currentPrayerSample().size else state.totalSamples
@@ -503,17 +531,17 @@ fun PlaybackBar(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Controls row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 // Skip Previous
                 IconButton(
@@ -528,12 +556,12 @@ fun PlaybackBar(
                         )
                     },
                     enabled = currentIndex > 0,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
@@ -555,13 +583,13 @@ fun PlaybackBar(
                     modifier = Modifier.size(42.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(22.dp),
                     )
                 }
 
@@ -578,12 +606,12 @@ fun PlaybackBar(
                         )
                     },
                     enabled = currentIndex < itemCount - 1,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
@@ -599,7 +627,7 @@ fun PlaybackBar(
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -637,13 +665,13 @@ fun PlaybackBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.Speed,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(14.dp),
                 )
                 Slider(
                     value = state.playbackSpeed,
@@ -654,12 +682,12 @@ fun PlaybackBar(
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                    )
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ),
                 )
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
                     Text(
                         text = if (state.playbackSpeed % 1f == 0f) {
@@ -671,7 +699,7 @@ fun PlaybackBar(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
             }
@@ -878,38 +906,38 @@ fun CurrentSampleCard(state: VisualizationState) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Posture name with color indicator
             displayedPosture?.let { posture ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .background(
                                 color = getPostureColor(posture),
-                                shape = CircleShape
-                            )
+                                shape = CircleShape,
+                            ),
                     )
                     Text(
                         text = posture.displayName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (posture.arabicName.isNotEmpty()) {
                         Text(
                             text = posture.arabicName,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
                         )
                     }
                 }
@@ -933,7 +961,7 @@ fun CurrentSampleCard(state: VisualizationState) {
                 val agrees = predicted == displayedPosture
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -941,7 +969,7 @@ fun CurrentSampleCard(state: VisualizationState) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
                             MaterialTheme.colorScheme.errorContainer
-                        }
+                        },
                     ) {
                         Text(
                             text = when {
@@ -955,7 +983,7 @@ fun CurrentSampleCard(state: VisualizationState) {
                                 MaterialTheme.colorScheme.onSecondaryContainer
                             } else {
                                 MaterialTheme.colorScheme.onErrorContainer
-                            }
+                            },
                         )
                     }
                     if (!agrees && predicted != null) {
@@ -963,7 +991,7 @@ fun CurrentSampleCard(state: VisualizationState) {
                             text = "≠ label",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -973,7 +1001,7 @@ fun CurrentSampleCard(state: VisualizationState) {
             if (!isTwoRakah) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     SensorReadout("Pitch", "${"%.1f".format(state.currentPitch)}\u00B0")
                     SensorReadout("Roll", "${"%.1f".format(state.currentRoll)}\u00B0")
@@ -993,13 +1021,13 @@ private fun SensorReadout(label: String, value: String) {
             style = MaterialTheme.typography.labelMedium,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 10.sp
+            fontSize = 10.sp,
         )
     }
 }
@@ -1011,32 +1039,32 @@ private fun SensorReadout(label: String, value: String) {
 @Composable
 private fun ScatterAxisRow(
     state: VisualizationState,
-    onStateChange: (VisualizationState) -> Unit
+    onStateChange: (VisualizationState) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CompactAxisSelector(
             label = "X",
             selectedAxis = state.axisX,
             labelColor = Color(0xFFEF5350),
             onAxisSelected = { onStateChange(state.copy(axisX = it)) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         CompactAxisSelector(
             label = "Y",
             selectedAxis = state.axisY,
             labelColor = Color(0xFF66BB6A),
             onAxisSelected = { onStateChange(state.copy(axisY = it)) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         CompactAxisSelector(
             label = "Z",
             selectedAxis = state.axisZ,
             labelColor = Color(0xFF42A5F5),
             onAxisSelected = { onStateChange(state.copy(axisZ = it)) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -1047,7 +1075,7 @@ private fun CompactAxisSelector(
     selectedAxis: String,
     labelColor: Color,
     onAxisSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -1061,7 +1089,7 @@ private fun CompactAxisSelector(
         "gx" to "Gyro X",
         "gy" to "Gyro Y",
         "gz" to "Gyro Z",
-        "gm" to "Gyro M"
+        "gm" to "Gyro M",
     )
 
     Box(modifier = modifier) {
@@ -1075,27 +1103,27 @@ private fun CompactAxisSelector(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             border = androidx.compose.foundation.BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            ),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 // Colored axis label
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = labelColor.copy(alpha = 0.15f)
+                    color = labelColor.copy(alpha = 0.15f),
                 ) {
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = labelColor,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                     )
                 }
                 Text(
@@ -1103,32 +1131,32 @@ private fun CompactAxisSelector(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
                     imageVector = Icons.Default.ArrowDropDown,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
         ) {
             axisOptions.forEach { (key, displayName) ->
                 DropdownMenuItem(
                     text = {
                         Text(
                             text = displayName,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     },
                     onClick = {
                         onAxisSelected(key)
                         expanded = false
-                    }
+                    },
                 )
             }
         }
@@ -1160,7 +1188,7 @@ fun getPostureColor(posture: SalahPosture): Color {
 @Composable
 fun DataQualitySummary(
     samples: List<com.starception.submission.ml.SalahDataSample>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     if (samples.isEmpty()) return
 
@@ -1189,24 +1217,24 @@ fun DataQualitySummary(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Header with quality badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "DATA QUALITY",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.2.sp
+                    letterSpacing = 1.2.sp,
                 )
                 val (badgeText, badgeColor) = when {
                     emptyClasses > 0 -> "Missing classes" to Color(0xFFE53935)
@@ -1216,14 +1244,14 @@ fun DataQualitySummary(
                 }
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = badgeColor
+                    color = badgeColor,
                 ) {
                     Text(
                         text = badgeText,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                     )
                 }
             }
@@ -1233,34 +1261,34 @@ fun DataQualitySummary(
                 val animatedFraction by animateFloatAsState(
                     targetValue = if (maxCount > 0) count.toFloat() / maxCount else 0f,
                     animationSpec = tween(600, easing = FastOutSlowInEasing),
-                    label = "bar_${posture.name}"
+                    label = "bar_${posture.name}",
                 )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     // Color dot + name
                     Row(
                         modifier = Modifier.width(90.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .background(
                                     color = getPostureColor(posture),
-                                    shape = CircleShape
-                                )
+                                    shape = CircleShape,
+                                ),
                         )
                         Text(
                             text = posture.displayName,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
 
@@ -1270,7 +1298,7 @@ fun DataQualitySummary(
                             .weight(1f)
                             .height(10.dp)
                             .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     ) {
                         Box(
                             modifier = Modifier
@@ -1278,8 +1306,8 @@ fun DataQualitySummary(
                                 .fillMaxWidth(animatedFraction)
                                 .background(
                                     color = getPostureColor(posture),
-                                    shape = RoundedCornerShape(5.dp)
-                                )
+                                    shape = RoundedCornerShape(5.dp),
+                                ),
                         )
                     }
 
@@ -1289,10 +1317,13 @@ fun DataQualitySummary(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = if (count == 0) Color(0xFFE53935)
-                        else MaterialTheme.colorScheme.onSurface,
+                        color = if (count == 0) {
+                            Color(0xFFE53935)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                         modifier = Modifier.width(36.dp),
-                        textAlign = TextAlign.End
+                        textAlign = TextAlign.End,
                     )
                 }
             }
@@ -1302,12 +1333,12 @@ fun DataQualitySummary(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                SummaryStatChip("Balance", "${balanceRatio}%")
+                SummaryStatChip("Balance", "$balanceRatio%")
                 SummaryStatChip(
                     "Sessions",
-                    "$sessionCount"
+                    "$sessionCount",
                 )
                 SummaryStatChip("Samples", "$totalClassification")
             }
@@ -1323,13 +1354,13 @@ private fun SummaryStatChip(label: String, value: String) {
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 10.sp
+            fontSize = 10.sp,
         )
     }
 }

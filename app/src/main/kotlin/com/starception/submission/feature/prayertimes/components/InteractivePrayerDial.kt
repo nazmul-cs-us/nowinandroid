@@ -1,98 +1,100 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.util.Log
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.animation.core.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import android.util.Log
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.graphics.drawscope.rotate
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.effects.lens
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.highlight.HighlightStyle
-import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import kotlin.math.atan2
-import kotlin.math.sqrt
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 // ============================================================================
 // UI SENSOR FOR DYNAMIC HIGHLIGHT (from AndroidLiquidGlass)
@@ -163,7 +165,7 @@ data class ClockStyle(
     val minutesDialStyle: DialStyle = DialStyle(),
     val hourLabelStyle: TextStyle = TextStyle(),
     val overlayStrokeWidth: Float = 2f,
-    val overlayStrokeColor: Color = Color.Red
+    val overlayStrokeColor: Color = Color.Red,
 )
 
 val PrayerDialStyle = ClockStyle(
@@ -171,31 +173,31 @@ val PrayerDialStyle = ClockStyle(
         stepsTextStyle = TextStyle(
             color = Color.White, // White text for Control Center glass
             fontSize = 18.sp,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
         ),
         stepsColor = Color.White.copy(alpha = 0.6f), // Subtle white tick marks
         stepsLabelTopPadding = 18f,
         normalStepsLineHeight = 6f,
-        fiveStepsLineHeight = 12f
+        fiveStepsLineHeight = 12f,
     ),
     minutesDialStyle = DialStyle(
         stepsTextStyle = TextStyle(
             color = Color.White.copy(alpha = 0.8f), // Slightly transparent white
             fontSize = 14.sp,
-            fontWeight = FontWeight.Normal
+            fontWeight = FontWeight.Normal,
         ),
         stepsColor = Color.White.copy(alpha = 0.4f), // More subtle inner tick marks
         stepsLabelTopPadding = 16f,
         normalStepsLineHeight = 4f,
-        fiveStepsLineHeight = 10f
+        fiveStepsLineHeight = 10f,
     ),
     hourLabelStyle = TextStyle(
         color = Color.White, // White hour label
         fontSize = 56.sp,
-        fontWeight = FontWeight.Bold
+        fontWeight = FontWeight.Bold,
     ),
     overlayStrokeColor = Color.White.copy(alpha = 0.8f), // White overlay
-    overlayStrokeWidth = 1.5f
+    overlayStrokeWidth = 1.5f,
 )
 
 // ============================================================================
@@ -211,7 +213,7 @@ fun InteractivePrayerDial(
     timeAdjustment: Int,
     onTimeAdjusted: (Int) -> Unit,
     onSaveAdjustment: (String, Int) -> Unit,
-    onResetAdjustment: () -> Unit
+    onResetAdjustment: () -> Unit,
 ) {
     // TextMeasurer for drawing text on Canvas (from watchface)
     val textMeasurer = rememberTextMeasurer()
@@ -232,7 +234,7 @@ fun InteractivePrayerDial(
     val density = LocalDensity.current
 
     // Control Center style colors
-    val containerColor = Color.Black.copy(alpha = 0.05f)  // Very subtle dark tint
+    val containerColor = Color.Black.copy(alpha = 0.05f) // Very subtle dark tint
 
     // Glass shape provider for circle
     val glassShape: () -> androidx.compose.ui.graphics.Shape = { CircleShape }
@@ -242,8 +244,8 @@ fun InteractivePrayerDial(
         Highlight(
             style = HighlightStyle.Default(
                 angle = uiSensor.gravityAngle,
-                falloff = 2f
-            )
+                falloff = 2f,
+            ),
         )
     }
 
@@ -253,7 +255,7 @@ fun InteractivePrayerDial(
         lens(
             with(density) { 24.dp.toPx() },
             with(density) { 48.dp.toPx() },
-            depthEffect = true
+            depthEffect = true,
         )
     }
 
@@ -341,10 +343,10 @@ fun InteractivePrayerDial(
         } else {
             spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
+                stiffness = Spring.StiffnessMediumLow,
             )
         },
-        label = "swipeOffset"
+        label = "swipeOffset",
     )
 
     // Log whenever currentAdjustment changes
@@ -357,27 +359,27 @@ fun InteractivePrayerDial(
         targetValue = if (isDragging) 1.05f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "dialScale"
+        label = "dialScale",
     )
 
     val knobScale by animateFloatAsState(
         targetValue = if (isDragging) 1.2f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "knobScale"
+        label = "knobScale",
     )
 
     val progressArcGlow by animateFloatAsState(
         targetValue = if (isDragging) 1.5f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "progressArcGlow"
+        label = "progressArcGlow",
     )
 
     // Get Material 3 theme colors for dark/light mode support
@@ -406,9 +408,9 @@ fun InteractivePrayerDial(
                 effects = glassEffects,
                 highlight = glassHighlight,
                 shadow = null,
-                onDrawSurface = glassSurface
+                onDrawSurface = glassSurface,
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Canvas(
             modifier = Modifier
@@ -429,7 +431,7 @@ fun InteractivePrayerDial(
                             // Start dragging anywhere within the dial area - much more lenient
                             val distanceFromCenter = kotlin.math.sqrt(
                                 (offset.x - center.x) * (offset.x - center.x) +
-                                (offset.y - center.y) * (offset.y - center.y)
+                                    (offset.y - center.y) * (offset.y - center.y),
                             )
 
                             // Allow dragging if touch is anywhere within the circular dial
@@ -438,7 +440,7 @@ fun InteractivePrayerDial(
                                 isDragging = true
                                 lastAngle = kotlin.math.atan2(
                                     offset.y - center.y,
-                                    offset.x - center.x
+                                    offset.x - center.x,
                                 ) * 180f / PI.toFloat()
                                 accumulatedAngle = 0f // Reset accumulated angle
 
@@ -447,11 +449,11 @@ fun InteractivePrayerDial(
                                 val adjustedTime = adjustedDateTime.toLocalTime()
                                 val hourIn12Format = if (adjustedTime.hour % 12 == 0) 12 else adjustedTime.hour % 12
                                 val timeAngle = ((hourIn12Format * 60 + adjustedTime.minute) / (12 * 60f)) * 360f - 90f
-                                
+
                                 // Start drag angle from finger position for immediate visual feedback
                                 // The knob will snap to finger position when dragging starts
                                 currentDragAngle = lastAngle
-                                
+
                                 // Calculate initial angle difference to track from the start
                                 var initialAngleDiff = lastAngle - timeAngle
                                 if (initialAngleDiff > 180f) initialAngleDiff -= 360f
@@ -468,19 +470,19 @@ fun InteractivePrayerDial(
                         },
                         onDragEnd = {
                             Log.d("InteractiveDial", "🏁 DRAG END - Prayer: $prayerName, Final adjustment: ${currentAdjustment}m")
-                            Log.d("InteractiveDial", "📊 Final accumulated angle: ${accumulatedAngle}°")
+                            Log.d("InteractiveDial", "📊 Final accumulated angle: $accumulatedAngle°")
                             Log.d("InteractiveDial", "🔵 Drag ended - Save button will appear for user to confirm")
                             isDragging = false
 
                             // Light haptic feedback to indicate drag ended
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
+                        },
                     ) { change, _ ->
                         if (isDragging) {
-                        val center = Offset(size.width / 2f, size.height / 2f)
+                            val center = Offset(size.width / 2f, size.height / 2f)
                             val fingerAngle = kotlin.math.atan2(
                                 change.position.y - center.y,
-                                change.position.x - center.x
+                                change.position.x - center.x,
                             ) * 180f / PI.toFloat()
 
                             var angleDiff = fingerAngle - lastAngle
@@ -529,7 +531,7 @@ fun InteractivePrayerDial(
                             Log.d("InteractiveDial", "❌ Drag event but isDragging=false")
                         }
                     }
-                }
+                },
         ) {
             // ================================================================
             // WATCHFACE DIAL DRAWING (copied from watchface-main Clock.kt)
@@ -548,7 +550,7 @@ fun InteractivePrayerDial(
                 radius = outerRadius,
                 rotation = secondRotation,
                 textMeasurer = textMeasurer,
-                dialStyle = clockStyle.secondsDialStyle
+                dialStyle = clockStyle.secondsDialStyle,
             )
 
             // Minutes Dial (inner ring with rotating numbers)
@@ -556,14 +558,14 @@ fun InteractivePrayerDial(
                 radius = innerRadius,
                 rotation = minuteRotation,
                 textMeasurer = textMeasurer,
-                dialStyle = clockStyle.minutesDialStyle
+                dialStyle = clockStyle.minutesDialStyle,
             )
 
             // Draw hour label in center
             val hourString = String.format("%02d", hour)
             val hourTextMeasureOutput = textMeasurer.measure(
                 text = buildAnnotatedString { append(hourString) },
-                style = clockStyle.hourLabelStyle
+                style = clockStyle.hourLabelStyle,
             )
             val hourTopLeft = Offset(
                 x = this.center.x - (hourTextMeasureOutput.size.width / 2),
@@ -573,7 +575,7 @@ fun InteractivePrayerDial(
                 textMeasurer = textMeasurer,
                 text = hourString,
                 topLeft = hourTopLeft,
-                style = clockStyle.hourLabelStyle
+                style = clockStyle.hourLabelStyle,
             )
 
             // Drawing minute-second overlay indicator (pointing to 3 o'clock)
@@ -590,12 +592,12 @@ fun InteractivePrayerDial(
 
                 val secondsLabelMaxWidth = textMeasurer.measure(
                     text = buildAnnotatedString { append("60") },
-                    style = clockStyle.secondsDialStyle.stepsTextStyle
+                    style = clockStyle.secondsDialStyle.stepsTextStyle,
                 ).size.width
 
                 val minutesLabelMaxWidth = textMeasurer.measure(
                     text = buildAnnotatedString { append("60") },
-                    style = clockStyle.minutesDialStyle.stepsTextStyle
+                    style = clockStyle.minutesDialStyle.stepsTextStyle,
                 ).size.width
 
                 val overlayLineX =
@@ -608,7 +610,7 @@ fun InteractivePrayerDial(
                     x2 = overlayLineX - overlayRadius,
                     y2 = endOffset.y,
                     x3 = overlayLineX,
-                    y3 = endOffset.y
+                    y3 = endOffset.y,
                 )
                 lineTo(endOffset.x, endOffset.y)
             }
@@ -616,7 +618,7 @@ fun InteractivePrayerDial(
             drawPath(
                 path = minuteHandOverlayPath,
                 color = clockStyle.overlayStrokeColor,
-                style = Stroke(width = clockStyle.overlayStrokeWidth)
+                style = Stroke(width = clockStyle.overlayStrokeWidth),
             )
         }
 
@@ -628,7 +630,7 @@ fun InteractivePrayerDial(
                 .size(200.dp)
                 .background(
                     color = Color.Transparent,
-                    shape = CircleShape
+                    shape = CircleShape,
                 )
                 .pointerInput(baseAdjustment, currentAdjustment) {
                     // Detect tap to close when no adjustment has been made
@@ -641,14 +643,14 @@ fun InteractivePrayerDial(
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSaveAdjustment(prayerName, baseAdjustment) // Close dial
                             }
-                        }
+                        },
                     )
                 },
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 // Prayer name display at the top
                 Text(
@@ -656,10 +658,10 @@ fun InteractivePrayerDial(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 18.sp,
-                        letterSpacing = 0.5.sp
+                        letterSpacing = 0.5.sp,
                     ),
                     color = Color(0xFF26C6DA), // Teal color to match the theme
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -671,10 +673,10 @@ fun InteractivePrayerDial(
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 44.sp,
-                        letterSpacing = (-1.sp) // Tight spacing for digital clock look
+                        letterSpacing = (-1.sp), // Tight spacing for digital clock look
                     ),
                     color = Color(0xFF37474F), // Dark blue-gray for better contrast
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
 
                 // Small indicator showing adjustment amount - always visible
@@ -700,7 +702,7 @@ fun InteractivePrayerDial(
                             else -> "${currentAdjustment}m"
                         }
                     }
-                    else -> "0m"  // Show 0m when there's no adjustment
+                    else -> "0m" // Show 0m when there's no adjustment
                 }
 
                 Text(
@@ -708,10 +710,10 @@ fun InteractivePrayerDial(
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
-                        letterSpacing = 0.5.sp
+                        letterSpacing = 0.5.sp,
                     ),
                     color = Color(0xFF26C6DA), // Teal color
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -728,7 +730,7 @@ fun InteractivePrayerDial(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp)
-                            .padding(horizontal = 8.dp)
+                            .padding(horizontal = 8.dp),
                     ) {
                         // iOS Frosted Glass Background Track
                         Box(
@@ -742,10 +744,10 @@ fun InteractivePrayerDial(
                                         colors = listOf(
                                             MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
                                             MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
-                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                        )
-                                    )
-                                )
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                        ),
+                                    ),
+                                ),
                         )
 
                         // Glass border overlay for depth
@@ -760,12 +762,12 @@ fun InteractivePrayerDial(
                                             colors = listOf(
                                                 Color.White.copy(alpha = 0.5f),
                                                 Color.White.copy(alpha = 0.2f),
-                                                Color.White.copy(alpha = 0.3f)
-                                            )
-                                        )
+                                                Color.White.copy(alpha = 0.3f),
+                                            ),
+                                        ),
                                     ),
-                                    shape = RoundedCornerShape(32.dp)
-                                )
+                                    shape = RoundedCornerShape(32.dp),
+                                ),
                         )
 
                         // Inner glass shimmer effect
@@ -778,12 +780,12 @@ fun InteractivePrayerDial(
                                     Brush.radialGradient(
                                         colors = listOf(
                                             Color.White.copy(alpha = 0.2f),
-                                            Color.Transparent
+                                            Color.Transparent,
                                         ),
                                         radius = 200f,
-                                        center = Offset(0.3f, 0.3f)
-                                    )
-                                )
+                                        center = Offset(0.3f, 0.3f),
+                                    ),
+                                ),
                         )
 
                         // Circular Reset Button on the left
@@ -795,7 +797,9 @@ fun InteractivePrayerDial(
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset < 0) {
                                         (kotlin.math.abs(animatedSwipeOffset) / swipeThreshold).coerceIn(0.7f, 1f)
-                                    } else 0.5f
+                                    } else {
+                                        0.5f
+                                    }
                                     scaleX = if (animatedSwipeOffset < -swipeThreshold * 0.8f) 1.1f else 1f
                                     scaleY = if (animatedSwipeOffset < -swipeThreshold * 0.8f) 1.1f else 1f
                                 }
@@ -804,26 +808,26 @@ fun InteractivePrayerDial(
                                     Brush.radialGradient(
                                         colors = listOf(
                                             MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                         ),
-                                        radius = 80f
+                                        radius = 80f,
                                     ),
-                                    shape = CircleShape
+                                    shape = CircleShape,
                                 )
                                 .border(
                                     BorderStroke(
                                         width = 0.5.dp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
                                     ),
-                                    shape = CircleShape
+                                    shape = CircleShape,
                                 ),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
                                 contentDescription = "Reset",
                                 modifier = Modifier.size(26.dp),
-                                tint = Color(0xFFFF9800)
+                                tint = Color(0xFFFF9800),
                             )
                         }
 
@@ -836,7 +840,9 @@ fun InteractivePrayerDial(
                                 .graphicsLayer {
                                     alpha = if (animatedSwipeOffset > 0) {
                                         (animatedSwipeOffset / swipeThreshold).coerceIn(0.7f, 1f)
-                                    } else 0.5f
+                                    } else {
+                                        0.5f
+                                    }
                                     scaleX = if (animatedSwipeOffset > swipeThreshold * 0.8f) 1.1f else 1f
                                     scaleY = if (animatedSwipeOffset > swipeThreshold * 0.8f) 1.1f else 1f
                                 }
@@ -845,26 +851,26 @@ fun InteractivePrayerDial(
                                     Brush.radialGradient(
                                         colors = listOf(
                                             MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                         ),
-                                        radius = 80f
+                                        radius = 80f,
                                     ),
-                                    shape = CircleShape
+                                    shape = CircleShape,
                                 )
                                 .border(
                                     BorderStroke(
                                         width = 0.5.dp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
                                     ),
-                                    shape = CircleShape
+                                    shape = CircleShape,
                                 ),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Save,
                                 contentDescription = "Save",
                                 modifier = Modifier.size(26.dp),
-                                tint = Color(0xFF4CAF50)
+                                tint = Color(0xFF4CAF50),
                             )
                         }
 
@@ -909,19 +915,20 @@ fun InteractivePrayerDial(
                                                 isSwipingHorizontally = false
                                                 swipeOffset = 0f
                                             }
-                                        }
+                                        },
                                     ) { change, dragAmount ->
                                         // Update swipe offset within bounds
                                         swipeOffset = (swipeOffset + dragAmount).coerceIn(-180f, 180f)
 
                                         // Haptic feedback at threshold points
                                         if (kotlin.math.abs(swipeOffset) >= swipeThreshold &&
-                                            kotlin.math.abs(swipeOffset - dragAmount) < swipeThreshold) {
+                                            kotlin.math.abs(swipeOffset - dragAmount) < swipeThreshold
+                                        ) {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         }
                                     }
                                 },
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             // Swipeable pill indicator - iPhone style with frosted glass effect
                             // Constrain movement to avoid overlapping buttons
@@ -934,7 +941,7 @@ fun InteractivePrayerDial(
                                     .size(width = 90.dp, height = 50.dp)
                                     .offset(x = constrainedOffset.dp)
                                     .clip(RoundedCornerShape(25.dp)),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.Center,
                             ) {
                                 // Layer 1: Base glass background
                                 Box(
@@ -948,8 +955,8 @@ fun InteractivePrayerDial(
                                                     Color(0xFF4CAF50).copy(alpha = 0.3f) // Green tint
                                                 else ->
                                                     MaterialTheme.colorScheme.surface.copy(alpha = 0.5f) // Neutral
-                                            }
-                                        )
+                                            },
+                                        ),
                                 )
 
                                 // Layer 2: Blur effect simulation with gradient
@@ -961,10 +968,10 @@ fun InteractivePrayerDial(
                                                 colors = listOf(
                                                     Color.White.copy(alpha = 0.4f),
                                                     Color.White.copy(alpha = 0.2f),
-                                                    Color.White.copy(alpha = 0.25f)
-                                                )
-                                            )
-                                        )
+                                                    Color.White.copy(alpha = 0.25f),
+                                                ),
+                                            ),
+                                        ),
                                 )
 
                                 // Layer 3: Glass shine effect
@@ -976,10 +983,10 @@ fun InteractivePrayerDial(
                                                 colors = listOf(
                                                     Color.Transparent,
                                                     Color.White.copy(alpha = 0.1f),
-                                                    Color.Transparent
-                                                )
-                                            )
-                                        )
+                                                    Color.Transparent,
+                                                ),
+                                            ),
+                                        ),
                                 )
 
                                 // Layer 4: Border for definition
@@ -992,12 +999,12 @@ fun InteractivePrayerDial(
                                                 brush = Brush.verticalGradient(
                                                     colors = listOf(
                                                         Color.White.copy(alpha = 0.6f),
-                                                        Color.White.copy(alpha = 0.2f)
-                                                    )
-                                                )
+                                                        Color.White.copy(alpha = 0.2f),
+                                                    ),
+                                                ),
                                             ),
-                                            shape = RoundedCornerShape(25.dp)
-                                        )
+                                            shape = RoundedCornerShape(25.dp),
+                                        ),
                                 )
 
                                 // Text content on top of all glass layers
@@ -1019,7 +1026,7 @@ fun InteractivePrayerDial(
                                     modifier = Modifier.graphicsLayer {
                                         // Add subtle shadow for text readability
                                         shadowElevation = 2f
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -1028,17 +1035,17 @@ fun InteractivePrayerDial(
                     // Show hints when no adjustment has been made
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
                             text = "Drag knob to adjust",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 13.sp,
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.3.sp,
                             ),
                             color = Color(0xFF607D8B).copy(alpha = 0.6f), // Subtle gray
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
@@ -1046,10 +1053,10 @@ fun InteractivePrayerDial(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 12.sp,
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.3.sp,
                             ),
                             color = Color(0xFF607D8B).copy(alpha = 0.5f), // Slightly more visible
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -1069,13 +1076,13 @@ private fun DrawScope.drawCleanCircularTimer(
     onSurfaceColor: Color,
     outlineColor: Color,
     knobScale: Float = 1f,
-    progressArcGlow: Float = 1f
+    progressArcGlow: Float = 1f,
 ) {
     // Design matching the reference image: central dial with outer segmented ring
     // Ensure perfect centering - use the exact center parameter directly
     // CRITICAL: Both circles MUST use the exact same center point
     val exactCenter = center
-    
+
     val outerRingRadius = radius * 1.15f // Outer ring radius
     val centralKnobRadius = radius * 0.35f // Central knob radius (smaller, no dark center)
 
@@ -1088,14 +1095,14 @@ private fun DrawScope.drawCleanCircularTimer(
     drawCircle(
         color = Color(0xFF000000).copy(alpha = 0.1f), // Subtle shadow with low opacity
         radius = outerRingRadius + 6f,
-        center = exactCenter // Shadow centered, not offset
+        center = exactCenter, // Shadow centered, not offset
     )
 
     // Draw outer segmented ring background (recessed appearance) - perfectly centered
     drawCircle(
         color = lightGreyBackground, // Light grey background for the outer ring
         radius = outerRingRadius,
-        center = exactCenter
+        center = exactCenter,
     )
 
     // Draw segmented outer ring with markers ON the track
@@ -1106,7 +1113,7 @@ private fun DrawScope.drawCleanCircularTimer(
     val markerWidth = 2.5f // Uniform width for all markers (teal and grey)
     val trackWidth = 16f // Width of the track/ring where markers are drawn
     val inactiveGrey = Color(0xFFE0E0E0) // Light grey for inactive markers - fully opaque
-    
+
     // Calculate actual prayer time (adjusted) for angle calculation
     val adjustedDateTime = LocalDateTime.of(LocalDate.now(), originalTime).plusMinutes(timeAdjustment.toLong())
     val adjustedTime = adjustedDateTime.toLocalTime()
@@ -1117,7 +1124,7 @@ private fun DrawScope.drawCleanCircularTimer(
 
     // Draw markers on the track with progress indication
     // Active markers (teal) from 12 o'clock clockwise, inactive markers (grey) for the rest
-        val currentAngle = if (isDragging) currentDragAngle else timeAngle
+    val currentAngle = if (isDragging) currentDragAngle else timeAngle
     val normalizedCurrentAngle = ((currentAngle + 90f) % 360 + 360) % 360 // Normalize relative to top (0° = 12 o'clock)
 
     for (i in 0 until segmentCount) {
@@ -1132,20 +1139,20 @@ private fun DrawScope.drawCleanCircularTimer(
         // Position markers on the track itself, ensuring they stay within track width
         val trackInnerRadius = outerRingRadius - trackWidth / 2f
         val trackOuterRadius = outerRingRadius + trackWidth / 2f
-        
+
         // Draw marker as a vertical dash ON the track, fully contained within track boundaries
         // Marker should be within the track, with some padding from edges
         val markerPadding = 1f // Small padding to ensure markers stay within track
         val markerStartRadius = trackInnerRadius + markerPadding
         val markerEndRadius = trackOuterRadius - markerPadding
-        
+
         val markerStart = Offset(
             exactCenter.x + markerStartRadius * cos(markerAngle.toFloat()).toFloat(),
-            exactCenter.y + markerStartRadius * sin(markerAngle.toFloat()).toFloat()
+            exactCenter.y + markerStartRadius * sin(markerAngle.toFloat()).toFloat(),
         )
         val markerEnd = Offset(
             exactCenter.x + markerEndRadius * cos(markerAngle.toFloat()).toFloat(),
-            exactCenter.y + markerEndRadius * sin(markerAngle.toFloat()).toFloat()
+            exactCenter.y + markerEndRadius * sin(markerAngle.toFloat()).toFloat(),
         )
 
         // Draw marker - uniform width for both teal and grey, sharp color transition
@@ -1159,7 +1166,7 @@ private fun DrawScope.drawCleanCircularTimer(
             start = markerStart,
             end = markerEnd,
             strokeWidth = markerWidth, // Uniform width for all markers
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
     }
 
@@ -1169,11 +1176,11 @@ private fun DrawScope.drawCleanCircularTimer(
 
     // FIX: Position knob properly within the track, not overlapping the center
     // Place it exactly in the middle of the track (between inner and outer edges)
-    val indicatorRadius = outerRingRadius - trackWidth/2f // Center of the track
+    val indicatorRadius = outerRingRadius - trackWidth / 2f // Center of the track
 
     val indicatorCenter = Offset(
         exactCenter.x + indicatorRadius * cos(indicatorAngleRad),
-        exactCenter.y + indicatorRadius * sin(indicatorAngleRad)
+        exactCenter.y + indicatorRadius * sin(indicatorAngleRad),
     )
 
     // Draw circular knob indicator (larger and more visible for dragging)
@@ -1184,67 +1191,70 @@ private fun DrawScope.drawCleanCircularTimer(
         color = Color.White,
         radius = knobIndicatorRadius + 2f,
         center = indicatorCenter,
-        style = Stroke(width = 2f)
+        style = Stroke(width = 2f),
     )
 
     // Draw the knob itself
     drawCircle(
         color = tealColor,
         radius = knobIndicatorRadius,
-        center = indicatorCenter
+        center = indicatorCenter,
     )
-    
 }
 
 private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {
     val documentSize = radius * 1.8f // Document size larger than the circular dial
     val cornerSize = radius * 0.4f // Size of the folded corner
-    
+
     // Main document shadow for depth
     drawRect(
         color = Color.Black.copy(alpha = 0.15f),
         topLeft = Offset(
-            center.x - documentSize/2 + 3f,
-            center.y - documentSize/2 + 4f
+            center.x - documentSize / 2 + 3f,
+            center.y - documentSize / 2 + 4f,
         ),
-        size = Size(documentSize, documentSize)
+        size = Size(documentSize, documentSize),
     )
-    
+
     // Main document body (light gray like PNG file)
     val documentPath = Path().apply {
         // Start from top-left, create document shape with folded corner
-        moveTo(center.x - documentSize/2, center.y - documentSize/2 + 16f)
-        
+        moveTo(center.x - documentSize / 2, center.y - documentSize / 2 + 16f)
+
         // Top edge up to fold
-        lineTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2)
-        
+        lineTo(center.x + documentSize / 2 - cornerSize, center.y - documentSize / 2)
+
         // Folded corner diagonal
-        lineTo(center.x + documentSize/2, center.y - documentSize/2 + cornerSize)
-        
+        lineTo(center.x + documentSize / 2, center.y - documentSize / 2 + cornerSize)
+
         // Right edge
-        lineTo(center.x + documentSize/2, center.y + documentSize/2 - 16f)
-        
+        lineTo(center.x + documentSize / 2, center.y + documentSize / 2 - 16f)
+
         // Bottom-right corner (rounded)
         quadraticTo(
-            center.x + documentSize/2, center.y + documentSize/2,
-            center.x + documentSize/2 - 16f, center.y + documentSize/2
+            center.x + documentSize / 2,
+            center.y + documentSize / 2,
+            center.x + documentSize / 2 - 16f,
+            center.y + documentSize / 2,
         )
-        
+
         // Bottom edge
-        lineTo(center.x - documentSize/2 + 16f, center.y + documentSize/2)
-        
+        lineTo(center.x - documentSize / 2 + 16f, center.y + documentSize / 2)
+
         // Bottom-left corner (rounded)
         quadraticTo(
-            center.x - documentSize/2, center.y + documentSize/2,
-            center.x - documentSize/2, center.y + documentSize/2 - 16f
+            center.x - documentSize / 2,
+            center.y + documentSize / 2,
+            center.x - documentSize / 2,
+            center.y + documentSize / 2 - 16f,
         )
-        
+
         // Left edge
-        lineTo(center.x - documentSize/2, center.y - documentSize/2 + 16f)
-        
+        lineTo(center.x - documentSize / 2, center.y - documentSize / 2 + 16f)
+
         close()
     }
-    
+
     // Draw main document with light gray gradient
     drawPath(
         path = documentPath,
@@ -1253,50 +1263,54 @@ private fun DrawScope.drawPNGDocumentBackground(center: Offset, radius: Float) {
                 Color(0xFFF8F8F8), // Very light gray at top
                 Color(0xFFF0F0F0), // Light gray at bottom
             ),
-            start = Offset(center.x, center.y - documentSize/2),
-            end = Offset(center.x, center.y + documentSize/2)
-        )
+            start = Offset(center.x, center.y - documentSize / 2),
+            end = Offset(center.x, center.y + documentSize / 2),
+        ),
     )
-    
+
     // Draw the folded corner triangle (slightly darker for depth)
     val foldPath = Path().apply {
-        moveTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2)
-        lineTo(center.x + documentSize/2 - cornerSize, center.y - documentSize/2 + cornerSize)
-        lineTo(center.x + documentSize/2, center.y - documentSize/2 + cornerSize)
+        moveTo(center.x + documentSize / 2 - cornerSize, center.y - documentSize / 2)
+        lineTo(center.x + documentSize / 2 - cornerSize, center.y - documentSize / 2 + cornerSize)
+        lineTo(center.x + documentSize / 2, center.y - documentSize / 2 + cornerSize)
         close()
     }
-    
+
     drawPath(
         path = foldPath,
-        color = Color(0xFFE0E0E0) // Slightly darker for the fold
+        color = Color(0xFFE0E0E0), // Slightly darker for the fold
     )
-    
+
     // Document border
     drawPath(
         path = documentPath,
         color = Color(0xFFD0D0D0),
-        style = Stroke(width = 1.5f)
+        style = Stroke(width = 1.5f),
     )
-    
+
     // Fold line
     drawLine(
         color = Color(0xFFD0D0D0),
-        start = Offset(center.x + documentSize/2 - cornerSize, center.y - documentSize/2),
-        end = Offset(center.x + documentSize/2, center.y - documentSize/2 + cornerSize),
-        strokeWidth = 1f
+        start = Offset(center.x + documentSize / 2 - cornerSize, center.y - documentSize / 2),
+        end = Offset(center.x + documentSize / 2, center.y - documentSize / 2 + cornerSize),
+        strokeWidth = 1f,
     )
 }
 
 private fun adjustTimeByMinutes(originalTime: LocalTime, minutes: Int): String {
     val adjustedDateTime = LocalDateTime.of(
         LocalDate.now(),
-        originalTime
+        originalTime,
     ).plusMinutes(minutes.toLong())
 
     val adjustedTime = adjustedDateTime.toLocalTime()
-    val hour12 = if (adjustedTime.hour == 0) 12
-                else if (adjustedTime.hour > 12) adjustedTime.hour - 12
-                else adjustedTime.hour
+    val hour12 = if (adjustedTime.hour == 0) {
+        12
+    } else if (adjustedTime.hour > 12) {
+        adjustedTime.hour - 12
+    } else {
+        adjustedTime.hour
+    }
     val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
 
     return String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
@@ -1311,7 +1325,7 @@ private fun DrawScope.drawWatchfaceDial(
     radius: Float,
     rotation: Float,
     textMeasurer: TextMeasurer,
-    dialStyle: DialStyle = DialStyle()
+    dialStyle: DialStyle = DialStyle(),
 ) {
     var stepsAngle = 0
 
@@ -1328,15 +1342,15 @@ private fun DrawScope.drawWatchfaceDial(
         // Calculate steps start and end offset
         val stepsStartOffset = Offset(
             x = center.x + (radius * cos((stepsAngle + rotation) * (Math.PI / 180f))).toFloat(),
-            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
         )
         val stepsEndOffset = Offset(
             x = center.x + (radius - stepsHeight) * cos(
-                (stepsAngle + rotation) * (Math.PI / 180)
+                (stepsAngle + rotation) * (Math.PI / 180),
             ).toFloat(),
             y = center.y - (radius - stepsHeight) * sin(
-                (stepsAngle + rotation) * (Math.PI / 180)
-            ).toFloat()
+                (stepsAngle + rotation) * (Math.PI / 180),
+            ).toFloat(),
         )
 
         // Draw step line
@@ -1345,7 +1359,7 @@ private fun DrawScope.drawWatchfaceDial(
             start = stepsStartOffset,
             end = stepsEndOffset,
             strokeWidth = dialStyle.stepsWidth,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
 
         // Draw steps labels (every 5th step)
@@ -1354,33 +1368,32 @@ private fun DrawScope.drawWatchfaceDial(
             val stepsLabel = String.format("%02d", steps)
             val stepsLabelTextLayout = textMeasurer.measure(
                 text = buildAnnotatedString { append(stepsLabel) },
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
 
             // Calculate the offset for label position
             val stepsLabelOffset = Offset(
                 x = center.x + (radius - stepsHeight - dialStyle.stepsLabelTopPadding) * cos(
-                    (stepsAngle + rotation) * (Math.PI / 180)
+                    (stepsAngle + rotation) * (Math.PI / 180),
                 ).toFloat(),
                 y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding) * sin(
-                    (stepsAngle + rotation) * (Math.PI / 180)
-                ).toFloat()
+                    (stepsAngle + rotation) * (Math.PI / 180),
+                ).toFloat(),
             )
 
             // Subtract the label width and height to position label at the center of the step
             val stepsLabelTopLeft = Offset(
                 stepsLabelOffset.x - ((stepsLabelTextLayout.size.width) / 2f),
-                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f)
+                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f),
             )
 
             drawText(
                 textMeasurer = textMeasurer,
                 text = stepsLabel,
                 topLeft = stepsLabelTopLeft,
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
         }
         stepsAngle += 6
     }
 }
-

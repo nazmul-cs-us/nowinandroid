@@ -42,13 +42,11 @@ import androidx.glance.layout.size
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
 import androidx.glance.unit.ColorProvider
-import com.starception.submission.R
-import com.starception.submission.widget.themedCookieWidgetBackground
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.minCenterButtonTapTarget
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.minCornerButtonTapTarget
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.scaledButtonBackground
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarLayoutDimens.scaledIconSize
-import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
+import com.starception.submission.widget.themedCookieWidgetBackground
 
 /**
  * Layout focused on presenting 5 most frequently used actions in your app.
@@ -94,14 +92,14 @@ fun ExpressiveToolbarLayout(
     when (ExpressiveToolbarLayoutSize.fromLocalSize()) {
         ExpressiveToolbarLayoutSize.SMALL -> CenterButtonOnlyLayout(
             centerButton = centerButton,
-            modifier = backgroundModifier
+            modifier = backgroundModifier,
         )
 
         ExpressiveToolbarLayoutSize.MEDIUM -> AllButtonsScaledLayout(
             centerButton = centerButton,
             cornerButtons = cornerButtons,
             cookieBackgroundSize = cookieBackgroundSize,
-            modifier = backgroundModifier
+            modifier = backgroundModifier,
         )
     }
 }
@@ -121,7 +119,7 @@ private fun CenterButtonOnlyLayout(
 ) {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier
+        modifier = modifier,
     ) {
         CenterButton(
             button = centerButton,
@@ -129,7 +127,7 @@ private fun CenterButtonOnlyLayout(
             clickableSize = 48.dp,
             iconSize = 24.dp,
             filled = false,
-            shape = RoundedCornerShape.MEDIUM
+            shape = RoundedCornerShape.MEDIUM,
         )
     }
 }
@@ -149,7 +147,7 @@ private fun AllButtonsScaledLayout(
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier
+        modifier = modifier,
     ) {
         // Centered at the bottom layer (with larger tap target).
         CenterButton(
@@ -160,7 +158,7 @@ private fun AllButtonsScaledLayout(
             // Older android versions didn't support rounded corners, we use unfilled buttons in those
             // versions.
             filled = Build.VERSION.SDK_INT > Build.VERSION_CODES.S,
-            shape = RoundedCornerShape.MEDIUM
+            shape = RoundedCornerShape.MEDIUM,
         )
         // 4 corner buttons on top layer
         CornerButtonsGrid(
@@ -168,7 +166,7 @@ private fun AllButtonsScaledLayout(
             buttonBackgroundSize = buttonBackgroundSize,
             iconSize = iconSize,
             clickableSize = buttonBackgroundSize.coerceAtLeast(minCornerButtonTapTarget),
-            modifier = GlanceModifier.fillMaxSize()
+            modifier = GlanceModifier.fillMaxSize(),
         )
     }
 }
@@ -205,13 +203,13 @@ private fun CornerButtonsGrid(
             {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = GlanceModifier.fillMaxSize()
+                    modifier = GlanceModifier.fillMaxSize(),
                 ) {
                     CornerButton(
                         toolBarButton = it,
                         buttonBackgroundSize = buttonBackgroundSize,
                         iconSize = iconSize,
-                        clickableSize = clickableSize
+                        clickableSize = clickableSize,
                     )
                 }
             }
@@ -235,7 +233,7 @@ private fun CornerButton(
         contentColor = GlanceTheme.colors.primary,
         roundedCornerShape = RoundedCornerShape.FULL,
         onClick = toolBarButton.onClick,
-        modifier = GlanceModifier.size(clickableSize)
+        modifier = GlanceModifier.size(clickableSize),
     )
 }
 
@@ -269,7 +267,7 @@ private fun CenterButton(
         contentColor = contentColor,
         roundedCornerShape = shape,
         onClick = button.onClick,
-        modifier = GlanceModifier.size(clickableSize)
+        modifier = GlanceModifier.size(clickableSize),
     )
 }
 
@@ -293,20 +291,20 @@ private fun IconButton(
         modifier = modifier
             .cornerRadius(roundedCornerShape.cornerRadius)
             .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick)
+            .clickable(onClick),
     ) {
         Box( // colored background
             contentAlignment = Alignment.Center,
             modifier = GlanceModifier
                 .size(backgroundSize)
                 .background(backgroundColor)
-                .cornerRadius(roundedCornerShape.cornerRadius)
+                .cornerRadius(roundedCornerShape.cornerRadius),
         ) {
             Image(
                 provider = imageProvider,
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(contentColor),
-                modifier = GlanceModifier.size(iconSize)
+                modifier = GlanceModifier.size(iconSize),
             )
         }
     }
@@ -317,7 +315,9 @@ private enum class ExpressiveToolbarLayoutSize {
     SMALL,
 
     // Size at which center button has filled background and corner buttons are shown as well.
-    MEDIUM;
+    MEDIUM,
+
+    ;
 
     companion object {
         @Composable

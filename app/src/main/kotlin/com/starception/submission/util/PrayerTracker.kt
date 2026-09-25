@@ -19,11 +19,11 @@ package com.starception.submission.util
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 /**
  * Tracks which prayers have been marked as prayed by the user
@@ -32,12 +32,12 @@ object PrayerTracker {
     private const val TAG = "PrayerTracker"
     private const val PREFS_NAME = "prayer_tracker_prefs"
     private const val KEY_PRAYED_PRAYERS_PREFIX = "prayed_prayers_"
-    
+
     private lateinit var prefs: SharedPreferences
     private var observedDate: String? = null
     private val _prayedPrayersToday = MutableStateFlow<Set<String>>(emptySet())
     val prayedPrayersToday: StateFlow<Set<String>> = _prayedPrayersToday.asStateFlow()
-    
+
     /**
      * Initialize the tracker with application context
      */
@@ -57,7 +57,7 @@ object PrayerTracker {
             _prayedPrayersToday.value = current
         }
     }
-    
+
     /**
      * Mark a prayer as prayed for today
      */
@@ -124,7 +124,7 @@ object PrayerTracker {
             markPrayerAsPrayed(prayerName)
         }
     }
-    
+
     /**
      * Get the count of prayers marked as prayed today
      */
@@ -133,7 +133,7 @@ object PrayerTracker {
             Log.e(TAG, "PrayerTracker not initialized!")
             return 0
         }
-        
+
         refreshToday()
         return _prayedPrayersToday.value.size
     }
@@ -142,7 +142,7 @@ object PrayerTracker {
         refreshToday()
         return _prayedPrayersToday.value
     }
-    
+
     /**
      * Get all prayers marked as prayed for a specific date
      */
@@ -150,11 +150,11 @@ object PrayerTracker {
         if (!::prefs.isInitialized) {
             return emptySet()
         }
-        
+
         val key = "$KEY_PRAYED_PRAYERS_PREFIX$date"
         return prefs.getStringSet(key, emptySet()) ?: emptySet()
     }
-    
+
     /**
      * Check if a specific prayer has been marked as prayed today
      */
@@ -162,7 +162,7 @@ object PrayerTracker {
         refreshToday()
         return _prayedPrayersToday.value.contains(prayerName)
     }
-    
+
     /**
      * Clear all prayed prayers for today (useful for testing)
      */
@@ -170,7 +170,7 @@ object PrayerTracker {
         if (!::prefs.isInitialized) {
             return
         }
-        
+
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val key = "$KEY_PRAYED_PRAYERS_PREFIX$today"
         prefs.edit().remove(key).apply()
@@ -181,7 +181,7 @@ object PrayerTracker {
 
     private fun todayKey(): String =
         LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-    
+
     /**
      * Clean up old prayer records (older than 7 days)
      */
@@ -189,14 +189,14 @@ object PrayerTracker {
         if (!::prefs.isInitialized) {
             return
         }
-        
+
         val sevenDaysAgo = LocalDate.now().minusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)
         val allKeys = prefs.all.keys
         val keysToRemove = allKeys.filter { key ->
             key.startsWith(KEY_PRAYED_PRAYERS_PREFIX) &&
-            key.removePrefix(KEY_PRAYED_PRAYERS_PREFIX) < sevenDaysAgo
+                key.removePrefix(KEY_PRAYED_PRAYERS_PREFIX) < sevenDaysAgo
         }
-        
+
         if (keysToRemove.isNotEmpty()) {
             val editor = prefs.edit()
             keysToRemove.forEach { editor.remove(it) }

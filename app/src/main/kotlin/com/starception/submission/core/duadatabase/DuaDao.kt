@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.duadatabase
 
 import androidx.room.Dao
@@ -60,7 +76,7 @@ interface DuaDao {
         WHERE id > (SELECT id FROM chapters WHERE title = :title LIMIT 1)
           AND audio_url IS NOT NULL AND audio_url != ''
         ORDER BY id ASC LIMIT 1
-        """
+        """,
     )
     suspend fun getNextChapterAfter(title: String): NextChapterAudio?
 
@@ -68,11 +84,13 @@ interface DuaDao {
      * Per-DUA recitation audio URL, looked up by chapter title + dua position.
      * Falls back (in the caller) to the chapter audio when a dua has none.
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.audio_url FROM invocations i
         JOIN chapters c ON c.id = i.chapter_id
         WHERE c.title = :title AND i.position = :position LIMIT 1
-    """)
+    """,
+    )
     suspend fun getDuaAudioByTitleAndPosition(title: String, position: Int): String?
 
     /**
@@ -81,48 +99,56 @@ interface DuaDao {
      * database, so callers parse book names out of these prose strings
      * (e.g. "Al-Bukhari, cf. Al-Asqalani, Fathul-Bari 11/113; Muslim 4/2083").
      */
-    @Query("""
+    @Query(
+        """
         SELECT hr.reference_str FROM hadith_references hr
         JOIN invocations i ON i.id = hr.invocation_id
         JOIN chapters c ON c.id = i.chapter_id
         WHERE c.title = :title AND i.position = :position
           AND hr.reference_str IS NOT NULL AND hr.reference_str != ''
         ORDER BY hr.id ASC
-    """)
+    """,
+    )
     suspend fun getDuaReferenceStringsByTitleAndPosition(title: String, position: Int): List<String>
 
     /**
      * Get all chapters with dua count
      */
-    @Query("""
+    @Query(
+        """
         SELECT c.id, c.title,
                (SELECT COUNT(*) FROM invocations i WHERE i.chapter_id = c.id) as duaCount
         FROM chapters c
         ORDER BY c.id ASC
-    """)
+    """,
+    )
     suspend fun getAllChaptersWithCount(): List<ChapterWithCount>
 
     /**
      * Get all chapters with dua count as Flow
      */
-    @Query("""
+    @Query(
+        """
         SELECT c.id, c.title,
                (SELECT COUNT(*) FROM invocations i WHERE i.chapter_id = c.id) as duaCount
         FROM chapters c
         ORDER BY c.id ASC
-    """)
+    """,
+    )
     fun getAllChaptersWithCountFlow(): Flow<List<ChapterWithCount>>
 
     /**
      * Search chapters by title
      */
-    @Query("""
+    @Query(
+        """
         SELECT c.id, c.title,
                (SELECT COUNT(*) FROM invocations i WHERE i.chapter_id = c.id) as duaCount
         FROM chapters c
         WHERE c.title LIKE '%' || :query || '%'
         ORDER BY c.id ASC
-    """)
+    """,
+    )
     suspend fun searchChapters(query: String): List<ChapterWithCount>
 
     /**
@@ -172,40 +198,47 @@ interface DuaDao {
     /**
      * Search invocations by Arabic text
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM invocations
         WHERE arabic LIKE '%' || :query || '%'
         ORDER BY chapter_id ASC, position ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchByArabic(query: String, limit: Int = 50): List<DuaInvocationEntity>
 
     /**
      * Search invocations by transliteration
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM invocations
         WHERE transliteration LIKE '%' || :query || '%'
         ORDER BY chapter_id ASC, position ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchByTransliteration(query: String, limit: Int = 50): List<DuaInvocationEntity>
 
     /**
      * Search invocations by translation (English)
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM invocations
         WHERE translation LIKE '%' || :query || '%'
         ORDER BY chapter_id ASC, position ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchByTranslation(query: String, limit: Int = 50): List<DuaInvocationEntity>
 
     /**
      * Search all fields (Arabic, transliteration, translation, context)
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM invocations
         WHERE arabic LIKE '%' || :query || '%'
            OR transliteration LIKE '%' || :query || '%'
@@ -214,7 +247,8 @@ interface DuaDao {
            OR instruction LIKE '%' || :query || '%'
         ORDER BY chapter_id ASC, position ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAll(query: String, limit: Int = 100): List<DuaInvocationEntity>
 
     /**
@@ -229,7 +263,8 @@ interface DuaDao {
      * Ordering: chapter-title hits float to the top, then shorter translations,
      * then natural chapter/position order.
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.* FROM invocations i
         LEFT JOIN chapters c ON i.chapter_id = c.id
         WHERE (
@@ -263,7 +298,8 @@ interface DuaDao {
             length(COALESCE(i.translation, '')) ASC,
             i.chapter_id ASC, i.position ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAllMultiToken(
         t0: String,
         t1: String,
@@ -274,7 +310,8 @@ interface DuaDao {
     /**
      * Get invocations with chapter title
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.id, i.chapter_id as chapterId, c.title as chapterTitle,
                i.position, i.arabic, i.transliteration, i.translation,
                i.context, i.instruction, i.note, i.post_context as postContext,
@@ -283,13 +320,15 @@ interface DuaDao {
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE i.chapter_id = :chapterId
         ORDER BY i.position ASC
-    """)
+    """,
+    )
     suspend fun getInvocationsWithChapterTitle(chapterId: Int): List<DuaWithChapterTitle>
 
     /**
      * Get random dua (for daily dua feature)
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.id, i.chapter_id as chapterId, c.title as chapterTitle,
                i.position, i.arabic, i.transliteration, i.translation,
                i.context, i.instruction, i.note, i.post_context as postContext,
@@ -299,19 +338,22 @@ interface DuaDao {
         WHERE i.arabic IS NOT NULL AND i.arabic != ''
         ORDER BY RANDOM()
         LIMIT 1
-    """)
+    """,
+    )
     suspend fun getRandomDua(): DuaWithChapterTitle?
 
     /**
      * Get duas by category keywords (for smart filtering)
      * Example: "morning", "evening", "sleep", "prayer"
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.* FROM invocations i
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE c.title LIKE '%' || :keyword || '%'
         ORDER BY i.chapter_id ASC, i.position ASC
-    """)
+    """,
+    )
     suspend fun getDuasByCategory(keyword: String): List<DuaInvocationEntity>
 
     // ============= Footnote Queries =============
@@ -343,12 +385,14 @@ interface DuaDao {
     /**
      * Search footnotes by term
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM footnotes
         WHERE term LIKE '%' || :query || '%'
            OR definition LIKE '%' || :query || '%'
         ORDER BY chapter_id ASC
-    """)
+    """,
+    )
     suspend fun searchFootnotes(query: String): List<DuaFootnoteEntity>
 
     // ============= Combined Queries =============
@@ -356,12 +400,14 @@ interface DuaDao {
     /**
      * Get chapter with all its invocations and footnotes
      */
-    @Query("""
+    @Query(
+        """
         SELECT c.id, c.title,
                (SELECT COUNT(*) FROM invocations i WHERE i.chapter_id = c.id) as duaCount
         FROM chapters c
         WHERE c.id = :chapterId
-    """)
+    """,
+    )
     suspend fun getChapterWithCount(chapterId: Int): ChapterWithCount?
 
     /**
@@ -431,25 +477,29 @@ interface DuaDao {
      * This is used to map news_resources dua IDs to fortress_of_the_muslim invocation IDs
      * for hadith reference lookup
      */
-    @Query("""
+    @Query(
+        """
         SELECT i.* FROM invocations i
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE LOWER(c.title) = LOWER(:chapterTitle) AND i.position = :position
         LIMIT 1
-    """)
+    """,
+    )
     suspend fun getInvocationByChapterAndPosition(chapterTitle: String, position: Int): DuaInvocationEntity?
 
     /**
      * Get hadith references by chapter title and position
      * This combines the lookup of invocation ID and hadith references in one query
      */
-    @Query("""
+    @Query(
+        """
         SELECT hr.* FROM hadith_references hr
         INNER JOIN invocations i ON hr.invocation_id = i.id
         INNER JOIN chapters c ON i.chapter_id = c.id
         WHERE LOWER(c.title) = LOWER(:chapterTitle) AND i.position = :position
         ORDER BY hr.id ASC
-    """)
+    """,
+    )
     suspend fun getHadithReferencesByChapterAndPosition(chapterTitle: String, position: Int): List<HadithReferenceEntity>
 
     // ============= Write Operations (for refresh from assets) =============
@@ -494,7 +544,7 @@ interface DuaDao {
 data class ChapterWithCount(
     val id: Int,
     val title: String,
-    val duaCount: Int
+    val duaCount: Int,
 )
 
 /**
@@ -544,5 +594,5 @@ fun DuaWithChapterTitle.toDua() = Dua(
 fun ChapterWithCount.toDuaChapter() = DuaChapter(
     id = id,
     title = title,
-    duaCount = duaCount
+    duaCount = duaCount,
 )

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.scheduler
 
 import android.app.AlarmManager
@@ -5,9 +21,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.provider.Settings
 import android.util.Log
 import androidx.work.*
+import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.sync.workers.DelegatingWorker
 import com.starception.submission.sync.workers.delegatedData
@@ -17,14 +33,13 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
-import com.starception.submission.prayer.util.FileLogger
 
 /**
  * Prayer Notification Scheduler
- * 
+ *
  * This class provides a robust scheduling system for prayer time notifications
  * that works even when the main service isn't running.
- * 
+ *
  * Features:
  * - WorkManager for reliable scheduling (Android 6+)
  * - AlarmManager for exact timing (all Android versions)
@@ -33,11 +48,11 @@ import com.starception.submission.prayer.util.FileLogger
  * - Boot receiver integration
  */
 object PrayerNotificationScheduler {
-    
+
     private const val TAG = "PrayerNotificationScheduler"
     private const val WORK_NAME_PREFIX = "prayer_notification_"
     private const val ALARM_REQUEST_CODE_PREFIX = 1000
-    
+
     /**
      * Schedule a prayer time notification
      *
@@ -50,7 +65,7 @@ object PrayerNotificationScheduler {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        reminderMinutes: Int = 10
+        reminderMinutes: Int = 10,
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
@@ -58,7 +73,7 @@ object PrayerNotificationScheduler {
                 event = "SCHEDULE_REQUEST",
                 prayerName = prayerName,
                 scheduledTime = prayerTime,
-                details = mapOf("reminderMinutes" to reminderMinutes)
+                details = mapOf("reminderMinutes" to reminderMinutes),
             )
 
             // Schedule the main alarm if EITHER notifications OR silent-during-prayer
@@ -86,7 +101,7 @@ object PrayerNotificationScheduler {
                 notificationTime = prayerDateTime,
                 notificationType = PrayerNotificationWorker.TYPE_PRAYER_TIME,
                 requestCode = getRequestCode(prayerName, "main"),
-                priorMinutes = reminderMinutes
+                priorMinutes = reminderMinutes,
             )
 
             // Schedule reminder notification if requested. Reminders are purely a
@@ -101,49 +116,48 @@ object PrayerNotificationScheduler {
                         notificationTime = reminderTime,
                         notificationType = PrayerNotificationWorker.TYPE_REMINDER,
                         requestCode = getRequestCode(prayerName, "reminder"),
-                        priorMinutes = reminderMinutes
+                        priorMinutes = reminderMinutes,
                     )
-                    Log.d(TAG, "⏰ Scheduled reminder for $prayerName ${reminderMinutes} minutes before")
+                    Log.d(TAG, "⏰ Scheduled reminder for $prayerName $reminderMinutes minutes before")
                 }
             }
-            
+
             Log.d(TAG, "✅ Successfully scheduled $prayerName notification")
-            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule prayer notification", e)
         }
     }
-    
+
     /**
      * Schedule all prayer notifications for today
      */
     fun scheduleAllPrayerNotifications(
         context: Context,
         prayerTimes: Map<String, String>,
-        reminderMinutes: Int = 10
+        reminderMinutes: Int = 10,
     ) {
         Log.d(TAG, "📅 Scheduling all prayer notifications for today")
-        
+
         prayerTimes.forEach { (prayerName, prayerTime) ->
             schedulePrayerNotification(context, prayerName, prayerTime, reminderMinutes)
         }
     }
-    
+
     /**
      * Cancel all scheduled prayer notifications
      */
     fun cancelAllPrayerNotifications(context: Context) {
         Log.d(TAG, "🗑️ Canceling all prayer notifications")
-        
+
         try {
             // Cancel WorkManager jobs
             val workManager = WorkManager.getInstance(context)
             workManager.cancelAllWorkByTag("prayer_notification")
-            
+
             // Cancel AlarmManager alarms
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val prayerNames = listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha")
-            
+
             prayerNames.forEach { prayerName ->
                 // Cancel main prayer alarm
                 val mainIntent = createNotificationIntent(context, prayerName, "", PrayerNotificationWorker.TYPE_PRAYER_TIME)
@@ -151,28 +165,27 @@ object PrayerNotificationScheduler {
                     context,
                     getRequestCode(prayerName, "main"),
                     mainIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
                 alarmManager.cancel(mainPendingIntent)
-                
+
                 // Cancel reminder alarm
                 val reminderIntent = createNotificationIntent(context, prayerName, "", PrayerNotificationWorker.TYPE_REMINDER)
                 val reminderPendingIntent = PendingIntent.getBroadcast(
                     context,
                     getRequestCode(prayerName, "reminder"),
                     reminderIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
                 alarmManager.cancel(reminderPendingIntent)
             }
-            
+
             Log.d(TAG, "✅ All prayer notifications canceled")
-            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to cancel prayer notifications", e)
         }
     }
-    
+
     /**
      * Reschedule all notifications (useful after device reboot)
      */
@@ -181,7 +194,7 @@ object PrayerNotificationScheduler {
         // This would typically be called from a BootReceiver
         // Implementation would reload prayer times and reschedule
     }
-    
+
     /**
      * Check if exact alarm permission is granted (Android 12+)
      */
@@ -194,31 +207,30 @@ object PrayerNotificationScheduler {
         }
         return true // Pre-Android 12 doesn't need this permission
     }
-    
+
     /**
      * Schedule a test notification to verify the system works
      */
     fun scheduleTestNotification(context: Context, delaySeconds: Int = 60) {
         try {
             Log.d(TAG, "🧪 Scheduling TEST notification in $delaySeconds seconds")
-            
+
             val testTime = LocalTime.now().plusSeconds(delaySeconds.toLong())
             val testDateTime = LocalDateTime.of(LocalDate.now(), testTime)
-            
+
             schedulePrayerNotification(
                 context = context,
                 prayerName = "Test Prayer",
                 prayerTime = testTime.format(DateTimeFormatter.ofPattern("h:mm a")),
-                reminderMinutes = 0 // No reminder for test
+                reminderMinutes = 0, // No reminder for test
             )
-            
+
             Log.d(TAG, "✅ Test notification scheduled for $testDateTime")
-            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule test notification", e)
         }
     }
-    
+
     private fun scheduleExactNotification(
         context: Context,
         prayerName: String,
@@ -226,7 +238,7 @@ object PrayerNotificationScheduler {
         notificationTime: LocalDateTime,
         notificationType: String,
         requestCode: Int,
-        priorMinutes: Int = 10
+        priorMinutes: Int = 10,
     ) {
         val currentTime = LocalDateTime.now()
 
@@ -271,14 +283,14 @@ object PrayerNotificationScheduler {
             }
         }
     }
-    
+
     private fun scheduleWithWorkManager(
         context: Context,
         prayerName: String,
         prayerTime: String,
         notificationType: String,
         delayMillis: Long,
-        priorMinutes: Int = 10
+        priorMinutes: Int = 10,
     ) {
         val inputData = Data.Builder()
             .putAll(PrayerNotificationWorker::class.delegatedData())
@@ -287,7 +299,7 @@ object PrayerNotificationScheduler {
             .putString(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
             .putInt(PrayerNotificationWorker.PRIOR_MINUTES_KEY, priorMinutes)
             .build()
-        
+
         val workRequest = OneTimeWorkRequestBuilder<DelegatingWorker>()
             .setInputData(inputData)
             .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
@@ -298,10 +310,10 @@ object PrayerNotificationScheduler {
                     .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
                     .setRequiresBatteryNotLow(false)
                     .setRequiresCharging(false)
-                    .build()
+                    .build(),
             )
             .build()
-        
+
         val workManager = WorkManager.getInstance(context)
         val uniqueWorkName = buildString {
             append(WORK_NAME_PREFIX)
@@ -314,10 +326,10 @@ object PrayerNotificationScheduler {
             ExistingWorkPolicy.REPLACE,
             workRequest,
         )
-        
+
         Log.d(TAG, "📱 Scheduled with WorkManager: $prayerName ($notificationType) in ${delayMillis / 1000}s")
     }
-    
+
     private fun scheduleWithAlarmManager(
         context: Context,
         prayerName: String,
@@ -325,7 +337,7 @@ object PrayerNotificationScheduler {
         notificationType: String,
         notificationTime: LocalDateTime,
         requestCode: Int,
-        priorMinutes: Int = 10
+        priorMinutes: Int = 10,
     ) {
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -345,25 +357,25 @@ object PrayerNotificationScheduler {
                 context,
                 requestCode,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            
+
             val triggerTime = notificationTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerTime,
-                    pendingIntent
+                    pendingIntent,
                 )
             } else {
                 alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP,
                     triggerTime,
-                    pendingIntent
+                    pendingIntent,
                 )
             }
-            
+
             val delaySeconds = java.time.Duration.between(LocalDateTime.now(), notificationTime).seconds
             Log.d(TAG, "⏰ Scheduled with AlarmManager: $prayerName ($notificationType) in ${delaySeconds}s at $notificationTime")
 
@@ -375,23 +387,22 @@ object PrayerNotificationScheduler {
                 details = mapOf(
                     "notificationType" to notificationType,
                     "scheduledDateTime" to notificationTime.toString(),
-                    "delaySeconds" to delaySeconds
-                )
+                    "delaySeconds" to delaySeconds,
+                ),
             )
-
         } catch (e: SecurityException) {
             Log.e(TAG, "❌ SecurityException scheduling alarm - exact alarm permission not granted", e)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule with AlarmManager", e)
         }
     }
-    
+
     private fun createNotificationIntent(
         context: Context,
         prayerName: String,
         prayerTime: String,
         notificationType: String,
-        priorMinutes: Int = 10
+        priorMinutes: Int = 10,
     ): Intent {
         return Intent(context, com.starception.submission.prayer.receiver.PrayerNotificationReceiver::class.java).apply {
             putExtra(PrayerNotificationWorker.PRAYER_NAME_KEY, prayerName)
@@ -400,7 +411,7 @@ object PrayerNotificationScheduler {
             putExtra(PrayerNotificationWorker.PRIOR_MINUTES_KEY, priorMinutes)
         }
     }
-    
+
     private fun parsePrayerTime(prayerTime: String): LocalDateTime? {
         return try {
             val time = LocalTime.parse(prayerTime, DateTimeFormatter.ofPattern("h:mm a"))
@@ -410,7 +421,7 @@ object PrayerNotificationScheduler {
             null
         }
     }
-    
+
     private fun getRequestCode(prayerName: String, type: String): Int {
         val prayerCode = when (prayerName.lowercase()) {
             "fajr" -> 1
@@ -463,7 +474,6 @@ object PrayerNotificationScheduler {
             val isEnabled = notificationPrefs.isNotificationEnabledForPrayer(prayerName)
             Log.d(TAG, "🔔 Notification for $prayerName: ${if (isEnabled) "ENABLED" else "DISABLED"}")
             return isEnabled
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error reading notification preferences for $prayerName", e)
             // Default to enabled on error

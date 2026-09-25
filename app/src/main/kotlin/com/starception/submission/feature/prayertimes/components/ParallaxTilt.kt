@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import android.content.Context
@@ -9,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 
@@ -28,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 object ParallaxTiltSource {
     private const val MAX_TILT_RADIANS = 0.6f
     private const val ALPHA = 0.15f // response low-pass (smaller = smoother/slower)
+
     // Baseline low-pass: a running estimate of the phone's *resting* orientation.
     // Parallax is published relative to this baseline (a high-pass), so holding
     // the phone at any angle settles back to neutral — the same look it has lying
@@ -35,6 +51,7 @@ object ParallaxTiltSource {
     // phone is fairly still (see MOTION_REF); it's frozen mid-tilt so the up/down
     // parallax persists through the gesture instead of fading out under the hand.
     private const val BASE_ALPHA = 0.03f
+
     // Innovation magnitude (raw-vs-smoothed) at/above which the phone is treated
     // as actively tilting rather than at rest — gates the baseline recenter so a
     // real tilt keeps its 3D shift while a static hold still settles to neutral.
@@ -60,11 +77,12 @@ object ParallaxTiltSource {
             val pitchN: Float
             when (event.sensor.type) {
                 Sensor.TYPE_GAME_ROTATION_VECTOR,
-                Sensor.TYPE_ROTATION_VECTOR -> {
+                Sensor.TYPE_ROTATION_VECTOR,
+                -> {
                     SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
                     SensorManager.getOrientation(rotationMatrix, orientation)
                     val pitch = orientation[1] // around X (forward/back)
-                    val roll = orientation[2]  // around Y (left/right)
+                    val roll = orientation[2] // around Y (left/right)
                     rollN = (roll / MAX_TILT_RADIANS).coerceIn(-1f, 1f)
                     pitchN = (pitch / MAX_TILT_RADIANS).coerceIn(-1f, 1f)
                 }

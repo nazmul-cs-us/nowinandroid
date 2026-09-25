@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.visualization
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -48,8 +64,9 @@ import com.google.android.filament.MaterialInstance
 import com.google.android.filament.RenderableManager
 import com.google.android.filament.Renderer
 import com.google.android.filament.VertexBuffer
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.starception.submission.core.ui.ChapterAudioController
+import com.starception.submission.ml.SalahDataSample
+import com.starception.submission.ml.SalahPosture
 import io.github.sceneview.Scene
 import io.github.sceneview.SceneScope
 import io.github.sceneview.SurfaceType
@@ -59,8 +76,8 @@ import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Scale
 import io.github.sceneview.math.Size
 import io.github.sceneview.node.MeshNode
-import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
 import io.github.sceneview.rememberEnvironmentLoader
@@ -68,11 +85,10 @@ import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.rememberRenderer
 import io.github.sceneview.rememberView
-import com.starception.submission.ml.SalahDataSample
-import com.starception.submission.ml.SalahPosture
-import com.starception.submission.core.ui.ChapterAudioController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.coroutines.coroutineContext
 import kotlin.math.PI
 import kotlin.math.abs
@@ -141,7 +157,9 @@ fun Visualization3DView(
             state.posePlaybackSource != PosePlaybackSource.RECORDED ||
             !state.isPlaying ||
             samples.isEmpty()
-        ) return@LaunchedEffect
+        ) {
+            return@LaunchedEffect
+        }
         if (samples.size == 1) {
             dispatchPlayback(0, false)
             return@LaunchedEffect
@@ -175,7 +193,9 @@ fun Visualization3DView(
         if (
             state.posePlaybackSource != PosePlaybackSource.TWO_RAKAH_SAMPLE ||
             !state.isTwoRakahPlaying
-        ) return@LaunchedEffect
+        ) {
+            return@LaunchedEffect
+        }
 
         val sample = state.currentPrayerSample()
         val index = state.twoRakahStepIndex.coerceIn(sample.indices)
@@ -271,7 +291,7 @@ fun Visualization3DView(
             filamentView.multiSampleAntiAliasingOptions.apply {
                 enabled = true
                 sampleCount = 4
-        }
+            }
         filamentView.setShadowingEnabled(true)
         environment.indirectLight?.intensity = 45_000f
         renderer.clearOptions = Renderer.ClearOptions().apply {
@@ -382,7 +402,11 @@ fun Visualization3DView(
         if (state.mode == VisualizationMode.PHONE_MODEL) {
             val twoRakahStep = if (
                 state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
-            ) state.currentTwoRakahStep() else null
+            ) {
+                state.currentTwoRakahStep()
+            } else {
+                null
+            }
             val recorded = twoRakahStep?.posture ?: samples.getOrNull(state.playbackIndex)?.posture
             val prediction = if (twoRakahStep == null) {
                 state.predictions?.getOrNull(state.playbackIndex)
@@ -702,11 +726,15 @@ private fun SceneScope.GravityScene(
                 val rawY = group.map { it.meanAccelY }.average().toFloat()
                 val rawZ = group.map { it.meanAccelZ }.average().toFloat()
                 val magnitude = sqrt(rawX * rawX + rawY * rawY + rawZ * rawZ)
-                if (magnitude < 0.1f) null else posture to Position(
-                    rawX / magnitude * 1.35f,
-                    rawY / magnitude * 1.35f,
-                    rawZ / magnitude * 1.35f,
-                )
+                if (magnitude < 0.1f) {
+                    null
+                } else {
+                    posture to Position(
+                        rawX / magnitude * 1.35f,
+                        rawY / magnitude * 1.35f,
+                        rawZ / magnitude * 1.35f,
+                    )
+                }
             }
     }
 
@@ -755,7 +783,11 @@ private fun SceneScope.HumanoidScene(
     val sample = samples.getOrNull(state.playbackIndex)
     val twoRakahStep = if (
         state.posePlaybackSource == PosePlaybackSource.TWO_RAKAH_SAMPLE
-    ) state.currentTwoRakahStep() else null
+    ) {
+        state.currentTwoRakahStep()
+    } else {
+        null
+    }
     val recorded = twoRakahStep?.posture ?: sample?.posture ?: SalahPosture.QIYAM
     val prediction = if (twoRakahStep == null) {
         state.predictions?.getOrNull(state.playbackIndex)
@@ -847,14 +879,22 @@ private fun io.github.sceneview.loaders.MaterialLoader.createUnlitColorInstance(
 }
 
 private enum class Joint {
-    HEAD, NECK,
-    LEFT_SHOULDER, RIGHT_SHOULDER,
-    LEFT_ELBOW, RIGHT_ELBOW,
-    LEFT_WRIST, RIGHT_WRIST,
-    LEFT_HIP, RIGHT_HIP,
-    LEFT_KNEE, RIGHT_KNEE,
-    LEFT_ANKLE, RIGHT_ANKLE,
-    LEFT_TOE, RIGHT_TOE,
+    HEAD,
+    NECK,
+    LEFT_SHOULDER,
+    RIGHT_SHOULDER,
+    LEFT_ELBOW,
+    RIGHT_ELBOW,
+    LEFT_WRIST,
+    RIGHT_WRIST,
+    LEFT_HIP,
+    RIGHT_HIP,
+    LEFT_KNEE,
+    RIGHT_KNEE,
+    LEFT_ANKLE,
+    RIGHT_ANKLE,
+    LEFT_TOE,
+    RIGHT_TOE,
 }
 
 private data class SkeletonPose(val joints: Map<Joint, Position>)
@@ -892,6 +932,7 @@ private fun SceneScope.HolographicHumanoid(
     // each body segment is a real capsule (cylinder + hemispherical caps) and each joint a
     // sphere, all fused into a single solid, continuous mannequin.
     fun j(joint: Joint) = animated.getValue(joint)
+
     // A distinct capsule for one bone, inset from both joints so neighbouring parts stay
     // visually separate (articulated) instead of fusing into a single blob.
     fun bone(a: Joint, b: Joint, radius: Float, inset: Float = 0.18f): CapsuleSpec {
@@ -1153,11 +1194,17 @@ private fun buildFigureMeshData(specs: List<FigurePartSpec>): FigureMeshData {
     indices.forEach { indexBufferData.putInt(it) }
     indexBufferData.flip()
 
-    var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE; var minZ = Float.MAX_VALUE
-    var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE; var maxZ = -Float.MAX_VALUE
+    var minX = Float.MAX_VALUE
+    var minY = Float.MAX_VALUE
+    var minZ = Float.MAX_VALUE
+    var maxX = -Float.MAX_VALUE
+    var maxY = -Float.MAX_VALUE
+    var maxZ = -Float.MAX_VALUE
     var i = 0
     while (i < positions.size) {
-        val x = positions[i]; val y = positions[i + 1]; val z = positions[i + 2]
+        val x = positions[i]
+        val y = positions[i + 1]
+        val z = positions[i + 2]
         if (x < minX) minX = x
         if (y < minY) minY = y
         if (z < minZ) minZ = z
@@ -1214,7 +1261,10 @@ private fun appendShapeVolume(
         val normalLength = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(0.0001f)
         val nDotL = (nx * light.x + ny * light.y + nz * light.z) / normalLength
         val shade = 0.4f + 0.6f * (0.5f * nDotL + 0.5f)
-        colors.add(shade); colors.add(shade); colors.add(shade); colors.add(1f)
+        colors.add(shade)
+        colors.add(shade)
+        colors.add(shade)
+        colors.add(1f)
     }
 
     for (ring in 0..lengthSegments) {
@@ -1263,21 +1313,31 @@ private fun appendShapeVolume(
             val b = current + following
             val c = next + following
             val d = next + segment
-            indices.add(a); indices.add(b); indices.add(d)
-            indices.add(b); indices.add(c); indices.add(d)
+            indices.add(a)
+            indices.add(b)
+            indices.add(d)
+            indices.add(b)
+            indices.add(c)
+            indices.add(d)
         }
     }
 
     fun cap(center: Position, ringStart: Int, normalScale: Float, reverse: Boolean) {
         val centerIndex = positions.size / 3
-        positions.add(center.x); positions.add(center.y); positions.add(center.z)
+        positions.add(center.x)
+        positions.add(center.y)
+        positions.add(center.z)
         addColor(axis.x * normalScale, axis.y * normalScale, axis.z * normalScale)
         for (segment in 0 until radialSegments) {
             val next = (segment + 1) % radialSegments
             if (reverse) {
-                indices.add(centerIndex); indices.add(ringStart + next); indices.add(ringStart + segment)
+                indices.add(centerIndex)
+                indices.add(ringStart + next)
+                indices.add(ringStart + segment)
             } else {
-                indices.add(centerIndex); indices.add(ringStart + segment); indices.add(ringStart + next)
+                indices.add(centerIndex)
+                indices.add(ringStart + segment)
+                indices.add(ringStart + next)
             }
         }
     }
@@ -1307,9 +1367,13 @@ private fun appendCapsule(
     val ay: Float
     val az: Float
     if (len < 1e-5f) {
-        ax = 0f; ay = 1f; az = 0f
+        ax = 0f
+        ay = 1f
+        az = 0f
     } else {
-        ax = dx / len; ay = dy / len; az = dz / len
+        ax = dx / len
+        ay = dy / len
+        az = dz / len
     }
 
     // Orthonormal basis (u, v) perpendicular to the capsule axis.
@@ -1317,15 +1381,21 @@ private fun appendCapsule(
     val hy: Float
     val hz: Float
     if (kotlin.math.abs(ay) < 0.99f) {
-        hx = 0f; hy = 1f; hz = 0f
+        hx = 0f
+        hy = 1f
+        hz = 0f
     } else {
-        hx = 1f; hy = 0f; hz = 0f
+        hx = 1f
+        hy = 0f
+        hz = 0f
     }
     var ux = ay * hz - az * hy
     var uy = az * hx - ax * hz
     var uz = ax * hy - ay * hx
     val ul = sqrt(ux * ux + uy * uy + uz * uz).coerceAtLeast(1e-5f)
-    ux /= ul; uy /= ul; uz /= ul
+    ux /= ul
+    uy /= ul
+    uz /= ul
     val vx = ay * uz - az * uy
     val vy = az * ux - ax * uz
     val vz = ax * uy - ay * ux
@@ -1353,7 +1423,10 @@ private fun appendCapsule(
             positions.add(cz + rr * (cphi * uz + sphi * vz))
             val nDotL = na * axisDotL + nr * (cphi * uDotL + sphi * vDotL)
             val shade = 0.4f + 0.6f * (0.5f * nDotL + 0.5f)
-            colors.add(shade); colors.add(shade); colors.add(shade); colors.add(1f)
+            colors.add(shade)
+            colors.add(shade)
+            colors.add(shade)
+            colors.add(1f)
         }
     }
 
@@ -1382,8 +1455,12 @@ private fun appendCapsule(
             val b = a0 + s2
             val c = b0 + s2
             val d = b0 + s
-            indices.add(a); indices.add(b); indices.add(d)
-            indices.add(b); indices.add(c); indices.add(d)
+            indices.add(a)
+            indices.add(b)
+            indices.add(d)
+            indices.add(b)
+            indices.add(c)
+            indices.add(d)
         }
     }
 }
@@ -1673,10 +1750,12 @@ private fun postureColor(posture: SalahPosture): Color = when (posture) {
 private fun standardDeviation(values: List<Float>): Float {
     if (values.isEmpty()) return 0f
     val mean = values.average().toFloat()
-    return sqrt(values.sumOf { value ->
-        val delta = value - mean
-        (delta * delta).toDouble()
-    }.toFloat() / values.size)
+    return sqrt(
+        values.sumOf { value ->
+            val delta = value - mean
+            (delta * delta).toDouble()
+        }.toFloat() / values.size,
+    )
 }
 
 private fun lerp(from: Position, to: Position, amount: Float) = Position(
@@ -1701,8 +1780,11 @@ private fun PoseLegendChip(
             },
             border = BorderStroke(
                 1.dp,
-                if (isError) Color(0xFFFF8A9B).copy(alpha = 0.35f)
-                else Color.White.copy(alpha = 0.12f),
+                if (isError) {
+                    Color(0xFFFF8A9B).copy(alpha = 0.35f)
+                } else {
+                    Color.White.copy(alpha = 0.12f)
+                },
             ),
             tonalElevation = 2.dp,
         ) {

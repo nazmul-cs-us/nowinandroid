@@ -21,10 +21,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.icon.NiaIcons
 import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute
+import com.starception.submission.feature.course.navigation.CourseRoute
 import com.starception.submission.feature.foryou.navigation.ForYouRoute
 import com.starception.submission.feature.interests.navigation.InterestsRoute
 import com.starception.submission.feature.prayertimes.navigation.PrayerTimesRoute
-import com.starception.submission.feature.course.navigation.CourseRoute
 import kotlin.reflect.KClass
 import com.starception.submission.feature.bookmarks.R as bookmarksR
 import com.starception.submission.feature.foryou.R as forYouR

@@ -1,20 +1,24 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,25 +27,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -56,22 +52,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import kotlin.math.PI
-import kotlin.math.sin
-import kotlin.random.Random
 
 /**
  * TTS test state
@@ -81,7 +71,7 @@ enum class TtsTestState {
     INITIALIZING,
     SPEAKING,
     SUCCESS,
-    ERROR
+    ERROR,
 }
 
 /**
@@ -89,7 +79,7 @@ enum class TtsTestState {
  */
 enum class TtsModelType {
     VITS,
-    KOKORO
+    KOKORO,
 }
 
 /**
@@ -107,7 +97,7 @@ enum class TtsVoice(
     val lexiconFile: String,
     val voicesFile: String,
     val icon: ImageVector,
-    val iconGlyph: String
+    val iconGlyph: String,
 ) {
     KOKORO_EN(
         displayName = "Kokoro",
@@ -121,7 +111,7 @@ enum class TtsVoice(
         lexiconFile = "",
         voicesFile = "kokoro-int8-en-v0_19/voices.bin",
         icon = Icons.Outlined.GraphicEq,
-        iconGlyph = FlaticonIcons.VOICE
+        iconGlyph = FlaticonIcons.VOICE,
     ),
     VITS_VCTK(
         displayName = "VCTK British",
@@ -135,8 +125,8 @@ enum class TtsVoice(
         lexiconFile = "vits-vctk/lexicon.txt",
         voicesFile = "",
         icon = Icons.Outlined.RecordVoiceOver,
-        iconGlyph = FlaticonIcons.VOLUME
-    )
+        iconGlyph = FlaticonIcons.VOLUME,
+    ),
 }
 
 /**
@@ -149,7 +139,7 @@ data class TtsSettingsState(
     val selectedSpeakerId: Int = 0,
     val availableVoices: List<TtsVoice> = listOf(TtsVoice.KOKORO_EN, TtsVoice.VITS_VCTK),
     // Real-time audio amplitude (0.0 to 1.0)
-    val amplitude: Float = 0f,  
+    val amplitude: Float = 0f,
     val needsDownload: Boolean = false,
     val downloadCategory: String? = null,
 )
@@ -170,13 +160,13 @@ fun TtsSettingsSection(
     onSpeakerChanged: (Int) -> Unit = {},
     downloadManager: com.starception.submission.download.AssetDownloadManager? = null,
     onDownloadComplete: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Voice model selection section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -184,7 +174,7 @@ fun TtsSettingsSection(
                 text = "Voice",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
 
             // Voice Selection Cards
@@ -195,7 +185,7 @@ fun TtsSettingsSection(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onVoiceChanged(voice)
-                    }
+                    },
                 )
             }
         }
@@ -214,7 +204,7 @@ fun TtsSettingsSection(
                 },
                 downloadManager = downloadManager,
                 onDownloadComplete = onDownloadComplete,
-                modifier = Modifier.padding(horizontal = 0.dp)
+                modifier = Modifier.padding(horizontal = 0.dp),
             )
         } else {
             // Speaker Selection (only for multi-speaker models)
@@ -224,7 +214,7 @@ fun TtsSettingsSection(
                         text = "Speaker",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
 
                     ModernSpeakerSelector(
@@ -233,7 +223,7 @@ fun TtsSettingsSection(
                         onSpeakerChanged = { speaker ->
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSpeakerChanged(speaker)
-                        }
+                        },
                     )
                 }
             }
@@ -244,7 +234,7 @@ fun TtsSettingsSection(
                     text = "Preview",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
 
                 TtsVoicePreviewButton(
@@ -279,24 +269,26 @@ private fun ModernVoiceCard(
     voice: TtsVoice,
     isSelected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected)
+        targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        else
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "cardBackground"
+        label = "cardBackground",
     )
 
     val borderColor by animateColorAsState(
-        targetValue = if (isSelected)
+        targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primary
-        else
-            Color.Transparent,
+        } else {
+            Color.Transparent
+        },
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "cardBorder"
+        label = "cardBorder",
     )
 
     Surface(
@@ -306,22 +298,22 @@ private fun ModernVoiceCard(
             .border(
                 width = 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary),
-                onClick = onClick
+                onClick = onClick,
             ),
         color = backgroundColor,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -334,15 +326,16 @@ private fun ModernVoiceCard(
                             MaterialTheme.colorScheme.surfaceContainerHigh
                         },
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 FlaticonIcon(
                     glyph = voice.iconGlyph,
                     contentDescription = null,
-                    tint = if (isSelected)
+                    tint = if (isSelected) {
                         MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     fontSize = 20.sp,
                 )
             }
@@ -385,7 +378,7 @@ private fun ModernSpeakerSelector(
     selectedSpeaker: Int,
     totalSpeakers: Int,
     onSpeakerChanged: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var previousValue by remember { mutableStateOf(selectedSpeaker) }
@@ -393,18 +386,18 @@ private fun ModernSpeakerSelector(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
                     Text(
@@ -422,7 +415,7 @@ private fun ModernSpeakerSelector(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Surface(
                         modifier = Modifier
@@ -435,22 +428,24 @@ private fun ModernSpeakerSelector(
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         onSpeakerChanged(selectedSpeaker - 1)
                                     }
-                                }
+                                },
                             ),
                         shape = CircleShape,
-                        color = if (selectedSpeaker > 0)
+                        color = if (selectedSpeaker > 0) {
                             MaterialTheme.colorScheme.primaryContainer
-                        else
+                        } else {
                             MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             FlaticonIcon(
                                 glyph = FlaticonIcons.ANGLE_LEFT,
                                 contentDescription = "Previous",
-                                tint = if (selectedSpeaker > 0)
+                                tint = if (selectedSpeaker > 0) {
                                     MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                },
                                 fontSize = 20.sp,
                             )
                         }
@@ -467,22 +462,24 @@ private fun ModernSpeakerSelector(
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         onSpeakerChanged(selectedSpeaker + 1)
                                     }
-                                }
+                                },
                             ),
                         shape = CircleShape,
-                        color = if (selectedSpeaker < totalSpeakers - 1)
+                        color = if (selectedSpeaker < totalSpeakers - 1) {
                             MaterialTheme.colorScheme.primaryContainer
-                        else
+                        } else {
                             MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             FlaticonIcon(
                                 glyph = FlaticonIcons.ANGLE_RIGHT,
                                 contentDescription = "Next",
-                                tint = if (selectedSpeaker < totalSpeakers - 1)
+                                tint = if (selectedSpeaker < totalSpeakers - 1) {
                                     MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                },
                                 fontSize = 20.sp,
                             )
                         }
@@ -505,10 +502,9 @@ private fun ModernSpeakerSelector(
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
                     activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
             )
-
         }
     }
 }

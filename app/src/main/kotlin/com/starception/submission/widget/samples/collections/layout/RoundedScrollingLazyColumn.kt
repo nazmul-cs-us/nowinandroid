@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -29,20 +45,20 @@ import androidx.glance.layout.height
  */
 @Composable
 fun RoundedScrollingLazyColumn(
-  modifier: GlanceModifier = GlanceModifier,
-  horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-  content: LazyListScope.() -> Unit,
+    modifier: GlanceModifier = GlanceModifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    content: LazyListScope.() -> Unit,
 ) {
-  Box(
-    modifier = modifier
-      .fillMaxSize()
-      .cornerRadius(16.dp) // to present a rounded scrolling experience
-  ) {
-    LazyColumn(
-      horizontalAlignment = horizontalAlignment,
-      content = content
-    )
-  }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .cornerRadius(16.dp), // to present a rounded scrolling experience
+    ) {
+        LazyColumn(
+            horizontalAlignment = horizontalAlignment,
+            content = content,
+        )
+    }
 }
 
 /**
@@ -58,22 +74,22 @@ fun RoundedScrollingLazyColumn(
  */
 @Composable
 fun <T> RoundedScrollingLazyColumn(
-  items: List<T>,
-  itemContentProvider: @Composable (item: T) -> Unit,
-  modifier: GlanceModifier = GlanceModifier,
-  horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-  verticalItemsSpacing: Dp = 4.dp
+    items: List<T>,
+    itemContentProvider: @Composable (item: T) -> Unit,
+    modifier: GlanceModifier = GlanceModifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    verticalItemsSpacing: Dp = 4.dp,
 ) {
-  val lastIndex = items.size - 1
+    val lastIndex = items.size - 1
 
-  RoundedScrollingLazyColumn(modifier, horizontalAlignment) {
-    itemsIndexed(items) { index, item ->
-      Column(modifier = GlanceModifier.fillMaxWidth()) {
-        itemContentProvider(item)
-        if (index != lastIndex) {
-          Spacer(modifier = GlanceModifier.height(verticalItemsSpacing))
+    RoundedScrollingLazyColumn(modifier, horizontalAlignment) {
+        itemsIndexed(items) { index, item ->
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                itemContentProvider(item)
+                if (index != lastIndex) {
+                    Spacer(modifier = GlanceModifier.height(verticalItemsSpacing))
+                }
+            }
         }
-      }
     }
-  }
 }

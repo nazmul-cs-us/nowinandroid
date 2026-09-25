@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ object CourseProgressTracker {
         context: Context,
         courseId: String,
         lessonId: String,
-        lessonTitle: String
+        lessonTitle: String,
     ) {
         val prefs = getPrefs(context)
         val key = "$PENDING_COMPLETION_PREFIX$courseId"
@@ -269,8 +269,10 @@ object CourseProgressTracker {
             if (isLessonCompleted(context, "daily_bukhari", lessonId)) {
                 // Determine which day this hadith belongs to
                 val dayNumber = hadithNumber
-                val monthNames = listOf("January", "February", "March", "April", "May", "June",
-                    "July", "August", "September", "October", "November", "December")
+                val monthNames = listOf(
+                    "January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December",
+                )
                 val daysInMonth = listOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
                 var remaining = dayNumber
@@ -355,11 +357,14 @@ object CourseProgressTracker {
             0L
         }
 
-        saveQuranListeningProgress(context, progress.copy(
-            currentPositionMs = positionMs,
-            lastPlayedTimestamp = currentTime,
-            sessionListeningTimeMs = progress.sessionListeningTimeMs + additionalSessionTime,
-        ))
+        saveQuranListeningProgress(
+            context,
+            progress.copy(
+                currentPositionMs = positionMs,
+                lastPlayedTimestamp = currentTime,
+                sessionListeningTimeMs = progress.sessionListeningTimeMs + additionalSessionTime,
+            ),
+        )
     }
 
     /**
@@ -378,12 +383,15 @@ object CourseProgressTracker {
         val nextIndex = if (completedSurahIndex >= 113) 0 else completedSurahIndex + 1
 
         // Update progress for next surah
-        saveQuranListeningProgress(context, progress.copy(
-            currentSurahIndex = nextIndex,
-            currentPositionMs = 0,
-            sessionSurahsCompleted = progress.sessionSurahsCompleted + 1,
-            lastPlayedTimestamp = System.currentTimeMillis(),
-        ))
+        saveQuranListeningProgress(
+            context,
+            progress.copy(
+                currentSurahIndex = nextIndex,
+                currentPositionMs = 0,
+                sessionSurahsCompleted = progress.sessionSurahsCompleted + 1,
+                lastPlayedTimestamp = System.currentTimeMillis(),
+            ),
+        )
 
         android.util.Log.i("CourseProgressTracker", "🕌 Completed Surah ${completedSurahIndex + 1} (${getSurahName(completedSurahIndex + 1)}), advancing to Surah ${nextIndex + 1}")
 
@@ -398,12 +406,15 @@ object CourseProgressTracker {
         val progress = getQuranListeningProgress(context)
         val currentTime = System.currentTimeMillis()
 
-        saveQuranListeningProgress(context, progress.copy(
-            sessionStartTime = currentTime,
-            sessionListeningTimeMs = 0,
-            sessionSurahsCompleted = 0,
-            lastPlayedTimestamp = currentTime,
-        ))
+        saveQuranListeningProgress(
+            context,
+            progress.copy(
+                sessionStartTime = currentTime,
+                sessionListeningTimeMs = 0,
+                sessionSurahsCompleted = 0,
+                lastPlayedTimestamp = currentTime,
+            ),
+        )
 
         android.util.Log.i("CourseProgressTracker", "🕌 Started new Quran listening session at Surah ${progress.currentSurahNumber}")
     }
@@ -481,7 +492,7 @@ object CourseProgressTracker {
             "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat",
             "Al-Qari'ah", "At-Takathur", "Al-Asr", "Al-Humazah", "Al-Fil",
             "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr",
-            "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas"
+            "Al-Masad", "Al-Ikhlas", "Al-Falaq", "An-Nas",
         )
         return surahNames.getOrElse(surahNumber - 1) { "Surah $surahNumber" }
     }

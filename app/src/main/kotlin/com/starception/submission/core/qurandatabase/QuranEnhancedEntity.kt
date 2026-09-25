@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import androidx.room.ColumnInfo
@@ -147,7 +163,7 @@ data class QuranEnhancedEntity(
      * May contain slightly different tashkeel notation
      */
     @ColumnInfo(name = "aya_text_tashkil")
-    val ayahTextTashkil: String
+    val ayahTextTashkil: String,
 )
 
 /**
@@ -172,7 +188,7 @@ data class QuranEnhancedAyah(
     val tafseerSaadi: String,
     val tafseerMoysar: String,
     val tafseerBaghawi: String,
-    val ayahTextTashkil: String
+    val ayahTextTashkil: String,
 )
 
 /**
@@ -187,7 +203,7 @@ data class QuranAyahBasic(
     val ayahNumber: Int,
     val ayahText: String,
     val pageNumber: Int,
-    val juz: Int
+    val juz: Int,
 )
 
 /**
@@ -205,7 +221,7 @@ data class QuranAyahTafseer(
     val tafseerBaghawi: String,
     val ayahMeanings: String,
     val grammaticalAnalysis: String,
-    val revelationReasons: String
+    val revelationReasons: String,
 )
 
 /**
@@ -219,7 +235,7 @@ data class QuranAyahPage(
     val ayahText: String,
     val pageNumber: Int,
     val lineStart: Int,
-    val lineEnd: Int
+    val lineEnd: Int,
 )
 
 // Extension functions for conversion between entity and domain models
@@ -240,9 +256,9 @@ private fun removeBismillahIfNeeded(ayahText: String, surahNumber: Int, ayahNumb
 
     // Bismillah text with various possible forms
     val bismillahPatterns = listOf(
-        "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",  // With Quranic diacritics
-        "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",  // Standard diacritics
-        "بسم الله الرحمن الرحيم"                  // Without diacritics
+        "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ", // With Quranic diacritics
+        "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", // Standard diacritics
+        "بسم الله الرحمن الرحيم", // Without diacritics
     )
 
     var cleanedText = ayahText
@@ -275,7 +291,7 @@ fun QuranEnhancedEntity.toQuranEnhancedAyah() = QuranEnhancedAyah(
     tafseerSaadi = tafseerSaadi,
     tafseerMoysar = tafseerMoysar,
     tafseerBaghawi = tafseerBaghawi,
-    ayahTextTashkil = ayahTextTashkil
+    ayahTextTashkil = ayahTextTashkil,
 )
 
 /**
@@ -289,7 +305,7 @@ fun QuranEnhancedEntity.toQuranAyahBasic() = QuranAyahBasic(
     ayahNumber = ayahNumber,
     ayahText = ayahText,
     pageNumber = pageNumber,
-    juz = juz
+    juz = juz,
 )
 
 /**
@@ -307,7 +323,7 @@ fun QuranEnhancedEntity.toQuranAyahTafseer() = QuranAyahTafseer(
     tafseerBaghawi = tafseerBaghawi,
     ayahMeanings = ayahMeanings,
     grammaticalAnalysis = grammaticalAnalysis,
-    revelationReasons = revelationReasons
+    revelationReasons = revelationReasons,
 )
 
 /**
@@ -320,7 +336,7 @@ fun QuranEnhancedEntity.toQuranAyahPage() = QuranAyahPage(
     ayahText = ayahText,
     pageNumber = pageNumber,
     lineStart = lineStart,
-    lineEnd = lineEnd
+    lineEnd = lineEnd,
 )
 
 /**
@@ -337,7 +353,7 @@ fun QuranEnhancedEntity.toQuranAyahPage() = QuranAyahPage(
 fun getAyahAudioUrl(
     surahNumber: Int,
     ayahNumber: Int,
-    reciter: String = "Alafasy_128kbps"
+    reciter: String = "Alafasy_128kbps",
 ): String {
     val surahFormatted = String.format("%03d", surahNumber)
     val ayahFormatted = String.format("%03d", ayahNumber)

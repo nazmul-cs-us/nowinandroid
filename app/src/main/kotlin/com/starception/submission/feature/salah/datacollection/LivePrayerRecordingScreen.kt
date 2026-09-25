@@ -1,7 +1,23 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.datacollection
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,10 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +48,7 @@ import java.io.File
 fun LivePrayerRecordingScreen(
     onNavigateToReview: (String) -> Unit,
     onBack: () -> Unit,
-    viewModel: LivePrayerRecordingViewModel = hiltViewModel()
+    viewModel: LivePrayerRecordingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -48,9 +64,9 @@ fun LivePrayerRecordingScreen(
                             fontSize = 20.sp,
                         )
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -61,7 +77,7 @@ fun LivePrayerRecordingScreen(
                 // the bottom-anchored Start/Stop buttons hide behind the pill.
                 .padding(bottom = com.starception.submission.core.designsystem.theme.FloatingNavClearance),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when {
                 // Post-recording state
@@ -79,7 +95,7 @@ fun LivePrayerRecordingScreen(
                                 File(state.recordedFilePath!!).delete()
                             } catch (_: Exception) {}
                             onBack()
-                        }
+                        },
                     )
                 }
                 // During recording
@@ -91,7 +107,7 @@ fun LivePrayerRecordingScreen(
                         detectedConfidence = state.detectedConfidence,
                         rakahCount = state.rakahCount,
                         targetRakahCount = state.targetRakahCount,
-                        onStopRecording = { viewModel.stopRecording() }
+                        onStopRecording = { viewModel.stopRecording() },
                     )
                 }
                 // Pre-recording state
@@ -99,7 +115,7 @@ fun LivePrayerRecordingScreen(
                     PreRecordingContent(
                         selectedRakahCount = state.targetRakahCount,
                         onRakahCountSelected = viewModel::selectTargetRakahCount,
-                        onStartRecording = { viewModel.startRecording() }
+                        onStartRecording = { viewModel.startRecording() },
                     )
                 }
             }
@@ -111,7 +127,7 @@ fun LivePrayerRecordingScreen(
 private fun PreRecordingContent(
     selectedRakahCount: Int,
     onRakahCountSelected: (Int) -> Unit,
-    onStartRecording: () -> Unit
+    onStartRecording: () -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -129,85 +145,85 @@ private fun PreRecordingContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 3.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 3.dp,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
                 ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header with gradient icon
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                    // Header with gradient icon
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        FlaticonIcon(
-                            glyph = FlaticonIcons.INFO,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            fontSize = 20.sp,
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                        ),
+                                    ),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.INFO,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                fontSize = 20.sp,
+                            )
+                        }
+                        Text(
+                            text = "Instructions",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
-                    Text(
-                        text = "Instructions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
 
-                // Gradient divider
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                    // Gradient divider
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.outlineVariant,
-                                        MaterialTheme.colorScheme.outlineVariant,
-                                        Color.Transparent
-                                    )
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            Color.Transparent,
+                                        ),
+                                    ),
                                 )
-                            )
-                            .padding(vertical = 0.5.dp)
-                    )
-                }
+                                .padding(vertical = 0.5.dp),
+                        )
+                    }
 
-                // Steps with numbered badges
-                InstructionStep(number = 1, text = "Place your phone in your pocket")
-                InstructionStep(number = 2, text = "Tap 'Start Recording' below")
-                InstructionStep(number = 3, text = "Perform your prayer normally")
-                InstructionStep(number = 4, text = "After finishing, pull phone out and tap 'Stop'")
-                InstructionStep(number = 5, text = "Review and label the detected postures")
+                    // Steps with numbered badges
+                    InstructionStep(number = 1, text = "Place your phone in your pocket")
+                    InstructionStep(number = 2, text = "Tap 'Start Recording' below")
+                    InstructionStep(number = 3, text = "Perform your prayer normally")
+                    InstructionStep(number = 4, text = "After finishing, pull phone out and tap 'Stop'")
+                    InstructionStep(number = 5, text = "Review and label the detected postures")
+                }
             }
-        }
 
             PrayerLengthSelector(
                 selectedRakahCount = selectedRakahCount,
@@ -215,61 +231,61 @@ private fun PreRecordingContent(
             )
 
             Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 2.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 2.dp,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
                 ),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Header with gradient icon
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                    // Header with gradient icon
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        FlaticonIcon(
-                            glyph = FlaticonIcons.DEVELOPER,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            fontSize = 18.sp,
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                        ),
+                                    ),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.DEVELOPER,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                fontSize = 18.sp,
+                            )
+                        }
+                        Text(
+                            text = "Real-time ML Detection",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                     Text(
-                        text = "Real-time ML Detection",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        text = "The app will automatically detect and count your prayer postures using on-device ML. You can review and correct any mistakes after recording.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    text = "The app will automatically detect and count your prayer postures using on-device ML. You can review and correct any mistakes after recording.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             }
         }
 
@@ -284,7 +300,7 @@ private fun PreRecordingContent(
         ) {
             Text(
                 text = "Start $selectedRakahCount Rakʿah Recording",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
             )
         }
     }
@@ -413,14 +429,14 @@ private fun RecordingContent(
     detectedConfidence: Float,
     rakahCount: Int,
     targetRakahCount: Int,
-    onStopRecording: () -> Unit
+    onStopRecording: () -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -432,25 +448,25 @@ private fun RecordingContent(
                     elevation = 6.dp,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     ambientColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
-                    spotColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                    spotColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            )
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+            ),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "● RECORDING",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
         }
@@ -463,28 +479,28 @@ private fun RecordingContent(
                     elevation = 3.dp,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = formatTime(elapsedSeconds),
                     style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "Elapsed Time",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -497,21 +513,21 @@ private fun RecordingContent(
                     elevation = 3.dp,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Header with gradient icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -521,11 +537,11 @@ private fun RecordingContent(
                                 brush = Brush.linearGradient(
                                     colors = listOf(
                                         MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    ),
+                                ),
                             ),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         FlaticonIcon(
                             glyph = FlaticonIcons.QUICK_ACTION,
@@ -537,13 +553,13 @@ private fun RecordingContent(
                     Text(
                         text = "Live Detection",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 // Gradient divider
                 Box(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Box(
                         modifier = Modifier
@@ -554,57 +570,57 @@ private fun RecordingContent(
                                         Color.Transparent,
                                         MaterialTheme.colorScheme.outlineVariant,
                                         MaterialTheme.colorScheme.outlineVariant,
-                                        Color.Transparent
-                                    )
-                                )
+                                        Color.Transparent,
+                                    ),
+                                ),
                             )
-                            .padding(vertical = 0.5.dp)
+                            .padding(vertical = 0.5.dp),
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Detected Posture:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = detectedPosture?.displayName ?: "Analyzing...",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Confidence:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = "${(detectedConfidence * 100).toInt()}%",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Rakʿahs Detected:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = "$rakahCount / $targetRakahCount",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
 
@@ -628,16 +644,16 @@ private fun RecordingContent(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Samples Recorded:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = sampleCount.toString(),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -657,7 +673,7 @@ private fun RecordingContent(
         ) {
             Text(
                 text = "Stop Recording",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
             )
         }
 
@@ -665,7 +681,7 @@ private fun RecordingContent(
             text = "Auto-stops after 30 minutes",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -678,14 +694,14 @@ private fun PostRecordingContent(
     rakahCount: Int,
     targetRakahCount: Int,
     onNavigateToReview: (String) -> Unit,
-    onDiscard: () -> Unit
+    onDiscard: () -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -697,22 +713,22 @@ private fun PostRecordingContent(
                     elevation = 4.dp,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -722,11 +738,11 @@ private fun PostRecordingContent(
                                 brush = Brush.linearGradient(
                                     colors = listOf(
                                         MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    ),
+                                ),
                             ),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         FlaticonIcon(
                             glyph = FlaticonIcons.COMPLETED,
@@ -739,7 +755,7 @@ private fun PostRecordingContent(
                         text = "Recording Completed",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
             }
@@ -753,21 +769,21 @@ private fun PostRecordingContent(
                     elevation = 3.dp,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                 ),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Header with gradient icon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -777,11 +793,11 @@ private fun PostRecordingContent(
                                 brush = Brush.linearGradient(
                                     colors = listOf(
                                         MaterialTheme.colorScheme.primaryContainer,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    )
-                                )
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    ),
+                                ),
                             ),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         FlaticonIcon(
                             glyph = FlaticonIcons.COMPLETED,
@@ -793,68 +809,68 @@ private fun PostRecordingContent(
                     Text(
                         text = "Recording Summary",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Duration:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = formatTime(elapsedSeconds),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Samples:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = sampleCount.toString(),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Prayer selected:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = "$targetRakahCount rakʿahs",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Rakʿahs detected:",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = rakahCount.toString(),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
 
@@ -863,7 +879,7 @@ private fun PostRecordingContent(
                 Text(
                     text = "File: ${File(filePath).name}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -882,7 +898,7 @@ private fun PostRecordingContent(
         ) {
             Text(
                 text = "Review & Label",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
             )
         }
 
@@ -894,11 +910,11 @@ private fun PostRecordingContent(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(56.dp),
         ) {
             Text(
                 text = "Discard Recording",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
             )
         }
     }
@@ -908,7 +924,7 @@ private fun PostRecordingContent(
 private fun InstructionStep(number: Int, text: String) {
     Row(
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
@@ -918,23 +934,23 @@ private fun InstructionStep(number: Int, text: String) {
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        )
-                    )
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        ),
+                    ),
                 ),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = number.toString(),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
         }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,17 +19,15 @@ package com.starception.submission.feature.course
 import android.Manifest
 import android.util.Log
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,28 +46,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.component.NiaTextButton
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDragHandle
-import com.starception.submission.core.ui.FlaticonIcon
-import com.starception.submission.core.ui.FlaticonIcons
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -87,13 +72,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDragHandle
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTextButton
+import com.starception.submission.core.ui.FlaticonIcon
+import com.starception.submission.core.ui.FlaticonIcons
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

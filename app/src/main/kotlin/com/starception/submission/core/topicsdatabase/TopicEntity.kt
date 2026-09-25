@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.topicsdatabase
 
 import androidx.room.ColumnInfo
@@ -41,7 +57,7 @@ data class TopicEntity(
     val createdAt: String?,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: String?
+    val updatedAt: String?,
 )
 
 /**
@@ -56,7 +72,7 @@ data class Topic(
     val url: String,
     val icon: String?,
     val isSystem: Boolean,
-    val isUserCreated: Boolean
+    val isUserCreated: Boolean,
 )
 
 /**
@@ -71,7 +87,7 @@ fun TopicEntity.toTopic() = Topic(
     url = url ?: "",
     icon = icon,
     isSystem = (isSystem ?: 1) == 1,
-    isUserCreated = (isUserCreated ?: 0) == 1
+    isUserCreated = (isUserCreated ?: 0) == 1,
 )
 
 /**
@@ -88,6 +104,5 @@ fun Topic.toEntity() = TopicEntity(
     isSystem = if (isSystem) 1 else 0,
     isUserCreated = if (isUserCreated) 1 else 0,
     createdAt = null,
-    updatedAt = null
+    updatedAt = null,
 )
-

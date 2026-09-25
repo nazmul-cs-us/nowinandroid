@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ class VoiceRecordingManager(private val context: Context) {
         if (!courseDir.exists()) {
             courseDir.mkdirs()
         }
-        return File(courseDir, "${lessonId}.m4a").absolutePath
+        return File(courseDir, "$lessonId.m4a").absolutePath
     }
 
     /**
@@ -191,7 +191,7 @@ class VoiceRecordingManager(private val context: Context) {
     fun startPlayback(
         courseId: String,
         lessonId: String,
-        onCompletion: () -> Unit = {}
+        onCompletion: () -> Unit = {},
     ): Boolean {
         if (isPlaying) {
             stopPlayback()

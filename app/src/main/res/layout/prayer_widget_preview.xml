@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     4x2 picker entry: the illustrated hero, as the widget actually draws it.
+     Copyright 2026 The Android Open Source Project
 
-     This used to be a generic card — a location row, a progress bar and a "next prayer"
-     line — which shared nothing with the widget it was advertising. The preview now stands
-     on the same artwork plate the hero uses, so what the picker shows is what gets placed.
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -268,6 +268,7 @@ private fun WidgetPreviewSpec.imagePreviewRemoteViews(context: Context): RemoteV
 /** Publishes actual Glance RemoteViews to Android 15+ launchers instead of approximation XML. */
 object WidgetPreviewRegistrar {
     private const val TAG = "WidgetPreviewRegistrar"
+
     @Volatile private var registeredForProcess = false
 
     suspend fun register(context: Context) {

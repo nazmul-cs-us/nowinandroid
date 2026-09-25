@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.usersettings.ui
 
 import androidx.compose.foundation.background
@@ -22,10 +38,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +46,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.prayer.repository.PrayerSettingsRepository.CountrySwitchProposal
 
 /**
@@ -65,85 +81,85 @@ fun CountrySwitchConsentSheet(
     ) {
         NiaBottomSheetTheme {
             NiaBottomSheetFrame {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 4.dp, bottom = 28.dp),
-            ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Public,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 4.dp, bottom = 28.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Public,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
 
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "You're now in $place",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = if (proposal.isRestore) {
-                    "Restore your saved prayer settings for $place?"
-                } else {
-                    "Update your prayer calculation to $place's method?"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(20.dp))
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
-                    LabeledValue(label = "Calculation method", value = proposal.proposedMethod)
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant,
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "You're now in $place",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    LabeledValue(label = "Asr calculation", value = proposal.proposedAsr)
-                }
-            }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (proposal.isRestore) {
+                            "Restore your saved prayer settings for $place?"
+                        } else {
+                            "Update your prayer calculation to $place's method?"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = "Currently using ${proposal.currentMethod}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+                    Spacer(Modifier.height(20.dp))
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                            LabeledValue(label = "Calculation method", value = proposal.proposedMethod)
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                            LabeledValue(label = "Asr calculation", value = proposal.proposedAsr)
+                        }
+                    }
 
-            Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                NiaOutlinedButton(
-                    onClick = onKeepCurrent,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                ) {
-                    Text("Keep current")
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = "Currently using ${proposal.currentMethod}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        NiaOutlinedButton(
+                            onClick = onKeepCurrent,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) {
+                            Text("Keep current")
+                        }
+                        NiaOutlinedButton(
+                            onClick = onApply,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                        ) {
+                            Text(if (proposal.isRestore) "Restore" else "Apply")
+                        }
+                    }
                 }
-                NiaOutlinedButton(
-                    onClick = onApply,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                ) {
-                    Text(if (proposal.isRestore) "Restore" else "Apply")
-                }
-            }
-            }
             }
         }
     }

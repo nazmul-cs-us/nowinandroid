@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.automotive
 
 import android.util.Log
@@ -13,7 +29,6 @@ import androidx.car.app.model.Template
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
@@ -30,7 +45,7 @@ import java.time.format.DateTimeFormatter
  */
 class PrayerTimesMainScreen(
     carContext: CarContext,
-    private val dataProvider: AutomotivePrayerDataProvider
+    private val dataProvider: AutomotivePrayerDataProvider,
 ) : Screen(carContext) {
 
     companion object {
@@ -58,7 +73,7 @@ class PrayerTimesMainScreen(
                     Row.Builder()
                         .setTitle("🕌 Loading Prayer Times...")
                         .addText("Fetching accurate Islamic prayer times")
-                        .build()
+                        .build(),
                 )
             }
 
@@ -67,12 +82,12 @@ class PrayerTimesMainScreen(
                     Row.Builder()
                         .setTitle("⚠️ Unable to Load Prayer Times")
                         .addText(errorMessage ?: "Unknown error")
-                        .build()
+                        .build(),
                 )
                 itemListBuilder.addItem(
                     Row.Builder()
                         .setTitle("Tap Refresh to try again")
-                        .build()
+                        .build(),
                 )
             }
 
@@ -91,22 +106,22 @@ class PrayerTimesMainScreen(
                         Action.Builder()
                             .setTitle("🧭 Qibla")
                             .setOnClickListener { navigateToQibla() }
-                            .build()
+                            .build(),
                     )
                     .addAction(
                         Action.Builder()
                             .setTitle("🔄 Refresh")
                             .setOnClickListener { loadPrayerTimes() }
-                            .build()
+                            .build(),
                     )
-                    .build()
+                    .build(),
             )
             .build()
     }
 
     private fun buildPrayerTimesList(
         builder: ItemList.Builder,
-        data: AutomotivePrayerDataProvider.AutomotivePrayerData
+        data: AutomotivePrayerDataProvider.AutomotivePrayerData,
     ) {
         val timeFormat = DateTimeFormatter.ofPattern("h:mm a")
 
@@ -117,14 +132,14 @@ class PrayerTimesMainScreen(
                 Row.Builder()
                     .setTitle("⏰ Next: ${nextPrayer.name}")
                     .addText("in ${data.nextPrayerCountdown}")
-                    .build()
+                    .build(),
             )
 
             // Separator
             builder.addItem(
                 Row.Builder()
                     .setTitle("─────────────────────")
-                    .build()
+                    .build(),
             )
         }
 
@@ -143,7 +158,7 @@ class PrayerTimesMainScreen(
                     .setTitle("${getPrayerEmoji(prayer.name)} ${prayer.name}")
                     .addText(formattedTime)
                     .addText("$statusEmoji $statusText")
-                    .build()
+                    .build(),
             )
         }
 
@@ -151,14 +166,14 @@ class PrayerTimesMainScreen(
         builder.addItem(
             Row.Builder()
                 .setTitle("─────────────────────")
-                .build()
+                .build(),
         )
 
         builder.addItem(
             Row.Builder()
                 .setTitle("📍 ${data.locationName}")
                 .addText("📐 Method: ${data.calculationMethod}")
-                .build()
+                .build(),
         )
     }
 
@@ -205,5 +220,4 @@ class PrayerTimesMainScreen(
             else -> "🕐"
         }
     }
-
 }

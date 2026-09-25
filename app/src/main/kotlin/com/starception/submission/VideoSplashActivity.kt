@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
@@ -71,8 +70,10 @@ class VideoSplashActivity : ComponentActivity() {
         val splashAlreadyShown = prefs.getBoolean(KEY_SPLASH_SHOWN, false)
 
         // Detect system theme
-        val isNightMode = (resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+        val isNightMode = (
+            resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+            ) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
 
         android.util.Log.d("VideoSplash", "📋 LAUNCH INFO:")
@@ -120,10 +121,10 @@ class VideoSplashActivity : ComponentActivity() {
 
         // Create PlayerView programmatically with padding to shrink video
         playerView = PlayerView(this).apply {
-            useController = false  // Hide playback controls
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT  // Fit video without cropping
-            setBackgroundColor(android.graphics.Color.WHITE)  // White background to match video
-            setOnClickListener { navigateToMain() }  // Tap to skip
+            useController = false // Hide playback controls
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT // Fit video without cropping
+            setBackgroundColor(android.graphics.Color.WHITE) // White background to match video
+            setOnClickListener { navigateToMain() } // Tap to skip
         }
 
         // Wrap PlayerView in a FrameLayout with horizontal padding (10% on each side = 80% width)
@@ -131,11 +132,14 @@ class VideoSplashActivity : ComponentActivity() {
             setBackgroundColor(android.graphics.Color.WHITE)
             val horizontalPadding = (resources.displayMetrics.widthPixels * 0.10f).toInt()
             setPadding(horizontalPadding, 0, horizontalPadding, 0)
-            addView(playerView, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER
-            ))
+            addView(
+                playerView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER,
+                ),
+            )
         }
         setContentView(container)
 
@@ -152,7 +156,7 @@ class VideoSplashActivity : ComponentActivity() {
             playerView?.player = exoPlayer
 
             // Load video from raw resources
-            val videoUri = "android.resource://${packageName}/${R.raw.splash_alt}"
+            val videoUri = "android.resource://$packageName/${R.raw.splash_alt}"
             val mediaItem = MediaItem.fromUri(videoUri)
             exoPlayer.setMediaItem(mediaItem)
 

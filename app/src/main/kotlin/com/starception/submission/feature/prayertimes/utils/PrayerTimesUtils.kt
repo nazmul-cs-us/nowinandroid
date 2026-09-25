@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.utils
 
 import com.starception.submission.prayer.model.PrayerTimeOffsets
@@ -44,10 +60,11 @@ fun getCurrentDate(): String {
  * @return Qibla direction in degrees from true North (0-360)
  */
 fun calculateQiblaDirection(
-    lat1: Double, lon1: Double,
+    lat1: Double,
+    lon1: Double,
     // Kaaba coordinates
-    lat2: Double = 21.4225, 
-    lon2: Double = 39.8262
+    lat2: Double = 21.4225,
+    lon2: Double = 39.8262,
 ): Double {
     val lat1Rad = Math.toRadians(lat1)
     val lat2Rad = Math.toRadians(lat2)
@@ -59,7 +76,7 @@ fun calculateQiblaDirection(
 
     // x component: cos(φ1) * sin(φ2) - sin(φ1) * cos(φ2) * cos(Δλ)
     val x = kotlin.math.cos(lat1Rad) * kotlin.math.sin(lat2Rad) -
-            kotlin.math.sin(lat1Rad) * kotlin.math.cos(lat2Rad) * kotlin.math.cos(deltaLon)
+        kotlin.math.sin(lat1Rad) * kotlin.math.cos(lat2Rad) * kotlin.math.cos(deltaLon)
 
     var qibla = Math.toDegrees(kotlin.math.atan2(y, x))
 
@@ -67,7 +84,7 @@ fun calculateQiblaDirection(
     // atan2 can return negative angles, so we add 360° if negative
     if (qibla < 0) qibla += 360.0
 
-    return qibla  // Direction to Qibla in degrees from true North
+    return qibla // Direction to Qibla in degrees from true North
 }
 
 /**
@@ -114,7 +131,7 @@ fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTime {
 fun getAdjustedPrayerTime(
     prayerName: String,
     baseTime: LocalTime,
-    offsets: PrayerTimeOffsets
+    offsets: PrayerTimeOffsets,
 ): LocalTime {
     val offset = when (prayerName.lowercase()) {
         "fajr" -> offsets.fajr
@@ -141,14 +158,18 @@ fun formatAdjustedTime(
     baseTime: LocalTime,
     offsetMinutes: Int,
     format12Hour: Boolean = true,
-    showOffset: Boolean = false
+    showOffset: Boolean = false,
 ): String {
     val adjustedTime = applyOffsetToTime(baseTime, offsetMinutes)
 
     val timeString = if (format12Hour) {
-        val hour12 = if (adjustedTime.hour == 0) 12
-                     else if (adjustedTime.hour > 12) adjustedTime.hour - 12
-                     else adjustedTime.hour
+        val hour12 = if (adjustedTime.hour == 0) {
+            12
+        } else if (adjustedTime.hour > 12) {
+            adjustedTime.hour - 12
+        } else {
+            adjustedTime.hour
+        }
         val amPm = if (adjustedTime.hour < 12) "AM" else "PM"
         String.format("%d:%02d %s", hour12, adjustedTime.minute, amPm)
     } else {

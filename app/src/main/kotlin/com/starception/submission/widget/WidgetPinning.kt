@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ import kotlinx.coroutines.delay
  */
 object WidgetPinning {
     private const val DISCOVERY_PREFERENCES = "widget_discovery_preferences"
+
     // v2 deliberately gives existing users one opportunity to discover the expanded widget set.
     private const val DISCOVERY_SEEN = "widget_discovery_seen_v2"
     private const val ACTION_WIDGET_PINNED =

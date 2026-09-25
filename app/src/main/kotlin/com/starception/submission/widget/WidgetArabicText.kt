@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,10 @@ internal object WidgetArabicText {
         // One line first, while it stays legible; then as many lines as allowed.
         while (size >= singleLineFloorSp) {
             val layout = layoutAt(size)
-            if (layout.lineCount <= 1 && layout.height <= maxHeightPx) { chosen = layout; break }
+            if (layout.lineCount <= 1 && layout.height <= maxHeightPx) {
+                chosen = layout
+                break
+            }
             size -= 0.5f
         }
         if (chosen == null) {

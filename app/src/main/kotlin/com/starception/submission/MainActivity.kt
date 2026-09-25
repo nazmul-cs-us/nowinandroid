@@ -16,39 +16,27 @@
 
 package com.starception.submission
 
+import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
-import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import com.starception.submission.download.AssetDownloadScreen
-import com.starception.submission.download.shouldShowContentSetup
-import androidx.compose.ui.Modifier
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarResult
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.ui.graphics.Color
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.metrics.performance.JankStats
-import androidx.tracing.trace
-import androidx.fragment.app.FragmentActivity
 import com.starception.submission.MainActivityUiState.Loading
 import com.starception.submission.core.analytics.AnalyticsHelper
 import com.starception.submission.core.analytics.LocalAnalyticsHelper
@@ -59,66 +47,48 @@ import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.translation.LocationBasedTranslationDefaults
 import com.starception.submission.core.ui.LocalTimeZone
-import com.starception.submission.ui.NiaApp
-import com.starception.submission.widget.WidgetNavigationBus
-import com.starception.submission.widget.WidgetDiscoveryPrompt
-import com.starception.submission.ui.rememberNiaAppState
-import com.starception.submission.services.PrayerNotificationService
+import com.starception.submission.download.AssetDownloadScreen
+import com.starception.submission.download.AssetDownloadViewModel
+import com.starception.submission.download.shouldShowContentSetup
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.CountryPrayerMethodService
-import android.location.Location as AndroidLocation
-import com.starception.submission.download.AssetDownloadViewModel
-import com.starception.submission.util.isSystemInDarkTheme
-import com.starception.submission.util.PermissionManager
+import com.starception.submission.ui.NiaApp
+import com.starception.submission.ui.rememberNiaAppState
 import com.starception.submission.util.ActivityBasedDuaHelper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlinx.coroutines.delay
-import android.content.pm.PackageManager
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.runtime.remember
 import com.starception.submission.util.GoogleSampleNotificationManager
-import android.app.NotificationManager
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import com.starception.submission.util.PermissionManager
+import com.starception.submission.util.isSystemInDarkTheme
+import com.starception.submission.widget.WidgetDiscoveryPrompt
+import com.starception.submission.widget.WidgetNavigationBus
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import android.location.Location as AndroidLocation
 
 /**
  * MAIN ACTIVITY: Entry point for the Islamic prayer times app
- * 
+ *
  * This activity serves as the foundation for the entire application, handling:
- * 
+ *
  * CURRENT STATE (Emergency Fix Mode):
  * - Simplified startup to prevent ANR (Application Not Responding)
  * - Lazy injection to avoid main thread blocking
  * - Disabled splash screen for faster startup
  * - Minimal permission handling
- * 
+ *
  * APP COORDINATION:
  * - Hosts the main Compose UI with NiaApp
  * - Manages system services (analytics, network monitoring)
  * - Handles theme and edge-to-edge display
- * 
+ *
  * PRAYER FEATURES:
  * - Initializes prayer notification service
  * - Manages location and notification permissions
  * - Coordinates between prayer times and main app
- * 
+ *
  * EDIT THIS TO:
  * - Re-enable features after fixing performance issues
  * - Add new initialization steps
@@ -149,19 +119,19 @@ class MainActivity : FragmentActivity() {
 
     // LAZY DEPENDENCY INJECTION - Prevents main thread blocking during startup
     @Inject
-    lateinit var lazyStats: dagger.Lazy<JankStats>        // Performance monitoring (lazy loaded)
+    lateinit var lazyStats: dagger.Lazy<JankStats> // Performance monitoring (lazy loaded)
 
     @Inject
-    lateinit var networkMonitor: NetworkMonitor           // Internet connectivity monitoring
+    lateinit var networkMonitor: NetworkMonitor // Internet connectivity monitoring
 
     @Inject
-    lateinit var timeZoneMonitor: TimeZoneMonitor        // System timezone change detection
+    lateinit var timeZoneMonitor: TimeZoneMonitor // System timezone change detection
 
     @Inject
-    lateinit var analyticsHelper: AnalyticsHelper        // App usage analytics
+    lateinit var analyticsHelper: AnalyticsHelper // App usage analytics
 
     @Inject
-    lateinit var userNewsResourceRepository: UserNewsResourceRepository  // News data access
+    lateinit var userNewsResourceRepository: UserNewsResourceRepository // News data access
 
     @Inject
     lateinit var prayerNotificationServiceManager: com.starception.submission.prayer.service.PrayerNotificationServiceManager
@@ -172,7 +142,7 @@ class MainActivity : FragmentActivity() {
     // EMERGENCY FIX: ViewModel disabled to prevent main thread blocking
     // TODO: Re-enable after fixing performance issues
     // private var viewModel: MainActivityViewModel? = null
-    
+
     // PERMISSION MANAGEMENT - Handles location and notification permissions for prayer features
     private lateinit var permissionManager: PermissionManager
 
@@ -180,8 +150,10 @@ class MainActivity : FragmentActivity() {
         Log.d("MainActivity", "═══════════════════════════════════════════")
         Log.d("MainActivity", "🏠 MAIN ACTIVITY onCreate START")
         Log.d("MainActivity", "═══════════════════════════════════════════")
-        val isNightMode = (resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+        val isNightMode = (
+            resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+            ) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         Log.d("MainActivity", "   • System dark mode: $isNightMode")
         Log.d("MainActivity", "   • savedInstanceState: ${if (savedInstanceState != null) "EXISTS" else "NULL"}")
@@ -191,10 +163,10 @@ class MainActivity : FragmentActivity() {
         // Mark a genuinely fresh install as eligible before asynchronous location
         // detection starts. Existing installs and restored language choices are preserved.
         LocationBasedTranslationDefaults.prepareFirstInstall(this)
-        
+
         // EDGE-TO-EDGE DISPLAY - Modern Android UI extending behind system bars
         enableEdgeToEdge()
-        
+
         // Initialize ActivityTracker to load saved notification mode preference and start detection
         com.starception.submission.util.ActivityTracker.initialize(this, startDetectionNow = true)
         Log.d("MainActivity", "✅ ActivityTracker initialized with activity detection started")
@@ -214,7 +186,7 @@ class MainActivity : FragmentActivity() {
         //         Log.e("MainActivity", "Error initializing permissions", e)
         //     }
         // }
-        
+
         // DISABLED: No ViewModel initialization to prevent any blocking
         // lifecycleScope.launch {
         //     delay(3000)
@@ -359,7 +331,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
-        
+
         Log.d("MainActivity", "ULTRA-MINIMAL onCreate completed")
     }
 
@@ -370,10 +342,10 @@ class MainActivity : FragmentActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray
+        grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
+
         when (requestCode) {
             PermissionManager.LOCATION_PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) {
@@ -432,7 +404,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
-        
+
         // NON-BLOCKING: Access JankStats lazily in background
         lifecycleScope.launch {
             try {
@@ -442,29 +414,29 @@ class MainActivity : FragmentActivity() {
                 Log.w("MainActivity", "Failed to disable JankStats", e)
             }
         }
-        
+
         Log.d("MainActivity", "NON-BLOCKING onPause completed")
     }
-    
+
     /**
      * NON-BLOCKING: Start prayer service in background coroutine
      */
     private fun startPrayerServiceIfNeeded() {
         Log.d("MainActivity", "🚀 Starting prayer notification system in background")
-        
+
         lifecycleScope.launch {
             try {
                 // Start auto-detection FIRST (independent of service and settings dialog)
                 Log.d("MainActivity", "📍 Step 1: Starting location-based auto-detection...")
                 startLocationBasedAutoDetection()
                 Log.d("MainActivity", "✅ Step 1: Auto-detection completed")
-                
+
                 // Initialize the complete prayer notification system
                 // This includes both foreground service and backup notifications
                 Log.d("MainActivity", "⏰ Step 2: Initializing prayer notification system...")
                 prayerNotificationServiceManager.initializeNotificationSystem()
                 Log.d("MainActivity", "✅ Step 2: Notification system initialized")
-                
+
                 // DISABLED: Activity detection now merged into PrayerNotificationService
                 // The sensor HandlerThread is created in PrayerNotificationService.onCreate() and passed
                 // to ActivityTracker via setSensorHandler() for reliable background sensor operation.
@@ -484,7 +456,7 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
-    
+
     /**
      * Start activity detection service for automatic dua playing
      */
@@ -496,7 +468,7 @@ class MainActivity : FragmentActivity() {
             Log.e("MainActivity", "❌ Error starting activity detection service", e)
         }
     }
-    
+
     /**
      * Start location-based auto-detection independent of Prayer Settings dialog
      * This runs once at app startup to configure prayer methods automatically
@@ -504,11 +476,11 @@ class MainActivity : FragmentActivity() {
     private suspend fun startLocationBasedAutoDetection() {
         try {
             Log.d("MainActivity", "🌍 Starting location-based auto-detection")
-            
+
             // Use the Hilt singleton repository (per-country store lives here too)
             val settingsRepository = prayerSettingsRepository
             val countryService = CountryPrayerMethodService(this)
-            
+
             // Read the location only. The repository owns the consent decision; calculation
             // method values must never be used here to bypass that country-switch flow.
             val currentSettings = settingsRepository.getSettings()
@@ -521,9 +493,9 @@ class MainActivity : FragmentActivity() {
             }
 
             LocationBasedTranslationDefaults.applyDetectedCountry(this, location.countryCode)
-            
+
             Log.d("MainActivity", "📍 Auto-detecting for location: ${location.getDisplayName()}")
-            
+
             // Detect country and prayer method with timeout
             withContext(Dispatchers.IO) {
                 kotlinx.coroutines.withTimeoutOrNull(5000L) {
@@ -532,9 +504,9 @@ class MainActivity : FragmentActivity() {
                         latitude = location.latitude
                         longitude = location.longitude
                     }
-                    
+
                     val detectionResult = countryService.getPrayerMethodForLocation(androidLocation)
-                    
+
                     if (detectionResult.isAutoDetected) {
                         // The geocoded result is a fallback when the cached location did not yet
                         // carry a country code. This method is idempotent after the first write.
@@ -545,7 +517,7 @@ class MainActivity : FragmentActivity() {
                         Log.i("MainActivity", "🎯 Auto-detection successful: ${detectionResult.countryName}")
                         Log.i("MainActivity", "🕌 Method: ${detectionResult.calculationMethod.name}")
                         Log.i("MainActivity", "📿 Madhhab: ${detectionResult.madhhab.name}")
-                        
+
                         // This initializes a first-ever country, or publishes a proposal when the
                         // detected country differs from the active one. Only the sheet's Apply
                         // action is allowed to mutate settings on a later country change.
@@ -558,7 +530,6 @@ class MainActivity : FragmentActivity() {
                     Log.w("MainActivity", "⚠️ Auto-detection timed out")
                 }
             }
-            
         } catch (e: Exception) {
             Log.w("MainActivity", "Auto-detection failed: ${e.message}")
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,8 @@
 
 package com.starception.submission.voice
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothProfile
-import android.content.Context
 import android.app.KeyguardManager
+import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -51,26 +49,28 @@ class VoiceCompletionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val whisperService: WhisperVoiceService,
     private val sherpaKwsService: SherpaOnnxKwsService,
-    private val sherpaOnnxTts: SherpaOnnxTtsService
+    private val sherpaOnnxTts: SherpaOnnxTtsService,
 ) {
     companion object {
         private const val TAG = "VoiceCompletionManager"
 
         // Configuration
         const val LISTENING_DURATION_MS = 5000L
-        const val LISTENING_DURATION_RETRY_MS = 6000L  // Longer duration for retries
+        const val LISTENING_DURATION_RETRY_MS = 6000L // Longer duration for retries
+
         // FAST TRANSITION: Mic works, minimize delays to catch user's immediate response
         // Previous 300ms + 1500ms delays caused "yes" to be completely missed
-        const val PROMPT_DELAY_MS = 50L  // Tiny delay - mic is ready immediately
-        const val BLUETOOTH_EXTRA_DELAY_MS = 50L  // Minimal extra for Bluetooth
+        const val PROMPT_DELAY_MS = 50L // Tiny delay - mic is ready immediately
+        const val BLUETOOTH_EXTRA_DELAY_MS = 50L // Minimal extra for Bluetooth
         const val LOCKED_DEVICE_EXTRA_DELAY_MS = 250L
         const val ENGINE_READY_TIMEOUT_MS = 8000L
         const val ENGINE_READY_POLL_MS = 120L
+
         // Note: The mic is explicitly set to phone's built-in mic via setPreferredDevice()
         const val UTTERANCE_ID_PROMPT = "voice_completion_prompt"
 
         // Retry configuration for noisy environments
-        const val MAX_RETRY_ATTEMPTS = 2  // Will try up to 3 times total (1 initial + 2 retries)
+        const val MAX_RETRY_ATTEMPTS = 2 // Will try up to 3 times total (1 initial + 2 retries)
     }
 
     // Retry state
@@ -108,7 +108,7 @@ class VoiceCompletionManager @Inject constructor(
         onComplete: () -> Unit,
         onSkipped: () -> Unit,
         onInconclusive: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ) {
         if (isPromptInProgress) {
             Log.w(TAG, "Voice completion already in progress")
@@ -192,9 +192,8 @@ class VoiceCompletionManager @Inject constructor(
                         Log.e(TAG, "Voice recognition error: $error")
                         onError(error)
                         isPromptInProgress = false
-                    }
+                    },
                 )
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error in voice completion flow", e)
                 onError(e.message ?: "Unknown error")
@@ -285,7 +284,6 @@ class VoiceCompletionManager @Inject constructor(
                 continuation.invokeOnCancellation {
                     textToSpeech?.stop()
                 }
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error playing voice prompt with Android TTS", e)
                 if (continuation.isActive) {
@@ -325,7 +323,7 @@ class VoiceCompletionManager @Inject constructor(
             promptText,
             TextToSpeech.QUEUE_FLUSH,
             null,
-            UTTERANCE_ID_PROMPT
+            UTTERANCE_ID_PROMPT,
         )
     }
 
@@ -395,7 +393,7 @@ class VoiceCompletionManager @Inject constructor(
                 val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                 val hasBluetooth = devices.any { device ->
                     device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                        device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
                 }
                 if (hasBluetooth) {
                     Log.d(TAG, "🔵 Bluetooth audio output detected")
@@ -478,7 +476,6 @@ class VoiceCompletionManager @Inject constructor(
             }
 
             Log.i(TAG, "🎤 Audio state after: mode=${getModeString(audioManager.mode)}, SCO=${audioManager.isBluetoothScoOn}, speaker=${audioManager.isSpeakerphoneOn}")
-
         } catch (e: Exception) {
             Log.w(TAG, "Error forcing phone microphone", e)
         }
@@ -538,7 +535,7 @@ class VoiceCompletionManager @Inject constructor(
                         android.media.AudioAttributes.Builder()
                             .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
                             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
+                            .build(),
                     )
                     .build()
                 audioManager.requestAudioFocus(focusRequest)
@@ -604,7 +601,7 @@ class VoiceCompletionManager @Inject constructor(
         onYes: () -> Unit,
         onNo: () -> Unit,
         onInconclusive: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ) {
         // Reset retry count at start of new listening session
         currentRetryCount = 0
@@ -619,7 +616,7 @@ class VoiceCompletionManager @Inject constructor(
         onYes: () -> Unit,
         onNo: () -> Unit,
         onInconclusive: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ) {
         val selectedEngine = getSelectedEngine()
         val isRetry = currentRetryCount > 0
@@ -656,7 +653,7 @@ class VoiceCompletionManager @Inject constructor(
         onYes: () -> Unit,
         onNo: () -> Unit,
         onInconclusive: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ): Boolean {
         if (currentRetryCount < MAX_RETRY_ATTEMPTS) {
             currentRetryCount++
@@ -783,7 +780,7 @@ class VoiceCompletionManager @Inject constructor(
         onNo: () -> Unit,
         onInconclusive: (String) -> Unit,
         onError: (String) -> Unit,
-        durationMs: Long = LISTENING_DURATION_MS
+        durationMs: Long = LISTENING_DURATION_MS,
     ) {
         scope.launch {
             sherpaKwsService.startListening(
@@ -793,14 +790,14 @@ class VoiceCompletionManager @Inject constructor(
                         when (result) {
                             is SherpaOnnxKwsService.VoiceResult.Yes -> {
                                 Log.i(TAG, "✅ KWS detected: YES")
-                                currentRetryCount = 0  // Reset on success
+                                currentRetryCount = 0 // Reset on success
                                 speakConfirmation("I heard yes. Marking lesson complete.") {
                                     onYes()
                                 }
                             }
                             is SherpaOnnxKwsService.VoiceResult.No -> {
                                 Log.i(TAG, "❌ KWS detected: NO")
-                                currentRetryCount = 0  // Reset on success
+                                currentRetryCount = 0 // Reset on success
                                 speakConfirmation("I heard no. Skipping this lesson.") {
                                     onNo()
                                 }
@@ -841,7 +838,7 @@ class VoiceCompletionManager @Inject constructor(
                     override fun onStatusUpdate(message: String) {
                         Log.d(TAG, "KWS status: $message")
                     }
-                }
+                },
             )
         }
     }
@@ -855,67 +852,67 @@ class VoiceCompletionManager @Inject constructor(
         onNo: () -> Unit,
         onInconclusive: (String) -> Unit,
         onError: (String) -> Unit,
-        durationMs: Long = LISTENING_DURATION_MS
+        durationMs: Long = LISTENING_DURATION_MS,
     ) {
         scope.launch {
             whisperService.startListening(
-            durationMs = durationMs,
-            callback = object : WhisperVoiceService.VoiceRecognitionCallback {
-                override fun onResult(result: WhisperVoiceService.VoiceResult) {
-                    when (result) {
-                        is WhisperVoiceService.VoiceResult.Yes -> {
-                            Log.i(TAG, "✅ Whisper recognized: YES")
-                            currentRetryCount = 0  // Reset on success
-                            speakConfirmation("I heard yes. Marking lesson complete.") {
-                                onYes()
-                            }
-                        }
-                        is WhisperVoiceService.VoiceResult.No -> {
-                            Log.i(TAG, "❌ Whisper recognized: NO")
-                            currentRetryCount = 0  // Reset on success
-                            speakConfirmation("I heard no. Skipping this lesson.") {
-                                onNo()
-                            }
-                        }
-                        is WhisperVoiceService.VoiceResult.Timeout -> {
-                            Log.d(TAG, "⏱️ No speech detected (timeout)")
-                            // Try retry before giving up
-                            val retried = handleRetry("timeout - no speech detected", onYes, onNo, onInconclusive, onError)
-                            if (!retried) {
-                                speakConfirmation("I could not clearly hear a response.") {
-                                    onInconclusive("timeout - no speech detected")
+                durationMs = durationMs,
+                callback = object : WhisperVoiceService.VoiceRecognitionCallback {
+                    override fun onResult(result: WhisperVoiceService.VoiceResult) {
+                        when (result) {
+                            is WhisperVoiceService.VoiceResult.Yes -> {
+                                Log.i(TAG, "✅ Whisper recognized: YES")
+                                currentRetryCount = 0 // Reset on success
+                                speakConfirmation("I heard yes. Marking lesson complete.") {
+                                    onYes()
                                 }
                             }
-                        }
-                        is WhisperVoiceService.VoiceResult.Unrecognized -> {
-                            Log.d(TAG, "❓ Unrecognized speech: ${result.text}")
-                            // Try retry before giving up
-                            val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onInconclusive, onError)
-                            if (!retried) {
-                                speakConfirmation("I could not clearly understand the response.") {
-                                    onInconclusive("unrecognized: ${result.text}")
+                            is WhisperVoiceService.VoiceResult.No -> {
+                                Log.i(TAG, "❌ Whisper recognized: NO")
+                                currentRetryCount = 0 // Reset on success
+                                speakConfirmation("I heard no. Skipping this lesson.") {
+                                    onNo()
                                 }
                             }
-                        }
-                        is WhisperVoiceService.VoiceResult.Error -> {
-                            onError(result.message)
+                            is WhisperVoiceService.VoiceResult.Timeout -> {
+                                Log.d(TAG, "⏱️ No speech detected (timeout)")
+                                // Try retry before giving up
+                                val retried = handleRetry("timeout - no speech detected", onYes, onNo, onInconclusive, onError)
+                                if (!retried) {
+                                    speakConfirmation("I could not clearly hear a response.") {
+                                        onInconclusive("timeout - no speech detected")
+                                    }
+                                }
+                            }
+                            is WhisperVoiceService.VoiceResult.Unrecognized -> {
+                                Log.d(TAG, "❓ Unrecognized speech: ${result.text}")
+                                // Try retry before giving up
+                                val retried = handleRetry("unrecognized: ${result.text}", onYes, onNo, onInconclusive, onError)
+                                if (!retried) {
+                                    speakConfirmation("I could not clearly understand the response.") {
+                                        onInconclusive("unrecognized: ${result.text}")
+                                    }
+                                }
+                            }
+                            is WhisperVoiceService.VoiceResult.Error -> {
+                                onError(result.message)
+                            }
                         }
                     }
-                }
 
-                override fun onListeningStarted() {
-                    Log.d(TAG, "Whisper listening started (duration: ${durationMs}ms)")
-                }
+                    override fun onListeningStarted() {
+                        Log.d(TAG, "Whisper listening started (duration: ${durationMs}ms)")
+                    }
 
-                override fun onListeningStopped() {
-                    Log.d(TAG, "Whisper listening stopped")
-                }
+                    override fun onListeningStopped() {
+                        Log.d(TAG, "Whisper listening stopped")
+                    }
 
-                override fun onStatusUpdate(message: String) {
-                    Log.d(TAG, "Whisper status: $message")
-                }
-            }
-        )
+                    override fun onStatusUpdate(message: String) {
+                        Log.d(TAG, "Whisper status: $message")
+                    }
+                },
+            )
         }
     }
 
@@ -1083,7 +1080,7 @@ class VoiceCompletionManager @Inject constructor(
             onError = { error ->
                 Log.e(TAG, "🧪 ❌ TEST RESULT: Error occurred - $error")
                 Log.i(TAG, "🧪 ========== VOICE COMPLETION TEST FINISHED ==========")
-            }
+            },
         )
     }
 }

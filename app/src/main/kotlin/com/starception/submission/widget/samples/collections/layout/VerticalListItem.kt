@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -38,52 +54,52 @@ import androidx.glance.semantics.semantics
  */
 @Composable
 fun VerticalListItem(
-  titleContent: @Composable (() -> Unit),
-  modifier: GlanceModifier = GlanceModifier,
-  topContent: @Composable (() -> Unit)? = null,
-  supportingContent: @Composable (() -> Unit)? = null,
-  trailingBottomContent: @Composable (() -> Unit)? = null,
-  onClick: Action? = null,
-  itemContentDescription: String? = null,
+    titleContent: @Composable (() -> Unit),
+    modifier: GlanceModifier = GlanceModifier,
+    topContent: @Composable (() -> Unit)? = null,
+    supportingContent: @Composable (() -> Unit)? = null,
+    trailingBottomContent: @Composable (() -> Unit)? = null,
+    onClick: Action? = null,
+    itemContentDescription: String? = null,
 ) {
-  val listItemModifier = if (itemContentDescription != null) {
-    modifier.semantics { contentDescription = itemContentDescription }
-  } else {
-    modifier
-  }
+    val listItemModifier = if (itemContentDescription != null) {
+        modifier.semantics { contentDescription = itemContentDescription }
+    } else {
+        modifier
+    }
 
-  Column(
-    modifier = listItemModifier.maybeClickable(onClick),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    // Top
-    topContent?.let {
-      it()
-      // Smaller spacing to make the vertical spacing between individual list items more prominent.
-      Spacer(modifier = GlanceModifier.height(4.dp))
+    Column(
+        modifier = listItemModifier.maybeClickable(onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Top
+        topContent?.let {
+            it()
+            // Smaller spacing to make the vertical spacing between individual list items more prominent.
+            Spacer(modifier = GlanceModifier.height(4.dp))
+        }
+        // Bottom
+        Row {
+            Column(
+                modifier = GlanceModifier.defaultWeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                titleContent()
+                supportingContent?.let { it() }
+            }
+            // Trailing bottom
+            trailingBottomContent?.let {
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                it()
+            }
+        }
     }
-    // Bottom
-    Row {
-      Column(
-        modifier = GlanceModifier.defaultWeight(),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        titleContent()
-        supportingContent?.let { it() }
-      }
-      // Trailing bottom
-      trailingBottomContent?.let {
-        Spacer(modifier = GlanceModifier.width(8.dp))
-        it()
-      }
-    }
-  }
 }
 
 private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
-  return if (action != null) {
-    this.clickable(action)
-  } else {
-    this
-  }
+    return if (action != null) {
+        this.clickable(action)
+    } else {
+        this
+    }
 }

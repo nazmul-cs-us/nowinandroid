@@ -1,31 +1,34 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlin.math.*
 
 /**
@@ -35,7 +38,7 @@ import kotlin.math.*
 fun PrayerTimesHeaderCard(
     location: String,
     date: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
@@ -44,8 +47,8 @@ fun PrayerTimesHeaderCard(
                 elevation = 8.dp,
                 shape = RoundedCornerShape(20.dp),
                 ambientColor = Color.Black.copy(alpha = 0.1f),
-                spotColor = Color.Black.copy(alpha = 0.25f)
-            )
+                spotColor = Color.Black.copy(alpha = 0.25f),
+            ),
     ) {
         // Main container with PNG file aesthetic
         Box(
@@ -56,15 +59,15 @@ fun PrayerTimesHeaderCard(
                     Brush.verticalGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ),
                 )
-                .padding(20.dp)
+                .padding(20.dp),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // Header section with gradient background
                 Box(
@@ -75,49 +78,49 @@ fun PrayerTimesHeaderCard(
                             Brush.horizontalGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                ),
+                            ),
                         )
                         .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "🕌 Prayer Times",
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Location and date info
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "📍 $location",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                     Text(
                         text = "📅 $date",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
-        
+
         // Corner fold effect (like PNG file icon)
         Box(
             modifier = Modifier
                 .size(30.dp)
                 .align(Alignment.TopEnd)
-                .offset(x = (-10).dp, y = 10.dp)
+                .offset(x = (-10).dp, y = 10.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -127,10 +130,10 @@ fun PrayerTimesHeaderCard(
                         Brush.linearGradient(
                             colors = listOf(
                                 Color(0xFFDEE2E6),
-                                Color(0xFFADB5BD)
-                            )
-                        )
-                    )
+                                Color(0xFFADB5BD),
+                            ),
+                        ),
+                    ),
             )
         }
     }
@@ -141,29 +144,29 @@ fun PrayerTimesHeaderCard(
  */
 @Composable
 fun PrayerTimesLoadingCard(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(200.dp),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CircularProgressIndicator()
                 Text(
                     text = "Calculating prayer times...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -177,7 +180,7 @@ fun PrayerTimesLoadingCard(
 fun PrayerTimeCard(
     prayerName: String,
     time: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
@@ -186,8 +189,8 @@ fun PrayerTimeCard(
                 elevation = 6.dp,
                 shape = RoundedCornerShape(16.dp),
                 ambientColor = Color.Black.copy(alpha = 0.08f),
-                spotColor = Color.Black.copy(alpha = 0.2f)
-            )
+                spotColor = Color.Black.copy(alpha = 0.2f),
+            ),
     ) {
         // Main card content
         Box(
@@ -198,16 +201,16 @@ fun PrayerTimeCard(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color(0xFFFFFFFF),
-                            Color(0xFFF8F9FA)
-                        )
-                    )
+                            Color(0xFFF8F9FA),
+                        ),
+                    ),
                 )
-                .padding(20.dp)
+                .padding(20.dp),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Prayer name with colored background
                 Box(
@@ -222,35 +225,35 @@ fun PrayerTimeCard(
                                 "Maghrib" -> Brush.horizontalGradient(listOf(Color(0xFFFA8BFF), Color(0xFF2BD2FF)))
                                 "Isha" -> Brush.horizontalGradient(listOf(Color(0xFF2193B0), Color(0xFF6DD5ED)))
                                 else -> Brush.horizontalGradient(listOf(Color(0xFF4A90E2), Color(0xFF5BA4F2)))
-                            }
+                            },
                         )
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = prayerName,
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
-                
+
                 // Prayer time
                 Text(
                     text = time,
                     style = MaterialTheme.typography.headlineMedium,
                     color = Color(0xFF495057),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
-        
+
         // Small corner fold effect
         Box(
             modifier = Modifier
                 .size(20.dp)
                 .align(Alignment.TopEnd)
-                .offset(x = (-8).dp, y = 8.dp)
+                .offset(x = (-8).dp, y = 8.dp),
         ) {
             Box(
                 modifier = Modifier
@@ -260,10 +263,10 @@ fun PrayerTimeCard(
                         Brush.linearGradient(
                             colors = listOf(
                                 Color(0xFFE9ECEF),
-                                Color(0xFFCED4DA)
-                            )
-                        )
-                    )
+                                Color(0xFFCED4DA),
+                            ),
+                        ),
+                    ),
             )
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,9 +54,9 @@ import com.starception.submission.core.designsystem.component.NiaBottomSheetDefa
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.voice.SherpaOnnxTtsService
-import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Shared TTS model and speaker picker for detail screens that narrate content.

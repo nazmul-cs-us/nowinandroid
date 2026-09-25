@@ -16,9 +16,6 @@
 
 package com.starception.submission.widget.samples.toolbars
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
-
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
@@ -27,6 +24,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolBarButton
 import com.starception.submission.widget.samples.toolbars.layout.ExpressiveToolbarLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
@@ -63,30 +62,30 @@ class ExpressiveToolbarAppWidget : GlanceAppWidget() {
             centerButton = ExpressiveToolBarButton(
                 iconRes = R.drawable.sample_add_icon,
                 contentDescription = "Add notes",
-                onClick = actionStartDemoActivity("add notes button")
+                onClick = actionStartDemoActivity("add notes button"),
             ),
             cornerButtons = listOf(
                 ExpressiveToolBarButton(
                     iconRes = R.drawable.sample_qibla_icon,
                     contentDescription = "Qibla",
-                    onClick = actionStartDemoActivity("mic button")
+                    onClick = actionStartDemoActivity("mic button"),
                 ),
                 ExpressiveToolBarButton(
                     iconRes = R.drawable.sample_tasbih_icon,
                     contentDescription = "Tasbih",
-                    onClick = actionStartDemoActivity("camera button")
+                    onClick = actionStartDemoActivity("camera button"),
                 ),
                 ExpressiveToolBarButton(
                     iconRes = R.drawable.sample_quran_icon,
                     contentDescription = "Quran",
-                    onClick = actionStartDemoActivity("share button")
+                    onClick = actionStartDemoActivity("share button"),
                 ),
                 ExpressiveToolBarButton(
                     iconRes = R.drawable.sample_file_upload_icon,
                     contentDescription = "file upload",
-                    onClick = actionStartDemoActivity("file upload button")
+                    onClick = actionStartDemoActivity("file upload button"),
                 ),
-            )
+            ),
         )
     }
 }

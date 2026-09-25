@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,19 +47,15 @@ import androidx.glance.ImageProvider
 import androidx.glance.background
 import androidx.glance.color.ColorProviders
 import androidx.glance.layout.ContentScale
-import androidx.glance.layout.Box
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.material3.ColorProviders
 import androidx.glance.unit.ColorProvider
-import androidx.glance.appwidget.cornerRadius
-import androidx.compose.ui.unit.dp
+import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.designsystem.theme.niaColorScheme
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.core.model.data.UserData
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
-import com.starception.submission.R
 
 /** App theme state plus the global widget appearance captured for this render. */
 internal data class WidgetThemeSource(
@@ -87,6 +83,7 @@ private val LocalCookieWidgetGradient = staticCompositionLocalOf<ImageProvider> 
     error("Cookie widget gradient was not provided")
 }
 internal val LocalWidgetAppearance = staticCompositionLocalOf { WidgetAppearanceSettings() }
+
 /**
  * The resolved day/night state for this render, after applying the widget's own colour-mode
  * override on top of the system mode. Header ink that sits directly on the plate reads this
@@ -108,6 +105,7 @@ internal val LocalWidgetHeroAccent = staticCompositionLocalOf {
 }
 
 internal val TransparentWidgetBackground = ColorProvider(Color.Transparent)
+
 /**
  * Paint for the one view marked as android.R.id.background — the widget's plate.
  *
@@ -140,8 +138,9 @@ internal fun StarceptionWidgetTheme(
     val systemDark = when (context.getSystemService(UiModeManager::class.java)?.nightMode) {
         UiModeManager.MODE_NIGHT_YES -> true
         UiModeManager.MODE_NIGHT_NO -> false
-        else -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-            Configuration.UI_MODE_NIGHT_YES
+        else ->
+            context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
     }
     val darkTheme = when (source.appearance.colorMode) {
         WidgetColorMode.FOLLOW_SYSTEM -> systemDark
@@ -345,8 +344,10 @@ internal fun alphaAdjustedImageProvider(
     // comfortably in memory.
     val key = "$drawableRes:$alpha:${targetAspect?.let { "%.3f".format(it) }}:$preservedBand"
     artworkCache.get(key)?.let { return ImageProvider(it) }
-    return ImageProvider(renderAdjustedArtwork(context, drawableRes, alpha, targetAspect, preservedBand)
-        .also { artworkCache.put(key, it) })
+    return ImageProvider(
+        renderAdjustedArtwork(context, drawableRes, alpha, targetAspect, preservedBand)
+            .also { artworkCache.put(key, it) },
+    )
 }
 
 private val artworkCache = android.util.LruCache<String, Bitmap>(8)

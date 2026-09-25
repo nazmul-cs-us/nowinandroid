@@ -1,57 +1,72 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.dua
 
 import android.content.Context
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.PredictiveBackHandler
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -60,67 +75,34 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.FontDownload
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.BookmarkBorder
-import androidx.compose.material.icons.filled.TextFormat
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.FormatAlignCenter
-import androidx.compose.material.icons.filled.FormatAlignRight
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CheckCircleOutline
-import androidx.compose.material.icons.outlined.RecordVoiceOver
-import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Checklist
-import androidx.compose.material.icons.outlined.Notes
-import androidx.compose.material.icons.outlined.Article
-import androidx.compose.material.icons.outlined.LibraryBooks
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -136,86 +118,81 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.zIndex
-import androidx.compose.runtime.toMutableStateList
-import androidx.compose.foundation.lazy.rememberLazyListState
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
-import androidx.compose.ui.graphics.Color
-import android.content.res.Configuration
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.starception.submission.feature.surah.QuranFonts
-import com.starception.submission.util.toLocalizedDigits
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import com.starception.submission.core.qurandatabase.QuranTranslationHelper
-import com.starception.submission.core.qurandatabase.QuranTranslationRepository
-import com.starception.submission.feature.surah.tajweed.TajweedAnnotation
-import com.starception.submission.feature.surah.tajweed.TajweedParser
-import com.starception.submission.feature.surah.tajweed.TajweedTextApplier
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
-import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.R
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
-import java.util.Locale
-import com.starception.submission.core.topicsdatabase.Topic
-import com.starception.submission.core.topicsdatabase.TopicsDatabase
-import com.starception.submission.core.topicsdatabase.toTopic
-import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.duadatabase.HadithReference
 import com.starception.submission.core.duadatabase.toHadithReference
 import com.starception.submission.core.qurandatabase.QuranDatabase
+import com.starception.submission.core.qurandatabase.QuranTranslationHelper
+import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import com.starception.submission.core.topicsdatabase.Topic
+import com.starception.submission.core.topicsdatabase.TopicsDatabase
+import com.starception.submission.core.topicsdatabase.toTopic
 import com.starception.submission.core.ui.ChapterAudioController
 import com.starception.submission.core.ui.DynamicSkyHeader
 import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.core.ui.getCurrentSkyPeriodForTheme
-import com.starception.submission.core.ui.getSkyColors
+import com.starception.submission.feature.surah.QuranFonts
+import com.starception.submission.feature.surah.tajweed.TajweedAnnotation
+import com.starception.submission.feature.surah.tajweed.TajweedParser
+import com.starception.submission.feature.surah.tajweed.TajweedTextApplier
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.settings.components.TtsVoiceSelectionSheet
 import com.starception.submission.settings.components.isTtsVoiceModelAvailable
+import com.starception.submission.util.toLocalizedDigits
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.ui.platform.LocalDensity
-import com.starception.submission.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.util.Locale
+import kotlin.math.roundToInt
 
 private const val DUA_SECTION_ORDER_PREFS = "dua_section_order_prefs"
 private const val DUA_SECTION_ORDER_KEY = "section_order"
@@ -241,7 +218,11 @@ private fun loadDuaSectionOrder(context: android.content.Context): List<DuaSecti
     val orderString = prefs.getString(DUA_SECTION_ORDER_KEY, null) ?: return null
     return try {
         orderString.split(",").mapNotNull { name ->
-            try { DuaSection.valueOf(name) } catch (e: Exception) { null }
+            try {
+                DuaSection.valueOf(name)
+            } catch (e: Exception) {
+                null
+            }
         }
     } catch (e: Exception) {
         null
@@ -261,21 +242,21 @@ data class DuaItem(
     val quranReference: String?,
     val duaNumber: Int,
     // Extracted from quranReference for database lookup
-    val surahNumber: Int = 0,  
+    val surahNumber: Int = 0,
     // Extracted from quranReference for database lookup
-    val ayahNumber: Int = 0,   
+    val ayahNumber: Int = 0,
     // Surah name fetched from database (e.g., "Al-Baqarah")
-    val surahName: String = "", 
+    val surahName: String = "",
     // When/why to recite (before the dua)
-    val context: String = "",  
+    val context: String = "",
     // Special instructions (e.g., "Recite 3 times")
-    val instruction: String = "",  
+    val instruction: String = "",
     // Additional scholarly notes
-    val note: String = "",  
+    val note: String = "",
     // Context after the dua text
-    val postContext: String = "",  
+    val postContext: String = "",
     // Hadith references
-    val reference: String = ""  
+    val reference: String = "",
 )
 
 /**
@@ -288,15 +269,15 @@ data class ParsedDuaContent(
     val explanation: String,
     val quranReference: String?,
     // When/why to recite (before the dua)
-    val context: String = "",  
+    val context: String = "",
     // Special instructions (e.g., "Recite 3 times")
-    val instruction: String = "",  
+    val instruction: String = "",
     // Additional scholarly notes
-    val note: String = "",  
+    val note: String = "",
     // Context after the dua text
-    val postContext: String = "",  
+    val postContext: String = "",
     // Hadith references
-    val reference: String = ""  
+    val reference: String = "",
 )
 
 /**
@@ -307,19 +288,19 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
     private val prefs: SharedPreferences = context.getSharedPreferences("quran_prefs", Context.MODE_PRIVATE)
 
     private val _selectedArabicFont = MutableStateFlow(
-        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem",
     )
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 
     // Translation selection - same as Quran player
     private val _selectedTranslation = MutableStateFlow(
-        prefs.getString("quran_translation", "en") ?: "en"
+        prefs.getString("quran_translation", "en") ?: "en",
     )
     val selectedTranslation: StateFlow<String> = _selectedTranslation.asStateFlow()
 
     // Tajweed setting - synced with Surah page
     private val _showTajweed = MutableStateFlow(
-        prefs.getBoolean("show_tajweed", false)
+        prefs.getBoolean("show_tajweed", false),
     )
     val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
 
@@ -441,7 +422,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
             "uthmani_script",
             "indopak_script",
             "amiri",
-            "scheherazade"
+            "scheherazade",
         )
     }
 
@@ -604,7 +585,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                         roomDbPath.absolutePath,
                         null,
-                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
                     )
 
                     // Query duas filtered by topic
@@ -613,7 +594,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                            FROM news_resources nr
                            INNER JOIN news_topics nt ON nr.id = nt.news_id
                            WHERE nt.topic_id = ? AND nr.type LIKE '%Dua%'""",
-                        arrayOf(topicId)
+                        arrayOf(topicId),
                     )
 
                     while (cursor.moveToNext()) {
@@ -650,8 +631,8 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                                 instruction = parsed.instruction,
                                 note = parsed.note,
                                 postContext = parsed.postContext,
-                                reference = parsed.reference
-                            )
+                                reference = parsed.reference,
+                            ),
                         )
                     }
 
@@ -703,12 +684,12 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                         roomDbPath.absolutePath,
                         null,
-                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
                     )
 
                     val cursor = db.rawQuery(
                         "SELECT id, title, content, type FROM news_resources WHERE type LIKE '%Dua%'",
-                        null
+                        null,
                     )
 
                     while (cursor.moveToNext()) {
@@ -746,8 +727,8 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                                 instruction = parsed.instruction,
                                 note = parsed.note,
                                 postContext = parsed.postContext,
-                                reference = parsed.reference
-                            )
+                                reference = parsed.reference,
+                            ),
                         )
                     }
 
@@ -773,7 +754,7 @@ class DuaDetailViewModel(private val context: Context) : ViewModel() {
                             val surahName = fetchSurahName(dua.surahNumber)
                             dua.copy(
                                 translation = translatedText ?: dua.translation,
-                                surahName = surahName
+                                surahName = surahName,
                             )
                         } else {
                             dua
@@ -915,17 +896,17 @@ fun parseDuaContent(content: String, quranReference: String? = null): ParsedDuaC
         instruction = instruction,
         note = note,
         postContext = postContext,
-        reference = reference
+        reference = reference,
     )
 }
 
 // Gradient colors for dua header - Material 3 Expressive
 private val DuaGradientColors = listOf(
-    Color(0xFF0D47A1),  // Deep blue
-    Color(0xFF1565C0),  // Blue
-    Color(0xFF1976D2),  // Medium blue
-    Color(0xFF00695C),  // Teal
-    Color(0xFF004D40)   // Dark teal
+    Color(0xFF0D47A1), // Deep blue
+    Color(0xFF1565C0), // Blue
+    Color(0xFF1976D2), // Medium blue
+    Color(0xFF00695C), // Teal
+    Color(0xFF004D40), // Dark teal
 )
 
 /**
@@ -948,7 +929,7 @@ fun DuaDetailScreen(
     onToggleNiaBookmark: (newsResourceId: String) -> Unit = {},
     topicId: String = "",
     onTopicClick: (String) -> Unit = {},
-    onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
+    onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null,
 ) {
     // Enable immersive full-screen mode (hides status bar)
     // Don't restore on dispose to prevent status bar flash when navigating to surah detail
@@ -1133,7 +1114,7 @@ fun DuaDetailScreen(
     // Pager state
     val pagerState = rememberPagerState(
         initialPage = targetPageIndex,
-        pageCount = { if (duasList.isNotEmpty()) duasList.size else 40 }
+        pageCount = { if (duasList.isNotEmpty()) duasList.size else 40 },
     )
 
     // Force scroll to correct page on initial composition
@@ -1156,11 +1137,15 @@ fun DuaDetailScreen(
             // Fortress: title match wins so we don't fall into a Quranic Dua id collision
             val indexByTitle = if (isFortressTitle) {
                 duasList.indexOfFirst { it.title == title }.takeIf { it >= 0 }
-            } else null
+            } else {
+                null
+            }
             // Otherwise: news resource ID (Quranic Duas + topic-filtered lists)
             val indexById = if (initialNewsResourceId.isNotEmpty()) {
                 duasList.indexOfFirst { it.id == initialNewsResourceId }.takeIf { it >= 0 }
-            } else null
+            } else {
+                null
+            }
             // Fall back to dua number matching
             val indexByNumber = duasList.indexOfFirst { it.duaNumber == initialDuaNumber }.takeIf { it >= 0 }
             val targetIndex = indexByTitle ?: indexById ?: indexByNumber
@@ -1238,8 +1223,8 @@ fun DuaDetailScreen(
     // When duasList is empty but we have fallback content, show 1 (single dua from navigation params)
     val totalDuas = when {
         duasList.isNotEmpty() -> duasList.size
-        content.isNotBlank() -> 1  // Fallback: single dua from navigation params
-        else -> 1  // Default to 1, not 40
+        content.isNotBlank() -> 1 // Fallback: single dua from navigation params
+        else -> 1 // Default to 1, not 40
     }
     val currentPage = pagerState.currentPage
     // Enable circular navigation - always allow navigation when there are multiple duas
@@ -1249,7 +1234,7 @@ fun DuaDetailScreen(
     // Get current NiA news resource ID for bookmark tracking
     // Dua 1 = news resource ID "128", Dua 2 = "129", etc.
     val currentNewsResourceId = remember(currentPage) {
-        (128 + currentPage).toString()  // currentPage is 0-indexed, dua 1 is at page 0
+        (128 + currentPage).toString() // currentPage is 0-indexed, dua 1 is at page 0
     }
 
     // Update bookmark state when page changes using NiA's bookmark system
@@ -1281,8 +1266,8 @@ fun DuaDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,  // Solid background to prevent sky showing through
-        contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, // Solid background to prevent sky showing through
+        contentWindowInsets = WindowInsets(0, 0, 0, 0), // No padding for status bar in immersive mode
     ) { _ ->
         // Don't apply paddingValues - let content scroll under transparent toolbar like SurahDetailScreen
         Box(modifier = Modifier.fillMaxSize()) {
@@ -1296,7 +1281,7 @@ fun DuaDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator()
                 }
@@ -1359,618 +1344,328 @@ fun DuaDetailScreen(
                                     if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
                                         change.consume()
                                     }
-                                }
+                                },
                             )
-                        }
+                        },
                 ) {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = false
-                ) { page ->
-                    val dua = duasList[page]
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = false,
+                    ) { page ->
+                        val dua = duasList[page]
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // Track scroll state for collapsing toolbar effect
-                        val lazyListState = rememberLazyListState()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Track scroll state for collapsing toolbar effect
+                            val lazyListState = rememberLazyListState()
 
-                        // Force scroll to top immediately when this page is displayed
-                        LaunchedEffect(page) {
-                            lazyListState.scrollToItem(0, 0)
-                        }
-
-                        // Calculate if header has scrolled past threshold (when Surah reference should appear in toolbar)
-                        val showTitleInToolbar = remember {
-                            androidx.compose.runtime.derivedStateOf {
-                                lazyListState.firstVisibleItemIndex > 0 ||
-                                (lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset > 150)
+                            // Force scroll to top immediately when this page is displayed
+                            LaunchedEffect(page) {
+                                lazyListState.scrollToItem(0, 0)
                             }
-                        }
 
-                        // Toolbar always shows solid surface background regardless of scroll position
-                        LaunchedEffect(Unit) {
-                            toolbarCollapseProgress = 1f
-                        }
-
-                        // Build list of available sections based on dua data
-                        val availableSections = remember(dua) {
-                            mutableListOf<DuaSection>().apply {
-                                if (dua.context.isNotEmpty()) add(DuaSection.CONTEXT)
-                                if (dua.arabicText.isNotEmpty()) add(DuaSection.ARABIC)
-                                if (dua.instruction.isNotEmpty()) add(DuaSection.INSTRUCTION)
-                                if (dua.translation.isNotEmpty()) add(DuaSection.TRANSLATION)
-                                if (dua.transliteration.isNotEmpty()) add(DuaSection.TRANSLITERATION)
-                                if (dua.explanation.isNotEmpty()) add(DuaSection.EXPLANATION)
-                                if (dua.note.isNotEmpty()) add(DuaSection.NOTE)
-                                if (dua.postContext.isNotEmpty()) add(DuaSection.POST_CONTEXT)
-                                if (dua.reference.isNotEmpty()) add(DuaSection.REFERENCE)
-                            }.toList()
-                        }
-
-                        // Load saved order and apply it to available sections
-                        val initialSections = remember(availableSections) {
-                            val savedOrder = loadDuaSectionOrder(context)
-                            if (savedOrder != null) {
-                                // Reorder available sections based on saved order
-                                val ordered = mutableListOf<DuaSection>()
-                                savedOrder.forEach { section ->
-                                    if (section in availableSections) ordered.add(section)
+                            // Calculate if header has scrolled past threshold (when Surah reference should appear in toolbar)
+                            val showTitleInToolbar = remember {
+                                androidx.compose.runtime.derivedStateOf {
+                                    lazyListState.firstVisibleItemIndex > 0 ||
+                                        (lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset > 150)
                                 }
-                                // Add any new sections not in saved order
-                                availableSections.forEach { section ->
-                                    if (section !in ordered) ordered.add(section)
-                                }
-                                ordered
-                            } else {
-                                availableSections
                             }
-                        }
 
-                        // Local mutable list for smooth drag reordering
-                        val localSections = remember(initialSections) { initialSections.toMutableStateList() }
-
-                        // Track if reordering happened to save on drag end
-                        var wasReordered by remember { mutableStateOf(false) }
-
-                        // State for loaded hadith references (needed for REFERENCE section)
-                        var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
-
-                        // Load hadith references by parsing title to get chapter and position
-                        LaunchedEffect(dua.title) {
-                            try {
-                                val titleParts = dua.title.split(": Dua ")
-                                if (titleParts.size == 2) {
-                                    val chapterTitle = titleParts[0].trim()
-                                    val position = titleParts[1].trim().toIntOrNull() ?: 1
-                                    val duaDb = DuaDatabase.getInstance(context)
-                                    val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
-                                    hadithReferences = refs.map { it.toHadithReference() }
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("DuaDetailScreen", "Error loading hadith references", e)
+                            // Toolbar always shows solid surface background regardless of scroll position
+                            LaunchedEffect(Unit) {
+                                toolbarCollapseProgress = 1f
                             }
-                        }
 
-                        // Reorderable state for the LazyColumn
-                        val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                            // Only reorder if both indices are in the sections range (after header + spacer)
-                            val headerOffset = 2 // 1 header item + 1 spacer before sections
-                            val fromSectionIndex = from.index - headerOffset
-                            val toSectionIndex = to.index - headerOffset
-                            if (fromSectionIndex >= 0 && toSectionIndex >= 0 &&
-                                fromSectionIndex < localSections.size && toSectionIndex < localSections.size) {
-                                localSections.apply {
-                                    add(toSectionIndex, removeAt(fromSectionIndex))
-                                }
-                                wasReordered = true
+                            // Build list of available sections based on dua data
+                            val availableSections = remember(dua) {
+                                mutableListOf<DuaSection>().apply {
+                                    if (dua.context.isNotEmpty()) add(DuaSection.CONTEXT)
+                                    if (dua.arabicText.isNotEmpty()) add(DuaSection.ARABIC)
+                                    if (dua.instruction.isNotEmpty()) add(DuaSection.INSTRUCTION)
+                                    if (dua.translation.isNotEmpty()) add(DuaSection.TRANSLATION)
+                                    if (dua.transliteration.isNotEmpty()) add(DuaSection.TRANSLITERATION)
+                                    if (dua.explanation.isNotEmpty()) add(DuaSection.EXPLANATION)
+                                    if (dua.note.isNotEmpty()) add(DuaSection.NOTE)
+                                    if (dua.postContext.isNotEmpty()) add(DuaSection.POST_CONTEXT)
+                                    if (dua.reference.isNotEmpty()) add(DuaSection.REFERENCE)
+                                }.toList()
                             }
-                        }
 
-                        // Each page has its own LazyColumn with header + content
-                        // No status bar padding - immersive mode hides status bar
-                        LazyColumn(
-                            state = lazyListState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 56.dp) // Space for Vuesax pagination pill
-                        ) {
-                            // Header with Masjid al-Nawabi image - with parallax effect
-                            item {
-                                // Calculate parallax progress based on scroll
-                                val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
-                                val headerHeightPx = with(LocalDensity.current) {
-                                    if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
+                            // Load saved order and apply it to available sections
+                            val initialSections = remember(availableSections) {
+                                val savedOrder = loadDuaSectionOrder(context)
+                                if (savedOrder != null) {
+                                    // Reorder available sections based on saved order
+                                    val ordered = mutableListOf<DuaSection>()
+                                    savedOrder.forEach { section ->
+                                        if (section in availableSections) ordered.add(section)
+                                    }
+                                    // Add any new sections not in saved order
+                                    availableSections.forEach { section ->
+                                        if (section !in ordered) ordered.add(section)
+                                    }
+                                    ordered
+                                } else {
+                                    availableSections
                                 }
-                                val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
+                            }
 
-                                // Easing function for smooth parallax
-                                fun easeOutCubic(x: Float): Float = 1f - (1f - x).let { it * it * it }
-                                val easedProgress = easeOutCubic(parallaxProgress)
-                                val centeredProgress = (easedProgress - 0.5f) * 2f
+                            // Local mutable list for smooth drag reordering
+                            val localSections = remember(initialSections) { initialSections.toMutableStateList() }
 
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            // Track if reordering happened to save on drag end
+                            var wasReordered by remember { mutableStateOf(false) }
+
+                            // State for loaded hadith references (needed for REFERENCE section)
+                            var hadithReferences by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
+
+                            // Load hadith references by parsing title to get chapter and position
+                            LaunchedEffect(dua.title) {
+                                try {
+                                    val titleParts = dua.title.split(": Dua ")
+                                    if (titleParts.size == 2) {
+                                        val chapterTitle = titleParts[0].trim()
+                                        val position = titleParts[1].trim().toIntOrNull() ?: 1
+                                        val duaDb = DuaDatabase.getInstance(context)
+                                        val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
+                                        hadithReferences = refs.map { it.toHadithReference() }
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("DuaDetailScreen", "Error loading hadith references", e)
+                                }
+                            }
+
+                            // Reorderable state for the LazyColumn
+                            val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                                // Only reorder if both indices are in the sections range (after header + spacer)
+                                val headerOffset = 2 // 1 header item + 1 spacer before sections
+                                val fromSectionIndex = from.index - headerOffset
+                                val toSectionIndex = to.index - headerOffset
+                                if (fromSectionIndex >= 0 && toSectionIndex >= 0 &&
+                                    fromSectionIndex < localSections.size && toSectionIndex < localSections.size
                                 ) {
-                                    Column {
-                                        // Album-style header image with parallax
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .then(
-                                                    if (isLandscape) {
-                                                        Modifier.height(160.dp)
-                                                    } else {
-                                                        Modifier.aspectRatio(4f / 3f)
-                                                    }
-                                                )
-                                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                        ) {
-                                            Image(
-                                                painter = painterResource(R.drawable.masjid_al_nawabi),
-                                                contentDescription = "Masjid al-Nawabi",
+                                    localSections.apply {
+                                        add(toSectionIndex, removeAt(fromSectionIndex))
+                                    }
+                                    wasReordered = true
+                                }
+                            }
+
+                            // Each page has its own LazyColumn with header + content
+                            // No status bar padding - immersive mode hides status bar
+                            LazyColumn(
+                                state = lazyListState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 56.dp), // Space for Vuesax pagination pill
+                            ) {
+                                // Header with Masjid al-Nawabi image - with parallax effect
+                                item {
+                                    // Calculate parallax progress based on scroll
+                                    val scrollOffset = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                                    val headerHeightPx = with(LocalDensity.current) {
+                                        if (isLandscape) 200.dp.toPx() else 400.dp.toPx()
+                                    }
+                                    val parallaxProgress = (scrollOffset / headerHeightPx).coerceIn(0f, 1f)
+
+                                    // Easing function for smooth parallax
+                                    fun easeOutCubic(x: Float): Float = 1f - (1f - x).let { it * it * it }
+                                    val easedProgress = easeOutCubic(parallaxProgress)
+                                    val centeredProgress = (easedProgress - 0.5f) * 2f
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                    ) {
+                                        Column {
+                                            // Album-style header image with parallax
+                                            Box(
                                                 modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .graphicsLayer {
-                                                        // Scale effect: 1.0 -> 1.08 zoom
-                                                        val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
-                                                        scaleX = scaleValue
-                                                        scaleY = scaleValue
+                                                    .fillMaxWidth()
+                                                    .then(
+                                                        if (isLandscape) {
+                                                            Modifier.height(160.dp)
+                                                        } else {
+                                                            Modifier.aspectRatio(4f / 3f)
+                                                        },
+                                                    )
+                                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                            ) {
+                                                Image(
+                                                    painter = painterResource(R.drawable.masjid_al_nawabi),
+                                                    contentDescription = "Masjid al-Nawabi",
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .graphicsLayer {
+                                                            // Scale effect: 1.0 -> 1.08 zoom
+                                                            val scaleValue = 1f + (1f - kotlin.math.abs(centeredProgress)) * 0.08f
+                                                            scaleX = scaleValue
+                                                            scaleY = scaleValue
 
-                                                        // Subtle vertical translation
-                                                        val maxTranslation = 15.dp.toPx()
-                                                        translationY = -easedProgress * maxTranslation
+                                                            // Subtle vertical translation
+                                                            val maxTranslation = 15.dp.toPx()
+                                                            translationY = -easedProgress * maxTranslation
 
-                                                        // Alpha variation
-                                                        alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
-                                                    },
-                                                contentScale = ContentScale.Crop,
-                                                alignment = Alignment.Center
-                                            )
-                                        }
-
-                                        // Info card below header
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 24.dp)
-                                                .padding(top = 12.dp, bottom = 8.dp)
-                                        ) {
-                                            // Load hadith references for header display
-                                            var headerHadithRefs by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
-                                            LaunchedEffect(dua.title) {
-                                                if (dua.surahNumber <= 0 || dua.ayahNumber <= 0) {
-                                                    // Only load for non-Quranic duas
-                                                    try {
-                                                        // Parse title to extract chapter name and dua number
-                                                        // Titles follow pattern: "When waking up: Dua 1"
-                                                        val titleParts = dua.title.split(": Dua ")
-                                                        if (titleParts.size == 2) {
-                                                            val chapterTitle = titleParts[0].trim()
-                                                            val position = titleParts[1].trim().toIntOrNull() ?: 1
-                                                            val duaDb = DuaDatabase.getInstance(context)
-                                                            val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
-                                                            headerHadithRefs = refs.map { it.toHadithReference() }
-                                                        }
-                                                    } catch (e: Exception) {
-                                                        android.util.Log.e("DuaDetailScreen", "Error loading header hadith refs", e)
-                                                    }
-                                                }
+                                                            // Alpha variation
+                                                            alpha = 0.95f + (1f - kotlin.math.abs(centeredProgress)) * 0.05f
+                                                        },
+                                                    contentScale = ContentScale.Crop,
+                                                    alignment = Alignment.Center,
+                                                )
                                             }
 
-                                            Column(
-                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            // Info card below header
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 24.dp)
+                                                    .padding(top = 12.dp, bottom = 8.dp),
                                             ) {
-                                                // Dua title - cleaned and formatted
-                                                val duaTitle = dua.title
-                                                    .replace(Regex("Quranic Dua \\d+:\\s*"), "")
-                                                    .replace(Regex("Dua #\\d+:\\s*"), "")
-                                                    .replace(Regex("Dua \\d+:\\s*"), "")
-                                                    .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
-                                                    .replace(Regex("\\s*\\(\\d+/\\d+\\)\\s*$"), "")
-                                                    .trim()
-                                                    .let { title ->
-                                                        if (title.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
-                                                            "Dua"
-                                                        } else {
-                                                            title.ifEmpty { "Dua" }
-                                                        }
-                                                    }
-
-                                                // Group 1: Title + Arabic subtitle
-                                                Column(
-                                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = duaTitle,
-                                                        style = MaterialTheme.typography.headlineSmall,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        maxLines = 2,
-                                                        lineHeight = 28.sp
-                                                    )
-
-                                                    // Arabic subtitle using selected font
-                                                    if (dua.arabicText.isNotBlank()) {
-                                                        val arabicPreview = dua.arabicText.split("\n").firstOrNull()?.take(60) ?: ""
-                                                        if (arabicPreview.isNotBlank()) {
-                                                            Text(
-                                                                text = arabicPreview + if (arabicPreview.length >= 60) "..." else "",
-                                                                style = MaterialTheme.typography.bodyLarge,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                maxLines = 1,
-                                                                fontFamily = arabicFontFamily,
-                                                                fontSize = 16.sp
-                                                            )
+                                                // Load hadith references for header display
+                                                var headerHadithRefs by remember { mutableStateOf<List<HadithReference>>(emptyList()) }
+                                                LaunchedEffect(dua.title) {
+                                                    if (dua.surahNumber <= 0 || dua.ayahNumber <= 0) {
+                                                        // Only load for non-Quranic duas
+                                                        try {
+                                                            // Parse title to extract chapter name and dua number
+                                                            // Titles follow pattern: "When waking up: Dua 1"
+                                                            val titleParts = dua.title.split(": Dua ")
+                                                            if (titleParts.size == 2) {
+                                                                val chapterTitle = titleParts[0].trim()
+                                                                val position = titleParts[1].trim().toIntOrNull() ?: 1
+                                                                val duaDb = DuaDatabase.getInstance(context)
+                                                                val refs = duaDb.duaDao().getHadithReferencesByChapterAndPosition(chapterTitle, position)
+                                                                headerHadithRefs = refs.map { it.toHadithReference() }
+                                                            }
+                                                        } catch (e: Exception) {
+                                                            android.util.Log.e("DuaDetailScreen", "Error loading header hadith refs", e)
                                                         }
                                                     }
                                                 }
 
-                                                // Group 2: Hadith references (scrollable left) + Topic tag (fixed right)
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                Column(
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
                                                 ) {
-                                                    // Left side - Surah reference OR Hadith reference chips (scrollable, takes remaining space)
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .horizontalScroll(rememberScrollState())
-                                                    ) {
-                                                        if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                                                            // Quranic dua - show Surah reference
-                                                            var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
-                                                            LaunchedEffect(dua.surahNumber) {
-                                                                if (dua.surahName.isEmpty()) {
-                                                                    surahName = viewModel.getSurahName(dua.surahNumber)
-                                                                }
+                                                    // Dua title - cleaned and formatted
+                                                    val duaTitle = dua.title
+                                                        .replace(Regex("Quranic Dua \\d+:\\s*"), "")
+                                                        .replace(Regex("Dua #\\d+:\\s*"), "")
+                                                        .replace(Regex("Dua \\d+:\\s*"), "")
+                                                        .replace(Regex("\\s*\\(\\d+:\\d+\\)\\s*$"), "")
+                                                        .replace(Regex("\\s*\\(\\d+/\\d+\\)\\s*$"), "")
+                                                        .trim()
+                                                        .let { title ->
+                                                            if (title.any { it in '\u0600'..'\u06FF' || it in '\u0750'..'\u077F' }) {
+                                                                "Dua"
+                                                            } else {
+                                                                title.ifEmpty { "Dua" }
                                                             }
-                                                            NiaTopicTag(
-                                                                followed = true,
-                                                                onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
-                                                                text = {
-                                                                    Text(
-                                                                        text = "$surahName:${dua.ayahNumber.toLocalizedDigits(selectedTranslation)}"
-                                                                            .uppercase(Locale.getDefault()),
-                                                                    )
-                                                                }
-                                                            )
-                                                        } else if (headerHadithRefs.isNotEmpty()) {
-                                                            // Non-Quranic dua - show Hadith references
-                                                            headerHadithRefs.forEach { ref ->
-                                                                val refText = buildString {
-                                                                    append(ref.collectionName ?: "Hadith")
-                                                                    if (ref.hadithNumber != null) {
-                                                                        append(":${ref.hadithNumber}")
-                                                                    }
-                                                                }
-                                                                NiaTopicTag(
-                                                                    followed = false,
-                                                                    onClick = {
-                                                                        if (ref.databaseFile != null && ref.hadithNumber != null && onHadithClick != null) {
-                                                                            onHadithClick(
-                                                                                ref.collectionName ?: "Hadith",
-                                                                                ref.hadithNumber,
-                                                                                ref.databaseFile
-                                                                            )
-                                                                        }
-                                                                    },
-                                                                    text = {
-                                                                        Text(text = refText.uppercase(Locale.getDefault()))
-                                                                    }
+                                                        }
+
+                                                    // Group 1: Title + Arabic subtitle
+                                                    Column(
+                                                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                                                    ) {
+                                                        Text(
+                                                            text = duaTitle,
+                                                            style = MaterialTheme.typography.headlineSmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface,
+                                                            maxLines = 2,
+                                                            lineHeight = 28.sp,
+                                                        )
+
+                                                        // Arabic subtitle using selected font
+                                                        if (dua.arabicText.isNotBlank()) {
+                                                            val arabicPreview = dua.arabicText.split("\n").firstOrNull()?.take(60) ?: ""
+                                                            if (arabicPreview.isNotBlank()) {
+                                                                Text(
+                                                                    text = arabicPreview + if (arabicPreview.length >= 60) "..." else "",
+                                                                    style = MaterialTheme.typography.bodyLarge,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                    maxLines = 1,
+                                                                    fontFamily = arabicFontFamily,
+                                                                    fontSize = 16.sp,
                                                                 )
                                                             }
                                                         }
                                                     }
 
-                                                    // Right side - Topic tag (fixed, single line, never wraps)
-                                                    if (topics.isNotEmpty()) {
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        topics.take(1).forEach { topic -> // Show only first topic to ensure single line
-                                                            NiaTopicTag(
-                                                                followed = true,
-                                                                onClick = { onTopicClick(topic.id) },
-                                                                text = {
-                                                                    Text(
-                                                                        text = topic.name.uppercase(Locale.getDefault()),
-                                                                        maxLines = 1
-                                                                    )
-                                                                }
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                        // Spacer between header and content cards
-                        item {
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-
-                        // Reorderable content sections - each section is a separate item
-                        items(localSections, key = { "section_${it.name}" }) { section ->
-                            ReorderableItem(reorderableLazyListState, key = "section_${section.name}") { isDragging ->
-                                // Shared callback to save order when drag ends
-                                val onDragStopped: () -> Unit = {
-                                    if (wasReordered) {
-                                        saveDuaSectionOrder(context, localSections.toList())
-                                        wasReordered = false
-                                    }
-                                }
-
-                                when (section) {
-                                    DuaSection.CONTEXT -> {
-                                        CollapsibleDuaSection(
-                                            title = "Context",
-                                            accentColor = Color(0xFF4CAF50),
-                                            initiallyExpanded = true,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.context,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 15.sp,
-                                                    lineHeight = 24.sp
-                                                ),
-                                                color = Color(0xFF5D5D5D)
-                                            )
-                                        }
-                                    }
-                                    DuaSection.ARABIC -> {
-                                        CollapsibleDuaSection(
-                                            title = "Arabic (Original)",
-                                            accentColor = MaterialTheme.colorScheme.primary,
-                                            initiallyExpanded = true,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
-                                                viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
-                                            } else {
-                                                emptyList()
-                                            }
-
-                                            if (showTajweed && tajweedAnnotations.isNotEmpty()) {
-                                                val annotatedText = TajweedTextApplier.applyWithOverlap(
-                                                    text = dua.arabicText,
-                                                    annotations = tajweedAnnotations,
-                                                    defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                )
-                                                Text(
-                                                    text = annotatedText,
-                                                    style = duaArabicReadingStyle(
-                                                        fontFamily = arabicFontFamily,
-                                                        fontSize = 32f,
-                                                    ),
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = dua.arabicText,
-                                                    style = duaArabicReadingStyle(
-                                                        fontFamily = arabicFontFamily,
-                                                        fontSize = 32f,
-                                                    ),
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )
-                                            }
-                                        }
-                                    }
-                                    DuaSection.INSTRUCTION -> {
-                                        CollapsibleDuaSection(
-                                            title = "Instruction",
-                                            accentColor = Color(0xFFE91E63),
-                                            initiallyExpanded = true,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.instruction,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 15.sp,
-                                                    lineHeight = 24.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                ),
-                                                color = Color(0xFF5D5D5D)
-                                            )
-                                        }
-                                    }
-                                    DuaSection.TRANSLATION -> {
-                                        CollapsibleDuaSection(
-                                            title = "Translation ($translationDisplayName)",
-                                            accentColor = Color(0xFF9E9E9E),
-                                            initiallyExpanded = true,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.translation,
-                                                style = MaterialTheme.typography.bodyLarge.copy(
-                                                    fontSize = 17.sp,
-                                                    lineHeight = 28.sp,
-                                                    fontStyle = FontStyle.Italic
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                    DuaSection.TRANSLITERATION -> {
-                                        CollapsibleDuaSection(
-                                            title = "Transliteration",
-                                            accentColor = Color(0xFF9E9E9E),
-                                            initiallyExpanded = true,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.transliteration,
-                                                style = MaterialTheme.typography.bodyLarge.copy(
-                                                    fontSize = 17.sp,
-                                                    lineHeight = 28.sp,
-                                                    fontStyle = FontStyle.Italic
-                                                ),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                    DuaSection.EXPLANATION -> {
-                                        CollapsibleDuaSection(
-                                            title = "Explanation",
-                                            accentColor = Color(0xFF8BC34A),
-                                            initiallyExpanded = false,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.explanation,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 15.sp,
-                                                    lineHeight = 24.sp
-                                                ),
-                                                color = Color(0xFF5D5D5D)
-                                            )
-                                        }
-                                    }
-                                    DuaSection.NOTE -> {
-                                        CollapsibleDuaSection(
-                                            title = "Note",
-                                            accentColor = Color(0xFFFF9800),
-                                            initiallyExpanded = false,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.note,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 14.sp,
-                                                    lineHeight = 22.sp,
-                                                    fontStyle = FontStyle.Italic
-                                                ),
-                                                color = Color(0xFF5D5D5D)
-                                            )
-                                        }
-                                    }
-                                    DuaSection.POST_CONTEXT -> {
-                                        CollapsibleDuaSection(
-                                            title = "Additional Context",
-                                            accentColor = Color(0xFF2196F3),
-                                            initiallyExpanded = false,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Text(
-                                                text = dua.postContext,
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontSize = 15.sp,
-                                                    lineHeight = 24.sp
-                                                ),
-                                                color = Color(0xFF5D5D5D)
-                                            )
-                                        }
-                                    }
-                                    DuaSection.REFERENCE -> {
-                                        CollapsibleDuaSection(
-                                            title = "Reference",
-                                            accentColor = Color(0xFF9C27B0),
-                                            initiallyExpanded = false,
-                                            showDragHandle = true,
-                                            isDragging = isDragging,
-                                            dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
-                                            modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped)
-                                        ) {
-                                            Column {
-                                                if (dua.reference.isNotEmpty()) {
-                                                    Text(
-                                                        text = dua.reference,
-                                                        style = MaterialTheme.typography.bodySmall.copy(
-                                                            fontSize = 13.sp,
-                                                            lineHeight = 20.sp
-                                                        ),
-                                                        color = Color(0xFF757575)
-                                                    )
-                                                }
-
-                                                if (hadithReferences.isNotEmpty() && onHadithClick != null) {
-                                                    Spacer(modifier = Modifier.height(12.dp))
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .horizontalScroll(rememberScrollState()),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        hadithReferences.forEach { ref ->
-                                                            val refText = buildString {
-                                                                append(ref.collectionName ?: "Hadith")
-                                                                if (ref.hadithNumber != null) {
-                                                                    append(":${ref.hadithNumber}")
-                                                                }
-                                                            }
-                                                            NiaTopicTag(
-                                                                followed = false,
-                                                                onClick = {
-                                                                    if (ref.databaseFile != null && ref.hadithNumber != null) {
-                                                                        onHadithClick(
-                                                                            ref.collectionName ?: "Hadith",
-                                                                            ref.hadithNumber,
-                                                                            ref.databaseFile
-                                                                        )
-                                                                    }
-                                                                },
-                                                                text = {
-                                                                    Text(text = refText.uppercase(Locale.getDefault()))
-                                                                }
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                if (topics.isNotEmpty()) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    // Group 2: Hadith references (scrollable left) + Topic tag (fixed right)
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        verticalAlignment = Alignment.CenterVertically,
                                                     ) {
-                                                        topics.take(2).forEach { topic ->
-                                                            NiaTopicTag(
-                                                                followed = true,
-                                                                onClick = { onTopicClick(topic.id) },
-                                                                text = {
-                                                                    Text(
-                                                                        text = topic.name.uppercase(Locale.getDefault()),
-                                                                        maxLines = 1
+                                                        // Left side - Surah reference OR Hadith reference chips (scrollable, takes remaining space)
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            modifier = Modifier
+                                                                .weight(1f)
+                                                                .horizontalScroll(rememberScrollState()),
+                                                        ) {
+                                                            if (dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                                                // Quranic dua - show Surah reference
+                                                                var surahName by remember { mutableStateOf(dua.surahName.ifEmpty { "Surah ${dua.surahNumber}" }) }
+                                                                LaunchedEffect(dua.surahNumber) {
+                                                                    if (dua.surahName.isEmpty()) {
+                                                                        surahName = viewModel.getSurahName(dua.surahNumber)
+                                                                    }
+                                                                }
+                                                                NiaTopicTag(
+                                                                    followed = true,
+                                                                    onClick = { onNavigateToSurah?.invoke(dua.surahNumber, dua.ayahNumber) },
+                                                                    text = {
+                                                                        Text(
+                                                                            text = "$surahName:${dua.ayahNumber.toLocalizedDigits(selectedTranslation)}"
+                                                                                .uppercase(Locale.getDefault()),
+                                                                        )
+                                                                    },
+                                                                )
+                                                            } else if (headerHadithRefs.isNotEmpty()) {
+                                                                // Non-Quranic dua - show Hadith references
+                                                                headerHadithRefs.forEach { ref ->
+                                                                    val refText = buildString {
+                                                                        append(ref.collectionName ?: "Hadith")
+                                                                        if (ref.hadithNumber != null) {
+                                                                            append(":${ref.hadithNumber}")
+                                                                        }
+                                                                    }
+                                                                    NiaTopicTag(
+                                                                        followed = false,
+                                                                        onClick = {
+                                                                            if (ref.databaseFile != null && ref.hadithNumber != null && onHadithClick != null) {
+                                                                                onHadithClick(
+                                                                                    ref.collectionName ?: "Hadith",
+                                                                                    ref.hadithNumber,
+                                                                                    ref.databaseFile,
+                                                                                )
+                                                                            }
+                                                                        },
+                                                                        text = {
+                                                                            Text(text = refText.uppercase(Locale.getDefault()))
+                                                                        },
                                                                     )
                                                                 }
-                                                            )
+                                                            }
+                                                        }
+
+                                                        // Right side - Topic tag (fixed, single line, never wraps)
+                                                        if (topics.isNotEmpty()) {
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            topics.take(1).forEach { topic -> // Show only first topic to ensure single line
+                                                                NiaTopicTag(
+                                                                    followed = true,
+                                                                    onClick = { onTopicClick(topic.id) },
+                                                                    text = {
+                                                                        Text(
+                                                                            text = topic.name.uppercase(Locale.getDefault()),
+                                                                            maxLines = 1,
+                                                                        )
+                                                                    },
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1978,179 +1673,469 @@ fun DuaDetailScreen(
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                        // Bottom spacing
-                        item {
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
-
-
-                        // Floating play button at the banner/content boundary — same
-                        // affordance as the Surah and Hadith detail pages. Rides up
-                        // with the parallax header and hides once the header scrolls
-                        // away. Uses this PAGE's dua audio (per-dua clip, falling back
-                        // to the whole-chapter recitation).
-                        var pageAudioUrl by remember(dua.title) { mutableStateOf<String?>(null) }
-                        LaunchedEffect(dua.title) {
-                            val chTitle = if (dua.title.contains(": Dua ")) {
-                                dua.title.substringBeforeLast(": Dua ").trim()
-                            } else {
-                                dua.title.substringBefore(":").trim()
-                            }
-                            val position = dua.title.substringAfterLast(": Dua ", "").trim().toIntOrNull()
-                            pageAudioUrl = withContext(Dispatchers.IO) {
-                                runCatching {
-                                    val dao = DuaDatabase.getInstance(context).duaDao()
-                                    val perDua = if (position != null) {
-                                        dao.getDuaAudioByTitleAndPosition(chTitle, position)
-                                    } else {
-                                        null
-                                    }
-                                    perDua ?: dao.getChapterAudioByTitle(chTitle)
-                                }.getOrNull()
-                            }
-                        }
-                        pageAudioUrl?.let { audioUrl ->
-                            // Anchor to the REAL banner-image height: the header is
-                            // aspectRatio(4:3) in portrait (width * 3/4) and 160dp in
-                            // landscape — see the parallax header item above. The FAB
-                            // stays PINNED at the boundary (like Surah/Hadith) and
-                            // show/hide follows scroll direction with a gentle
-                            // scale+fade, matching the Surah page exactly.
-                            val headerHeight = if (isLandscape) {
-                                160.dp
-                            } else {
-                                configuration.screenWidthDp.dp * 3f / 4f
-                            }
-                            var fabVisible by remember { mutableStateOf(true) }
-                            var prevIndex by remember { mutableStateOf(0) }
-                            var prevOffset by remember { mutableStateOf(0) }
-                            LaunchedEffect(
-                                lazyListState.firstVisibleItemIndex,
-                                lazyListState.firstVisibleItemScrollOffset,
-                            ) {
-                                val index = lazyListState.firstVisibleItemIndex
-                                val offset = lazyListState.firstVisibleItemScrollOffset
-                                val delta = (index * 1000 + offset) - (prevIndex * 1000 + prevOffset)
-                                if (kotlin.math.abs(delta) > 10) {
-                                    fabVisible = when {
-                                        // At the very top: always show.
-                                        index == 0 && offset < 100 -> true
-                                        // Header fully scrolled off: keep hidden (the FAB
-                                        // rides off with the banner; don't flash it back in
-                                        // on an upward flick deep in the list).
-                                        index > 0 -> false
-                                        // Within the header: scrolling up shows, down hides.
-                                        else -> delta < 0
-                                    }
-                                    prevIndex = index
-                                    prevOffset = offset
+                                // Spacer between header and content cards
+                                item {
+                                    Spacer(modifier = Modifier.height(6.dp))
                                 }
-                            }
-                            AnimatedVisibility(
-                                visible = fabVisible,
-                                enter = scaleIn(
-                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                                exit = scaleOut(
-                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                ) + fadeOut(animationSpec = tween(durationMillis = 300)),
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    // Ride up 1:1 with the scroll like the Surah page's FAB
-                                    // (which lives inside the scrolling content): stay pinned
-                                    // to the banner's bottom edge and track how far the header
-                                    // (item 0) has scrolled up, so it moves with the page and
-                                    // then scrolls away — instead of just vanishing in place.
-                                    // Read in the layout phase (offset lambda) so scrolling
-                                    // never triggers recomposition.
-                                    .offset {
-                                        val scrolled = if (lazyListState.firstVisibleItemIndex == 0) {
-                                            lazyListState.firstVisibleItemScrollOffset
-                                        } else {
-                                            // Header fully scrolled off — carry the FAB off
-                                            // the top edge with it.
-                                            headerHeight.toPx().toInt()
+
+                                // Reorderable content sections - each section is a separate item
+                                items(localSections, key = { "section_${it.name}" }) { section ->
+                                    ReorderableItem(reorderableLazyListState, key = "section_${section.name}") { isDragging ->
+                                        // Shared callback to save order when drag ends
+                                        val onDragStopped: () -> Unit = {
+                                            if (wasReordered) {
+                                                saveDuaSectionOrder(context, localSections.toList())
+                                                wasReordered = false
+                                            }
                                         }
-                                        IntOffset(
-                                            x = (-12).dp.toPx().roundToInt(),
-                                            y = (headerHeight.toPx() - 28.dp.toPx() - scrolled).roundToInt(),
-                                        )
-                                    },
-                            ) {
-                                val isThisPlaying = ChapterAudioController.currentUrl == audioUrl &&
-                                    ChapterAudioController.isPlaying
-                                val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
-                                FloatingActionButton(
-                                    onClick = {
-                                        ChapterAudioController.currentTitle = dua.title
-                                        // Feed the media bar's subtitle the Interests topic
-                                        // this dua belongs to (first chip on the page).
-                                        ChapterAudioController.currentTopic = topics.firstOrNull()?.name
-                                        ChapterAudioController.toggle(audioUrl)
-                                    },
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+
+                                        when (section) {
+                                            DuaSection.CONTEXT -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Context",
+                                                    accentColor = Color(0xFF4CAF50),
+                                                    initiallyExpanded = true,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.context,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = 15.sp,
+                                                            lineHeight = 24.sp,
+                                                        ),
+                                                        color = Color(0xFF5D5D5D),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.ARABIC -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Arabic (Original)",
+                                                    accentColor = MaterialTheme.colorScheme.primary,
+                                                    initiallyExpanded = true,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    val tajweedAnnotations = if (showTajweed && dua.surahNumber > 0 && dua.ayahNumber > 0) {
+                                                        viewModel.getTajweedAnnotations(dua.surahNumber, dua.ayahNumber)
+                                                    } else {
+                                                        emptyList()
+                                                    }
+
+                                                    if (showTajweed && tajweedAnnotations.isNotEmpty()) {
+                                                        val annotatedText = TajweedTextApplier.applyWithOverlap(
+                                                            text = dua.arabicText,
+                                                            annotations = tajweedAnnotations,
+                                                            defaultStyle = androidx.compose.ui.text.SpanStyle(
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                            ),
+                                                        )
+                                                        Text(
+                                                            text = annotatedText,
+                                                            style = duaArabicReadingStyle(
+                                                                fontFamily = arabicFontFamily,
+                                                                fontSize = 32f,
+                                                            ),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = dua.arabicText,
+                                                            style = duaArabicReadingStyle(
+                                                                fontFamily = arabicFontFamily,
+                                                                fontSize = 32f,
+                                                            ),
+                                                            color = MaterialTheme.colorScheme.onSurface,
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            DuaSection.INSTRUCTION -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Instruction",
+                                                    accentColor = Color(0xFFE91E63),
+                                                    initiallyExpanded = true,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.instruction,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = 15.sp,
+                                                            lineHeight = 24.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                        ),
+                                                        color = Color(0xFF5D5D5D),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.TRANSLATION -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Translation ($translationDisplayName)",
+                                                    accentColor = Color(0xFF9E9E9E),
+                                                    initiallyExpanded = true,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.translation,
+                                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                                            fontSize = 17.sp,
+                                                            lineHeight = 28.sp,
+                                                            fontStyle = FontStyle.Italic,
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.TRANSLITERATION -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Transliteration",
+                                                    accentColor = Color(0xFF9E9E9E),
+                                                    initiallyExpanded = true,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.transliteration,
+                                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                                            fontSize = 17.sp,
+                                                            lineHeight = 28.sp,
+                                                            fontStyle = FontStyle.Italic,
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.EXPLANATION -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Explanation",
+                                                    accentColor = Color(0xFF8BC34A),
+                                                    initiallyExpanded = false,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.explanation,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = 15.sp,
+                                                            lineHeight = 24.sp,
+                                                        ),
+                                                        color = Color(0xFF5D5D5D),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.NOTE -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Note",
+                                                    accentColor = Color(0xFFFF9800),
+                                                    initiallyExpanded = false,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.note,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = 14.sp,
+                                                            lineHeight = 22.sp,
+                                                            fontStyle = FontStyle.Italic,
+                                                        ),
+                                                        color = Color(0xFF5D5D5D),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.POST_CONTEXT -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Additional Context",
+                                                    accentColor = Color(0xFF2196F3),
+                                                    initiallyExpanded = false,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Text(
+                                                        text = dua.postContext,
+                                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                                            fontSize = 15.sp,
+                                                            lineHeight = 24.sp,
+                                                        ),
+                                                        color = Color(0xFF5D5D5D),
+                                                    )
+                                                }
+                                            }
+                                            DuaSection.REFERENCE -> {
+                                                CollapsibleDuaSection(
+                                                    title = "Reference",
+                                                    accentColor = Color(0xFF9C27B0),
+                                                    initiallyExpanded = false,
+                                                    showDragHandle = true,
+                                                    isDragging = isDragging,
+                                                    dragHandleModifier = Modifier.draggableHandle(onDragStopped = onDragStopped),
+                                                    modifier = Modifier.longPressDraggableHandle(onDragStopped = onDragStopped),
+                                                ) {
+                                                    Column {
+                                                        if (dua.reference.isNotEmpty()) {
+                                                            Text(
+                                                                text = dua.reference,
+                                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                                    fontSize = 13.sp,
+                                                                    lineHeight = 20.sp,
+                                                                ),
+                                                                color = Color(0xFF757575),
+                                                            )
+                                                        }
+
+                                                        if (hadithReferences.isNotEmpty() && onHadithClick != null) {
+                                                            Spacer(modifier = Modifier.height(12.dp))
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .horizontalScroll(rememberScrollState()),
+                                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            ) {
+                                                                hadithReferences.forEach { ref ->
+                                                                    val refText = buildString {
+                                                                        append(ref.collectionName ?: "Hadith")
+                                                                        if (ref.hadithNumber != null) {
+                                                                            append(":${ref.hadithNumber}")
+                                                                        }
+                                                                    }
+                                                                    NiaTopicTag(
+                                                                        followed = false,
+                                                                        onClick = {
+                                                                            if (ref.databaseFile != null && ref.hadithNumber != null) {
+                                                                                onHadithClick(
+                                                                                    ref.collectionName ?: "Hadith",
+                                                                                    ref.hadithNumber,
+                                                                                    ref.databaseFile,
+                                                                                )
+                                                                            }
+                                                                        },
+                                                                        text = {
+                                                                            Text(text = refText.uppercase(Locale.getDefault()))
+                                                                        },
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (topics.isNotEmpty()) {
+                                                            Spacer(modifier = Modifier.height(8.dp))
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                            ) {
+                                                                topics.take(2).forEach { topic ->
+                                                                    NiaTopicTag(
+                                                                        followed = true,
+                                                                        onClick = { onTopicClick(topic.id) },
+                                                                        text = {
+                                                                            Text(
+                                                                                text = topic.name.uppercase(Locale.getDefault()),
+                                                                                maxLines = 1,
+                                                                            )
+                                                                        },
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Bottom spacing
+                                item {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
+
+                            // Floating play button at the banner/content boundary — same
+                            // affordance as the Surah and Hadith detail pages. Rides up
+                            // with the parallax header and hides once the header scrolls
+                            // away. Uses this PAGE's dua audio (per-dua clip, falling back
+                            // to the whole-chapter recitation).
+                            var pageAudioUrl by remember(dua.title) { mutableStateOf<String?>(null) }
+                            LaunchedEffect(dua.title) {
+                                val chTitle = if (dua.title.contains(": Dua ")) {
+                                    dua.title.substringBeforeLast(": Dua ").trim()
+                                } else {
+                                    dua.title.substringBefore(":").trim()
+                                }
+                                val position = dua.title.substringAfterLast(": Dua ", "").trim().toIntOrNull()
+                                pageAudioUrl = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        val dao = DuaDatabase.getInstance(context).duaDao()
+                                        val perDua = if (position != null) {
+                                            dao.getDuaAudioByTitleAndPosition(chTitle, position)
+                                        } else {
+                                            null
+                                        }
+                                        perDua ?: dao.getChapterAudioByTitle(chTitle)
+                                    }.getOrNull()
+                                }
+                            }
+                            pageAudioUrl?.let { audioUrl ->
+                                // Anchor to the REAL banner-image height: the header is
+                                // aspectRatio(4:3) in portrait (width * 3/4) and 160dp in
+                                // landscape — see the parallax header item above. The FAB
+                                // stays PINNED at the boundary (like Surah/Hadith) and
+                                // show/hide follows scroll direction with a gentle
+                                // scale+fade, matching the Surah page exactly.
+                                val headerHeight = if (isLandscape) {
+                                    160.dp
+                                } else {
+                                    configuration.screenWidthDp.dp * 3f / 4f
+                                }
+                                var fabVisible by remember { mutableStateOf(true) }
+                                var prevIndex by remember { mutableStateOf(0) }
+                                var prevOffset by remember { mutableStateOf(0) }
+                                LaunchedEffect(
+                                    lazyListState.firstVisibleItemIndex,
+                                    lazyListState.firstVisibleItemScrollOffset,
                                 ) {
-                                    if (isThisLoading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = if (isThisPlaying) "Pause recitation" else "Play recitation",
-                                        )
+                                    val index = lazyListState.firstVisibleItemIndex
+                                    val offset = lazyListState.firstVisibleItemScrollOffset
+                                    val delta = (index * 1000 + offset) - (prevIndex * 1000 + prevOffset)
+                                    if (kotlin.math.abs(delta) > 10) {
+                                        fabVisible = when {
+                                            // At the very top: always show.
+                                            index == 0 && offset < 100 -> true
+                                            // Header fully scrolled off: keep hidden (the FAB
+                                            // rides off with the banner; don't flash it back in
+                                            // on an upward flick deep in the list).
+                                            index > 0 -> false
+                                            // Within the header: scrolling up shows, down hides.
+                                            else -> delta < 0
+                                        }
+                                        prevIndex = index
+                                        prevOffset = offset
+                                    }
+                                }
+                                AnimatedVisibility(
+                                    visible = fabVisible,
+                                    enter = scaleIn(
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                    ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                                    exit = scaleOut(
+                                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        // Ride up 1:1 with the scroll like the Surah page's FAB
+                                        // (which lives inside the scrolling content): stay pinned
+                                        // to the banner's bottom edge and track how far the header
+                                        // (item 0) has scrolled up, so it moves with the page and
+                                        // then scrolls away — instead of just vanishing in place.
+                                        // Read in the layout phase (offset lambda) so scrolling
+                                        // never triggers recomposition.
+                                        .offset {
+                                            val scrolled = if (lazyListState.firstVisibleItemIndex == 0) {
+                                                lazyListState.firstVisibleItemScrollOffset
+                                            } else {
+                                                // Header fully scrolled off — carry the FAB off
+                                                // the top edge with it.
+                                                headerHeight.toPx().toInt()
+                                            }
+                                            IntOffset(
+                                                x = (-12).dp.toPx().roundToInt(),
+                                                y = (headerHeight.toPx() - 28.dp.toPx() - scrolled).roundToInt(),
+                                            )
+                                        },
+                                ) {
+                                    val isThisPlaying = ChapterAudioController.currentUrl == audioUrl &&
+                                        ChapterAudioController.isPlaying
+                                    val isThisLoading = ChapterAudioController.loadingUrl == audioUrl
+                                    FloatingActionButton(
+                                        onClick = {
+                                            ChapterAudioController.currentTitle = dua.title
+                                            // Feed the media bar's subtitle the Interests topic
+                                            // this dua belongs to (first chip on the page).
+                                            ChapterAudioController.currentTopic = topics.firstOrNull()?.name
+                                            ChapterAudioController.toggle(audioUrl)
+                                        },
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    ) {
+                                        if (isThisLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = if (isThisPlaying) "Pause recitation" else "Play recitation",
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                // Edge indicators using custom swipe state
-                val touchYDp = with(density) { touchY.toDp() }
-                val baseHeight = 72f
-                val targetSize = 46f
-                val indicatorHeight = (baseHeight - (baseHeight - targetSize) * duaAnimatedProgress).dp
-                val verticalOffset = touchYDp - (indicatorHeight / 2)
+                    // Edge indicators using custom swipe state
+                    val touchYDp = with(density) { touchY.toDp() }
+                    val baseHeight = 72f
+                    val targetSize = 46f
+                    val indicatorHeight = (baseHeight - (baseHeight - targetSize) * duaAnimatedProgress).dp
+                    val verticalOffset = touchYDp - (indicatorHeight / 2)
 
-                val thresholdReachedLeft = swipeProgress >= 1f && showLeftIndicator
-                val thresholdReachedRight = swipeProgress >= 1f && showRightIndicator
-                val detachOffset = 8.dp
+                    val thresholdReachedLeft = swipeProgress >= 1f && showLeftIndicator
+                    val thresholdReachedRight = swipeProgress >= 1f && showRightIndicator
+                    val detachOffset = 8.dp
 
-                if (duaAnimatedProgress > 0.01f && showLeftIndicator) {
-                    DuaSwipeArrowIndicator(
-                        progress = duaAnimatedProgress,
-                        thresholdReached = thresholdReachedLeft,
-                        isLeftEdge = true,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(
-                                x = if (thresholdReachedLeft) detachOffset else 0.dp,
-                                y = verticalOffset
-                            ),
-                    )
-                }
+                    if (duaAnimatedProgress > 0.01f && showLeftIndicator) {
+                        DuaSwipeArrowIndicator(
+                            progress = duaAnimatedProgress,
+                            thresholdReached = thresholdReachedLeft,
+                            isLeftEdge = true,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .offset(
+                                    x = if (thresholdReachedLeft) detachOffset else 0.dp,
+                                    y = verticalOffset,
+                                ),
+                        )
+                    }
 
-                if (duaAnimatedProgress > 0.01f && showRightIndicator) {
-                    DuaSwipeArrowIndicator(
-                        progress = duaAnimatedProgress,
-                        thresholdReached = thresholdReachedRight,
-                        isLeftEdge = false,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(
-                                x = if (thresholdReachedRight) -detachOffset else 0.dp,
-                                y = verticalOffset
-                            ),
-                    )
-                }
+                    if (duaAnimatedProgress > 0.01f && showRightIndicator) {
+                        DuaSwipeArrowIndicator(
+                            progress = duaAnimatedProgress,
+                            thresholdReached = thresholdReachedRight,
+                            isLeftEdge = false,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(
+                                    x = if (thresholdReachedRight) -detachOffset else 0.dp,
+                                    y = verticalOffset,
+                                ),
+                        )
+                    }
                 } // end wrapping Box
             } else {
                 // Fallback to single dua from navigation params
@@ -2160,7 +2145,7 @@ fun DuaDetailScreen(
                 SingleDuaContent(
                     parsedContent = parsedContent,
                     arabicFontFamily = arabicFontFamily,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
@@ -2217,8 +2202,12 @@ fun DuaDetailScreen(
                     if (pageBefore >= 0 && pageAfter >= 0) {
                         // Hidden pages are between pageBefore and pageAfter (exclusive)
                         ((pageBefore + 1) until pageAfter).toList()
-                    } else emptyList()
-                } else emptyList()
+                    } else {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
             }
 
             val rightEllipsisRange = remember(currentPage, totalDuas, pageNumbers) {
@@ -2231,8 +2220,12 @@ fun DuaDetailScreen(
                     if (pageBefore >= 0 && pageAfter >= 0) {
                         // Hidden pages are between pageBefore and pageAfter (exclusive)
                         ((pageBefore + 1) until pageAfter).toList()
-                    } else emptyList()
-                } else emptyList()
+                    } else {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
             }
 
             // Vuesax Circle Pagination - Clean circular buttons with inline grid expansion
@@ -2240,7 +2233,7 @@ fun DuaDetailScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 12.dp), // Equal 12dp gap above and below pagination
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // Expanded grid view for hidden pages (appears above pagination bar)
                 val activeHiddenPages = when (expandedEllipsis) {
@@ -2252,7 +2245,7 @@ fun DuaDetailScreen(
                 AnimatedVisibility(
                     visible = expandedEllipsis != 0 && activeHiddenPages.isNotEmpty(),
                     enter = expandVertically(expandFrom = Alignment.Bottom, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
                 ) {
                     Surface(
                         modifier = Modifier
@@ -2261,22 +2254,22 @@ fun DuaDetailScreen(
                                 elevation = 8.dp,
                                 shape = RoundedCornerShape(16.dp),
                                 ambientColor = Color.Black.copy(alpha = 0.1f),
-                                spotColor = Color.Black.copy(alpha = 0.15f)
+                                spotColor = Color.Black.copy(alpha = 0.15f),
                             ),
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 2.dp
+                        tonalElevation = 2.dp,
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             // Split pages into rows of 4
                             activeHiddenPages.chunked(4).forEach { rowPages ->
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     rowPages.forEach { page ->
                                         val isActive = page == currentPage
@@ -2289,16 +2282,22 @@ fun DuaDetailScreen(
                                             },
                                             modifier = Modifier.size(36.dp),
                                             shape = RoundedCornerShape(50),
-                                            color = if (isActive) MaterialTheme.colorScheme.primary
-                                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                                            color = if (isActive) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceContainerHigh
+                                            },
                                         ) {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                                 Text(
                                                     text = (page + 1).toLocalizedDigits(selectedTranslation),
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (isActive) MaterialTheme.colorScheme.onPrimary
-                                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = if (isActive) {
+                                                        MaterialTheme.colorScheme.onPrimary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
                                                 )
                                             }
                                         }
@@ -2316,16 +2315,16 @@ fun DuaDetailScreen(
                             elevation = 16.dp,
                             shape = RoundedCornerShape(50),
                             ambientColor = Color.Black.copy(alpha = 0.1f),
-                            spotColor = Color.Black.copy(alpha = 0.15f)
+                            spotColor = Color.Black.copy(alpha = 0.15f),
                         ),
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 2.dp
+                    tonalElevation = 2.dp,
                 ) {
                     Row(
                         modifier = Modifier.padding(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Previous arrow - circular
                         Surface(
@@ -2338,16 +2337,22 @@ fun DuaDetailScreen(
                             },
                             modifier = Modifier.size(36.dp),
                             shape = RoundedCornerShape(50),
-                            color = if (hasPrevious) MaterialTheme.colorScheme.primaryContainer
-                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                            color = if (hasPrevious) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = Icons.Default.ChevronLeft,
                                     contentDescription = "Previous",
-                                    tint = if (hasPrevious) MaterialTheme.colorScheme.onPrimaryContainer
-                                          else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(20.dp)
+                                    tint = if (hasPrevious) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    },
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
@@ -2365,15 +2370,21 @@ fun DuaDetailScreen(
                                     },
                                     modifier = Modifier.size(36.dp),
                                     shape = RoundedCornerShape(50),
-                                    color = if (isExpanded) MaterialTheme.colorScheme.primaryContainer
-                                           else MaterialTheme.colorScheme.surfaceContainerHigh
+                                    color = if (isExpanded) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
+                                    },
                                 ) {
                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                         Text(
                                             text = "•••",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (isExpanded) MaterialTheme.colorScheme.onPrimaryContainer
-                                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            color = if (isExpanded) {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            },
                                         )
                                     }
                                 }
@@ -2383,7 +2394,7 @@ fun DuaDetailScreen(
                                 val scale by animateFloatAsState(
                                     targetValue = if (isActive) 1.15f else 1f,
                                     animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-                                    label = "scale"
+                                    label = "scale",
                                 )
                                 Surface(
                                     onClick = {
@@ -2398,24 +2409,34 @@ fun DuaDetailScreen(
                                             scaleY = scale
                                         }
                                         .then(
-                                            if (isActive) Modifier.shadow(
-                                                elevation = 6.dp,
-                                                shape = RoundedCornerShape(50),
-                                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                            ) else Modifier
+                                            if (isActive) {
+                                                Modifier.shadow(
+                                                    elevation = 6.dp,
+                                                    shape = RoundedCornerShape(50),
+                                                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                                )
+                                            } else {
+                                                Modifier
+                                            },
                                         ),
                                     shape = RoundedCornerShape(50),
-                                    color = if (isActive) MaterialTheme.colorScheme.primary
-                                           else MaterialTheme.colorScheme.surfaceContainerHigh
+                                    color = if (isActive) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
+                                    },
                                 ) {
                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                         Text(
                                             text = (pageIndex + 1).toLocalizedDigits(selectedTranslation),
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isActive) MaterialTheme.colorScheme.onPrimary
-                                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (isActive) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
                                         )
                                     }
                                 }
@@ -2433,16 +2454,22 @@ fun DuaDetailScreen(
                             },
                             modifier = Modifier.size(36.dp),
                             shape = RoundedCornerShape(50),
-                            color = if (hasNext) MaterialTheme.colorScheme.primaryContainer
-                                   else MaterialTheme.colorScheme.surfaceContainerHigh
+                            color = if (hasNext) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = "Next",
-                                    tint = if (hasNext) MaterialTheme.colorScheme.onPrimaryContainer
-                                          else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(20.dp)
+                                    tint = if (hasNext) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    },
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
@@ -2492,296 +2519,310 @@ fun DuaDetailScreen(
                                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 3.dp),
                                 )
 
-                        // Live preview — the actual dua text, directly on the sheet.
-                        Text(
-                            text = duasList.getOrNull(currentPage)?.arabicText
-                                ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-                            fontFamily = arabicFontFamily,
-                            fontSize = arabicFontSize.sp,
-                            lineHeight = (arabicFontSize * 1.7f).sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 14.dp),
-                        )
+                                // Live preview — the actual dua text, directly on the sheet.
+                                Text(
+                                    text = duasList.getOrNull(currentPage)?.arabicText
+                                        ?: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                                    fontFamily = arabicFontFamily,
+                                    fontSize = arabicFontSize.sp,
+                                    lineHeight = (arabicFontSize * 1.7f).sp,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                                )
 
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 20.dp)
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        )
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 20.dp)
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                )
 
-                        // Text size — small A, slider, big A (Play Books style).
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            Text(
-                                text = "A",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Slider(
-                                value = arabicFontSize,
-                                onValueChange = { newValue ->
-                                    val stepped = newValue.toInt()
-                                    if (stepped != arabicFontSize.toInt()) {
-                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    }
-                                    arabicFontSize = newValue.coerceIn(minFontSize, maxFontSize)
-                                },
-                                valueRange = minFontSize..maxFontSize,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = "A",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 20.dp, vertical = 6.dp)
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        )
-
-                        // Tajweed — plain label + switch row.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { viewModel.toggleTajweed() }
-                                .padding(horizontal = 20.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Tajweed",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = showTajweed,
-                                onCheckedChange = { viewModel.toggleTajweed() },
-                            )
-                        }
-
-                        // TTS narration — opens the same model/speaker picker used by
-                        // Hadith details while keeping the reading controls in this sheet.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    showFloatingToolbar = false
-                                    showVoiceSheet = true
-                                }
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Narration voice",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = "${selectedVoice.displayName} · $selectedSpeakerId",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .size(12.dp),
-                            )
-                        }
-
-                        // Arabic font — value + chevron row.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { expandedSection = if (expandedSection == "font") null else "font" }
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Arabic font",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = when (selectedFont) {
-                                    "pdms_saleem" -> "Saleem"
-                                    "noor_e_hidayat" -> "Noor"
-                                    "thabit" -> "Thabit"
-                                    "uthmani_script" -> "Uthmani"
-                                    "indopak_script" -> "IndoPak"
-                                    else -> selectedFont.replaceFirstChar { it.uppercase() }
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .size(12.dp),
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = expandedSection == "font",
-                            enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
-                            exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
-                        ) {
-                            Column {
-                                availableFonts.forEach { font ->
-                                    val fontSelected = selectedFont == font
-                                    // Selected row gets a soft tinted pill — no radio circles.
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 2.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (fontSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable {
-                                                viewModel.changeArabicFont(font)
-                                                expandedSection = null
+                                // Text size — small A, slider, big A (Play Books style).
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                ) {
+                                    Text(
+                                        text = "A",
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Slider(
+                                        value = arabicFontSize,
+                                        onValueChange = { newValue ->
+                                            val stepped = newValue.toInt()
+                                            if (stepped != arabicFontSize.toInt()) {
+                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             }
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = when (font) {
-                                                "pdms_saleem" -> "Saleem"
-                                                "noor_e_hidayat" -> "Noor"
-                                                "thabit" -> "Thabit"
-                                                "uthmani_script" -> "Uthmani"
-                                                "indopak_script" -> "IndoPak"
-                                                else -> font.replaceFirstChar { it.uppercase() }
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (fontSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        // Live sample so the reader can see the script style.
-                                        Text(
-                                            text = "بِسْمِ اللَّهِ",
-                                            fontFamily = getArabicFontFamilyForDua(font),
-                                            fontSize = 18.sp,
-                                            maxLines = 1,
-                                            color = if (fontSelected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                            arabicFontSize = newValue.coerceIn(minFontSize, maxFontSize)
+                                        },
+                                        valueRange = minFontSize..maxFontSize,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = "A",
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 20.dp, vertical = 6.dp)
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                )
+
+                                // Tajweed — plain label + switch row.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.toggleTajweed() }
+                                        .padding(horizontal = 20.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "Tajweed",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Switch(
+                                        checked = showTajweed,
+                                        onCheckedChange = { viewModel.toggleTajweed() },
+                                    )
+                                }
+
+                                // TTS narration — opens the same model/speaker picker used by
+                                // Hadith details while keeping the reading controls in this sheet.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showFloatingToolbar = false
+                                            showVoiceSheet = true
+                                        }
+                                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "Narration voice",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = "${selectedVoice.displayName} · $selectedSpeakerId",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .padding(start = 8.dp)
+                                            .size(12.dp),
+                                    )
+                                }
+
+                                // Arabic font — value + chevron row.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expandedSection = if (expandedSection == "font") null else "font" }
+                                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "Arabic font",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = when (selectedFont) {
+                                            "pdms_saleem" -> "Saleem"
+                                            "noor_e_hidayat" -> "Noor"
+                                            "thabit" -> "Thabit"
+                                            "uthmani_script" -> "Uthmani"
+                                            "indopak_script" -> "IndoPak"
+                                            else -> selectedFont.replaceFirstChar { it.uppercase() }
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .padding(start = 8.dp)
+                                            .size(12.dp),
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = expandedSection == "font",
+                                    enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                                    exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
+                                ) {
+                                    Column {
+                                        availableFonts.forEach { font ->
+                                            val fontSelected = selectedFont == font
+                                            // Selected row gets a soft tinted pill — no radio circles.
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 2.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(
+                                                        if (fontSelected) {
+                                                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                                        } else {
+                                                            Color.Transparent
+                                                        },
+                                                    )
+                                                    .clickable {
+                                                        viewModel.changeArabicFont(font)
+                                                        expandedSection = null
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(
+                                                    text = when (font) {
+                                                        "pdms_saleem" -> "Saleem"
+                                                        "noor_e_hidayat" -> "Noor"
+                                                        "thabit" -> "Thabit"
+                                                        "uthmani_script" -> "Uthmani"
+                                                        "indopak_script" -> "IndoPak"
+                                                        else -> font.replaceFirstChar { it.uppercase() }
+                                                    },
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = if (fontSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                                // Live sample so the reader can see the script style.
+                                                Text(
+                                                    text = "بِسْمِ اللَّهِ",
+                                                    fontFamily = getArabicFontFamilyForDua(font),
+                                                    fontSize = 18.sp,
+                                                    maxLines = 1,
+                                                    color = if (fontSelected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
 
-                        // Translation language — value + chevron row.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { expandedSection = if (expandedSection == "language") null else "language" }
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Translation language",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = translationDisplayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .size(12.dp),
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = expandedSection == "language",
-                            enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
-                            exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
-                        ) {
-                            Column {
-                                availableTranslations.forEach { code ->
-                                    val langSelected = selectedTranslation == code
-                                    // Selected row gets a soft tinted pill — no radio circles.
-                                    Row(
+                                // Translation language — value + chevron row.
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expandedSection = if (expandedSection == "language") null else "language" }
+                                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "Translation language",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = translationDisplayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 2.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(
-                                                if (langSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable {
-                                                viewModel.changeTranslation(code)
-                                                expandedSection = null
+                                            .padding(start = 8.dp)
+                                            .size(12.dp),
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = expandedSection == "language",
+                                    enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
+                                    exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
+                                ) {
+                                    Column {
+                                        availableTranslations.forEach { code ->
+                                            val langSelected = selectedTranslation == code
+                                            // Selected row gets a soft tinted pill — no radio circles.
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 2.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(
+                                                        if (langSelected) {
+                                                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                                        } else {
+                                                            Color.Transparent
+                                                        },
+                                                    )
+                                                    .clickable {
+                                                        viewModel.changeTranslation(code)
+                                                        expandedSection = null
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(
+                                                    text = viewModel.getTranslationName(code),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = if (langSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                                // Endonym so native speakers recognize their language.
+                                                Text(
+                                                    text = when (code) {
+                                                        "ar" -> "العربية"
+                                                        "transliteration" -> "Bismillāh"
+                                                        "bn" -> "বাংলা"
+                                                        "zh" -> "中文"
+                                                        "en" -> "English"
+                                                        "es" -> "Español"
+                                                        "fr" -> "Français"
+                                                        "id" -> "Bahasa Indonesia"
+                                                        "ru" -> "Русский"
+                                                        "sv" -> "Svenska"
+                                                        "tr" -> "Türkçe"
+                                                        "ur" -> "اردو"
+                                                        else -> ""
+                                                    },
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 1,
+                                                    color = if (langSelected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                                )
                                             }
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = viewModel.getTranslationName(code),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (langSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        // Endonym so native speakers recognize their language.
-                                        Text(
-                                            text = when (code) {
-                                                "ar" -> "العربية"
-                                                "transliteration" -> "Bismillāh"
-                                                "bn" -> "বাংলা"
-                                                "zh" -> "中文"
-                                                "en" -> "English"
-                                                "es" -> "Español"
-                                                "fr" -> "Français"
-                                                "id" -> "Bahasa Indonesia"
-                                                "ru" -> "Русский"
-                                                "sv" -> "Svenska"
-                                                "tr" -> "Türkçe"
-                                                "ur" -> "اردو"
-                                                else -> ""
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 1,
-                                            color = if (langSelected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        }
                                     }
                                 }
                             }
@@ -2789,8 +2830,6 @@ fun DuaDetailScreen(
                     }
                 }
             }
-        }
-    }
 
             // Fixed toolbar at top - background transitions from transparent to solid on scroll
             // Smooth transition based on toolbarCollapseProgress (0 = transparent, 1 = solid)
@@ -2803,7 +2842,7 @@ fun DuaDetailScreen(
             val toolbarAlpha by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (statusBarVisible) 0f else 1f,
                 animationSpec = androidx.compose.animation.core.tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                label = "toolbarAlpha"
+                label = "toolbarAlpha",
             )
 
             // Content color transitions from white (over image) to onSurface (over solid background)
@@ -2812,52 +2851,59 @@ fun DuaDetailScreen(
                 red = 1f + (surfaceColor.red - 1f) * toolbarCollapseProgress,
                 green = 1f + (surfaceColor.green - 1f) * toolbarCollapseProgress,
                 blue = 1f + (surfaceColor.blue - 1f) * toolbarCollapseProgress,
-                alpha = 1f
+                alpha = 1f,
             )
 
             // Bookmark state hoisted above Box so it's accessible in both icon groups
-                    val currentDuaNewsResourceId = if (duasList.isNotEmpty() && currentPage < duasList.size) {
-                        duasList[currentPage].id
-                    } else {
-                        initialNewsResourceId
-                    }
-                    var localBookmarkState by remember(currentDuaNewsResourceId) {
-                        mutableStateOf(isNiaBookmarked(currentDuaNewsResourceId))
-                    }
-                    val parentBookmarkState = isNiaBookmarked(currentDuaNewsResourceId)
-                    LaunchedEffect(parentBookmarkState) {
-                        localBookmarkState = parentBookmarkState
-                    }
+            val currentDuaNewsResourceId = if (duasList.isNotEmpty() && currentPage < duasList.size) {
+                duasList[currentPage].id
+            } else {
+                initialNewsResourceId
+            }
+            var localBookmarkState by remember(currentDuaNewsResourceId) {
+                mutableStateOf(isNiaBookmarked(currentDuaNewsResourceId))
+            }
+            val parentBookmarkState = isNiaBookmarked(currentDuaNewsResourceId)
+            LaunchedEffect(parentBookmarkState) {
+                localBookmarkState = parentBookmarkState
+            }
 
-                    // Detect camera punch hole horizontal bounds to arrange icons around it
-                    val toolbarView = LocalView.current
-                    val toolbarDensity = LocalDensity.current
-                    val cutoutLeft = remember(toolbarView) {
-                        val cutout = toolbarView.rootWindowInsets?.displayCutout
-                        if (cutout != null && cutout.boundingRects.isNotEmpty()) {
-                            with(toolbarDensity) { cutout.boundingRects.minOf { it.left }.toDp() }
-                        } else 0.dp
-                    }
-                    val cutoutRight = remember(toolbarView) {
-                        val cutout = toolbarView.rootWindowInsets?.displayCutout
-                        if (cutout != null && cutout.boundingRects.isNotEmpty()) {
-                            with(toolbarDensity) { cutout.boundingRects.maxOf { it.right }.toDp() }
-                        } else 0.dp
-                    }
-                    val hasCutout = cutoutLeft > 0.dp && cutoutRight > cutoutLeft
+            // Detect camera punch hole horizontal bounds to arrange icons around it
+            val toolbarView = LocalView.current
+            val toolbarDensity = LocalDensity.current
+            val cutoutLeft = remember(toolbarView) {
+                val cutout = toolbarView.rootWindowInsets?.displayCutout
+                if (cutout != null && cutout.boundingRects.isNotEmpty()) {
+                    with(toolbarDensity) { cutout.boundingRects.minOf { it.left }.toDp() }
+                } else {
+                    0.dp
+                }
+            }
+            val cutoutRight = remember(toolbarView) {
+                val cutout = toolbarView.rootWindowInsets?.displayCutout
+                if (cutout != null && cutout.boundingRects.isNotEmpty()) {
+                    with(toolbarDensity) { cutout.boundingRects.maxOf { it.right }.toDp() }
+                } else {
+                    0.dp
+                }
+            }
+            val hasCutout = cutoutLeft > 0.dp && cutoutRight > cutoutLeft
 
-                    // Back button ends at 4dp(padding) + 40dp(button) + 8dp(gap) = 52dp
-                    val backButtonEndDp = 52.dp
-                    // Available width between back button and punch hole left edge
-                    val leftZoneWidth = if (hasCutout && cutoutLeft > backButtonEndDp)
-                        cutoutLeft - backButtonEndDp - 4.dp else 0.dp
-                    // How many action icons fit left of the punch hole:
-                    //   Language=40dp, +spacer8=48dp, +Font=40dp, +spacer4=92dp
-                    val iconsInLeftZone = when {
-                        leftZoneWidth >= 92.dp -> 2   // Language + Font both fit
-                        leftZoneWidth >= 48.dp -> 1   // Only Language fits
-                        else -> 0                      // All icons go to right group
-                    }
+            // Back button ends at 4dp(padding) + 40dp(button) + 8dp(gap) = 52dp
+            val backButtonEndDp = 52.dp
+            // Available width between back button and punch hole left edge
+            val leftZoneWidth = if (hasCutout && cutoutLeft > backButtonEndDp) {
+                cutoutLeft - backButtonEndDp - 4.dp
+            } else {
+                0.dp
+            }
+            // How many action icons fit left of the punch hole:
+            //   Language=40dp, +spacer8=48dp, +Font=40dp, +spacer4=92dp
+            val iconsInLeftZone = when {
+                leftZoneWidth >= 92.dp -> 2 // Language + Font both fit
+                leftZoneWidth >= 48.dp -> 1 // Only Language fits
+                else -> 0 // All icons go to right group
+            }
 
             Surface(
                 color = toolbarBackgroundColor,
@@ -2866,29 +2912,29 @@ fun DuaDetailScreen(
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
                     .padding(top = 8.dp)
-                    .graphicsLayer { alpha = toolbarAlpha }
+                    .graphicsLayer { alpha = toolbarAlpha },
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
+                        .height(64.dp),
                 ) {
                     // Back button — always at the far left
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .padding(start = 4.dp)
+                            .padding(start = 4.dp),
                     ) {
                         Surface(
                             modifier = Modifier.size(40.dp),
                             shape = CircleShape,
-                            color = toolbarContentColor.copy(alpha = 0.15f)
+                            color = toolbarContentColor.copy(alpha = 0.15f),
                         ) {
                             IconButton(onClick = wrappedOnBackClick) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = toolbarContentColor
+                                    tint = toolbarContentColor,
                                 )
                             }
                         }
@@ -2900,7 +2946,7 @@ fun DuaDetailScreen(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .padding(start = backButtonEndDp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Language icon always first in left group
                             Surface(
@@ -2908,25 +2954,25 @@ fun DuaDetailScreen(
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
-                                contentColor = toolbarContentColor
+                                contentColor = toolbarContentColor,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Language,
                                         contentDescription = "Translation",
                                         tint = toolbarContentColor,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(16.dp),
                                     )
                                     Text(
                                         text = translationCode,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = toolbarContentColor,
                                         fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -2938,25 +2984,25 @@ fun DuaDetailScreen(
                                     modifier = Modifier.size(40.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     color = toolbarContentColor.copy(alpha = 0.12f),
-                                    contentColor = toolbarContentColor
+                                    contentColor = toolbarContentColor,
                                 ) {
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center,
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.TextFormat,
                                             contentDescription = "Font selection",
                                             tint = toolbarContentColor,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(16.dp),
                                         )
                                         Text(
                                             text = fontDisplay,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = toolbarContentColor,
                                             fontSize = 8.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
                                         )
                                     }
                                 }
@@ -2969,7 +3015,7 @@ fun DuaDetailScreen(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Language icon goes here when it doesn't fit left of punch hole
                         if (iconsInLeftZone == 0) {
@@ -2978,25 +3024,25 @@ fun DuaDetailScreen(
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
-                                contentColor = toolbarContentColor
+                                contentColor = toolbarContentColor,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Language,
                                         contentDescription = "Translation",
                                         tint = toolbarContentColor,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(16.dp),
                                     )
                                     Text(
                                         text = translationCode,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = toolbarContentColor,
                                         fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -3009,25 +3055,25 @@ fun DuaDetailScreen(
                                 modifier = Modifier.size(40.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 color = toolbarContentColor.copy(alpha = 0.12f),
-                                contentColor = toolbarContentColor
+                                contentColor = toolbarContentColor,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.TextFormat,
                                         contentDescription = "Font selection",
                                         tint = toolbarContentColor,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(16.dp),
                                     )
                                     Text(
                                         text = fontDisplay,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = toolbarContentColor,
                                         fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             }
@@ -3049,13 +3095,13 @@ fun DuaDetailScreen(
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
                                         strokeWidth = 2.dp,
-                                        color = toolbarContentColor
+                                        color = toolbarContentColor,
                                     )
                                 } else {
                                     Icon(
                                         imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                         contentDescription = if (isThisPlaying) "Pause recitation" else "Play chapter recitation",
-                                        tint = toolbarContentColor
+                                        tint = toolbarContentColor,
                                     )
                                 }
                             }
@@ -3065,7 +3111,7 @@ fun DuaDetailScreen(
                             Icon(
                                 imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
                                 contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
-                                tint = toolbarContentColor
+                                tint = toolbarContentColor,
                             )
                         }
                         IconButton(onClick = {
@@ -3075,17 +3121,17 @@ fun DuaDetailScreen(
                             Icon(
                                 imageVector = if (localBookmarkState) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                                 contentDescription = if (localBookmarkState) "Remove Bookmark" else "Add Bookmark",
-                                tint = toolbarContentColor
+                                tint = toolbarContentColor,
                             )
                         }
                         IconButton(
                             onClick = { showFloatingToolbar = !showFloatingToolbar },
-                            modifier = Modifier.offset(x = (-8).dp)
+                            modifier = Modifier.offset(x = (-8).dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "More options",
-                                tint = toolbarContentColor
+                                tint = toolbarContentColor,
                             )
                         }
                     }
@@ -3154,7 +3200,7 @@ private fun DuaPageContent(
     modifier: Modifier = Modifier,
     onNavigateToSurah: ((surahNumber: Int, ayahNumber: Int) -> Unit)? = null,
     showTajweed: Boolean = false,
-    getTajweedAnnotations: ((Int, Int) -> List<TajweedAnnotation>)? = null
+    getTajweedAnnotations: ((Int, Int) -> List<TajweedAnnotation>)? = null,
 ) {
     Column(
         modifier = modifier
@@ -3162,7 +3208,7 @@ private fun DuaPageContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 72.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // Arabic Text Card - Enhanced with shadow and better styling
         if (dua.arabicText.isNotEmpty()) {
@@ -3173,23 +3219,23 @@ private fun DuaPageContent(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp),
                         ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                     ),
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 2.dp
+                tonalElevation = 2.dp,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Quran icon badge at top
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(bottom = 16.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.MenuBook,
@@ -3197,7 +3243,7 @@ private fun DuaPageContent(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .padding(8.dp)
-                                .size(20.dp)
+                                .size(20.dp),
                         )
                     }
 
@@ -3214,8 +3260,8 @@ private fun DuaPageContent(
                             text = dua.arabicText,
                             annotations = tajweedAnnotations,
                             defaultStyle = androidx.compose.ui.text.SpanStyle(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
                         )
                         Text(
                             text = annotatedText,
@@ -3247,16 +3293,16 @@ private fun DuaPageContent(
                 title = "Transliteration",
                 iconTint = MaterialTheme.colorScheme.secondary,
                 backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ) {
                 Text(
                     text = dua.transliteration,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 16.sp,
                         lineHeight = 26.sp,
-                        fontStyle = FontStyle.Italic
+                        fontStyle = FontStyle.Italic,
                     ),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             }
         }
@@ -3268,15 +3314,15 @@ private fun DuaPageContent(
                 title = "Translation",
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             ) {
                 Text(
                     text = dua.translation,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 15.sp,
-                        lineHeight = 24.sp
+                        lineHeight = 24.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
             }
         }
@@ -3288,15 +3334,15 @@ private fun DuaPageContent(
                 title = "Explanation",
                 iconTint = MaterialTheme.colorScheme.primary,
                 backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ) {
                 Text(
                     text = dua.explanation,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 14.sp,
-                        lineHeight = 22.sp
+                        lineHeight = 22.sp,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -3317,13 +3363,13 @@ private fun CollapsibleDuaSection(
     showDragHandle: Boolean = false,
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
-        label = "chevronRotation"
+        label = "chevronRotation",
     )
 
     // Background color for the section
@@ -3339,67 +3385,68 @@ private fun CollapsibleDuaSection(
             .shadow(
                 elevation = if (isDragging) 8.dp else 0.dp,
                 shape = sectionShape,
-                clip = false
+                clip = false,
             )
             .clip(sectionShape)
-            .background(sectionColor)
+            .background(sectionColor),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = sectionShape,
             color = sectionColor,
             tonalElevation = 1.dp,
-            shadowElevation = 2.dp
+            shadowElevation = 2.dp,
         ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Left accent border - spans full height including drag handle
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .background(accentColor)
-                    .then(
-                        if (isExpanded) {
-                            Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
-                        } else {
-                            Modifier.height(if (showDragHandle) 84.dp else 56.dp)
-                        }
-                    )
-            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Left accent border - spans full height including drag handle
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .background(accentColor)
+                        .then(
+                            if (isExpanded) {
+                                Modifier.height(androidx.compose.ui.unit.Dp.Unspecified)
+                            } else {
+                                Modifier.height(if (showDragHandle) 84.dp else 56.dp)
+                            },
+                        ),
+                )
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                // Drag handle at top center - modifier applies reorderable drag behavior
-                if (showDragHandle) {
-                    Box(
+                Column(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    // Drag handle at top center - modifier applies reorderable drag behavior
+                    if (showDragHandle) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Drag to reorder",
+                                tint = if (isDragging) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                },
+                                modifier = dragHandleModifier.size(24.dp),
+                            )
+                        }
+                    }
+
+                    // Header row - clickable to expand/collapse
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = "Drag to reorder",
-                            tint = if (isDragging)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = dragHandleModifier.size(24.dp)
-                        )
-                    }
-                }
-
-                // Header row - clickable to expand/collapse
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isExpanded = !isExpanded }
-                        .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
+                            .clickable { isExpanded = !isExpanded }
+                            .padding(horizontal = 16.dp, vertical = if (showDragHandle) 12.dp else 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
@@ -3407,14 +3454,14 @@ private fun CollapsibleDuaSection(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .size(24.dp)
-                                    .rotate(rotationAngle)
+                                    .rotate(rotationAngle),
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                         Icon(
@@ -3423,7 +3470,7 @@ private fun CollapsibleDuaSection(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(24.dp)
-                                .rotate(rotationAngle)
+                                .rotate(rotationAngle),
                         )
                     }
 
@@ -3431,12 +3478,12 @@ private fun CollapsibleDuaSection(
                     AnimatedVisibility(
                         visible = isExpanded,
                         enter = expandVertically(animationSpec = tween(250, easing = FastOutSlowInEasing)) + fadeIn(tween(200)),
-                        exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180))
+                        exit = shrinkVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(180)),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         ) {
                             content()
                         }
@@ -3459,9 +3506,8 @@ private enum class DuaSection {
     EXPLANATION,
     NOTE,
     POST_CONTEXT,
-    REFERENCE
+    REFERENCE,
 }
-
 
 /**
  * Reusable section card component with icon header (legacy - for backwards compatibility)
@@ -3474,13 +3520,13 @@ private fun DuaSectionCard(
     backgroundColor: Color,
     contentColor: Color,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     CollapsibleDuaSection(
         title = title,
         accentColor = iconTint,
         modifier = modifier,
-        initiallyExpanded = true
+        initiallyExpanded = true,
     ) {
         content()
     }
@@ -3493,19 +3539,19 @@ private fun DuaSectionCard(
 private fun SingleDuaContent(
     parsedContent: ParsedDuaContent,
     arabicFontFamily: FontFamily,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
     ) {
         // Header with mosque image - matches the pager header style
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp) // Shorter for fallback (no toolbar overlap needed)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             // Mosque image background only - no overlay text
             Image(
@@ -3513,7 +3559,7 @@ private fun SingleDuaContent(
                 contentDescription = "Masjid al-Nawabi",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alignment = Alignment.Center
+                alignment = Alignment.Center,
             )
         }
 
@@ -3522,14 +3568,14 @@ private fun SingleDuaContent(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .padding(bottom = 72.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Arabic Text Card - Using CollapsibleDuaSection for consistent styling
             if (parsedContent.arabicText.isNotEmpty()) {
                 CollapsibleDuaSection(
                     title = "Arabic",
                     accentColor = MaterialTheme.colorScheme.primary,
-                    initiallyExpanded = true
+                    initiallyExpanded = true,
                 ) {
                     Text(
                         text = parsedContent.arabicText,
@@ -3538,7 +3584,7 @@ private fun SingleDuaContent(
                             fontSize = 32f,
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -3548,16 +3594,16 @@ private fun SingleDuaContent(
                 CollapsibleDuaSection(
                     title = "Transliteration",
                     accentColor = Color(0xFF9E9E9E),
-                    initiallyExpanded = true
+                    initiallyExpanded = true,
                 ) {
                     Text(
                         text = parsedContent.transliteration,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 17.sp,
                             lineHeight = 28.sp,
-                            fontStyle = FontStyle.Italic
+                            fontStyle = FontStyle.Italic,
                         ),
-                        color = Color(0xFF5D5D5D)
+                        color = Color(0xFF5D5D5D),
                     )
                 }
             }
@@ -3567,16 +3613,16 @@ private fun SingleDuaContent(
                 CollapsibleDuaSection(
                     title = "Translation",
                     accentColor = Color(0xFF9E9E9E),
-                    initiallyExpanded = true
+                    initiallyExpanded = true,
                 ) {
                     Text(
                         text = parsedContent.translation,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontSize = 17.sp,
                             lineHeight = 28.sp,
-                            fontStyle = FontStyle.Italic
+                            fontStyle = FontStyle.Italic,
                         ),
-                        color = Color(0xFF5D5D5D)
+                        color = Color(0xFF5D5D5D),
                     )
                 }
             }
@@ -3586,15 +3632,15 @@ private fun SingleDuaContent(
                 CollapsibleDuaSection(
                     title = "Explanation",
                     accentColor = Color(0xFF8BC34A),
-                    initiallyExpanded = false
+                    initiallyExpanded = false,
                 ) {
                     Text(
                         text = parsedContent.explanation,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 15.sp,
-                            lineHeight = 24.sp
+                            lineHeight = 24.sp,
                         ),
-                        color = Color(0xFF5D5D5D)
+                        color = Color(0xFF5D5D5D),
                     )
                 }
             }
@@ -3711,8 +3757,11 @@ private fun DuaToolbarPickerRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(
-                if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
-                else Color.Transparent,
+                if (selected) {
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+                } else {
+                    Color.Transparent
+                },
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 11.dp),
@@ -3730,8 +3779,11 @@ private fun DuaToolbarPickerRow(
                     text = detail,
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = detailFontFamily,
-                    color = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -3772,13 +3824,13 @@ private fun translationEndonym(code: String): String = when (code) {
 @Composable
 private fun shimmerBrush(
     targetValue: Float = 1000f,
-    showShimmer: Boolean = true
+    showShimmer: Boolean = true,
 ): Brush {
     return if (showShimmer) {
         val shimmerColors = listOf(
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         )
 
         val transition = rememberInfiniteTransition(label = "shimmer")
@@ -3788,21 +3840,21 @@ private fun shimmerBrush(
             animationSpec = infiniteRepeatable(
                 animation = tween(
                     durationMillis = 1000,
-                    easing = LinearEasing
+                    easing = LinearEasing,
                 ),
-                repeatMode = RepeatMode.Restart
+                repeatMode = RepeatMode.Restart,
             ),
-            label = "shimmer_translate"
+            label = "shimmer_translate",
         )
 
         Brush.linearGradient(
             colors = shimmerColors,
             start = androidx.compose.ui.geometry.Offset(translateAnimation.value - 200f, 0f),
-            end = androidx.compose.ui.geometry.Offset(translateAnimation.value, 0f)
+            end = androidx.compose.ui.geometry.Offset(translateAnimation.value, 0f),
         )
     } else {
         Brush.linearGradient(
-            colors = listOf(Color.Transparent, Color.Transparent)
+            colors = listOf(Color.Transparent, Color.Transparent),
         )
     }
 }
@@ -3813,12 +3865,12 @@ private fun shimmerBrush(
 @Composable
 private fun ShimmerBox(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(8.dp)
+    shape: RoundedCornerShape = RoundedCornerShape(8.dp),
 ) {
     val brush = shimmerBrush()
     Box(
         modifier = modifier
-            .background(brush = brush, shape = shape)
+            .background(brush = brush, shape = shape),
     )
 }
 
@@ -3828,30 +3880,30 @@ private fun ShimmerBox(
 @Composable
 private fun DuaShimmerLoadingContent(
     onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             // Header with dynamic sky - shown immediately with shimmer placeholders
             val skyPeriod = getCurrentSkyPeriodForTheme()
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp) // Match taller header
+                    .height(420.dp), // Match taller header
             ) {
                 // Dynamic sky background based on time of day
                 DynamicSkyHeader(
                     modifier = Modifier.fillMaxSize(),
                     height = 420.dp,
-                    period = skyPeriod
+                    period = skyPeriod,
                 )
                 // Semi-transparent overlay for text readability
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.2f))
+                        .background(Color.Black.copy(alpha = 0.2f)),
                 )
                 // Header content positioned at bottom to show more sky artwork
                 Column(
@@ -3860,13 +3912,13 @@ private fun DuaShimmerLoadingContent(
                         .padding(horizontal = 16.dp)
                         .padding(top = 100.dp, bottom = 4.dp), // Position content at very bottom
                     verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         text = "Dua", // Generic text while loading
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -3878,8 +3930,8 @@ private fun DuaShimmerLoadingContent(
                             .height(24.dp)
                             .background(
                                 color = Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
+                                shape = RoundedCornerShape(12.dp),
+                            ),
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -3891,8 +3943,8 @@ private fun DuaShimmerLoadingContent(
                             .height(36.dp)
                             .background(
                                 color = Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(18.dp)
-                            )
+                                shape = RoundedCornerShape(18.dp),
+                            ),
                     )
                 }
             }
@@ -3903,7 +3955,7 @@ private fun DuaShimmerLoadingContent(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Arabic Text Card shimmer
                 Surface(
@@ -3913,37 +3965,37 @@ private fun DuaShimmerLoadingContent(
                             elevation = 8.dp,
                             shape = RoundedCornerShape(24.dp),
                             ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                         ),
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    tonalElevation = 2.dp
+                    tonalElevation = 2.dp,
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         // Arabic text shimmer lines
                         ShimmerBox(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .height(32.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
                         )
                         ShimmerBox(
                             modifier = Modifier
                                 .fillMaxWidth(0.75f)
                                 .height(32.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
                         )
                         ShimmerBox(
                             modifier = Modifier
                                 .fillMaxWidth(0.6f)
                                 .height(32.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
                         )
                     }
                 }
@@ -3951,20 +4003,20 @@ private fun DuaShimmerLoadingContent(
                 // Transliteration Card shimmer
                 ShimmerSectionCard(
                     iconTint = MaterialTheme.colorScheme.secondary,
-                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
                 )
 
                 // Translation Card shimmer
                 ShimmerSectionCard(
                     iconTint = MaterialTheme.colorScheme.tertiary,
-                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
                 )
 
                 // Explanation Card shimmer
                 ShimmerSectionCard(
                     iconTint = MaterialTheme.colorScheme.primary,
                     backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    lineCount = 4
+                    lineCount = 4,
                 )
             }
         }
@@ -3974,7 +4026,7 @@ private fun DuaShimmerLoadingContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
+                .statusBarsPadding(),
         ) {
             Row(
                 modifier = Modifier
@@ -3982,30 +4034,30 @@ private fun DuaShimmerLoadingContent(
                     .height(64.dp)
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.15f)
+                    color = Color.White.copy(alpha = 0.15f),
                 ) {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                 }
 
                 IconButton(
                     onClick = { /* Menu action */ },
-                    modifier = Modifier.offset(x = (-8).dp)
+                    modifier = Modifier.offset(x = (-8).dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "More options",
-                        tint = Color.White
+                        tint = Color.White,
                     )
                 }
             }
@@ -4018,7 +4070,7 @@ private fun DuaShimmerLoadingContent(
                 .align(Alignment.BottomCenter),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 4.dp,
-            shadowElevation = 12.dp
+            shadowElevation = 12.dp,
         ) {
             Column {
                 // Progress indicator placeholder
@@ -4026,7 +4078,7 @@ private fun DuaShimmerLoadingContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 )
 
                 Row(
@@ -4034,12 +4086,12 @@ private fun DuaShimmerLoadingContent(
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Previous button placeholder
                     ShimmerBox(
                         modifier = Modifier.size(50.dp),
-                        shape = RoundedCornerShape(25.dp)
+                        shape = RoundedCornerShape(25.dp),
                     )
 
                     // Center indicator placeholder
@@ -4047,13 +4099,13 @@ private fun DuaShimmerLoadingContent(
                         modifier = Modifier
                             .width(80.dp)
                             .height(40.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(16.dp),
                     )
 
                     // Next button placeholder
                     ShimmerBox(
                         modifier = Modifier.size(50.dp),
-                        shape = RoundedCornerShape(25.dp)
+                        shape = RoundedCornerShape(25.dp),
                     )
                 }
             }
@@ -4069,7 +4121,7 @@ private fun ShimmerSectionCard(
     iconTint: Color,
     backgroundColor: Color,
     lineCount: Int = 3,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier
@@ -4078,31 +4130,31 @@ private fun ShimmerSectionCard(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(20.dp),
                 ambientColor = Color.Black.copy(alpha = 0.08f),
-                spotColor = Color.Black.copy(alpha = 0.05f)
+                spotColor = Color.Black.copy(alpha = 0.05f),
             ),
         shape = RoundedCornerShape(20.dp),
         color = backgroundColor,
-        tonalElevation = 1.dp
+        tonalElevation = 1.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp)
+                .padding(18.dp),
         ) {
             // Header with icon shimmer
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 12.dp),
             ) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = iconTint.copy(alpha = 0.15f),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         ShimmerBox(
                             modifier = Modifier.size(18.dp),
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(4.dp),
                         )
                     }
                 }
@@ -4111,7 +4163,7 @@ private fun ShimmerSectionCard(
                     modifier = Modifier
                         .width(100.dp)
                         .height(16.dp),
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(4.dp),
                 )
             }
 
@@ -4127,7 +4179,7 @@ private fun ShimmerSectionCard(
                         modifier = Modifier
                             .fillMaxWidth(widthFraction)
                             .height(14.dp),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(4.dp),
                     )
                 }
             }
@@ -4225,7 +4277,7 @@ private fun DuaFontGlyphChip(
                 .width(18.dp)
                 .height(2.5.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
         )
     }
 }
@@ -4236,10 +4288,16 @@ private fun DuaTuneChip(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = if (active) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
-        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (active) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
+        },
+        contentColor = if (active) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         border = if (active) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)) else null,
     ) {
         Text(

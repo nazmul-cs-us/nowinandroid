@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,24 +19,22 @@ package com.starception.submission.voice
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.PowerManager
 import android.util.Log
 import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
 import com.starception.submission.download.AssetRepository
 import com.starception.submission.settings.components.TtsModelType
+import com.starception.submission.settings.components.TtsVoice
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -44,7 +42,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import com.starception.submission.settings.components.TtsVoice
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -223,176 +220,182 @@ class SherpaOnnxTtsService @Inject constructor(
 
             isInitializing = true
 
-        withContext(Dispatchers.IO) {
-            try {
-                Log.i(TAG, "Initializing Sherpa-ONNX TTS with ${currentVoice.displayName}...")
+            withContext(Dispatchers.IO) {
+                try {
+                    Log.i(TAG, "Initializing Sherpa-ONNX TTS with ${currentVoice.displayName}...")
 
-                // Extract model files from assets based on selected voice
-                val modelPath = extractAssetFile(currentVoice.modelFile)
-                val tokensPath = extractAssetFile(currentVoice.tokensFile)
+                    // Extract model files from assets based on selected voice
+                    val modelPath = extractAssetFile(currentVoice.modelFile)
+                    val tokensPath = extractAssetFile(currentVoice.tokensFile)
 
-                // Handle data directory (for espeak-ng)
-                val dataDir = if (currentVoice.dataDir.isNotEmpty()) {
-                    extractAssetDir(currentVoice.dataDir)
-                } else ""
-
-                // Handle lexicon file (for VITS)
-                val lexiconPath = if (currentVoice.lexiconFile.isNotEmpty()) {
-                    extractAssetFile(currentVoice.lexiconFile)
-                } else ""
-
-                // Handle voices file (for Kokoro)
-                val voicesPath = if (currentVoice.voicesFile.isNotEmpty()) {
-                    extractAssetFile(currentVoice.voicesFile)
-                } else ""
-
-                if (modelPath == null || tokensPath == null) {
-                    Log.e(TAG, "Failed to extract model files")
-                    isInitializing = false
-                    return@withContext false
-                }
-
-                Log.d(TAG, "Model path: $modelPath")
-                Log.d(TAG, "Tokens path: $tokensPath")
-                Log.d(TAG, "Data dir: ${dataDir ?: "N/A"}")
-                Log.d(TAG, "Lexicon path: ${lexiconPath ?: "N/A"}")
-                Log.d(TAG, "Voices path: ${voicesPath ?: "N/A"}")
-
-                // Pre-validate extracted model files before passing to native code.
-                // The native OfflineTts() constructor will SIGABRT if given invalid/corrupt
-                // model files, and native signals bypass Kotlin try/catch.
-                val modelFile = java.io.File(modelPath)
-                val tokensFile = java.io.File(tokensPath)
-                val minModelSize = 100_000L // ONNX models should be at least 100KB
-                val minTokensSize = 100L    // tokens.txt should be at least 100 bytes
-
-                if (!modelFile.exists() || modelFile.length() < minModelSize) {
-                    Log.e(TAG, "Model file validation failed: exists=${modelFile.exists()}, size=${modelFile.length()} bytes (min=$minModelSize)")
-                    // Delete stale/corrupt extracted file so next attempt re-extracts
-                    modelFile.delete()
-                    isInitializing = false
-                    return@withContext false
-                }
-
-                if (!tokensFile.exists() || tokensFile.length() < minTokensSize) {
-                    Log.e(TAG, "Tokens file validation failed: exists=${tokensFile.exists()}, size=${tokensFile.length()} bytes (min=$minTokensSize)")
-                    tokensFile.delete()
-                    isInitializing = false
-                    return@withContext false
-                }
-
-                // Sherpa's native constructor does not safely reject an incomplete eSpeak
-                // directory: it logs the missing file and then dereferences null. Validate the
-                // exact runtime directory before crossing the JNI boundary.
-                if (currentVoice.modelType == TtsModelType.KOKORO) {
-                    val extractedDataDir = dataDir
-                        ?.takeIf(String::isNotEmpty)
-                        ?.let(::File)
-                    val missingDataFiles = kokoroRequiredDataFiles.filter { relativePath ->
-                        val file = extractedDataDir?.let { java.io.File(it, relativePath) }
-                        file == null || !file.isFile || file.length() == 0L
+                    // Handle data directory (for espeak-ng)
+                    val dataDir = if (currentVoice.dataDir.isNotEmpty()) {
+                        extractAssetDir(currentVoice.dataDir)
+                    } else {
+                        ""
                     }
-                    if (missingDataFiles.isNotEmpty()) {
-                        Log.e(
-                            TAG,
-                            "Kokoro data validation failed; missing ${missingDataFiles.joinToString()}",
-                        )
+
+                    // Handle lexicon file (for VITS)
+                    val lexiconPath = if (currentVoice.lexiconFile.isNotEmpty()) {
+                        extractAssetFile(currentVoice.lexiconFile)
+                    } else {
+                        ""
+                    }
+
+                    // Handle voices file (for Kokoro)
+                    val voicesPath = if (currentVoice.voicesFile.isNotEmpty()) {
+                        extractAssetFile(currentVoice.voicesFile)
+                    } else {
+                        ""
+                    }
+
+                    if (modelPath == null || tokensPath == null) {
+                        Log.e(TAG, "Failed to extract model files")
                         isInitializing = false
                         return@withContext false
                     }
-                }
 
-                if (currentVoice.modelType == TtsModelType.VITS) {
-                    val lexiconFile = lexiconPath
-                        ?.takeIf(String::isNotEmpty)
-                        ?.let(::File)
-                    if (lexiconFile == null || !lexiconFile.isFile || lexiconFile.length() == 0L) {
-                        Log.e(TAG, "VITS lexicon validation failed")
+                    Log.d(TAG, "Model path: $modelPath")
+                    Log.d(TAG, "Tokens path: $tokensPath")
+                    Log.d(TAG, "Data dir: ${dataDir ?: "N/A"}")
+                    Log.d(TAG, "Lexicon path: ${lexiconPath ?: "N/A"}")
+                    Log.d(TAG, "Voices path: ${voicesPath ?: "N/A"}")
+
+                    // Pre-validate extracted model files before passing to native code.
+                    // The native OfflineTts() constructor will SIGABRT if given invalid/corrupt
+                    // model files, and native signals bypass Kotlin try/catch.
+                    val modelFile = java.io.File(modelPath)
+                    val tokensFile = java.io.File(tokensPath)
+                    val minModelSize = 100_000L // ONNX models should be at least 100KB
+                    val minTokensSize = 100L // tokens.txt should be at least 100 bytes
+
+                    if (!modelFile.exists() || modelFile.length() < minModelSize) {
+                        Log.e(TAG, "Model file validation failed: exists=${modelFile.exists()}, size=${modelFile.length()} bytes (min=$minModelSize)")
+                        // Delete stale/corrupt extracted file so next attempt re-extracts
+                        modelFile.delete()
                         isInitializing = false
                         return@withContext false
                     }
-                }
 
-                // Validate voices file for Kokoro (required, ~4MB)
-                if (currentVoice.modelType == TtsModelType.KOKORO && !voicesPath.isNullOrEmpty()) {
-                    val voicesFile = java.io.File(voicesPath)
-                    if (!voicesFile.exists() || voicesFile.length() < minModelSize) {
-                        Log.e(TAG, "Voices file validation failed: exists=${voicesFile.exists()}, size=${voicesFile.length()} bytes (min=$minModelSize)")
-                        voicesFile.delete()
+                    if (!tokensFile.exists() || tokensFile.length() < minTokensSize) {
+                        Log.e(TAG, "Tokens file validation failed: exists=${tokensFile.exists()}, size=${tokensFile.length()} bytes (min=$minTokensSize)")
+                        tokensFile.delete()
                         isInitializing = false
                         return@withContext false
                     }
-                }
 
-                Log.i(TAG, "Model file validation passed: model=${modelFile.length()} bytes, tokens=${tokensFile.length()} bytes")
-
-                // Configure TTS model based on type
-                val modelConfig = when (currentVoice.modelType) {
-                    TtsModelType.KOKORO -> {
-                        Log.i(TAG, "Configuring Kokoro model...")
-                        val kokoroConfig = OfflineTtsKokoroModelConfig(
-                            model = modelPath,
-                            voices = voicesPath ?: "",
-                            tokens = tokensPath,
-                            dataDir = dataDir ?: "",
-                            // Sherpa 1.12.x defers eSpeak voice selection until generate().
-                            // Leaving this blank initializes successfully but native-aborts on
-                            // the first sentence with "Failed to set eSpeak-ng voice".
-                            lang = "en-us",
-                            lengthScale = 1.0f
-                        )
-                        OfflineTtsModelConfig(
-                            kokoro = kokoroConfig,
-                            numThreads = inferenceThreads,
-                            debug = false,
-                            provider = "cpu"
-                        )
+                    // Sherpa's native constructor does not safely reject an incomplete eSpeak
+                    // directory: it logs the missing file and then dereferences null. Validate the
+                    // exact runtime directory before crossing the JNI boundary.
+                    if (currentVoice.modelType == TtsModelType.KOKORO) {
+                        val extractedDataDir = dataDir
+                            ?.takeIf(String::isNotEmpty)
+                            ?.let(::File)
+                        val missingDataFiles = kokoroRequiredDataFiles.filter { relativePath ->
+                            val file = extractedDataDir?.let { java.io.File(it, relativePath) }
+                            file == null || !file.isFile || file.length() == 0L
+                        }
+                        if (missingDataFiles.isNotEmpty()) {
+                            Log.e(
+                                TAG,
+                                "Kokoro data validation failed; missing ${missingDataFiles.joinToString()}",
+                            )
+                            isInitializing = false
+                            return@withContext false
+                        }
                     }
-                    TtsModelType.VITS -> {
-                        Log.i(TAG, "Configuring VITS model...")
-                        val vitsConfig = OfflineTtsVitsModelConfig(
-                            model = modelPath,
-                            lexicon = lexiconPath ?: "",
-                            tokens = tokensPath,
-                            dataDir = dataDir ?: "",
-                            noiseScale = 0.667f,
-                            noiseScaleW = 0.8f,
-                            lengthScale = 1.0f
-                        )
-                        OfflineTtsModelConfig(
-                            vits = vitsConfig,
-                            numThreads = inferenceThreads,
-                            debug = false,
-                            provider = "cpu"
-                        )
+
+                    if (currentVoice.modelType == TtsModelType.VITS) {
+                        val lexiconFile = lexiconPath
+                            ?.takeIf(String::isNotEmpty)
+                            ?.let(::File)
+                        if (lexiconFile == null || !lexiconFile.isFile || lexiconFile.length() == 0L) {
+                            Log.e(TAG, "VITS lexicon validation failed")
+                            isInitializing = false
+                            return@withContext false
+                        }
                     }
+
+                    // Validate voices file for Kokoro (required, ~4MB)
+                    if (currentVoice.modelType == TtsModelType.KOKORO && !voicesPath.isNullOrEmpty()) {
+                        val voicesFile = java.io.File(voicesPath)
+                        if (!voicesFile.exists() || voicesFile.length() < minModelSize) {
+                            Log.e(TAG, "Voices file validation failed: exists=${voicesFile.exists()}, size=${voicesFile.length()} bytes (min=$minModelSize)")
+                            voicesFile.delete()
+                            isInitializing = false
+                            return@withContext false
+                        }
+                    }
+
+                    Log.i(TAG, "Model file validation passed: model=${modelFile.length()} bytes, tokens=${tokensFile.length()} bytes")
+
+                    // Configure TTS model based on type
+                    val modelConfig = when (currentVoice.modelType) {
+                        TtsModelType.KOKORO -> {
+                            Log.i(TAG, "Configuring Kokoro model...")
+                            val kokoroConfig = OfflineTtsKokoroModelConfig(
+                                model = modelPath,
+                                voices = voicesPath ?: "",
+                                tokens = tokensPath,
+                                dataDir = dataDir ?: "",
+                                // Sherpa 1.12.x defers eSpeak voice selection until generate().
+                                // Leaving this blank initializes successfully but native-aborts on
+                                // the first sentence with "Failed to set eSpeak-ng voice".
+                                lang = "en-us",
+                                lengthScale = 1.0f,
+                            )
+                            OfflineTtsModelConfig(
+                                kokoro = kokoroConfig,
+                                numThreads = inferenceThreads,
+                                debug = false,
+                                provider = "cpu",
+                            )
+                        }
+                        TtsModelType.VITS -> {
+                            Log.i(TAG, "Configuring VITS model...")
+                            val vitsConfig = OfflineTtsVitsModelConfig(
+                                model = modelPath,
+                                lexicon = lexiconPath ?: "",
+                                tokens = tokensPath,
+                                dataDir = dataDir ?: "",
+                                noiseScale = 0.667f,
+                                noiseScaleW = 0.8f,
+                                lengthScale = 1.0f,
+                            )
+                            OfflineTtsModelConfig(
+                                vits = vitsConfig,
+                                numThreads = inferenceThreads,
+                                debug = false,
+                                provider = "cpu",
+                            )
+                        }
+                    }
+
+                    // Create TTS config
+                    val ttsConfig = OfflineTtsConfig(
+                        model = modelConfig,
+                        maxNumSentences = 1,
+                    )
+
+                    // Create TTS instance
+                    tts = OfflineTts(
+                        assetManager = null,
+                        config = ttsConfig,
+                    )
+
+                    isInitialized = true
+                    isInitializing = false
+
+                    Log.i(TAG, "${currentVoice.displayName} TTS initialized successfully")
+                    Log.i(TAG, "Sample rate: ${tts?.sampleRate()}, Speakers: ${tts?.numSpeakers()}")
+
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize TTS", e)
+                    isInitializing = false
+                    false
                 }
-
-                // Create TTS config
-                val ttsConfig = OfflineTtsConfig(
-                    model = modelConfig,
-                    maxNumSentences = 1
-                )
-
-                // Create TTS instance
-                tts = OfflineTts(
-                    assetManager = null,
-                    config = ttsConfig
-                )
-
-                isInitialized = true
-                isInitializing = false
-
-                Log.i(TAG, "${currentVoice.displayName} TTS initialized successfully")
-                Log.i(TAG, "Sample rate: ${tts?.sampleRate()}, Speakers: ${tts?.numSpeakers()}")
-
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize TTS", e)
-                isInitializing = false
-                false
             }
-        }
         }
     }
 
@@ -478,7 +481,9 @@ class SherpaOnnxTtsService @Inject constructor(
                                 sampleRate = audio.sampleRate
                             }
                         }
-                        if (generatedParts.size != sentences.size || stopRequested) null else {
+                        if (generatedParts.size != sentences.size || stopRequested) {
+                            null
+                        } else {
                             CachedAudio(concatenateSamples(generatedParts), sampleRate)
                         }
                     }
@@ -500,7 +505,6 @@ class SherpaOnnxTtsService @Inject constructor(
 
                     onComplete?.invoke()
                     if (continuation.isActive) continuation.resume(true)
-
                 } catch (e: Exception) {
                     Log.e(TAG, "Error generating/playing speech", e)
                     onComplete?.invoke()
@@ -533,7 +537,7 @@ class SherpaOnnxTtsService @Inject constructor(
         speakerId: Int,
         speed: Float,
         sentenceNum: Int,
-        totalSentences: Int
+        totalSentences: Int,
     ): GeneratedAudio? {
         // Capture TTS reference to prevent race condition
         val ttsEngine = tts
@@ -554,7 +558,7 @@ class SherpaOnnxTtsService @Inject constructor(
             val audio = ttsEngine.generate(
                 text = sentence,
                 sid = speakerId,
-                speed = speed
+                speed = speed,
             )
             if (audio != null && audio.samples.isNotEmpty()) {
                 Log.d(TAG, "Generated ${audio.samples.size} samples at ${audio.sampleRate} Hz")
@@ -619,7 +623,7 @@ class SherpaOnnxTtsService @Inject constructor(
             val bufferSize = AudioTrack.getMinBufferSize(
                 sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+                AudioFormat.ENCODING_PCM_16BIT,
             )
 
             audioTrack = AudioTrack.Builder()
@@ -627,14 +631,14 @@ class SherpaOnnxTtsService @Inject constructor(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
+                        .build(),
                 )
                 .setAudioFormat(
                     AudioFormat.Builder()
                         .setSampleRate(sampleRate)
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
+                        .build(),
                 )
                 .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size * 2))
                 .setTransferMode(AudioTrack.MODE_STATIC)
@@ -665,7 +669,6 @@ class SherpaOnnxTtsService @Inject constructor(
             // Minimal delay - mic now works immediately after TTS
             // Removed 200ms delay that was causing user's "yes" to be missed
             Thread.sleep(20)
-
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio", e)
             stopAudioTrack()
@@ -764,7 +767,7 @@ class SherpaOnnxTtsService @Inject constructor(
     fun preGenerateAsync(
         text: String,
         speakerId: Int = DEFAULT_SPEAKER_ID,
-        speed: Float = DEFAULT_SPEED
+        speed: Float = DEFAULT_SPEED,
     ) {
         val speechText = EnglishTtsTextNormalizer.normalize(text)
         val textHash = speechText.hashCode()
@@ -999,7 +1002,9 @@ class SherpaOnnxTtsService @Inject constructor(
         val totalDurationMs = if (audioCache.isNotEmpty()) {
             val avgSampleRate = audioCache.values.first().sampleRate
             (totalSamples * 1000L) / avgSampleRate
-        } else 0L
+        } else {
+            0L
+        }
 
         // Disk cache info
         val diskFiles = cacheDir.listFiles { file -> file.extension == "pcm" } ?: emptyArray()

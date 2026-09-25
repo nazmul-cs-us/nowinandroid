@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -11,7 +26,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.Action
 import androidx.glance.appwidget.components.CircleIconButton
@@ -27,6 +41,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.starception.submission.R
+import com.starception.submission.widget.LocalWidgetHostBackground
 import com.starception.submission.widget.samples.collections.layout.Dimensions.NUM_GRID_CELLS
 import com.starception.submission.widget.samples.collections.layout.Dimensions.fillItemItemPadding
 import com.starception.submission.widget.samples.collections.layout.Dimensions.filledItemCornerRadius
@@ -78,89 +93,89 @@ import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDe
  */
 @Composable
 fun ImageTextListLayout(
-  title: String,
-  @DrawableRes titleIconRes: Int,
-  @DrawableRes titleBarActionIconRes: Int,
-  titleBarActionIconContentDescription: String,
-  titleBarAction: (() -> Unit),
-  items: List<ImageTextListItemData>,
+    title: String,
+    @DrawableRes titleIconRes: Int,
+    @DrawableRes titleBarActionIconRes: Int,
+    titleBarActionIconContentDescription: String,
+    titleBarAction: (() -> Unit),
+    items: List<ImageTextListItemData>,
 ) {
-  val imageTextListLayoutSize = ImageTextListLayoutSize.fromLocalSize()
+    val imageTextListLayoutSize = ImageTextListLayoutSize.fromLocalSize()
 
-  fun titleBar(): @Composable (() -> Unit) = {
-    TitleBar(
-      startIcon = ImageProvider(titleIconRes),
-      title = title.takeIf { imageTextListLayoutSize != Small } ?: "",
-      iconColor = GlanceTheme.colors.primary,
-      textColor = GlanceTheme.colors.onSurface,
-      actions = {
-        CircleIconButton(
-          imageProvider = ImageProvider(titleBarActionIconRes),
-          contentDescription = titleBarActionIconContentDescription,
-          contentColor = GlanceTheme.colors.secondary,
-          backgroundColor = null, // transparent
-          onClick = titleBarAction
+    fun titleBar(): @Composable (() -> Unit) = {
+        TitleBar(
+            startIcon = ImageProvider(titleIconRes),
+            title = title.takeIf { imageTextListLayoutSize != Small } ?: "",
+            iconColor = GlanceTheme.colors.primary,
+            textColor = GlanceTheme.colors.onSurface,
+            actions = {
+                CircleIconButton(
+                    imageProvider = ImageProvider(titleBarActionIconRes),
+                    contentDescription = titleBarActionIconContentDescription,
+                    contentColor = GlanceTheme.colors.secondary,
+                    backgroundColor = null, // transparent
+                    onClick = titleBarAction,
+                )
+            },
         )
-      }
-    )
-  }
-
-  val scaffoldTopPadding = if (showTitleBar()) {
-    0.dp
-  } else {
-    widgetPadding
-  }
-
-  Scaffold(
-    backgroundColor = LocalWidgetHostBackground.current,
-    modifier = GlanceModifier
-      .padding(
-        top = scaffoldTopPadding,
-        bottom = widgetPadding
-      ),
-    titleBar = if (showTitleBar()) {
-      titleBar()
-    } else {
-      null
     }
-  ) {
-    Content(items)
-  }
+
+    val scaffoldTopPadding = if (showTitleBar()) {
+        0.dp
+    } else {
+        widgetPadding
+    }
+
+    Scaffold(
+        backgroundColor = LocalWidgetHostBackground.current,
+        modifier = GlanceModifier
+            .padding(
+                top = scaffoldTopPadding,
+                bottom = widgetPadding,
+            ),
+        titleBar = if (showTitleBar()) {
+            titleBar()
+        } else {
+            null
+        },
+    ) {
+        Content(items)
+    }
 }
 
 @Composable
 private fun Content(items: List<ImageTextListItemData>) {
-  val displayTrailingIconIfPresent = shouldDisplayTrailingIconButton()
+    val displayTrailingIconIfPresent = shouldDisplayTrailingIconButton()
 
-  if (items.isEmpty()) {
-    EmptyListContent()
-  } else {
-    when (ImageTextListLayoutSize.fromLocalSize()) {
-      Small -> {
-        ListView(
-          items = items,
-          displayImage = false,
-          displayTrailingIconIfPresent = displayTrailingIconIfPresent,
-        )
-      }
+    if (items.isEmpty()) {
+        EmptyListContent()
+    } else {
+        when (ImageTextListLayoutSize.fromLocalSize()) {
+            Small -> {
+                ListView(
+                    items = items,
+                    displayImage = false,
+                    displayTrailingIconIfPresent = displayTrailingIconIfPresent,
+                )
+            }
 
-      Medium -> {
-        ListView(
-          items = items,
-          displayImage = true,
-          displayTrailingIconIfPresent = displayTrailingIconIfPresent,
-        )
-      }
+            Medium -> {
+                ListView(
+                    items = items,
+                    displayImage = true,
+                    displayTrailingIconIfPresent = displayTrailingIconIfPresent,
+                )
+            }
 
-      Large -> {
-        GridView(
-          items = items,
-          displayImage = true,
-          displayTrailingIconIfPresent = displayTrailingIconIfPresent
-        )
-      }
+            Large -> {
+                GridView(
+                    items = items,
+                    displayImage = true,
+                    displayTrailingIconIfPresent = displayTrailingIconIfPresent,
+                )
+            }
+        }
     }
-  }
 }
 
 /**
@@ -169,24 +184,24 @@ private fun Content(items: List<ImageTextListItemData>) {
  */
 @Composable
 private fun ListView(
-  items: List<ImageTextListItemData>,
-  displayImage: Boolean,
-  displayTrailingIconIfPresent: Boolean,
+    items: List<ImageTextListItemData>,
+    displayImage: Boolean,
+    displayTrailingIconIfPresent: Boolean,
 ) {
-  RoundedScrollingLazyColumn(
-    modifier = GlanceModifier.fillMaxSize(),
-    items = items,
-    verticalItemsSpacing = verticalSpacing,
-    itemContentProvider = { item ->
-      FilledHorizontalListItem(
-        item = item,
-        displayImage = displayImage,
-        displayTrailingIcon = displayTrailingIconIfPresent,
-        onClick = actionStartDemoActivity("Item ${item.key} click"),
+    RoundedScrollingLazyColumn(
         modifier = GlanceModifier.fillMaxSize(),
-      )
-    },
-  )
+        items = items,
+        verticalItemsSpacing = verticalSpacing,
+        itemContentProvider = { item ->
+            FilledHorizontalListItem(
+                item = item,
+                displayImage = displayImage,
+                displayTrailingIcon = displayTrailingIconIfPresent,
+                onClick = actionStartDemoActivity("Item ${item.key} click"),
+                modifier = GlanceModifier.fillMaxSize(),
+            )
+        },
+    )
 }
 
 /**
@@ -196,25 +211,25 @@ private fun ListView(
  */
 @Composable
 private fun GridView(
-  items: List<ImageTextListItemData>,
-  displayImage: Boolean,
-  displayTrailingIconIfPresent: Boolean,
+    items: List<ImageTextListItemData>,
+    displayImage: Boolean,
+    displayTrailingIconIfPresent: Boolean,
 ) {
-  RoundedScrollingLazyVerticalGrid(
-    gridCells = NUM_GRID_CELLS,
-    items = items,
-    cellSpacing = verticalSpacing,
-    itemContentProvider = { item ->
-      FilledHorizontalListItem(
-        item = item,
-        displayImage = displayImage,
-        displayTrailingIcon = displayTrailingIconIfPresent,
-        onClick = actionStartDemoActivity("Item ${item.key} click"),
-        modifier = GlanceModifier.fillMaxSize()
-      )
-    },
-    modifier = GlanceModifier.fillMaxSize()
-  )
+    RoundedScrollingLazyVerticalGrid(
+        gridCells = NUM_GRID_CELLS,
+        items = items,
+        cellSpacing = verticalSpacing,
+        itemContentProvider = { item ->
+            FilledHorizontalListItem(
+                item = item,
+                displayImage = displayImage,
+                displayTrailingIcon = displayTrailingIconIfPresent,
+                onClick = actionStartDemoActivity("Item ${item.key} click"),
+                modifier = GlanceModifier.fillMaxSize(),
+            )
+        },
+        modifier = GlanceModifier.fillMaxSize(),
+    )
 }
 
 /**
@@ -223,83 +238,85 @@ private fun GridView(
  */
 @Composable
 private fun FilledHorizontalListItem(
-  item: ImageTextListItemData,
-  displayImage: Boolean,
-  displayTrailingIcon: Boolean,
-  onClick: Action,
-  modifier: GlanceModifier = GlanceModifier,
+    item: ImageTextListItemData,
+    displayImage: Boolean,
+    displayTrailingIcon: Boolean,
+    onClick: Action,
+    modifier: GlanceModifier = GlanceModifier,
 ) {
-  @Composable
-  fun TitleText() {
-    Text(
-      text = item.title,
-      maxLines = 2,
-      style = TextStyles.titleText,
-    )
-  }
-
-  @Composable
-  fun SupportingText() {
-    Text(
-      text = item.supportingText,
-      maxLines = 2,
-      style = TextStyles.supportingText
-    )
-  }
-
-  @Composable
-  fun SupportingImage() {
-    // Bitmaps are ensured to be within remote views limit in the repository class.
-    val imageProvider = if (item.supportingImageBitmap != null) {
-      ImageProvider(item.supportingImageBitmap)
-    } else {
-      ImageProvider(
-        R.drawable.sample_placeholder_image
-      )
+    @Composable
+    fun TitleText() {
+        Text(
+            text = item.title,
+            maxLines = 2,
+            style = TextStyles.titleText,
+        )
     }
 
-    Image(
-      provider = imageProvider,
-      // contentDescription is null because in this sample, it serves merely as a visual; but if
-      // it gives additional info to user, you should set the appropriate content description.
-      contentDescription = null,
-      // Depending on your image content, you may want to select an appropriate ContentScale.
-      contentScale = ContentScale.Crop,
-      // Fixed size per UX spec
-      modifier = modifier.cornerRadius(imageCornerRadius).size(Dimensions.imageSize)
-    )
-  }
-
-  @Composable
-  fun IconButton() {
-    if (item.trailingIconButton != null) {
-      // Using CircleIconButton allows us to keep the touch target 48x48
-      CircleIconButton(
-        imageProvider = ImageProvider(item.trailingIconButton),
-        backgroundColor = null, // to show transparent background.
-        contentDescription = item.trailingIconButtonContentDescription,
-        onClick = actionStartDemoActivity("Item ${item.key} icon button click")
-      )
+    @Composable
+    fun SupportingText() {
+        Text(
+            text = item.supportingText,
+            maxLines = 2,
+            style = TextStyles.supportingText,
+        )
     }
-  }
 
-  ListItem(
-    modifier = modifier
-      .padding(fillItemItemPadding)
-      .cornerRadius(filledItemCornerRadius)
-      .background(GlanceTheme.colors.secondaryContainer),
-    headlineContent = { TitleText() },
-    supportingContent = { SupportingText() },
-    onClick = onClick,
-    leadingContent = if (displayImage) {
-      { SupportingImage() }
-    } else {
-      null
-    },
-    trailingContent = if (displayTrailingIcon) {
-      { IconButton() }
-    } else null,
-  )
+    @Composable
+    fun SupportingImage() {
+        // Bitmaps are ensured to be within remote views limit in the repository class.
+        val imageProvider = if (item.supportingImageBitmap != null) {
+            ImageProvider(item.supportingImageBitmap)
+        } else {
+            ImageProvider(
+                R.drawable.sample_placeholder_image,
+            )
+        }
+
+        Image(
+            provider = imageProvider,
+            // contentDescription is null because in this sample, it serves merely as a visual; but if
+            // it gives additional info to user, you should set the appropriate content description.
+            contentDescription = null,
+            // Depending on your image content, you may want to select an appropriate ContentScale.
+            contentScale = ContentScale.Crop,
+            // Fixed size per UX spec
+            modifier = modifier.cornerRadius(imageCornerRadius).size(Dimensions.imageSize),
+        )
+    }
+
+    @Composable
+    fun IconButton() {
+        if (item.trailingIconButton != null) {
+            // Using CircleIconButton allows us to keep the touch target 48x48
+            CircleIconButton(
+                imageProvider = ImageProvider(item.trailingIconButton),
+                backgroundColor = null, // to show transparent background.
+                contentDescription = item.trailingIconButtonContentDescription,
+                onClick = actionStartDemoActivity("Item ${item.key} icon button click"),
+            )
+        }
+    }
+
+    ListItem(
+        modifier = modifier
+            .padding(fillItemItemPadding)
+            .cornerRadius(filledItemCornerRadius)
+            .background(GlanceTheme.colors.secondaryContainer),
+        headlineContent = { TitleText() },
+        supportingContent = { SupportingText() },
+        onClick = onClick,
+        leadingContent = if (displayImage) {
+            { SupportingImage() }
+        } else {
+            null
+        },
+        trailingContent = if (displayTrailingIcon) {
+            { IconButton() }
+        } else {
+            null
+        },
+    )
 }
 
 /**
@@ -318,12 +335,12 @@ private fun FilledHorizontalListItem(
  *                                             the accessibility services.
  */
 data class ImageTextListItemData(
-  val key: String,
-  val title: String,
-  val supportingText: String,
-  val supportingImageBitmap: Bitmap? = null,
-  @DrawableRes val trailingIconButton: Int? = null,
-  val trailingIconButtonContentDescription: String? = null,
+    val key: String,
+    val title: String,
+    val supportingText: String,
+    val supportingImageBitmap: Bitmap? = null,
+    @DrawableRes val trailingIconButton: Int? = null,
+    val trailingIconButtonContentDescription: String? = null,
 )
 
 /**
@@ -332,99 +349,100 @@ data class ImageTextListItemData(
  * In this layout, only width breakpoints are used to scale the layout.
  */
 private enum class ImageTextListLayoutSize(val maxWidth: Dp) {
-  // Single column vertical list without images or trailing button in this size.
-  Small(maxWidth = 260.dp),
+    // Single column vertical list without images or trailing button in this size.
+    Small(maxWidth = 260.dp),
 
-  // Single column horizontal list with images and optional trailing button if exists.
-  Medium(maxWidth = 479.dp),
+    // Single column horizontal list with images and optional trailing button if exists.
+    Medium(maxWidth = 479.dp),
 
-  // 2 Column Grid of horizontal list items. Images are always shown; trailing button is shown if
-  // it fits.
-  Large(maxWidth = 644.dp);
+    // 2 Column Grid of horizontal list items. Images are always shown; trailing button is shown if
+    // it fits.
+    Large(maxWidth = 644.dp),
+    ;
 
-  companion object {
-    /**
-     * Returns the corresponding [ImageTextListLayoutSize] to be considered for the current
-     * widget size.
-     */
-    @Composable
-    fun fromLocalSize(): ImageTextListLayoutSize {
-      val width = LocalSize.current.width
+    companion object {
+        /**
+         * Returns the corresponding [ImageTextListLayoutSize] to be considered for the current
+         * widget size.
+         */
+        @Composable
+        fun fromLocalSize(): ImageTextListLayoutSize {
+            val width = LocalSize.current.width
 
-      return if (width >= Medium.maxWidth) {
-        Large
-      } else if (width >= Small.maxWidth) {
-        Medium
-      } else {
-        Small
-      }
+            return if (width >= Medium.maxWidth) {
+                Large
+            } else if (width >= Small.maxWidth) {
+                Medium
+            } else {
+                Small
+            }
+        }
+
+        @Composable
+        fun showTitleBar(): Boolean {
+            return LocalSize.current.height >= 180.dp
+        }
+
+        /**
+         * Returns if icon button should be displayed across medium and large sizes based on
+         * predefined breakpoints.
+         */
+        @Composable
+        fun shouldDisplayTrailingIconButton(): Boolean {
+            val widgetWidth = LocalSize.current.width
+            return (widgetWidth in 340.dp..479.dp || widgetWidth > 620.dp)
+        }
     }
-
-    @Composable
-    fun showTitleBar(): Boolean {
-      return LocalSize.current.height >= 180.dp
-    }
-
-    /**
-     * Returns if icon button should be displayed across medium and large sizes based on
-     * predefined breakpoints.
-     */
-    @Composable
-    fun shouldDisplayTrailingIconButton(): Boolean {
-      val widgetWidth = LocalSize.current.width
-      return (widgetWidth in 340.dp..479.dp || widgetWidth > 620.dp)
-    }
-  }
 }
 
 private object TextStyles {
-  /**
-   * Style for the text displayed as title within each item.
-   */
-  val titleText: TextStyle
-    @Composable get() = TextStyle(
-      fontWeight = FontWeight.Medium,
-      fontSize = if (ImageTextListLayoutSize.fromLocalSize() == Small) {
-        14.sp // M3 Title Small
-      } else {
-        16.sp // M3 Title Medium
-      },
-      color = GlanceTheme.colors.onSurface
-    )
+    /**
+     * Style for the text displayed as title within each item.
+     */
+    val titleText: TextStyle
+        @Composable get() = TextStyle(
+            fontWeight = FontWeight.Medium,
+            fontSize = if (ImageTextListLayoutSize.fromLocalSize() == Small) {
+                14.sp // M3 Title Small
+            } else {
+                16.sp // M3 Title Medium
+            },
+            color = GlanceTheme.colors.onSurface,
+        )
 
-  /**
-   * Style for the text displayed as supporting text within each item.
-   */
-  val supportingText: TextStyle
-    @Composable get() =
-      TextStyle(
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, // M3 Label Medium
-        color = GlanceTheme.colors.secondary
-      )
+    /**
+     * Style for the text displayed as supporting text within each item.
+     */
+    val supportingText: TextStyle
+        @Composable get() =
+            TextStyle(
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp, // M3 Label Medium
+                color = GlanceTheme.colors.secondary,
+            )
 }
 
 private object Dimensions {
-  /** Number of cells in the grid, when items are displayed as a grid. */
-  const val NUM_GRID_CELLS = 2
+    /** Number of cells in the grid, when items are displayed as a grid. */
+    const val NUM_GRID_CELLS = 2
 
-  /** Padding around the the widget content */
-  val widgetPadding = 12.dp
+    /** Padding around the the widget content */
+    val widgetPadding = 12.dp
 
-  /** Corner radius for each filled list item. */
-  val filledItemCornerRadius = 16.dp
+    /** Corner radius for each filled list item. */
+    val filledItemCornerRadius = 16.dp
 
-  /** Padding applied to each item in the list. */
-  val fillItemItemPadding = 12.dp
+    /** Padding applied to each item in the list. */
+    val fillItemItemPadding = 12.dp
 
-  /** Vertical Space between each item in the list. */
-  val verticalSpacing = 4.dp
+    /** Vertical Space between each item in the list. */
+    val verticalSpacing = 4.dp
 
-  /** Size in which images should be displayed in the list. */
-  val imageSize: Dp = 68.dp
+    /** Size in which images should be displayed in the list. */
+    val imageSize: Dp = 68.dp
 
-  /** Corner radius for image in each item. */
-  val imageCornerRadius = 12.dp
+    /** Corner radius for image in each item. */
+    val imageCornerRadius = 12.dp
 }
 
 /**

@@ -24,14 +24,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -61,14 +59,14 @@ import kotlin.random.Random
  * Time periods for sky rendering
  */
 enum class SkyTimePeriod {
-    FAJR,       // Pre-dawn (4:00 AM - 5:30 AM)
-    SUNRISE,    // Sunrise (5:30 AM - 7:00 AM)
-    MORNING,    // Morning (7:00 AM - 10:00 AM)
-    DAY,        // Midday (10:00 AM - 4:00 PM)
-    ASR,        // Afternoon (4:00 PM - 6:00 PM)
-    MAGHRIB,    // Sunset (6:00 PM - 7:30 PM)
-    ISHA,       // Night (7:30 PM - 10:00 PM)
-    NIGHT       // Late night (10:00 PM - 4:00 AM)
+    FAJR, // Pre-dawn (4:00 AM - 5:30 AM)
+    SUNRISE, // Sunrise (5:30 AM - 7:00 AM)
+    MORNING, // Morning (7:00 AM - 10:00 AM)
+    DAY, // Midday (10:00 AM - 4:00 PM)
+    ASR, // Afternoon (4:00 PM - 6:00 PM)
+    MAGHRIB, // Sunset (6:00 PM - 7:30 PM)
+    ISHA, // Night (7:30 PM - 10:00 PM)
+    NIGHT, // Late night (10:00 PM - 4:00 AM)
 }
 
 /**
@@ -110,58 +108,58 @@ data class SkyColors(
     val topColor: Color,
     val middleColor: Color,
     val bottomColor: Color,
-    val horizonColor: Color
+    val horizonColor: Color,
 )
 
 fun getSkyColors(period: SkyTimePeriod): SkyColors {
     return when (period) {
         SkyTimePeriod.FAJR -> SkyColors(
-            topColor = Color(0xFF1a1a2e),      // Deep navy
-            middleColor = Color(0xFF16213e),   // Dark blue
-            bottomColor = Color(0xFF4a3f6b),   // Purple hint
-            horizonColor = Color(0xFFe94560)   // Pink/red dawn
+            topColor = Color(0xFF1a1a2e), // Deep navy
+            middleColor = Color(0xFF16213e), // Dark blue
+            bottomColor = Color(0xFF4a3f6b), // Purple hint
+            horizonColor = Color(0xFFe94560), // Pink/red dawn
         )
         SkyTimePeriod.SUNRISE -> SkyColors(
-            topColor = Color(0xFF4a90a4),      // Light blue
-            middleColor = Color(0xFFf9a825),   // Golden
-            bottomColor = Color(0xFFff7043),   // Orange
-            horizonColor = Color(0xFFffcc80)   // Light orange
+            topColor = Color(0xFF4a90a4), // Light blue
+            middleColor = Color(0xFFf9a825), // Golden
+            bottomColor = Color(0xFFff7043), // Orange
+            horizonColor = Color(0xFFffcc80), // Light orange
         )
         SkyTimePeriod.MORNING -> SkyColors(
-            topColor = Color(0xFF64b5f6),      // Sky blue
-            middleColor = Color(0xFF90caf9),   // Light blue
-            bottomColor = Color(0xFFbbdefb),   // Pale blue
-            horizonColor = Color(0xFFfff8e1)   // Cream
+            topColor = Color(0xFF64b5f6), // Sky blue
+            middleColor = Color(0xFF90caf9), // Light blue
+            bottomColor = Color(0xFFbbdefb), // Pale blue
+            horizonColor = Color(0xFFfff8e1), // Cream
         )
         SkyTimePeriod.DAY -> SkyColors(
-            topColor = Color(0xFF1976d2),      // Bright blue
-            middleColor = Color(0xFF42a5f5),   // Sky blue
-            bottomColor = Color(0xFF90caf9),   // Light blue
-            horizonColor = Color(0xFFe3f2fd)   // Very light blue
+            topColor = Color(0xFF1976d2), // Bright blue
+            middleColor = Color(0xFF42a5f5), // Sky blue
+            bottomColor = Color(0xFF90caf9), // Light blue
+            horizonColor = Color(0xFFe3f2fd), // Very light blue
         )
         SkyTimePeriod.ASR -> SkyColors(
-            topColor = Color(0xFF5c8db8),      // Muted blue
-            middleColor = Color(0xFFffb74d),   // Warm orange
-            bottomColor = Color(0xFFffcc80),   // Light orange
-            horizonColor = Color(0xFFffe0b2)   // Pale orange
+            topColor = Color(0xFF5c8db8), // Muted blue
+            middleColor = Color(0xFFffb74d), // Warm orange
+            bottomColor = Color(0xFFffcc80), // Light orange
+            horizonColor = Color(0xFFffe0b2), // Pale orange
         )
         SkyTimePeriod.MAGHRIB -> SkyColors(
-            topColor = Color(0xFF512da8),      // Deep purple
-            middleColor = Color(0xFFe91e63),   // Pink
-            bottomColor = Color(0xFFff5722),   // Deep orange
-            horizonColor = Color(0xFFffab91)   // Light coral
+            topColor = Color(0xFF512da8), // Deep purple
+            middleColor = Color(0xFFe91e63), // Pink
+            bottomColor = Color(0xFFff5722), // Deep orange
+            horizonColor = Color(0xFFffab91), // Light coral
         )
         SkyTimePeriod.ISHA -> SkyColors(
-            topColor = Color(0xFF0d1b2a),      // Very dark blue
-            middleColor = Color(0xFF1b263b),   // Dark blue
-            bottomColor = Color(0xFF415a77),   // Grayish blue
-            horizonColor = Color(0xFF778da9)   // Light grayish blue
+            topColor = Color(0xFF0d1b2a), // Very dark blue
+            middleColor = Color(0xFF1b263b), // Dark blue
+            bottomColor = Color(0xFF415a77), // Grayish blue
+            horizonColor = Color(0xFF778da9), // Light grayish blue
         )
         SkyTimePeriod.NIGHT -> SkyColors(
-            topColor = Color(0xFF0a0a14),      // Almost black
-            middleColor = Color(0xFF0d1b2a),   // Very dark blue
-            bottomColor = Color(0xFF1b263b),   // Dark blue
-            horizonColor = Color(0xFF2d3a4a)   // Dark grayish
+            topColor = Color(0xFF0a0a14), // Almost black
+            middleColor = Color(0xFF0d1b2a), // Very dark blue
+            bottomColor = Color(0xFF1b263b), // Dark blue
+            horizonColor = Color(0xFF2d3a4a), // Dark grayish
         )
     }
 }
@@ -173,7 +171,7 @@ data class Star(
     val x: Float,
     val y: Float,
     val size: Float,
-    val alpha: Float
+    val alpha: Float,
 )
 
 /**
@@ -184,14 +182,14 @@ data class ShootingStar(
     val startX: Float,
     val startY: Float,
     // Angle in radians
-    val angle: Float,  
+    val angle: Float,
     val length: Float,
     // Animation speed multiplier
-    val speed: Float,  
+    val speed: Float,
     // Delay before appearing (0-1)
-    val delay: Float,  
+    val delay: Float,
     // Seed for this shooting star instance
-    val seed: Int = 0  
+    val seed: Int = 0,
 )
 
 /**
@@ -206,7 +204,7 @@ private fun generateShootingStar(seed: Int): ShootingStar {
         length = random.nextFloat() * 0.1f + 0.05f,
         speed = random.nextFloat() * 0.4f + 0.7f,
         delay = random.nextFloat(),
-        seed = seed
+        seed = seed,
     )
 }
 
@@ -218,7 +216,7 @@ private fun generateShootingStar(seed: Int): ShootingStar {
 fun DynamicSkyHeader(
     modifier: Modifier = Modifier,
     height: Dp = 300.dp,
-    period: SkyTimePeriod = getCurrentSkyPeriod()
+    period: SkyTimePeriod = getCurrentSkyPeriod(),
 ) {
     val skyColors = getSkyColors(period)
 
@@ -233,7 +231,7 @@ fun DynamicSkyHeader(
                 x = random.nextFloat(),
                 y = random.nextFloat() * 0.65f, // Stars only in upper 65%
                 size = random.nextFloat() * 2.5f + 0.5f,
-                alpha = random.nextFloat() * 0.6f + 0.2f
+                alpha = random.nextFloat() * 0.6f + 0.2f,
             )
         }
     }
@@ -255,9 +253,9 @@ fun DynamicSkyHeader(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "twinkle"
+        label = "twinkle",
     )
 
     // Shooting star animation - smooth continuous animation
@@ -266,15 +264,15 @@ fun DynamicSkyHeader(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(8000, easing = LinearEasing), // Slower for smoother movement
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "shootingStar"
+        label = "shootingStar",
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .height(height),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
@@ -287,11 +285,11 @@ fun DynamicSkyHeader(
                         skyColors.topColor,
                         skyColors.middleColor,
                         skyColors.bottomColor,
-                        skyColors.horizonColor
+                        skyColors.horizonColor,
                     ),
                     startY = 0f,
-                    endY = canvasHeight
-                )
+                    endY = canvasHeight,
+                ),
             )
 
             // Draw horizon glow for sunrise/sunset
@@ -337,13 +335,13 @@ private fun DrawScope.drawHorizonGlow(width: Float, height: Float, period: SkyTi
             colors = listOf(
                 glowColor.copy(alpha = 0.6f),
                 glowColor.copy(alpha = 0.3f),
-                Color.Transparent
+                Color.Transparent,
             ),
             center = Offset(width * 0.5f, height * 0.85f),
-            radius = width * 0.5f
+            radius = width * 0.5f,
         ),
         center = Offset(width * 0.5f, height * 0.85f),
-        radius = width * 0.5f
+        radius = width * 0.5f,
     )
 }
 
@@ -352,7 +350,7 @@ private fun DrawScope.drawStars(
     width: Float,
     height: Float,
     twinkleAlpha: Float,
-    period: SkyTimePeriod
+    period: SkyTimePeriod,
 ) {
     val starVisibility = when (period) {
         SkyTimePeriod.NIGHT -> 1f
@@ -370,14 +368,14 @@ private fun DrawScope.drawStars(
             drawCircle(
                 color = Color.White.copy(alpha = adjustedAlpha * 0.3f),
                 radius = star.size * 2f,
-                center = Offset(star.x * width, star.y * height)
+                center = Offset(star.x * width, star.y * height),
             )
         }
 
         drawCircle(
             color = Color.White.copy(alpha = adjustedAlpha),
             radius = star.size,
-            center = Offset(star.x * width, star.y * height)
+            center = Offset(star.x * width, star.y * height),
         )
     }
 }
@@ -387,7 +385,7 @@ private fun DrawScope.drawShootingStars(
     width: Float,
     height: Float,
     progress: Float,
-    period: SkyTimePeriod
+    period: SkyTimePeriod,
 ) {
     val visibility = when (period) {
         SkyTimePeriod.NIGHT -> 1f
@@ -434,28 +432,28 @@ private fun DrawScope.drawShootingStars(
                     colors = listOf(
                         Color.White.copy(alpha = alpha),
                         Color.White.copy(alpha = alpha * 0.5f),
-                        Color.Transparent
+                        Color.Transparent,
                     ),
                     start = Offset(currentX, currentY),
-                    end = Offset(trailEndX, trailEndY)
+                    end = Offset(trailEndX, trailEndY),
                 ),
                 start = Offset(currentX, currentY),
                 end = Offset(trailEndX, trailEndY),
-                strokeWidth = 2.5f
+                strokeWidth = 2.5f,
             )
 
             // Bright head of shooting star
             drawCircle(
                 color = Color.White.copy(alpha = alpha),
                 radius = 3f,
-                center = Offset(currentX, currentY)
+                center = Offset(currentX, currentY),
             )
 
             // Glow around head
             drawCircle(
                 color = Color.White.copy(alpha = alpha * 0.4f),
                 radius = 6f,
-                center = Offset(currentX, currentY)
+                center = Offset(currentX, currentY),
             )
         }
     }
@@ -470,7 +468,7 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
             drawSun(
                 center = Offset(width * 0.45f, height * 0.68f),
                 radius = width * 0.08f,
-                glowRadius = width * 0.15f
+                glowRadius = width * 0.15f,
             )
         }
         SkyTimePeriod.MORNING -> {
@@ -478,7 +476,7 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
             drawSun(
                 center = Offset(width * 0.72f, height * 0.38f),
                 radius = width * 0.065f,
-                glowRadius = width * 0.11f
+                glowRadius = width * 0.11f,
             )
         }
         SkyTimePeriod.DAY -> {
@@ -486,7 +484,7 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
             drawSun(
                 center = Offset(width * 0.75f, height * 0.32f),
                 radius = width * 0.055f,
-                glowRadius = width * 0.09f
+                glowRadius = width * 0.09f,
             )
         }
         SkyTimePeriod.ASR -> {
@@ -494,7 +492,7 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
             drawSun(
                 center = Offset(width * 0.15f, height * 0.42f),
                 radius = width * 0.065f,
-                glowRadius = width * 0.11f
+                glowRadius = width * 0.11f,
             )
         }
         SkyTimePeriod.MAGHRIB -> {
@@ -503,14 +501,14 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
                 center = Offset(width * 0.45f, height * 0.70f),
                 radius = width * 0.09f,
                 glowRadius = width * 0.18f,
-                isSettingSun = true
+                isSettingSun = true,
             )
         }
         SkyTimePeriod.ISHA, SkyTimePeriod.NIGHT -> {
             // Crescent moon - moved left and up
             drawCrescentMoon(
                 center = Offset(width * 0.72f, height * 0.32f),
-                radius = width * 0.055f
+                radius = width * 0.055f,
             )
         }
         SkyTimePeriod.FAJR -> {
@@ -518,7 +516,7 @@ private fun DrawScope.drawCelestialBody(width: Float, height: Float, period: Sky
             drawCrescentMoon(
                 center = Offset(width * 0.12f, height * 0.35f),
                 radius = width * 0.05f,
-                alpha = 0.6f
+                alpha = 0.6f,
             )
         }
     }
@@ -528,7 +526,7 @@ private fun DrawScope.drawSun(
     center: Offset,
     radius: Float,
     glowRadius: Float,
-    isSettingSun: Boolean = false
+    isSettingSun: Boolean = false,
 ) {
     val sunColor = if (isSettingSun) Color(0xFFFF6B35) else Color(0xFFFFD54F)
     val glowColor = if (isSettingSun) Color(0xFFFF8A65) else Color(0xFFFFE082)
@@ -539,13 +537,13 @@ private fun DrawScope.drawSun(
             colors = listOf(
                 glowColor.copy(alpha = 0.4f),
                 glowColor.copy(alpha = 0.1f),
-                Color.Transparent
+                Color.Transparent,
             ),
             center = center,
-            radius = glowRadius
+            radius = glowRadius,
         ),
         center = center,
-        radius = glowRadius
+        radius = glowRadius,
     )
 
     // Sun body
@@ -554,20 +552,20 @@ private fun DrawScope.drawSun(
             colors = listOf(
                 Color.White,
                 sunColor,
-                sunColor.copy(alpha = 0.8f)
+                sunColor.copy(alpha = 0.8f),
             ),
             center = center,
-            radius = radius
+            radius = radius,
         ),
         center = center,
-        radius = radius
+        radius = radius,
     )
 }
 
 private fun DrawScope.drawCrescentMoon(
     center: Offset,
     radius: Float,
-    alpha: Float = 1f
+    alpha: Float = 1f,
 ) {
     val moonColor = Color(0xFFFFFDE7).copy(alpha = alpha)
     val shadowColor = Color(0xFF1a1a2e)
@@ -577,27 +575,27 @@ private fun DrawScope.drawCrescentMoon(
         brush = Brush.radialGradient(
             colors = listOf(
                 moonColor.copy(alpha = 0.3f * alpha),
-                Color.Transparent
+                Color.Transparent,
             ),
             center = center,
-            radius = radius * 2f
+            radius = radius * 2f,
         ),
         center = center,
-        radius = radius * 2f
+        radius = radius * 2f,
     )
 
     // Full moon circle
     drawCircle(
         color = moonColor,
         radius = radius,
-        center = center
+        center = center,
     )
 
     // Shadow circle to create crescent effect
     drawCircle(
         color = shadowColor,
         radius = radius * 0.85f,
-        center = Offset(center.x + radius * 0.4f, center.y - radius * 0.1f)
+        center = Offset(center.x + radius * 0.4f, center.y - radius * 0.1f),
     )
 }
 
@@ -608,7 +606,7 @@ private fun DrawScope.drawMasjidSilhouette(
     painter: Painter,
     width: Float,
     height: Float,
-    period: SkyTimePeriod
+    period: SkyTimePeriod,
 ) {
     // Determine silhouette color based on time period
     val silhouetteColor = when (period) {
@@ -642,8 +640,8 @@ private fun DrawScope.drawMasjidSilhouette(
                 size = Size(finalWidth, finalHeight),
                 colorFilter = ColorFilter.tint(
                     color = silhouetteColor.copy(alpha = silhouetteAlpha),
-                    blendMode = BlendMode.SrcIn
-                )
+                    blendMode = BlendMode.SrcIn,
+                ),
             )
         }
     }
@@ -656,10 +654,10 @@ private fun DrawScope.drawMasjidSilhouette(
 private fun DrawScope.drawSilhouetteOverlays(
     width: Float,
     height: Float,
-    period: SkyTimePeriod
+    period: SkyTimePeriod,
 ) {
     // Position calculations based on silhouette placement
-    val baseY = height  // At very bottom
+    val baseY = height // At very bottom
     val buildingBaseHeight = height * 0.08f
 
     // ===== MINARET CRESCENTS =====
@@ -671,7 +669,7 @@ private fun DrawScope.drawSilhouetteOverlays(
         width * 0.30f to minaretHeight * 0.9f,
         width * 0.70f to minaretHeight * 0.9f,
         width * 0.85f to minaretHeight * 0.85f,
-        width * 0.98f to minaretHeight
+        width * 0.98f to minaretHeight,
     )
 
     val crescentColor = Color(0xFFFFD700)
@@ -686,7 +684,7 @@ private fun DrawScope.drawSilhouetteOverlays(
         drawCircle(
             color = crescentColor.copy(alpha = crescentAlpha),
             radius = width * 0.006f,
-            center = Offset(x, minaretTop)
+            center = Offset(x, minaretTop),
         )
     }
 
@@ -707,7 +705,7 @@ private fun DrawScope.drawSilhouetteOverlays(
                 sweepAngle = 180f,
                 useCenter = true,
                 topLeft = Offset(windowX - width * 0.012f, baseY - height * 0.055f),
-                size = Size(width * 0.024f, height * 0.025f)
+                size = Size(width * 0.024f, height * 0.025f),
             )
         }
     }
@@ -732,8 +730,8 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
     // Reference: https://en.wikipedia.org/wiki/Prophet's_Mosque
 
     // Position silhouette in bottom portion only - leave top 55% clear for sky/content
-    val baseY = height * 1.0f  // At very bottom
-    val silhouetteTopLimit = height * 0.55f  // Silhouette stays below this line
+    val baseY = height * 1.0f // At very bottom
+    val silhouetteTopLimit = height * 0.55f // Silhouette stays below this line
     val centerX = width * 0.5f
 
     // ===== MAIN BUILDING BASE - Extended horizontal Ottoman structure =====
@@ -748,7 +746,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
     drawPath(
         path = buildingPath,
         color = silhouetteColor.copy(alpha = silhouetteAlpha),
-        style = Fill
+        style = Fill,
     )
 
     // ===== MINARETS - 6 visible from this angle (cylindrical top, octagonal middle, square base) =====
@@ -762,7 +760,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         width * 0.30f to minaretHeight * 0.9f,
         width * 0.70f to minaretHeight * 0.9f,
         width * 0.85f to minaretHeight * 0.85f,
-        width * 0.98f to minaretHeight
+        width * 0.98f to minaretHeight,
     )
 
     minaretPositions.forEach { (x, h) ->
@@ -772,7 +770,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         drawPath(
             path = minaretPath,
             color = silhouetteColor.copy(alpha = silhouetteAlpha),
-            style = Fill
+            style = Fill,
         )
     }
 
@@ -787,15 +785,17 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
             val domePath = Path().apply {
                 moveTo(domeX - smallDomeWidth, baseY - buildingBaseHeight)
                 quadraticBezierTo(
-                    domeX, baseY - buildingBaseHeight - smallDomeHeight,
-                    domeX + smallDomeWidth, baseY - buildingBaseHeight
+                    domeX,
+                    baseY - buildingBaseHeight - smallDomeHeight,
+                    domeX + smallDomeWidth,
+                    baseY - buildingBaseHeight,
                 )
                 close()
             }
             drawPath(
                 path = domePath,
                 color = silhouetteColor.copy(alpha = silhouetteAlpha),
-                style = Fill
+                style = Fill,
             )
         }
     }
@@ -817,24 +817,30 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
     drawPath(
         path = greenDomeBasePath,
         color = silhouetteColor.copy(alpha = silhouetteAlpha),
-        style = Fill
+        style = Fill,
     )
 
     // Draw the actual GREEN dome with color!
-    val greenDomeColor = Color(0xFF228B22)  // Forest green - the actual green dome color
+    val greenDomeColor = Color(0xFF228B22) // Forest green - the actual green dome color
     val greenDomePath = Path().apply {
         val domeBottom = baseY - buildingBaseHeight - greenDomeBaseHeight
         moveTo(greenDomeX - greenDomeWidth, domeBottom)
         // Semi-circular dome shape (not onion)
         cubicTo(
-            greenDomeX - greenDomeWidth, domeBottom - greenDomeHeight * 0.8f,
-            greenDomeX - greenDomeWidth * 0.3f, domeBottom - greenDomeHeight,
-            greenDomeX, domeBottom - greenDomeHeight
+            greenDomeX - greenDomeWidth,
+            domeBottom - greenDomeHeight * 0.8f,
+            greenDomeX - greenDomeWidth * 0.3f,
+            domeBottom - greenDomeHeight,
+            greenDomeX,
+            domeBottom - greenDomeHeight,
         )
         cubicTo(
-            greenDomeX + greenDomeWidth * 0.3f, domeBottom - greenDomeHeight,
-            greenDomeX + greenDomeWidth, domeBottom - greenDomeHeight * 0.8f,
-            greenDomeX + greenDomeWidth, domeBottom
+            greenDomeX + greenDomeWidth * 0.3f,
+            domeBottom - greenDomeHeight,
+            greenDomeX + greenDomeWidth,
+            domeBottom - greenDomeHeight * 0.8f,
+            greenDomeX + greenDomeWidth,
+            domeBottom,
         )
         close()
     }
@@ -848,7 +854,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
     drawPath(
         path = greenDomePath,
         color = greenDomeColor.copy(alpha = greenDomeAlpha),
-        style = Fill
+        style = Fill,
     )
 
     // ===== SECONDARY DOME (smaller, next to green dome) =====
@@ -859,15 +865,17 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
     val secondDomePath = Path().apply {
         moveTo(secondDomeX - secondDomeWidth, baseY - buildingBaseHeight)
         quadraticBezierTo(
-            secondDomeX, baseY - buildingBaseHeight - secondDomeHeight,
-            secondDomeX + secondDomeWidth, baseY - buildingBaseHeight
+            secondDomeX,
+            baseY - buildingBaseHeight - secondDomeHeight,
+            secondDomeX + secondDomeWidth,
+            baseY - buildingBaseHeight,
         )
         close()
     }
     drawPath(
         path = secondDomePath,
         color = silhouetteColor.copy(alpha = silhouetteAlpha),
-        style = Fill
+        style = Fill,
     )
 
     // ===== FINIAL AND CRESCENT ON GREEN DOME =====
@@ -879,20 +887,20 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         color = poleColor.copy(alpha = greenDomeAlpha),
         start = Offset(greenDomeX, greenDomeTop),
         end = Offset(greenDomeX, greenDomeTop - height * 0.03f),
-        strokeWidth = width * 0.004f
+        strokeWidth = width * 0.004f,
     )
 
     // Gold crescent on top
     drawCircle(
         color = poleColor.copy(alpha = greenDomeAlpha),
         radius = width * 0.012f,
-        center = Offset(greenDomeX, greenDomeTop - height * 0.04f)
+        center = Offset(greenDomeX, greenDomeTop - height * 0.04f),
     )
     // Crescent cutout
     drawCircle(
         color = greenDomeColor.copy(alpha = greenDomeAlpha),
         radius = width * 0.009f,
-        center = Offset(greenDomeX + width * 0.004f, greenDomeTop - height * 0.042f)
+        center = Offset(greenDomeX + width * 0.004f, greenDomeTop - height * 0.042f),
     )
 
     // ===== MINARET CRESCENTS =====
@@ -908,7 +916,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
         drawCircle(
             color = crescentColor.copy(alpha = crescentAlpha),
             radius = width * 0.006f,
-            center = Offset(x, minaretTop)
+            center = Offset(x, minaretTop),
         )
     }
 
@@ -929,7 +937,7 @@ private fun DrawScope.drawLandscapeSilhouette(width: Float, height: Float, perio
                 sweepAngle = 180f,
                 useCenter = true,
                 topLeft = Offset(windowX - width * 0.012f, baseY - height * 0.055f),
-                size = androidx.compose.ui.geometry.Size(width * 0.024f, height * 0.025f)
+                size = androidx.compose.ui.geometry.Size(width * 0.024f, height * 0.025f),
             )
         }
     }
@@ -954,7 +962,7 @@ private fun drawMinaretAccurate(path: Path, x: Float, baseY: Float, width: Float
 
         // Cylindrical top section tapering to point
         lineTo(x - width * 0.5f, baseY - height * 0.92f)
-        lineTo(x, baseY - height - height * 0.05f)  // Pointed top
+        lineTo(x, baseY - height - height * 0.05f) // Pointed top
         lineTo(x + width * 0.5f, baseY - height * 0.92f)
 
         // Right side (mirror)

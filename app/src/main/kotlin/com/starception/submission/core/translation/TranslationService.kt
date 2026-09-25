@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.translation
 
 import android.content.Context
@@ -39,25 +55,25 @@ class TranslationService private constructor(private val context: Context) {
         private val languageCodeMap = mapOf(
             "en" to "en",
             "ar" to "ar",
-            "bn" to "bn",  // Bengali
-            "zh" to "zh",  // Chinese
-            "es" to "es",  // Spanish
-            "fr" to "fr",  // French
-            "id" to "id",  // Indonesian
-            "ru" to "ru",  // Russian
-            "sv" to "sv",  // Swedish
-            "tr" to "tr",  // Turkish
-            "ur" to "ur"   // Urdu
+            "bn" to "bn", // Bengali
+            "zh" to "zh", // Chinese
+            "es" to "es", // Spanish
+            "fr" to "fr", // French
+            "id" to "id", // Indonesian
+            "ru" to "ru", // Russian
+            "sv" to "sv", // Swedish
+            "tr" to "tr", // Turkish
+            "ur" to "ur", // Urdu
         )
 
         // Reverso supported language pairs (from English)
         private val reversoSupportedLanguages = setOf(
             "ar", "zh", "fr", "de", "he", "it", "ja", "ko", "nl", "pl",
-            "pt", "ro", "ru", "es", "tr", "uk"
+            "pt", "ro", "ru", "es", "tr", "uk",
         )
 
         // Translation provider constants
-        const val PROVIDER_AUTO = "auto"      // Try Reverso first, fallback to Google
+        const val PROVIDER_AUTO = "auto" // Try Reverso first, fallback to Google
         const val PROVIDER_GOOGLE = "google"
         const val PROVIDER_REVERSO = "reverso"
         private const val PROVIDER_KEY = "translation_provider"
@@ -264,12 +280,15 @@ class TranslationService private constructor(private val context: Context) {
                 put("from", sourceLang)
                 put("to", targetLang)
                 put("format", "text")
-                put("options", JSONObject().apply {
-                    put("sentenceSplitter", true)
-                    put("origin", "reversomobile")
-                    put("contextResults", false)
-                    put("languageDetection", false)
-                })
+                put(
+                    "options",
+                    JSONObject().apply {
+                        put("sentenceSplitter", true)
+                        put("origin", "reversomobile")
+                        put("contextResults", false)
+                        put("languageDetection", false)
+                    },
+                )
             }
 
             connection.outputStream.bufferedWriter().use { it.write(requestBody.toString()) }
@@ -302,7 +321,7 @@ class TranslationService private constructor(private val context: Context) {
     private fun translateWithGoogle(text: String, sourceLang: String, targetLang: String): String? {
         return try {
             // Split long text into chunks to avoid URL length limits
-            val maxChunkSize = 1500  // Safe limit for URL encoding
+            val maxChunkSize = 1500 // Safe limit for URL encoding
             if (text.length > maxChunkSize) {
                 Log.d(TAG, "Text too long (${text.length} chars), splitting into chunks")
                 val chunks = text.chunked(maxChunkSize)
@@ -333,7 +352,7 @@ class TranslationService private constructor(private val context: Context) {
         return try {
             val encodedText = URLEncoder.encode(text, "UTF-8")
             val urlString = "https://translate.googleapis.com/translate_a/single?" +
-                    "client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=$encodedText"
+                "client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=$encodedText"
 
             val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
@@ -394,7 +413,7 @@ class TranslationService private constructor(private val context: Context) {
         // Check persistent cache
         val cached = cachePrefs.getString(key, null)
         if (cached != null) {
-            memoryCache[key] = cached  // Populate memory cache
+            memoryCache[key] = cached // Populate memory cache
         }
         return cached
     }

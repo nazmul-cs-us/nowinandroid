@@ -1,21 +1,39 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.islamic.salah.presentation.screen
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,12 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.islamic.qibla.presentation.component.QiblaCompass
 import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
 import com.starception.submission.prayer.model.DayPrayerTimes
@@ -36,27 +51,24 @@ import com.starception.submission.prayer.model.PrayerTime
 import com.starception.submission.prayer.service.EnhancedLocationService
 import com.starception.submission.prayer.viewmodel.PrayerTimesViewModel
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.PaddingValues
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 
 /**
  * Islamic Salah (Prayer) Dashboard Screen
- * 
+ *
  * Main screen for Islamic prayer times application displaying:
  * - Real-time prayer schedules with status
  * - Next prayer countdown and current prayer indicator
  * - Qibla direction compass for prayer orientation
  * - Location-based accurate prayer time calculations
  * - Islamic theming with Arabic prayer names
- * 
+ *
  * ## Features:
  * - **Real-time Updates**: Live prayer status and countdown
  * - **Qibla Compass**: Direction to Mecca for prayer
  * - **Location Services**: GPS-based precise calculations
  * - **Islamic Design**: Green color scheme, Arabic names, Islamic iconography
  * - **Material 3**: Modern, accessible design system
- * 
+ *
  * @param onSettingsClick Callback for settings navigation
  * @param locationService Enhanced location service for GPS functionality
  * @param viewModel Prayer times view model (injected via Hilt)
@@ -66,23 +78,23 @@ import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 fun SalahDashboard(
     onSettingsClick: () -> Unit = {},
     locationService: EnhancedLocationService? = null,
-    viewModel: PrayerTimesViewModel = hiltViewModel()
+    viewModel: PrayerTimesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
     ) {
         // Top app bar
         SalahTopBar(
             onSettingsClick = onSettingsClick,
-            onRefreshClick = { viewModel.refresh() }
+            onRefreshClick = { viewModel.refresh() },
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         when {
             uiState.isLoading -> {
                 SalahLoadingState()
@@ -90,13 +102,13 @@ fun SalahDashboard(
             uiState.prayerTimes != null -> {
                 SalahContent(
                     dayPrayerTimes = uiState.prayerTimes!!,
-                    locationService = locationService
+                    locationService = locationService,
                 )
             }
             uiState.error != null -> {
                 SalahErrorState(
                     message = uiState.error!!,
-                    onRetryClick = { viewModel.refresh() }
+                    onRetryClick = { viewModel.refresh() },
                 )
             }
         }
@@ -110,14 +122,14 @@ fun SalahDashboard(
 @Composable
 private fun SalahTopBar(
     onSettingsClick: () -> Unit,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Title with Islamic greeting
         Column {
@@ -125,18 +137,18 @@ private fun SalahTopBar(
                 text = "Home",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = "أوقات الصلاة", // "Prayer Times" in Arabic
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         // Action buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             IconButton(
                 onClick = {
@@ -145,12 +157,12 @@ private fun SalahTopBar(
                 },
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)),
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh prayer times",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
 
@@ -161,12 +173,12 @@ private fun SalahTopBar(
                 },
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)),
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -179,7 +191,7 @@ private fun SalahTopBar(
 @Composable
 private fun SalahContent(
     dayPrayerTimes: DayPrayerTimes,
-    locationService: EnhancedLocationService?
+    locationService: EnhancedLocationService?,
 ) {
     val actualPrayers = dayPrayerTimes.getActualPrayers()
     val nextPrayer = dayPrayerTimes.getNextPrayer()
@@ -194,26 +206,26 @@ private fun SalahContent(
         // LANDSCAPE LAYOUT: Two-column side-by-side
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Left column: Next prayer card + Qibla globe
             Column(
                 modifier = Modifier.weight(0.5f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Next prayer card with Qibla compass
                 NextPrayerCard(
                     nextPrayer = nextPrayer,
                     currentPrayer = currentPrayer,
                     timeUntilNext = timeUntilNext ?: "",
-                    locationService = locationService
+                    locationService = locationService,
                 )
 
                 // 3D Globe showing Qibla direction
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
                 ) {
                     QiblaGlobeCard(locationService = locationService)
                 }
@@ -222,7 +234,7 @@ private fun SalahContent(
             // Right column: Prayer times list + Location
             LazyColumn(
                 modifier = Modifier.weight(0.5f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Prayer times list
                 item {
@@ -239,7 +251,7 @@ private fun SalahContent(
         // PORTRAIT LAYOUT: Original vertical layout
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = FloatingNavClearance)
+            contentPadding = PaddingValues(bottom = FloatingNavClearance),
         ) {
             // Next prayer card with Qibla compass
             item {
@@ -247,14 +259,14 @@ private fun SalahContent(
                     nextPrayer = nextPrayer,
                     currentPrayer = currentPrayer,
                     timeUntilNext = timeUntilNext ?: "",
-                    locationService = locationService
+                    locationService = locationService,
                 )
             }
 
             // 3D Globe showing Qibla direction to Makkah
             item {
                 QiblaGlobeCard(
-                    locationService = locationService
+                    locationService = locationService,
                 )
             }
 
@@ -279,62 +291,62 @@ private fun NextPrayerCard(
     nextPrayer: PrayerTime?,
     currentPrayer: PrayerTime?,
     timeUntilNext: String,
-    locationService: EnhancedLocationService?
+    locationService: EnhancedLocationService?,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        )
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+        ),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Qibla compass
             QiblaCompass(
                 progress = 0f,
                 size = 120.dp,
-                locationService = locationService
+                locationService = locationService,
             )
-            
+
             // Prayer info
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 if (currentPrayer != null) {
                     Text(
                         text = "Current Prayer",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "${currentPrayer.name} (${getArabicName(currentPrayer.name)})",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                
+
                 if (nextPrayer != null) {
                     Text(
                         text = "Next Prayer",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "${nextPrayer.name} (${getArabicName(nextPrayer.name)})",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "in $timeUntilNext",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -349,24 +361,24 @@ private fun NextPrayerCard(
 private fun PrayerTimesSection(prayers: List<PrayerTime>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
         ) {
             Text(
                 text = "Today's Prayers",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
             )
-            
+
             prayers.forEach { prayer ->
                 PrayerTimeRow(prayer = prayer)
                 if (prayer != prayers.last()) {
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                     )
                 }
             }
@@ -384,7 +396,7 @@ private fun PrayerTimeRow(prayer: PrayerTime) {
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
             Text(
@@ -395,18 +407,18 @@ private fun PrayerTimeRow(prayer: PrayerTime) {
                     prayer.isCurrently -> MaterialTheme.colorScheme.primary
                     prayer.isNext -> MaterialTheme.colorScheme.secondary
                     else -> MaterialTheme.colorScheme.onSurface
-                }
+                },
             )
             Text(
                 text = getArabicName(prayer.name),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = prayer.time.toString(),
@@ -416,15 +428,15 @@ private fun PrayerTimeRow(prayer: PrayerTime) {
                     prayer.isCurrently -> MaterialTheme.colorScheme.primary
                     prayer.isNext -> MaterialTheme.colorScheme.secondary
                     else -> MaterialTheme.colorScheme.onSurface
-                }
+                },
             )
-            
+
             // Status indicator
             when {
                 prayer.isCurrently -> {
                     Badge(
                         containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        contentColor = MaterialTheme.colorScheme.primary
+                        contentColor = MaterialTheme.colorScheme.primary,
                     ) {
                         Text("NOW", fontSize = 10.sp)
                     }
@@ -432,7 +444,7 @@ private fun PrayerTimeRow(prayer: PrayerTime) {
                 prayer.isNext -> {
                     Badge(
                         containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                        contentColor = MaterialTheme.colorScheme.secondary
+                        contentColor = MaterialTheme.colorScheme.secondary,
                     ) {
                         Text("NEXT", fontSize = 10.sp)
                     }
@@ -465,43 +477,43 @@ private fun LocationCard(location: com.starception.submission.prayer.model.Locat
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = "Location",
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text(
                     text = locationName,
                     style = if (containsArabic && arabicFontFamily != null) {
                         MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = arabicFontFamily,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
                         )
                     } else {
                         MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
                         )
                     },
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "Lat: ${String.format("%.4f", location.latitude)}, Lng: ${String.format("%.4f", location.longitude)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -527,19 +539,19 @@ private fun getArabicFontFamilyForLocationCard(selectedFont: String): androidx.c
 private fun SalahLoadingState() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = "Calculating prayer times...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -551,42 +563,42 @@ private fun SalahLoadingState() {
 @Composable
 private fun SalahErrorState(
     message: String,
-    onRetryClick: () -> Unit
+    onRetryClick: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text = "Prayer Times Unavailable",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onErrorContainer,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
-            
+
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
-            
+
             NiaOutlinedButton(
-                onClick = onRetryClick
+                onClick = onRetryClick,
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Retry")
@@ -600,7 +612,7 @@ private fun SalahErrorState(
  */
 @Composable
 private fun QiblaGlobeCard(
-    locationService: EnhancedLocationService?
+    locationService: EnhancedLocationService?,
 ) {
     var userLocation by remember { mutableStateOf<android.location.Location?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -615,7 +627,7 @@ private fun QiblaGlobeCard(
                     },
                     onFailure = {
                         // Handle error - location unavailable
-                    }
+                    },
                 )
             }
         }
@@ -628,7 +640,7 @@ private fun QiblaGlobeCard(
             userLongitude = userLocation!!.longitude,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)  // Match the height we want for the tile
+                .height(200.dp), // Match the height we want for the tile
         )
     }
 }

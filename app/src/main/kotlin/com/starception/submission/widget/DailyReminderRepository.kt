@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,22 +130,22 @@ internal object DailyReminderRepository {
                 loadPrayerHadith(repository, currentPrayer, seed)?.let { return it }
             }
             val random = Random(seed)
-        // Several attempts, because a large share of Bukhari's entries are not readable on
-        // their own — see [isSelfContained]. Picking the first number that comes up gave
-        // the widget "Narrated Abu at-Tufail: The above mentioned Statement of `Ali.",
-        // which is a cross-reference, not a reminder. Bounded so a database of nothing but
-        // fragments cannot spin here; it falls through to the dua or the fallback instead.
-        // The candidates are drawn up front, so which hadith a given day resolves to is a
-        // pure function of the seed. Drawing them inside the loop made the choice depend on
-        // how many lookups happened to succeed: a cold database that returned null for an
-        // early candidate pushed the selection further down the sequence, so the same day
-        // rendered a different hadith on a warm process than on a cold one. The card and
-        // the link it carries are built together, but a re-render that silently changed its
-        // mind is still a card whose text no longer matches what the user last read.
-        //
-        // The first few hundred are the well-known ones on intention, faith and prayer,
-        // which read better on a home screen than a ruling pulled from the middle of a
-        // chapter on inheritance.
+            // Several attempts, because a large share of Bukhari's entries are not readable on
+            // their own — see [isSelfContained]. Picking the first number that comes up gave
+            // the widget "Narrated Abu at-Tufail: The above mentioned Statement of `Ali.",
+            // which is a cross-reference, not a reminder. Bounded so a database of nothing but
+            // fragments cannot spin here; it falls through to the dua or the fallback instead.
+            // The candidates are drawn up front, so which hadith a given day resolves to is a
+            // pure function of the seed. Drawing them inside the loop made the choice depend on
+            // how many lookups happened to succeed: a cold database that returned null for an
+            // early candidate pushed the selection further down the sequence, so the same day
+            // rendered a different hadith on a warm process than on a cold one. The card and
+            // the link it carries are built together, but a re-render that silently changed its
+            // mind is still a card whose text no longer matches what the user last read.
+            //
+            // The first few hundred are the well-known ones on intention, faith and prayer,
+            // which read better on a home screen than a ruling pulled from the middle of a
+            // chapter on inheritance.
             val candidates = List(CANDIDATE_ATTEMPTS) { random.nextInt(1, 300) }
 
             var found: DailyReminder? = null

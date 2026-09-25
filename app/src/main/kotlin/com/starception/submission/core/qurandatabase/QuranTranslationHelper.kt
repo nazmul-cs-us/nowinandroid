@@ -1,9 +1,24 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import android.content.Context
-import androidx.room.Room
-import androidx.room.RoomDatabase
 import android.util.Log
+import androidx.room.Room
 import com.starception.submission.download.AssetRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -27,15 +42,15 @@ class QuranDatabaseUnavailableException(
  * Supports loading Arabic (quran.db) and all translations
  */
 object QuranTranslationHelper {
-    
+
     private const val TAG = "QuranTranslationHelper"
-    
+
     // Cache of database instances by translation code
     private val databaseCache = mutableMapOf<String, QuranDatabase>()
-    
+
     /**
      * Get database instance for a specific translation
-     * 
+     *
      * @param context Application context
      * @param translationCode Translation code: "ar" for Arabic, or any other supported code
      * @return QuranDatabase instance for the requested translation
@@ -56,61 +71,61 @@ object QuranTranslationHelper {
 
         Log.d(TAG, "📖 Loading Quran database: $translationCode from $dbAssetPath")
 
-            try {
-                val instanceName = "quran_${translationCode}_instance"
-                val dbFile = assetRepository?.getDatabaseFile(cdnKey)
+        try {
+            val instanceName = "quran_${translationCode}_instance"
+            val dbFile = assetRepository?.getDatabaseFile(cdnKey)
 
-                // Refuse to build a database with nothing to fill it from. Room would
-                // happily create an empty file with the right schema, and because it only
-                // copies the prepopulated source at creation time, that empty file becomes
-                // permanent — which is how the Arabic text disappeared. Failing here keeps
-                // the broken state from being written at all and lets callers offer the
-                // download instead of rendering a blank page.
-                if (dbFile == null && !bundledAssetExists(context, dbAssetPath)) {
-                    throw QuranDatabaseUnavailableException(translationCode, cdnKey)
-                }
-
-                // Room only copies the prepopulated file when it creates the database. An
-                // instance opened once before its source was downloadable is left as an
-                // empty shell with the right schema and no rows, and Room never retries —
-                // every query then returns nothing and the surah renders blank. Discard
-                // such a shell so the copy happens again now that a source exists.
-                if (dbFile != null) {
-                    discardEmptyInstance(context, instanceName)
-                }
-
-                val builder = Room.databaseBuilder(
-                    context.applicationContext,
-                    QuranDatabase::class.java,
-                    instanceName
-                )
-
-                // Try CDN/extracted file first, fall back to bundled asset
-                if (dbFile != null) {
-                    builder.createFromFile(dbFile)
-                } else {
-                    builder.createFromAsset(dbAssetPath)
-                }
-
-                val database = builder
-                    .fallbackToDestructiveMigration()
-                    .build()
-
-                Log.d(TAG, "✅ Quran translation database created: $translationCode")
-
-                // Cache the instance
-                databaseCache[translationCode] = database
-
-                Log.d(TAG, "✅ Database loaded and cached successfully: $translationCode")
-                return database
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
-                Log.e(TAG, "❌ Database path: $dbAssetPath", e)
-                e.printStackTrace()
-                throw e
+            // Refuse to build a database with nothing to fill it from. Room would
+            // happily create an empty file with the right schema, and because it only
+            // copies the prepopulated source at creation time, that empty file becomes
+            // permanent — which is how the Arabic text disappeared. Failing here keeps
+            // the broken state from being written at all and lets callers offer the
+            // download instead of rendering a blank page.
+            if (dbFile == null && !bundledAssetExists(context, dbAssetPath)) {
+                throw QuranDatabaseUnavailableException(translationCode, cdnKey)
             }
+
+            // Room only copies the prepopulated file when it creates the database. An
+            // instance opened once before its source was downloadable is left as an
+            // empty shell with the right schema and no rows, and Room never retries —
+            // every query then returns nothing and the surah renders blank. Discard
+            // such a shell so the copy happens again now that a source exists.
+            if (dbFile != null) {
+                discardEmptyInstance(context, instanceName)
+            }
+
+            val builder = Room.databaseBuilder(
+                context.applicationContext,
+                QuranDatabase::class.java,
+                instanceName,
+            )
+
+            // Try CDN/extracted file first, fall back to bundled asset
+            if (dbFile != null) {
+                builder.createFromFile(dbFile)
+            } else {
+                builder.createFromAsset(dbAssetPath)
+            }
+
+            val database = builder
+                .fallbackToDestructiveMigration()
+                .build()
+
+            Log.d(TAG, "✅ Quran translation database created: $translationCode")
+
+            // Cache the instance
+            databaseCache[translationCode] = database
+
+            Log.d(TAG, "✅ Database loaded and cached successfully: $translationCode")
+            return database
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to load database for translation: $translationCode", e)
+            Log.e(TAG, "❌ Database path: $dbAssetPath", e)
+            e.printStackTrace()
+            throw e
+        }
     }
-    
+
     /** File name of the source database backing [translationCode]. */
     fun databaseFileName(translationCode: String): String = when (translationCode) {
         "ar" -> "quran.db"
@@ -158,7 +173,9 @@ object QuranTranslationHelper {
 
         val isEmpty = try {
             android.database.sqlite.SQLiteDatabase.openDatabase(
-                dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                dbPath.path,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
             ).use { db ->
                 db.rawQuery("SELECT COUNT(*) FROM surahs", null).use { cursor ->
                     cursor.moveToFirst() && cursor.getInt(0) == 0
@@ -217,27 +234,27 @@ object QuranTranslationHelper {
             }
         }
     }
-    
+
     /**
      * Get available translation codes
      */
     fun getAvailableTranslations(): List<String> {
         return listOf(
-            "ar",              // Arabic
+            "ar", // Arabic
             "transliteration", // English Transliteration
-            "bn",              // Bengali
-            "zh",              // Chinese
-            "en",              // English
-            "es",              // Spanish
-            "fr",              // French
-            "id",              // Indonesian
-            "ru",              // Russian
-            "sv",              // Swedish
-            "tr",              // Turkish
-            "ur"               // Urdu
+            "bn", // Bengali
+            "zh", // Chinese
+            "en", // English
+            "es", // Spanish
+            "fr", // French
+            "id", // Indonesian
+            "ru", // Russian
+            "sv", // Swedish
+            "tr", // Turkish
+            "ur", // Urdu
         )
     }
-    
+
     /**
      * Get display name for a translation code
      */
@@ -267,7 +284,7 @@ object QuranTranslationHelper {
 class QuranTranslationRepository(
     private val context: Context,
     private val translationCode: String = "ar",
-    private val assetRepository: AssetRepository? = null
+    private val assetRepository: AssetRepository? = null,
 ) {
 
     private val database: QuranDatabase by lazy {
@@ -278,7 +295,7 @@ class QuranTranslationRepository(
             throw e
         }
     }
-    
+
     private val quranDao: QuranDao by lazy {
         try {
             database.quranDao()
@@ -287,13 +304,13 @@ class QuranTranslationRepository(
             throw e
         }
     }
-    
+
     companion object {
         private const val TAG = "QuranTranslationRepository"
     }
-    
+
     // ============= Surah Operations =============
-    
+
     /**
      * Get all Surahs
      */
@@ -304,7 +321,7 @@ class QuranTranslationRepository(
             }
         }
     }
-    
+
     /**
      * Get all Surahs with their Ayah counts
      */
@@ -316,7 +333,7 @@ class QuranTranslationRepository(
             emptyList()
         }
     }
-    
+
     /**
      * Get a specific Surah by number (1-114)
      */
@@ -325,15 +342,15 @@ class QuranTranslationRepository(
             // Ensure database is initialized before querying
             // This will trigger lazy initialization if not already done
             val dao = quranDao
-            
+
             Log.d(TAG, "🔍 Querying Surah $surahNumber in translation: $translationCode")
-            
+
             // Query for the surah directly
             val entity = dao.getSurahByNumber(surahNumber)
-            
+
             if (entity == null) {
                 Log.w(TAG, "⚠️ Query returned null for Surah $surahNumber in translation: $translationCode")
-                
+
                 // Debug: Check if database has any surahs
                 val allSurahs = try {
                     dao.getAllSurahsOnce()
@@ -341,12 +358,12 @@ class QuranTranslationRepository(
                     Log.e(TAG, "❌ Failed to get all surahs from database", e)
                     return@withContext null
                 }
-                
+
                 Log.d(TAG, "📊 Database has ${allSurahs.size} surahs total")
                 if (allSurahs.isNotEmpty()) {
                     Log.d(TAG, "📖 First surah: ${allSurahs.first().nameEnglish} (number=${allSurahs.first().number}, id=${allSurahs.first().id})")
                     Log.d(TAG, "📖 Last surah: ${allSurahs.last().nameEnglish} (number=${allSurahs.last().number}, id=${allSurahs.last().id})")
-                    
+
                     // Check if surah number exists in the list
                     val foundSurah = allSurahs.find { it.number == surahNumber }
                     if (foundSurah == null) {
@@ -355,10 +372,10 @@ class QuranTranslationRepository(
                 } else {
                     Log.e(TAG, "❌ Database appears to be empty - no surahs found!")
                 }
-                
+
                 return@withContext null
             }
-            
+
             Log.d(TAG, "✅ Found Surah: ${entity.nameEnglish} (ID: ${entity.id}, Number: ${entity.number})")
             val surahId = entity.id ?: 0 // Handle nullable id (should never be null in practice)
             val ayahCount = dao.getAyahCount(surahId)
@@ -370,7 +387,7 @@ class QuranTranslationRepository(
             null
         }
     }
-    
+
     /**
      * Get a specific Surah by ID
      */
@@ -382,7 +399,7 @@ class QuranTranslationRepository(
             null
         }
     }
-    
+
     /**
      * Get Surahs by revelation type (Meccan/Medinan)
      */
@@ -391,7 +408,7 @@ class QuranTranslationRepository(
             entities.map { it.toSurah() }
         }
     }
-    
+
     /**
      * Search Surahs by name
      */
@@ -400,9 +417,9 @@ class QuranTranslationRepository(
             entities.map { it.toSurah() }
         }
     }
-    
+
     // ============= Ayah Operations =============
-    
+
     /**
      * Get all Ayahs for a specific Surah
      */
@@ -411,7 +428,7 @@ class QuranTranslationRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get all Ayahs for a specific Surah (one-time read)
      */
@@ -431,7 +448,7 @@ class QuranTranslationRepository(
             emptyList()
         }
     }
-    
+
     /**
      * Get all Ayahs for a specific Surah by surah number (using JOIN)
      * This is useful when surah_id might differ between databases or when surahs table is missing
@@ -445,7 +462,7 @@ class QuranTranslationRepository(
             emptyList()
         }
     }
-    
+
     /**
      * Get a specific Ayah by its global number
      */
@@ -456,13 +473,15 @@ class QuranTranslationRepository(
                 // Get surah to get its number
                 val surah = quranDao.getSurahById(ayah.surahId)
                 ayah.toAyah(surah?.number ?: 0)
-            } else null
+            } else {
+                null
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayah $ayahNumber", e)
             null
         }
     }
-    
+
     /**
      * Get Ayahs by page number
      */
@@ -471,7 +490,7 @@ class QuranTranslationRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get Ayahs by Juz (part) number
      */
@@ -480,7 +499,7 @@ class QuranTranslationRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get all Ayahs that require Sajda (prostration)
      */
@@ -489,7 +508,7 @@ class QuranTranslationRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Search Ayahs by text content
      */
@@ -498,7 +517,7 @@ class QuranTranslationRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Search Ayahs with result limit
      */
@@ -510,9 +529,9 @@ class QuranTranslationRepository(
             emptyList()
         }
     }
-    
+
     // ============= Statistics =============
-    
+
     /**
      * Get total number of Ayahs in the Quran (should be 6236)
      */
@@ -524,7 +543,7 @@ class QuranTranslationRepository(
             0
         }
     }
-    
+
     /**
      * Get number of Ayahs in a specific Surah
      */
@@ -536,9 +555,9 @@ class QuranTranslationRepository(
             0
         }
     }
-    
+
     // ============= Pagination =============
-    
+
     /**
      * Get a page of Ayahs for pagination
      */
@@ -551,9 +570,9 @@ class QuranTranslationRepository(
             emptyList()
         }
     }
-    
+
     // ============= Health Check =============
-    
+
     /**
      * Check if database is properly initialized
      */
@@ -561,14 +580,14 @@ class QuranTranslationRepository(
         try {
             val surahCount = quranDao.getAllSurahsOnce().size
             val ayahCount = quranDao.getTotalAyahCount()
-            
+
             val isValid = surahCount == 114 && ayahCount > 6000
-            
+
             Log.d(TAG, "📊 Database status ($translationCode):")
             Log.d(TAG, "   - Surahs: $surahCount (expected: 114)")
             Log.d(TAG, "   - Ayahs: $ayahCount (expected: 6236)")
             Log.d(TAG, "   - Status: ${if (isValid) "✅ Valid" else "❌ Invalid"}")
-            
+
             isValid
         } catch (e: Exception) {
             Log.e(TAG, "❌ Database not initialized", e)
@@ -576,4 +595,3 @@ class QuranTranslationRepository(
         }
     }
 }
-

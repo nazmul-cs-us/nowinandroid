@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.dua
 
 import androidx.navigation.NavController
@@ -29,7 +45,7 @@ data class DuaDetailRoute(
     val quranReference: String? = null,
     val duaNumber: Int = 1,
     val newsResourceId: String = "",
-    val topicId: String = ""
+    val topicId: String = "",
 )
 
 /**
@@ -42,7 +58,7 @@ fun NavController.navigateToDuaDetail(
     duaNumber: Int = 1,
     newsResourceId: String = "",
     topicId: String = "",
-    navOptions: NavOptions? = null
+    navOptions: NavOptions? = null,
 ) {
     val encodedContent = URLEncoder.encode(content, "UTF-8")
     val encodedTitle = URLEncoder.encode(title, "UTF-8")
@@ -63,9 +79,9 @@ fun NavController.navigateToDuaDetail(
             quranReference = encodedRef,
             duaNumber = duaNumber,
             newsResourceId = resourceId,
-            topicId = topicId
+            topicId = topicId,
         ),
-        navOptions = navOptions
+        navOptions = navOptions,
     )
 }
 
@@ -78,7 +94,7 @@ fun NavGraphBuilder.duaDetailScreen(
     isBookmarked: (newsResourceId: String) -> Boolean = { false },
     onToggleBookmark: (newsResourceId: String) -> Unit = {},
     onTopicClick: (String) -> Unit = {},
-    onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null
+    onHadithClick: ((collectionName: String, hadithNumber: Int, databaseFile: String) -> Unit)? = null,
 ) {
     composable<DuaDetailRoute>(
         enterTransition = { detailEnterTransition() },
@@ -108,7 +124,7 @@ fun NavGraphBuilder.duaDetailScreen(
             onToggleNiaBookmark = onToggleBookmark,
             topicId = route.topicId,
             onTopicClick = onTopicClick,
-            onHadithClick = onHadithClick
+            onHadithClick = onHadithClick,
         )
     }
 }

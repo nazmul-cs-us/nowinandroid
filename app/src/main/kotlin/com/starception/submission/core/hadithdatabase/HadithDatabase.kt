@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.hadithdatabase
 
 import android.content.Context
@@ -18,7 +34,7 @@ import com.starception.submission.download.AssetRepository
 @Database(
     entities = [HadithEntity::class],
     version = 2,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class HadithDatabase : RoomDatabase() {
 
@@ -44,7 +60,7 @@ abstract class HadithDatabase : RoomDatabase() {
             "Ibn Majah" to "sunan_ibn_majah.db",
             "Malik" to "muwatta_malik.db",
             "Ahmad" to "musnad_ahmad.db",
-            "Darimi" to "sunan_darimi.db"
+            "Darimi" to "sunan_darimi.db",
         )
 
         // Stored AssetRepository reference for database creation
@@ -88,7 +104,7 @@ abstract class HadithDatabase : RoomDatabase() {
             val builder = Room.databaseBuilder(
                 context.applicationContext,
                 HadithDatabase::class.java,
-                "hadith_$databaseFile"
+                "hadith_$databaseFile",
             )
 
             // Try CDN/extracted file first, fall back to bundled asset
@@ -101,7 +117,7 @@ abstract class HadithDatabase : RoomDatabase() {
                 builder.createFromAsset(assetPath)
             } else {
                 throw IllegalStateException(
-                    "Hadith database missing: $databaseFile. Download the required content assets and try again."
+                    "Hadith database missing: $databaseFile. Download the required content assets and try again.",
                 )
             }
 
@@ -142,7 +158,7 @@ abstract class HadithDatabase : RoomDatabase() {
                 val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                     sourceFile.absolutePath,
                     null,
-                    android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                    android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
                 )
 
                 val metaMap = mutableMapOf<String, String>()
@@ -167,9 +183,11 @@ abstract class HadithDatabase : RoomDatabase() {
                         author = metaMap["author"] ?: "",
                         authorArabic = metaMap["author_arabic"] ?: "",
                         hasElaboration = metaMap["has_elaboration"] == "1",
-                        hadithCount = metaMap["hadith_count"]?.toIntOrNull() ?: 0
+                        hadithCount = metaMap["hadith_count"]?.toIntOrNull() ?: 0,
                     )
-                } else null
+                } else {
+                    null
+                }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Error getting collection metadata", e)
                 null

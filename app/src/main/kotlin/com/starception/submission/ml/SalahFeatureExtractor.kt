@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.ml
 
 import kotlin.math.atan2
@@ -107,19 +123,19 @@ object SalahFeatureExtractor {
         val gyroEnergy = gyroEnergySum / gx.size
 
         return floatArrayOf(
-            accelMeanX, accelMeanY, accelMeanZ,       // 0-2
-            accelStdX, accelStdY, accelStdZ,           // 3-5
-            accelMagMean, accelMagVar,                  // 6-7
-            gyroMeanX, gyroMeanY, gyroMeanZ,           // 8-10
-            gyroStdX, gyroStdY, gyroStdZ,              // 11-13
-            gyroMagMean, gyroMagVar,                    // 14-15
-            pitch, pitchVar,                            // 16-17
-            roll, rollVar,                              // 18-19
-            accelMin, accelMax,                         // 20-21
-            gyroMin, gyroMax,                           // 22-23
-            pitchRange, rollRange,                      // 24-25
-            accelMagnitude, gyroMagnitude,              // 26-27
-            accelEnergy, gyroEnergy                     // 28-29
+            accelMeanX, accelMeanY, accelMeanZ, // 0-2
+            accelStdX, accelStdY, accelStdZ, // 3-5
+            accelMagMean, accelMagVar, // 6-7
+            gyroMeanX, gyroMeanY, gyroMeanZ, // 8-10
+            gyroStdX, gyroStdY, gyroStdZ, // 11-13
+            gyroMagMean, gyroMagVar, // 14-15
+            pitch, pitchVar, // 16-17
+            roll, rollVar, // 18-19
+            accelMin, accelMax, // 20-21
+            gyroMin, gyroMax, // 22-23
+            pitchRange, rollRange, // 24-25
+            accelMagnitude, gyroMagnitude, // 26-27
+            accelEnergy, gyroEnergy, // 28-29
         )
     }
 

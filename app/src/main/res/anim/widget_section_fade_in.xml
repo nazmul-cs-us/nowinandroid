@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     The incoming page, as Material's shared-axis X transition.
+     Copyright 2026 The Android Open Source Project
 
-     It was a plain alpha fade, symmetric with the outgoing one. Two half-transparent pages
-     overlapped for most of the transition, so the plate showed through both and the card
-     visibly dipped in brightness before recovering — the ghosting that makes a carousel
-     look cheap.
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
 
-     Shared axis fixes it by separating the two in time rather than blending them: the page
-     travels in from a fifth of the card's width while the one leaving is already on its way
-     out, and its opacity only starts to climb after the outgoing page has gone. The travel
-     is longer than the fade on purpose — motion carries the continuity, opacity just keeps
-     the hand-off clean.
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
 -->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:interpolator="@android:interpolator/fast_out_slow_in"

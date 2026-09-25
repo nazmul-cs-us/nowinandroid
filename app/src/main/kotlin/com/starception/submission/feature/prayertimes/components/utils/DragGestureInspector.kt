@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components.utils
 
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -16,7 +32,7 @@ suspend fun PointerInputScope.inspectDragGestures(
     onDragStart: (down: PointerInputChange) -> Unit = {},
     onDragEnd: (change: PointerInputChange) -> Unit = {},
     onDragCancel: () -> Unit = {},
-    onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit
+    onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit,
 ) {
     awaitEachGesture {
         val initialDown = awaitFirstDown(false, PointerEventPass.Initial)
@@ -29,7 +45,7 @@ suspend fun PointerInputScope.inspectDragGestures(
         val upEvent =
             drag(
                 pointerId = drag.id,
-                onDrag = { onDrag(it, it.positionChange()) }
+                onDrag = { onDrag(it, it.positionChange()) },
             )
         if (upEvent == null) {
             onDragCancel()
@@ -41,7 +57,7 @@ suspend fun PointerInputScope.inspectDragGestures(
 
 private suspend inline fun AwaitPointerEventScope.drag(
     pointerId: PointerId,
-    onDrag: (PointerInputChange) -> Unit
+    onDrag: (PointerInputChange) -> Unit,
 ): PointerInputChange? {
     val isPointerUp = currentEvent.changes.fastFirstOrNull { it.id == pointerId }?.pressed != true
     if (isPointerUp) {
@@ -62,7 +78,7 @@ private suspend inline fun AwaitPointerEventScope.drag(
 }
 
 private suspend inline fun AwaitPointerEventScope.awaitDragOrUp(
-    pointerId: PointerId
+    pointerId: PointerId,
 ): PointerInputChange? {
     var pointer = pointerId
     while (true) {

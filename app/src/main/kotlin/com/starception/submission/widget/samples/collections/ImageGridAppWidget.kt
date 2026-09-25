@@ -1,7 +1,20 @@
-package com.starception.submission.widget.samples.collections
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
+package com.starception.submission.widget.samples.collections
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -19,6 +32,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.collections.data.FakeImageGridDataRepository.Companion.cleanUp
 import com.starception.submission.widget.samples.collections.data.FakeImageGridDataRepository.Companion.getImageGridDataRepo
 import com.starception.submission.widget.samples.collections.layout.ImageGridItemData
@@ -33,67 +48,67 @@ import kotlinx.coroutines.withContext
  * Can be configured to select different data sources.
  */
 class ImageGridAppWidget : GlanceAppWidget() {
-  // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
-  // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
-  // supported size to be held in the widget host's memory.
-  override val sizeMode: SizeMode = SizeMode.Exact
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val repo = getImageGridDataRepo(id)
+    // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
+    // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
+    // supported size to be held in the widget host's memory.
+    override val sizeMode: SizeMode = SizeMode.Exact
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val repo = getImageGridDataRepo(id)
 
-    val initialItems = withContext(Dispatchers.Default) {
-      repo.load(context)
-    }
-    val themeSource = loadWidgetThemeSource(context)
-
-    provideContent {
-      val items by repo.data().collectAsState(initial = initialItems)
-      val coroutineScope = rememberCoroutineScope()
-
-      StarceptionWidgetTheme(themeSource) {
-        key(LocalSize.current) {
-          WidgetContent(
-            items = items,
-            refreshAction = {
-              coroutineScope.launch {
-                withContext(Dispatchers.IO) {
-                  repo.refresh(context)
-                }
-              }
-            }
-          )
+        val initialItems = withContext(Dispatchers.Default) {
+            repo.load(context)
         }
-      }
+        val themeSource = loadWidgetThemeSource(context)
+
+        provideContent {
+            val items by repo.data().collectAsState(initial = initialItems)
+            val coroutineScope = rememberCoroutineScope()
+
+            StarceptionWidgetTheme(themeSource) {
+                key(LocalSize.current) {
+                    WidgetContent(
+                        items = items,
+                        refreshAction = {
+                            coroutineScope.launch {
+                                withContext(Dispatchers.IO) {
+                                    repo.refresh(context)
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
     }
-  }
 }
 
 @Composable
 fun WidgetContent(
-  items: List<ImageGridItemData>,
-  refreshAction: () -> Unit,
+    items: List<ImageGridItemData>,
+    refreshAction: () -> Unit,
 ) {
-  val context = LocalContext.current
+    val context = LocalContext.current
 
-  ImageGridLayout(
-    title = context.getString(R.string.sample_image_grid_app_widget_name),
-    titleIconRes = R.drawable.ic_widget_quran_flaticon,
-    titleBarActionIconRes = R.drawable.sample_refresh_icon,
-    titleBarActionIconContentDescription = context.getString(
-      R.string.sample_refresh_icon_button_label
-    ),
-    titleBarAction = refreshAction,
-    items = items
-  )
+    ImageGridLayout(
+        title = context.getString(R.string.sample_image_grid_app_widget_name),
+        titleIconRes = R.drawable.ic_widget_quran_flaticon,
+        titleBarActionIconRes = R.drawable.sample_refresh_icon,
+        titleBarActionIconContentDescription = context.getString(
+            R.string.sample_refresh_icon_button_label,
+        ),
+        titleBarAction = refreshAction,
+        items = items,
+    )
 }
 
 class ImageGridAppWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget: GlanceAppWidget = ImageGridAppWidget()
+    override val glanceAppWidget: GlanceAppWidget = ImageGridAppWidget()
 
-  @SuppressLint("RestrictedApi")
-  override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-    appWidgetIds.forEach {
-      cleanUp(AppWidgetId(appWidgetId = it))
+    @SuppressLint("RestrictedApi")
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        appWidgetIds.forEach {
+            cleanUp(AppWidgetId(appWidgetId = it))
+        }
+        super.onDeleted(context, appWidgetIds)
     }
-    super.onDeleted(context, appWidgetIds)
-  }
 }

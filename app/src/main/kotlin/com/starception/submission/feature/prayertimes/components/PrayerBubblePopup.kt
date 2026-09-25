@@ -1,27 +1,20 @@
-/**
- * PRAYER POPUP COMPONENT - iOS-Inspired Design
+/*
+ * Copyright 2026 The Android Open Source Project
  *
- * Clean, minimal popup with blur effects and simple animations.
- * Inspired by iOS modal sheets and alert dialogs.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * WHAT IT DOES:
- * - Displays prayer information in a clean card design
- * - Shows countdown to prayer time or elapsed time
- * - Allows marking/unmarking prayers as prayed
- * - Provides smooth iOS-style animations
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- * FEATURES:
- * - iOS-inspired design with blur effects
- * - Clean, minimal layout with generous spacing
- * - Real-time countdown/elapsed time display
- * - Simple toggle button for prayer status
- * - Smooth spring-based animations
- * - Touch outside to dismiss
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package com.starception.submission.feature.prayertimes.components
 
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
-import com.starception.submission.feature.prayertimes.isJumuahDay
+package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -41,10 +34,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -56,13 +49,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.starception.submission.core.designsystem.animation.NiaMotion
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.animation.NiaTransitions
-import kotlinx.coroutines.launch
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.isJumuahDay
 import kotlinx.coroutines.delay
-import androidx.compose.runtime.rememberCoroutineScope
-import java.time.LocalTime
+import kotlinx.coroutines.launch
 import java.time.Duration
+import java.time.LocalTime
 
 /**
  * Prayer data class for popup
@@ -74,7 +68,7 @@ data class PrayerBubbleData(
     val isPrayed: Boolean,
     val initial: String,
     // Actual prayer time for countdown
-    val prayerTime: LocalTime? = null  
+    val prayerTime: LocalTime? = null,
 )
 
 /**
@@ -88,7 +82,7 @@ data class PrayerBubbleData(
 fun PrayerBubblePopup(
     prayerData: PrayerBubbleData,
     onDismiss: () -> Unit,
-    onTogglePrayer: ((String, Boolean) -> Unit)? = null
+    onTogglePrayer: ((String, Boolean) -> Unit)? = null,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
@@ -158,9 +152,9 @@ fun PrayerBubblePopup(
         targetValue = if (isVisible) 1f else 0.9f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = Spring.StiffnessMediumLow,
         ),
-        label = "popupScale"
+        label = "popupScale",
     )
 
     // Fade tracks the scale spring on the way in (~400ms settle) and finishes within
@@ -172,7 +166,7 @@ fun PrayerBubblePopup(
         } else {
             NiaMotion.exitTween(NiaMotion.Duration.SHORT_4)
         },
-        label = "popupAlpha"
+        label = "popupAlpha",
     )
 
     // iOS-style Dialog
@@ -181,8 +175,8 @@ fun PrayerBubblePopup(
         properties = DialogProperties(
             dismissOnBackPress = true,
             dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
+            usePlatformDefaultWidth = false,
+        ),
     ) {
         Box(
             modifier = Modifier
@@ -190,11 +184,11 @@ fun PrayerBubblePopup(
                 .background(Color.Black.copy(alpha = 0.5f * alpha))
                 .clickable(
                     indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
+                    interactionSource = remember { MutableInteractionSource() },
                 ) {
                     handleDismiss()
                 },
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             // iOS-style Card with Blur Effect
             IOSPrayerCard(
@@ -212,7 +206,7 @@ fun PrayerBubblePopup(
                     isPrayed = newStatus
                     onTogglePrayer?.invoke(prayerData.name, newStatus)
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                }
+                },
             )
         }
     }
@@ -230,7 +224,7 @@ private fun IOSPrayerCard(
     scale: Float,
     alpha: Float,
     onDismiss: () -> Unit,
-    onTogglePrayer: (Boolean) -> Unit
+    onTogglePrayer: (Boolean) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -240,36 +234,36 @@ private fun IOSPrayerCard(
             .alpha(alpha)
             .clickable(
                 indication = null,
-                interactionSource = remember { MutableInteractionSource() }
+                interactionSource = remember { MutableInteractionSource() },
             ) {
                 // Prevent click propagation to background
             },
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        shadowElevation = 1.dp
+        shadowElevation = 1.dp,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Close button - iOS style (top right X)
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = 8.dp, y = (-8).dp)
-                        .size(32.dp)
+                        .size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -278,7 +272,7 @@ private fun IOSPrayerCard(
 
             // Prayer initial circle - simple and clean
             Box(
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Surface(
                     modifier = Modifier.size(80.dp),
@@ -287,11 +281,11 @@ private fun IOSPrayerCard(
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
-                    }
+                    },
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = prayerData.initial,
@@ -301,7 +295,7 @@ private fun IOSPrayerCard(
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            },
                         )
                     }
                 }
@@ -316,17 +310,17 @@ private fun IOSPrayerCard(
                     Surface(
                         modifier = Modifier.size(24.dp),
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     ) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = "Prayed",
                                 tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(14.dp),
                             )
                         }
                     }
@@ -340,7 +334,7 @@ private fun IOSPrayerCard(
                 text = getPrayerDisplayName(prayerData.name),
                 fontSize = 26.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -350,7 +344,7 @@ private fun IOSPrayerCard(
                 text = prayerData.arabicName,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -358,17 +352,17 @@ private fun IOSPrayerCard(
             // Prayer time - simple container
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         text = prayerData.time,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
 
                     if (countdownText.isNotEmpty()) {
@@ -377,7 +371,7 @@ private fun IOSPrayerCard(
                             text = countdownText,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -389,7 +383,7 @@ private fun IOSPrayerCard(
             Divider(
                 modifier = Modifier.fillMaxWidth(),
                 thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -399,13 +393,13 @@ private fun IOSPrayerCard(
                 // Text button for unmark action
                 TextButton(
                     onClick = { onTogglePrayer(false) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
                         text = "Mark as Not Prayed",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             } else {
@@ -415,12 +409,12 @@ private fun IOSPrayerCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = !isUpcoming // Disable if prayer time is still upcoming
+                    enabled = !isUpcoming, // Disable if prayer time is still upcoming
                 ) {
                     Text(
                         text = if (isUpcoming) "Prayer Time Not Yet" else "Mark as Prayed",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
@@ -437,7 +431,7 @@ private fun IOSPrayerCard(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
     }

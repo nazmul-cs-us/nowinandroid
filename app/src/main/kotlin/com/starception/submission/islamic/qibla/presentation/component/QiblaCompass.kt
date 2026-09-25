@@ -1,11 +1,27 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.islamic.qibla.presentation.component
 
 import android.content.Context
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.hardware.GeomagneticField
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -14,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,16 +56,16 @@ import kotlin.math.*
 
 /**
  * Islamic Qibla Compass Component
- * 
+ *
  * A modern Islamic compass that shows the direction to Mecca (Qibla) for prayer.
  * Provides accurate Qibla direction indicator using device sensors.
- * 
+ *
  * ## Key Features:
  * - **Qibla Direction**: 10% circular arc pointing toward Mecca
  * - **Islamic Theming**: Green color scheme with 🕋 Kaaba emoji
  * - **Real-time Updates**: Responds to device orientation via magnetometer
  * - **Material 3 Design**: Clean, modern Islamic UI design
- * 
+ *
  * @param progress Prayer time progress (for future use)
  * @param modifier Modifier for styling
  * @param size Compass size (default: 88.dp, recommended: 120.dp+)
@@ -62,12 +76,12 @@ fun QiblaCompass(
     progress: Float,
     modifier: Modifier = Modifier,
     size: Dp = 88.dp,
-    locationService: EnhancedLocationService? = null
+    locationService: EnhancedLocationService? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     // Compass state
     var compassDegree by remember { mutableFloatStateOf(0f) }
     var qiblaDirection by remember { mutableFloatStateOf(0f) }
@@ -79,11 +93,11 @@ fun QiblaCompass(
     var isInitializing by remember { mutableStateOf(true) }
     var magneticFieldStrength by remember { mutableFloatStateOf(0f) } // For accuracy detection
     var magneticDeclination by remember { mutableFloatStateOf(0f) } // Magnetic declination correction
-    
+
     // Throttling for compass updates to prevent flickering
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
     val COMPASS_UPDATE_INTERVAL_MS = 50L // Update at most every 50ms (20 updates per second)
-    
+
     // Sensor management - Use rotation matrix method (same as QiblaGlobeView) for consistency
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val accelerometerSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
@@ -168,7 +182,7 @@ fun QiblaCompass(
             }
         }
     }
-    
+
     // Initialization delay to prevent red flicker
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(800) // 800ms delay
@@ -176,7 +190,7 @@ fun QiblaCompass(
             isInitializing = false
         }
     }
-    
+
     // Get user location for Qibla calculation
     LaunchedEffect(locationService) {
         locationService?.let { service ->
@@ -186,7 +200,7 @@ fun QiblaCompass(
                         userLocation = location
                         qiblaDirection = calculateQiblaDirection(
                             lat1 = location.latitude,
-                            lon1 = location.longitude
+                            lon1 = location.longitude,
                         ).toFloat()
 
                         // Calculate magnetic declination for this location
@@ -195,50 +209,50 @@ fun QiblaCompass(
                             location.latitude.toFloat(),
                             location.longitude.toFloat(),
                             location.altitude.toFloat(),
-                            System.currentTimeMillis()
+                            System.currentTimeMillis(),
                         )
                         magneticDeclination = geoField.declination
                     },
                     onFailure = {
                         qiblaDirection = 0f
                         magneticDeclination = 0f
-                    }
+                    },
                 )
             }
         }
     }
-    
+
     // Arc animation — arc sweeps WITH the user's physical rotation (radar beam = user's facing direction).
     // A fixed green Qibla marker is painted on the background at the Qibla bearing.
     // When the user rotates until the arc aligns with the Qibla marker → facing Qibla.
     val trueNorth = compassDegree + magneticDeclination
     val targetDegree = trueNorth // arc follows phone's facing direction (clockwise turn → arc goes clockwise)
     val currentDegreeState = remember { mutableFloatStateOf(targetDegree) }
-    
+
     // Calculate shortest rotation path
     LaunchedEffect(targetDegree) {
         val currentValue = currentDegreeState.floatValue
         val diff = targetDegree - currentValue
-        
+
         // Normalize difference to [-180, 180] range
         val normalizedDiff = when {
             diff > 180f -> diff - 360f
             diff < -180f -> diff + 360f
             else -> diff
         }
-        
+
         currentDegreeState.floatValue = currentValue + normalizedDiff
     }
-    
+
     val animatedCompassDegree by animateFloatAsState(
         targetValue = currentDegreeState.floatValue,
         animationSpec = spring(
             dampingRatio = 0.8f,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "compassRotation"
+        label = "compassRotation",
     )
-    
+
     // Lifecycle management - Register accelerometer and magnetic field sensors (same as QiblaGlobeView)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -249,7 +263,7 @@ fun QiblaCompass(
                         sensorManager.registerListener(
                             sensorListener,
                             it,
-                            SensorManager.SENSOR_DELAY_UI
+                            SensorManager.SENSOR_DELAY_UI,
                         )
                     }
                     // Register magnetic field sensor
@@ -257,7 +271,7 @@ fun QiblaCompass(
                         sensorManager.registerListener(
                             sensorListener,
                             it,
-                            SensorManager.SENSOR_DELAY_UI
+                            SensorManager.SENSOR_DELAY_UI,
                         )
                     }
                 }
@@ -275,7 +289,7 @@ fun QiblaCompass(
             sensorManager.unregisterListener(sensorListener)
         }
     }
-    
+
     // Accuracy color and calibration status
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
@@ -290,7 +304,7 @@ fun QiblaCompass(
     // Enhanced UI with better novice user guidance
     Box(
         modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Fixed background — white circle, accuracy border, N/E/S/W ticks
         Canvas(modifier = Modifier.size(size)) {
@@ -299,22 +313,22 @@ fun QiblaCompass(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(Color.White, Color(0xFFF8F9FA)),
-                    radius = backgroundRadius
+                    radius = backgroundRadius,
                 ),
                 radius = backgroundRadius,
-                center = center
+                center = center,
             )
             drawCircle(
                 color = accuracyColor.copy(alpha = 0.8f),
                 radius = backgroundRadius,
                 center = center,
-                style = Stroke(width = 4.dp.toPx())
+                style = Stroke(width = 4.dp.toPx()),
             )
             drawCircle(
                 color = Color.Black.copy(alpha = 0.15f),
                 radius = backgroundRadius - 3.dp.toPx(),
                 center = center,
-                style = Stroke(width = 1.dp.toPx())
+                style = Stroke(width = 1.dp.toPx()),
             )
             listOf(0f, 90f, 180f, 270f).forEach { angle ->
                 val angleRad = Math.toRadians(angle.toDouble())
@@ -322,14 +336,14 @@ fun QiblaCompass(
                     color = Color.Black.copy(alpha = 0.4f),
                     start = Offset(
                         x = center.x + cos(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx()),
-                        y = center.y + sin(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx())
+                        y = center.y + sin(angleRad).toFloat() * (backgroundRadius - 10.dp.toPx()),
                     ),
                     end = Offset(
                         x = center.x + cos(angleRad).toFloat() * backgroundRadius,
-                        y = center.y + sin(angleRad).toFloat() * backgroundRadius
+                        y = center.y + sin(angleRad).toFloat() * backgroundRadius,
                     ),
                     strokeWidth = 3.dp.toPx(),
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
             }
 
@@ -345,14 +359,14 @@ fun QiblaCompass(
                     color = qiblaMarkerColor,
                     start = Offset(
                         x = center.x + cos(qiblaRad).toFloat() * (backgroundRadius - 12.dp.toPx()),
-                        y = center.y + sin(qiblaRad).toFloat() * (backgroundRadius - 12.dp.toPx())
+                        y = center.y + sin(qiblaRad).toFloat() * (backgroundRadius - 12.dp.toPx()),
                     ),
                     end = Offset(
                         x = center.x + cos(qiblaRad).toFloat() * backgroundRadius,
-                        y = center.y + sin(qiblaRad).toFloat() * backgroundRadius
+                        y = center.y + sin(qiblaRad).toFloat() * backgroundRadius,
                     ),
                     strokeWidth = 5.dp.toPx(),
-                    cap = StrokeCap.Round
+                    cap = StrokeCap.Round,
                 )
 
                 // Small filled circle just inside the tick — Kaaba dot
@@ -361,8 +375,8 @@ fun QiblaCompass(
                     radius = 4.5.dp.toPx(),
                     center = Offset(
                         x = center.x + cos(qiblaRad).toFloat() * (backgroundRadius - 18.dp.toPx()),
-                        y = center.y + sin(qiblaRad).toFloat() * (backgroundRadius - 18.dp.toPx())
-                    )
+                        y = center.y + sin(qiblaRad).toFloat() * (backgroundRadius - 18.dp.toPx()),
+                    ),
                 )
             }
         }
@@ -373,25 +387,25 @@ fun QiblaCompass(
                 "N" to Offset(0f, -1f),
                 "E" to Offset(1f, 0f),
                 "S" to Offset(0f, 1f),
-                "W" to Offset(-1f, 0f)
+                "W" to Offset(-1f, 0f),
             ).forEach { (label, offset) ->
                 Box(
                     modifier = Modifier
                         .offset(
                             x = (offset.x * (size.value / 2 + 20)).dp,
-                            y = (offset.y * (size.value / 2 + 20)).dp
+                            y = (offset.y * (size.value / 2 + 20)).dp,
                         )
                         .size(24.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
                     )
                 }
             }
@@ -416,19 +430,19 @@ fun QiblaCompass(
             modifier = Modifier
                 .size(size - 16.dp)
                 .rotate(animatedCompassDegree),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             // Arc centered at 12 o'clock: startAngle=-117° (11:06), sweepAngle=54° → ends at 12:54
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawArc(
                     color = arcColor,
-                    startAngle = -117f,  // -90° - 27° centers the 54° arc at 12 o'clock
+                    startAngle = -117f, // -90° - 27° centers the 54° arc at 12 o'clock
                     sweepAngle = 54f,
                     useCenter = false,
                     style = Stroke(
                         width = arcStrokeWidth.toPx(),
-                        cap = StrokeCap.Round
-                    )
+                        cap = StrokeCap.Round,
+                    ),
                 )
             }
 
@@ -439,7 +453,7 @@ fun QiblaCompass(
                     .size(arrowSize)
                     .clip(CircleShape)
                     .background(arcColor),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Navigation,
@@ -447,21 +461,21 @@ fun QiblaCompass(
                     modifier = Modifier
                         .size(arrowIconSize)
                         .rotate(-90f), // Point upward
-                    tint = Color.White
+                    tint = Color.White,
                 )
             }
         }
-        
+
         // Enhanced center content with better instructions
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(12.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 // Kaaba icon with enhanced styling
                 Box(
@@ -469,19 +483,22 @@ fun QiblaCompass(
                         .size(if (size >= 140.dp) 32.dp else 24.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(
-                            if (needsCalibration) Color(0xFFFF4444).copy(alpha = 0.1f) 
-                            else Color(0xFF10B981).copy(alpha = 0.1f)
+                            if (needsCalibration) {
+                                Color(0xFFFF4444).copy(alpha = 0.1f)
+                            } else {
+                                Color(0xFF10B981).copy(alpha = 0.1f)
+                            },
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "🕋",
-                        fontSize = if (size >= 140.dp) 20.sp else 16.sp
+                        fontSize = if (size >= 140.dp) 20.sp else 16.sp,
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 // Status text - dynamic based on alignment
                 Text(
                     text = if (needsCalibration) {
@@ -501,7 +518,7 @@ fun QiblaCompass(
                     },
                     textAlign = TextAlign.Center,
                     fontWeight = if (isNearQibla && !needsCalibration) FontWeight.ExtraBold else FontWeight.Bold,
-                    fontSize = if (size >= 140.dp) 14.sp else 11.sp
+                    fontSize = if (size >= 140.dp) 14.sp else 11.sp,
                 )
 
                 // Calibration status or guidance
@@ -513,7 +530,7 @@ fun QiblaCompass(
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Medium,
                         fontSize = if (size >= 140.dp) 11.sp else 9.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 } else if (isNearQibla && size >= 140.dp) {
                     Text(
@@ -524,7 +541,7 @@ fun QiblaCompass(
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
                         lineHeight = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 } else if (size >= 140.dp) {
                     Text(
@@ -535,12 +552,12 @@ fun QiblaCompass(
                         fontWeight = FontWeight.Medium,
                         fontSize = 10.sp,
                         lineHeight = 12.sp,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
         }
-        
+
         // Calibration guidance overlay for larger compasses
         if (needsCalibration && size >= 160.dp) {
             Box(
@@ -548,14 +565,14 @@ fun QiblaCompass(
                     .offset(y = (size.value / 2 + 35).dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFFFF4444).copy(alpha = 0.9f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
                     text = "Move phone in figure-8 pattern",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -565,7 +582,7 @@ fun QiblaCompass(
 /**
  * Get sensor accuracy color
  */
-private fun getAccuracyColor(accuracy: Int): Color = when(accuracy) {
+private fun getAccuracyColor(accuracy: Int): Color = when (accuracy) {
     SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF10B981)
     SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> Color(0xFFFFA500)
     SensorManager.SENSOR_STATUS_ACCURACY_LOW -> Color(0xFFFF6B6B)

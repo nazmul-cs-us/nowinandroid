@@ -1,101 +1,122 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.surah
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.em
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.Orientation
-import kotlin.math.sqrt
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.systemGestureExclusion
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Spellcheck
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CheckCircleOutline
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.window.Dialog
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
-import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
-import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
-import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.text.ParagraphStyle
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.RequestDisallowInterceptTouchEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
@@ -103,84 +124,67 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.Velocity
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.util.lerp
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
 import com.starception.submission.R
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.designsystem.animation.NiaMotion
-import com.starception.submission.core.designsystem.theme.QuranFonts
-import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
+import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
+import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
+import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTopicTag
+import com.starception.submission.core.designsystem.component.NiaVerifiedTag
 import com.starception.submission.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.starception.submission.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.starception.submission.core.designsystem.component.scrollbar.scrollbarState
+import com.starception.submission.core.designsystem.theme.QuranFonts
+import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import com.starception.submission.core.qurandatabase.Ayah
 import com.starception.submission.core.qurandatabase.QuranRepository
 import com.starception.submission.core.qurandatabase.Surah
-import com.starception.submission.feature.quran.QuranPlaybackService
-import com.starception.submission.feature.quran.AudioLanguage
-import com.starception.submission.feature.quran.surahArtworkRes
-import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.core.ui.ImmersiveFullScreenEffect
 import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.feature.course.CourseCompletionInfo
+import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.feature.quran.AudioLanguage
+import com.starception.submission.feature.quran.QuranPlaybackService
+import com.starception.submission.feature.quran.surahArtworkRes
+import com.starception.submission.util.toLocalizedDigits
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.starception.submission.core.ui.ImmersiveFullScreenEffect
-import javax.inject.Inject
-import android.Manifest
-import android.os.Build
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.PermissionStatus
-import com.google.accompanist.permissions.rememberPermissionState
-import com.starception.submission.core.designsystem.component.NiaTopicTag
-import com.starception.submission.core.designsystem.component.NiaVerifiedTag
-import com.starception.submission.feature.course.CourseCompletionInfo
-import com.starception.submission.feature.course.CourseProgressTracker
-import com.starception.submission.util.toLocalizedDigits
 import java.util.Locale
+import javax.inject.Inject
+import kotlin.math.sqrt
 
 private const val SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO = 3f / 2f
 private val SurahArtworkLandscapeHeight = 180.dp
@@ -199,7 +203,7 @@ private fun SurahSwipeContainer(
     surahNumber: Int,
     onNavigateToPreviousSurah: () -> Unit,
     onNavigateToNextSurah: () -> Unit,
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable BoxScope.() -> Unit,
 ) {
     var swipeOffsetX by remember { mutableStateOf(0f) }
     var touchY by remember { mutableStateOf(0f) }
@@ -252,7 +256,7 @@ private fun SurahSwipeContainer(
                         if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) * 1.5f) {
                             change.consume()
                         }
-                    }
+                    },
                 )
             },
     ) {
@@ -280,7 +284,7 @@ private fun SurahSwipeContainer(
                     .align(Alignment.TopStart)
                     .offset(
                         x = if (thresholdReachedLeft) detachOffset else 0.dp,
-                        y = verticalOffset
+                        y = verticalOffset,
                     ),
             )
         }
@@ -295,7 +299,7 @@ private fun SurahSwipeContainer(
                     .align(Alignment.TopEnd)
                     .offset(
                         x = if (thresholdReachedRight) -detachOffset else 0.dp,
-                        y = verticalOffset
+                        y = verticalOffset,
                     ),
             )
         }
@@ -398,17 +402,17 @@ internal fun getArabicFontResId(selectedFont: String): Int = when (selectedFont)
 fun SurahDetailScreen(
     surahNumber: Int,
     // News resource ID for bookmark tracking
-    newsResourceId: String? = null, 
+    newsResourceId: String? = null,
     // Optional: scroll to specific ayah number (0 = no scroll)
-    scrollToAyah: Int = 0, 
+    scrollToAyah: Int = 0,
     onBackClick: () -> Unit,
     // Navigate to topic detail screen
-    onTopicClick: (String) -> Unit = {}, 
+    onTopicClick: (String) -> Unit = {},
     // Navigate to previous surah (swipe right)
-    onNavigateToPreviousSurah: () -> Unit = {}, 
+    onNavigateToPreviousSurah: () -> Unit = {},
     // Navigate to next surah (swipe left)
-    onNavigateToNextSurah: () -> Unit = {}, 
-    viewModel: SurahDetailViewModel = hiltViewModel()
+    onNavigateToNextSurah: () -> Unit = {},
+    viewModel: SurahDetailViewModel = hiltViewModel(),
 ) {
     // Enable immersive full-screen mode (hides status bar)
     // Don't restore on dispose to prevent status bar flash when swiping between surahs
@@ -452,7 +456,7 @@ fun SurahDetailScreen(
             Toast.makeText(
                 context,
                 "Audio permission is required to play Quran recitation",
-                Toast.LENGTH_SHORT
+                Toast.LENGTH_SHORT,
             ).show()
         }
     }
@@ -576,7 +580,7 @@ fun SurahDetailScreen(
     // instead of relying on a separate, easily-stale audio_language preference.
     var currentAudioLanguage by remember {
         mutableStateOf(
-            mapTranslationCodeToAudioLanguage(currentTranslation) ?: AudioLanguage.ARABIC_ONLY
+            mapTranslationCodeToAudioLanguage(currentTranslation) ?: AudioLanguage.ARABIC_ONLY,
         )
     }
 
@@ -609,7 +613,7 @@ fun SurahDetailScreen(
     // Font size state - loaded from ViewModel (which reads from SharedPreferences)
     val arabicFontSize by viewModel.arabicFontSize.collectAsState()
     val minFontSize = 14f
-    val maxFontSize = 60f  // Increased from 40f to 60f for much larger text
+    val maxFontSize = 60f // Increased from 40f to 60f for much larger text
 
     // Translation visibility toggle state - loaded from ViewModel (persisted in SharedPreferences)
     val showTranslationInText by viewModel.showTranslation.collectAsState()
@@ -804,7 +808,7 @@ fun SurahDetailScreen(
             if (ayahIndex in 0 until totalItems) {
                 android.util.Log.d("QuranAlbumPlayer", "📜 Scrolling to Ayah $scrollToAyah at index $ayahIndex")
                 scrollState.animateScrollToItem(
-                    ayahIndex
+                    ayahIndex,
                 )
             }
         }
@@ -906,305 +910,310 @@ fun SurahDetailScreen(
         Scaffold(
             topBar = {},
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0) // No padding for status bar in immersive mode
+            contentWindowInsets = WindowInsets(0, 0, 0, 0), // No padding for status bar in immersive mode
         ) { paddingValues ->
-        when (val state = uiState) {
-            is SurahDetailUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-            is SurahDetailUiState.Success -> {
-                androidx.compose.animation.AnimatedContent(
-                    targetState = currentPlayingSurahNumber,
-                    transitionSpec = {
-                        val direction = if (targetState > initialState) {
-                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
-                        } else {
-                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
-                        }
-                        slideIntoContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing)) togetherWith
-                            slideOutOfContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing))
-                    },
-                    label = "surahPageSwipe",
-                    modifier = Modifier.fillMaxSize(),
-                ) { num ->
-                    // Each pane reads its surah+ayahs from the preloaded cache so the
-                    // exiting page keeps its original content and the entering page
-                    // immediately shows the new surah while sliding in.
-                    // Ignore poisoned cache entries with no ayahs (a transient DB
-                    // failure during preload) — fall back to the loaded state so the
-                    // page never renders empty.
-                    val cached = surahCache[num]?.takeIf { it.second.isNotEmpty() }
-                    val pageSurah = cached?.first ?: state.surah
-                    val baseAyahs = cached?.second ?: state.ayahs
-                    // Swap Arabic text to the IndoPak edition when an IndoPak font is
-                    // selected, so the "extra alif" issue from Uthmani text rendered in
-                    // an IndoPak font goes away (matches quran.com IndoPak reading mode).
-                    val pageAyahs = remember(num, baseAyahs, selectedArabicFont) {
-                        if (selectedArabicFont == "pdms_saleem" || selectedArabicFont == "indopak_script") {
-                            val indoPakTexts = com.starception.submission.core.qurandatabase
-                                .IndoPakTextRepository.getInstance(context)
-                                .getSurahTexts(num)
-                            if (indoPakTexts.isEmpty()) baseAyahs
-                            else baseAyahs.map { ayah ->
-                                val ip = indoPakTexts[ayah.numberInSurah] ?: return@map ayah
-                                // Swap Arabic for IndoPak text but keep any translation
-                                // suffix joined with "\n\n" (renderer splits on this to
-                                // show Arabic on top and translation under it).
-                                val translationSuffix = ayah.text.substringAfter("\n\n", missingDelimiterValue = "")
-                                val newText = if (translationSuffix.isEmpty()) ip else "$ip\n\n$translationSuffix"
-                                ayah.copy(text = newText)
-                            }
-                        } else baseAyahs
+            when (val state = uiState) {
+                is SurahDetailUiState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
                     }
-                    // Tajweed offsets are authored against the Uthmani text, so they have
-                    // to travel with it: swapping the edition underneath them left every
-                    // rule pointing at whatever sat at that index in the other spelling —
-                    // the silent-lam colour landed on the following rāʾ, and other rules
-                    // on bare vowels, which reads as colour bleeding across a ligature.
-                    val pageTajweed = remember(num, baseAyahs, pageAyahs, tajweedAnnotations) {
-                        if (pageAyahs === baseAyahs) {
-                            tajweedAnnotations
-                        } else {
-                            val indoPakByNumber = pageAyahs.associate {
-                                it.numberInSurah to it.text.substringBefore("\n\n")
-                            }
-                            baseAyahs.mapNotNull { ayah ->
-                                val rules = tajweedAnnotations[ayah.numberInSurah]
-                                    ?: return@mapNotNull null
-                                val target = indoPakByNumber[ayah.numberInSurah]
-                                    ?: return@mapNotNull null
-                                ayah.numberInSurah to
-                                    com.starception.submission.feature.surah.tajweed
-                                        .TajweedEditionMapper.remap(
-                                            sourceText = ayah.text.substringBefore("\n\n"),
-                                            targetText = target,
-                                            annotations = rules,
-                                        )
-                            }.toMap()
-                        }
-                    }
-                AlbumPlayerContent(
-                    surah = pageSurah,
-                    ayahs = pageAyahs,
-                    scrollState = scrollState,
-                    collapseProgress = collapseProgress.value,
-                    showMusicPlayer = showMusicPlayer,
-                    isPlaying = isPlaying,
-                    currentProgress = currentProgress,
-                    currentVolume = currentVolume,
-                    currentPlayingSurahNumber = num,
-                    currentPlayingSurah = null,
-                    currentPlayingAyahs = null,
-                    showFabVisible = showFabVisible,
-                    selectedArabicFont = selectedArabicFont,
-                    arabicFontSize = arabicFontSize,
-                    textAlignment = textAlignment,
-                    currentTranslation = currentTranslation,
-                    showTranslationInText = showTranslationInText,
-                    showBismillahRow = showBismillahRow,
-                    showTajweed = showTajweed,
-                    tajweedAnnotations = pageTajweed,
-                    onToggleTajweed = {
-                        if (!showTajweed && !viewModel.isTajweedAvailable) {
-                            Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
-                        } else {
-                            viewModel.changeTajweed(!showTajweed)
-                        }
-                    },
-                    onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
-                    onCycleAlignment = {
-                        // Cycle through every alignment exposed by the reading controls.
-                        val nextAlignment = when (textAlignment) {
-                            "start" -> "center"
-                            "center" -> "end"
-                            "end" -> "justify"
-                            else -> "start"
-                        }
-                        viewModel.changeTextAlignment(nextAlignment)
-                    },
-                    onPlayPauseClick = {
-                        val service = playbackService
-                        android.util.Log.d("PlaybackTrace", "▶️ onPlayPauseClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()}")
-                        if (service != null) {
-                            if (service.isPlaying()) {
-                                service.togglePlayPause()
-                            } else {
-                                playWithPermissionCheck {
-                                    showMusicPlayer = true
-                                    service.setAudioLanguage(currentAudioLanguage)
-                                    android.util.Log.d("PlaybackTrace", "▶️ calling playSurah(index=${num - 1}) for num=$num")
-                                    service.playSurah(num - 1, true)
-                                }
-                            }
-                        }
-                    },
-                    onRewindClick = {
-                        // Immediately update the current surah number for UI sync
-                        val prevSurahNumber = if (currentPlayingSurahNumber > 1) currentPlayingSurahNumber - 1 else 114
-                        currentPlayingSurahNumber = prevSurahNumber
-                        playbackService?.playPrevious()
-                    },
-                    onForwardClick = {
-                        // Immediately update the current surah number for UI sync
-                        val nextSurahNumber = if (currentPlayingSurahNumber < 114) currentPlayingSurahNumber + 1 else 1
-                        currentPlayingSurahNumber = nextSurahNumber
-                        playbackService?.playNext()
-                    },
-                    onVolumeChange = { volume ->
-                        viewModel.changeVolume(volume)
-                        playbackService?.setVolume(volume)
-                    },
-                    onAyahClick = { /* TODO */ },
-                    onFabClick = {
-                        val service = playbackService
-                        android.util.Log.d("PlaybackTrace", "▶️ onFabClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()} | currentPlayingSurahNumber=$currentPlayingSurahNumber")
-                        if (service != null) {
-                            if (service.isPlaying()) {
-                                service.togglePlayPause()
-                            } else {
-                                playWithPermissionCheck {
-                                    showMusicPlayer = true
-                                    service.setAudioLanguage(currentAudioLanguage)
-                                    android.util.Log.d("PlaybackTrace", "▶️ FAB calling playSurah(index=${num - 1}) for num=$num")
-                                    service.playSurah(num - 1, true)
-                                }
-                            }
-                        }
-                    },
-                    onCollapseMusicPlayer = { showMusicPlayer = false },
-                    onWordStudyClick = { ayahNumber ->
-                        viewModel.loadWordStudy(surahNumber, ayahNumber)
-                        // Don't show dialog - data is shown in bottom sheet
-                    },
-                    onTafseerClick = { ayahNumber ->
-                        viewModel.loadTafseer(surahNumber, ayahNumber)
-                        // Don't show dialog - data is shown in bottom sheet
-                    },
-                    onPlayAyahClick = { ayahNumber ->
-                        val service = playbackService
-                        if (service != null) {
-                            playWithPermissionCheck {
-                                // Generate audio URL for this specific ayah
-                                val audioUrl = com.starception.submission.core.qurandatabase.getAyahAudioUrl(
-                                    surahNumber = surahNumber,
-                                    ayahNumber = ayahNumber,
-                                    reciter = com.starception.submission.core.qurandatabase.QuranReciters.ALAFASY_128
-                                )
-
-                                // Show music player
-                                showMusicPlayer = true
-
-                                // Play the specific ayah using URL
-                                service.playAyahByUrl(
-                                    audioUrl = audioUrl,
-                                    surahName = state.surah.nameEnglish,
-                                    ayahNumber = ayahNumber,
-                                    shouldAutoPlay = true
-                                )
-
-                                // Show toast with ayah info
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Playing ${state.surah.nameEnglish} - Ayah $ayahNumber",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        } else {
-                            android.widget.Toast.makeText(
-                                context,
-                                "Audio player not ready",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    },
-                    topics = topics,
-                    onTopicClick = onTopicClick,
-                    tafseerData = tafseerData,
-                    wordStudyData = wordStudyData,
-                    selectedTafseerBook = selectedTafseerBook,
-                    onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
-                    // Tafseer translation
-                    tafseerTranslationLanguage = tafseerTranslationLanguage,
-                    tafseerTranslationProvider = tafseerTranslationProvider,
-                    translatedTafseerSaadi = translatedTafseerSaadi,
-                    translatedTafseerMoysar = translatedTafseerMoysar,
-                    translatedTafseerBaghawi = translatedTafseerBaghawi,
-                    translatedWordMeanings = translatedWordMeanings,
-                    isTafseerTranslating = isTafseerTranslating,
-                    availableTafseerTranslations = viewModel.getAvailableTafseerTranslations(),
-                    availableTafseerProviders = viewModel.getAvailableTafseerProviders(),
-                    onTafseerLanguageChange = { lang -> viewModel.changeTafseerTranslationLanguage(lang) },
-                    onTafseerProviderChange = { provider -> viewModel.changeTafseerTranslationProvider(provider) },
-                    getTafseerTranslationName = { code -> viewModel.getTafseerTranslationName(code) },
-                    isLandscape = isLandscape,
-                    onFontSizeChange = { newSize -> viewModel.changeArabicFontSize(newSize) },
-                    minFontSize = minFontSize,
-                    maxFontSize = maxFontSize,
-                    onToggleContinuousReadingMode = { viewModel.toggleContinuousReadingMode() },
-                    continuousReadingMode = continuousReadingMode,
-                    initialMushafPage = viewModel.getLastMushafPage(num),
-                    onMushafPageChange = { page -> viewModel.saveLastMushafPage(num, page) },
-                    onNavigateToPreviousSurah = navigateToPreviousSurah,
-                    onNavigateToNextSurah = navigateToNextSurah,
-                    currentRecitingAyah = currentRecitingAyah,
-                    // Highlight + Mushaf snap only on the originating surah —
-                    // swiping to a neighbour surah shouldn't drag the tint or
-                    // page-jump to its same-numbered ayah.
-                    highlightedAyahNumber = if (num == surahNumber) highlightedAyahNumber else null,
-                    scrollToAyahForMushafJump = if (num == surahNumber) scrollToAyah else 0,
-                    modifier = Modifier
-                )
                 }
-            }
-            is SurahDetailUiState.Error -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.message,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-            is SurahDetailUiState.NeedsDownload -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    com.starception.submission.download.MissingContentCard(
-                        resourceName = state.resourceName,
-                        category = state.category,
-                        description = state.description,
-                        downloadManager = viewModel.downloadManager,
-                        onDownloadComplete = {
-                            // Close cached Room instance AND delete its managed DB file
-                            // so Room re-copies from the freshly downloaded source.
-                            // (Plain clearCache() would reuse the stale empty file Room
-                            // created on the previous open.)
-                            //
-                            // Reset the database the state says is missing, NOT the selected
-                            // translation — every layout is built on the Arabic text, so
-                            // reading English can be blocked by the Arabic database. Resetting
-                            // the selected one instead left the broken database cached and
-                            // reloaded straight back into this same download prompt.
-                            com.starception.submission.core.qurandatabase.QuranTranslationHelper
-                                .resetTranslationDatabase(context, state.translationCode)
-                            viewModel.loadSurah(surahNumber, currentTranslation)
+                is SurahDetailUiState.Success -> {
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = currentPlayingSurahNumber,
+                        transitionSpec = {
+                            val direction = if (targetState > initialState) {
+                                androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
+                            } else {
+                                androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
+                            }
+                            slideIntoContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing)) togetherWith
+                                slideOutOfContainer(direction, animationSpec = tween(350, easing = FastOutSlowInEasing))
                         },
-                    )
+                        label = "surahPageSwipe",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { num ->
+                        // Each pane reads its surah+ayahs from the preloaded cache so the
+                        // exiting page keeps its original content and the entering page
+                        // immediately shows the new surah while sliding in.
+                        // Ignore poisoned cache entries with no ayahs (a transient DB
+                        // failure during preload) — fall back to the loaded state so the
+                        // page never renders empty.
+                        val cached = surahCache[num]?.takeIf { it.second.isNotEmpty() }
+                        val pageSurah = cached?.first ?: state.surah
+                        val baseAyahs = cached?.second ?: state.ayahs
+                        // Swap Arabic text to the IndoPak edition when an IndoPak font is
+                        // selected, so the "extra alif" issue from Uthmani text rendered in
+                        // an IndoPak font goes away (matches quran.com IndoPak reading mode).
+                        val pageAyahs = remember(num, baseAyahs, selectedArabicFont) {
+                            if (selectedArabicFont == "pdms_saleem" || selectedArabicFont == "indopak_script") {
+                                val indoPakTexts = com.starception.submission.core.qurandatabase
+                                    .IndoPakTextRepository.getInstance(context)
+                                    .getSurahTexts(num)
+                                if (indoPakTexts.isEmpty()) {
+                                    baseAyahs
+                                } else {
+                                    baseAyahs.map { ayah ->
+                                        val ip = indoPakTexts[ayah.numberInSurah] ?: return@map ayah
+                                        // Swap Arabic for IndoPak text but keep any translation
+                                        // suffix joined with "\n\n" (renderer splits on this to
+                                        // show Arabic on top and translation under it).
+                                        val translationSuffix = ayah.text.substringAfter("\n\n", missingDelimiterValue = "")
+                                        val newText = if (translationSuffix.isEmpty()) ip else "$ip\n\n$translationSuffix"
+                                        ayah.copy(text = newText)
+                                    }
+                                }
+                            } else {
+                                baseAyahs
+                            }
+                        }
+                        // Tajweed offsets are authored against the Uthmani text, so they have
+                        // to travel with it: swapping the edition underneath them left every
+                        // rule pointing at whatever sat at that index in the other spelling —
+                        // the silent-lam colour landed on the following rāʾ, and other rules
+                        // on bare vowels, which reads as colour bleeding across a ligature.
+                        val pageTajweed = remember(num, baseAyahs, pageAyahs, tajweedAnnotations) {
+                            if (pageAyahs === baseAyahs) {
+                                tajweedAnnotations
+                            } else {
+                                val indoPakByNumber = pageAyahs.associate {
+                                    it.numberInSurah to it.text.substringBefore("\n\n")
+                                }
+                                baseAyahs.mapNotNull { ayah ->
+                                    val rules = tajweedAnnotations[ayah.numberInSurah]
+                                        ?: return@mapNotNull null
+                                    val target = indoPakByNumber[ayah.numberInSurah]
+                                        ?: return@mapNotNull null
+                                    ayah.numberInSurah to
+                                        com.starception.submission.feature.surah.tajweed
+                                            .TajweedEditionMapper.remap(
+                                                sourceText = ayah.text.substringBefore("\n\n"),
+                                                targetText = target,
+                                                annotations = rules,
+                                            )
+                                }.toMap()
+                            }
+                        }
+                        AlbumPlayerContent(
+                            surah = pageSurah,
+                            ayahs = pageAyahs,
+                            scrollState = scrollState,
+                            collapseProgress = collapseProgress.value,
+                            showMusicPlayer = showMusicPlayer,
+                            isPlaying = isPlaying,
+                            currentProgress = currentProgress,
+                            currentVolume = currentVolume,
+                            currentPlayingSurahNumber = num,
+                            currentPlayingSurah = null,
+                            currentPlayingAyahs = null,
+                            showFabVisible = showFabVisible,
+                            selectedArabicFont = selectedArabicFont,
+                            arabicFontSize = arabicFontSize,
+                            textAlignment = textAlignment,
+                            currentTranslation = currentTranslation,
+                            showTranslationInText = showTranslationInText,
+                            showBismillahRow = showBismillahRow,
+                            showTajweed = showTajweed,
+                            tajweedAnnotations = pageTajweed,
+                            onToggleTajweed = {
+                                if (!showTajweed && !viewModel.isTajweedAvailable) {
+                                    Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    viewModel.changeTajweed(!showTajweed)
+                                }
+                            },
+                            onToggleTranslation = { viewModel.changeShowTranslation(!showTranslationInText) },
+                            onCycleAlignment = {
+                                // Cycle through every alignment exposed by the reading controls.
+                                val nextAlignment = when (textAlignment) {
+                                    "start" -> "center"
+                                    "center" -> "end"
+                                    "end" -> "justify"
+                                    else -> "start"
+                                }
+                                viewModel.changeTextAlignment(nextAlignment)
+                            },
+                            onPlayPauseClick = {
+                                val service = playbackService
+                                android.util.Log.d("PlaybackTrace", "▶️ onPlayPauseClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()}")
+                                if (service != null) {
+                                    if (service.isPlaying()) {
+                                        service.togglePlayPause()
+                                    } else {
+                                        playWithPermissionCheck {
+                                            showMusicPlayer = true
+                                            service.setAudioLanguage(currentAudioLanguage)
+                                            android.util.Log.d("PlaybackTrace", "▶️ calling playSurah(index=${num - 1}) for num=$num")
+                                            service.playSurah(num - 1, true)
+                                        }
+                                    }
+                                }
+                            },
+                            onRewindClick = {
+                                // Immediately update the current surah number for UI sync
+                                val prevSurahNumber = if (currentPlayingSurahNumber > 1) currentPlayingSurahNumber - 1 else 114
+                                currentPlayingSurahNumber = prevSurahNumber
+                                playbackService?.playPrevious()
+                            },
+                            onForwardClick = {
+                                // Immediately update the current surah number for UI sync
+                                val nextSurahNumber = if (currentPlayingSurahNumber < 114) currentPlayingSurahNumber + 1 else 1
+                                currentPlayingSurahNumber = nextSurahNumber
+                                playbackService?.playNext()
+                            },
+                            onVolumeChange = { volume ->
+                                viewModel.changeVolume(volume)
+                                playbackService?.setVolume(volume)
+                            },
+                            onAyahClick = { /* TODO */ },
+                            onFabClick = {
+                                val service = playbackService
+                                android.util.Log.d("PlaybackTrace", "▶️ onFabClick | route=$surahNumber | num=$num | service=${service != null} | isPlaying=${service?.isPlaying()} | currentPlayingSurahNumber=$currentPlayingSurahNumber")
+                                if (service != null) {
+                                    if (service.isPlaying()) {
+                                        service.togglePlayPause()
+                                    } else {
+                                        playWithPermissionCheck {
+                                            showMusicPlayer = true
+                                            service.setAudioLanguage(currentAudioLanguage)
+                                            android.util.Log.d("PlaybackTrace", "▶️ FAB calling playSurah(index=${num - 1}) for num=$num")
+                                            service.playSurah(num - 1, true)
+                                        }
+                                    }
+                                }
+                            },
+                            onCollapseMusicPlayer = { showMusicPlayer = false },
+                            onWordStudyClick = { ayahNumber ->
+                                viewModel.loadWordStudy(surahNumber, ayahNumber)
+                                // Don't show dialog - data is shown in bottom sheet
+                            },
+                            onTafseerClick = { ayahNumber ->
+                                viewModel.loadTafseer(surahNumber, ayahNumber)
+                                // Don't show dialog - data is shown in bottom sheet
+                            },
+                            onPlayAyahClick = { ayahNumber ->
+                                val service = playbackService
+                                if (service != null) {
+                                    playWithPermissionCheck {
+                                        // Generate audio URL for this specific ayah
+                                        val audioUrl = com.starception.submission.core.qurandatabase.getAyahAudioUrl(
+                                            surahNumber = surahNumber,
+                                            ayahNumber = ayahNumber,
+                                            reciter = com.starception.submission.core.qurandatabase.QuranReciters.ALAFASY_128,
+                                        )
+
+                                        // Show music player
+                                        showMusicPlayer = true
+
+                                        // Play the specific ayah using URL
+                                        service.playAyahByUrl(
+                                            audioUrl = audioUrl,
+                                            surahName = state.surah.nameEnglish,
+                                            ayahNumber = ayahNumber,
+                                            shouldAutoPlay = true,
+                                        )
+
+                                        // Show toast with ayah info
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Playing ${state.surah.nameEnglish} - Ayah $ayahNumber",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Audio player not ready",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                            topics = topics,
+                            onTopicClick = onTopicClick,
+                            tafseerData = tafseerData,
+                            wordStudyData = wordStudyData,
+                            selectedTafseerBook = selectedTafseerBook,
+                            onTafseerBookSelected = { book -> viewModel.selectTafseerBook(book) },
+                            // Tafseer translation
+                            tafseerTranslationLanguage = tafseerTranslationLanguage,
+                            tafseerTranslationProvider = tafseerTranslationProvider,
+                            translatedTafseerSaadi = translatedTafseerSaadi,
+                            translatedTafseerMoysar = translatedTafseerMoysar,
+                            translatedTafseerBaghawi = translatedTafseerBaghawi,
+                            translatedWordMeanings = translatedWordMeanings,
+                            isTafseerTranslating = isTafseerTranslating,
+                            availableTafseerTranslations = viewModel.getAvailableTafseerTranslations(),
+                            availableTafseerProviders = viewModel.getAvailableTafseerProviders(),
+                            onTafseerLanguageChange = { lang -> viewModel.changeTafseerTranslationLanguage(lang) },
+                            onTafseerProviderChange = { provider -> viewModel.changeTafseerTranslationProvider(provider) },
+                            getTafseerTranslationName = { code -> viewModel.getTafseerTranslationName(code) },
+                            isLandscape = isLandscape,
+                            onFontSizeChange = { newSize -> viewModel.changeArabicFontSize(newSize) },
+                            minFontSize = minFontSize,
+                            maxFontSize = maxFontSize,
+                            onToggleContinuousReadingMode = { viewModel.toggleContinuousReadingMode() },
+                            continuousReadingMode = continuousReadingMode,
+                            initialMushafPage = viewModel.getLastMushafPage(num),
+                            onMushafPageChange = { page -> viewModel.saveLastMushafPage(num, page) },
+                            onNavigateToPreviousSurah = navigateToPreviousSurah,
+                            onNavigateToNextSurah = navigateToNextSurah,
+                            currentRecitingAyah = currentRecitingAyah,
+                            // Highlight + Mushaf snap only on the originating surah —
+                            // swiping to a neighbour surah shouldn't drag the tint or
+                            // page-jump to its same-numbered ayah.
+                            highlightedAyahNumber = if (num == surahNumber) highlightedAyahNumber else null,
+                            scrollToAyahForMushafJump = if (num == surahNumber) scrollToAyah else 0,
+                            modifier = Modifier,
+                        )
+                    }
+                }
+                is SurahDetailUiState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                is SurahDetailUiState.NeedsDownload -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        com.starception.submission.download.MissingContentCard(
+                            resourceName = state.resourceName,
+                            category = state.category,
+                            description = state.description,
+                            downloadManager = viewModel.downloadManager,
+                            onDownloadComplete = {
+                                // Close cached Room instance AND delete its managed DB file
+                                // so Room re-copies from the freshly downloaded source.
+                                // (Plain clearCache() would reuse the stale empty file Room
+                                // created on the previous open.)
+                                //
+                                // Reset the database the state says is missing, NOT the selected
+                                // translation — every layout is built on the Arabic text, so
+                                // reading English can be blocked by the Arabic database. Resetting
+                                // the selected one instead left the broken database cached and
+                                // reloaded straight back into this same download prompt.
+                                com.starception.submission.core.qurandatabase.QuranTranslationHelper
+                                    .resetTranslationDatabase(context, state.translationCode)
+                                viewModel.loadSurah(surahNumber, currentTranslation)
+                            },
+                        )
+                    }
                 }
             }
         }
-    }
 
         // In Mushaf mode the toolbar only shows when the user has scrolled up to the album
         // header (item 0) and at least half of it is in view. Keying off the header's
@@ -1226,62 +1235,66 @@ fun SurahDetailScreen(
             visible = showTopBar.value,
             enter = androidx.compose.animation.slideInVertically(
                 animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
-                initialOffsetY = { -it }
+                initialOffsetY = { -it },
             ) + androidx.compose.animation.fadeIn(animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3)),
             exit = androidx.compose.animation.slideOutVertically(
                 animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
-                targetOffsetY = { -it }
+                targetOffsetY = { -it },
             ) + androidx.compose.animation.fadeOut(animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3)),
         ) {
-        // Always visible toolbar with collapsing effect based on scroll position
-        AlbumPlayerTopBar(
-            collapseProgress = collapseProgress.value,
-            isCollapsed = isCollapsed.value,
-            surahName = when (uiState) {
-                is SurahDetailUiState.Success -> (surahCache[currentPlayingSurahNumber]?.first
-                    ?: (uiState as SurahDetailUiState.Success).surah).nameEnglish
-                else -> ""
-            },
-            surahNameArabic = when (uiState) {
-                is SurahDetailUiState.Success -> (surahCache[currentPlayingSurahNumber]?.first
-                    ?: (uiState as SurahDetailUiState.Success).surah).nameArabic
-                else -> ""
-            },
-            currentTranslation = currentTranslation,
-            isBookmarked = isBookmarked,
-            selectedArabicFont = selectedArabicFont,
-            showTajweed = showTajweed,
-            onBackClick = wrappedOnBackClick,
-            onTranslationClick = { showTranslationDialog = true },
-            onFontClick = { showFontDialog = true },
-            onTajweedClick = {
-                if (!showTajweed && !viewModel.isTajweedAvailable) {
-                    Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
-                } else {
-                    viewModel.changeTajweed(!showTajweed)
-                }
-            },
-            onBookmarkClick = {
-                val oldState = isBookmarked
-                val newState = !oldState
-                isBookmarked = newState
-                android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | bookmarkId=$bookmarkId | old_state=$oldState | new_state=$newState")
+            // Always visible toolbar with collapsing effect based on scroll position
+            AlbumPlayerTopBar(
+                collapseProgress = collapseProgress.value,
+                isCollapsed = isCollapsed.value,
+                surahName = when (uiState) {
+                    is SurahDetailUiState.Success -> (
+                        surahCache[currentPlayingSurahNumber]?.first
+                            ?: (uiState as SurahDetailUiState.Success).surah
+                        ).nameEnglish
+                    else -> ""
+                },
+                surahNameArabic = when (uiState) {
+                    is SurahDetailUiState.Success -> (
+                        surahCache[currentPlayingSurahNumber]?.first
+                            ?: (uiState as SurahDetailUiState.Success).surah
+                        ).nameArabic
+                    else -> ""
+                },
+                currentTranslation = currentTranslation,
+                isBookmarked = isBookmarked,
+                selectedArabicFont = selectedArabicFont,
+                showTajweed = showTajweed,
+                onBackClick = wrappedOnBackClick,
+                onTranslationClick = { showTranslationDialog = true },
+                onFontClick = { showFontDialog = true },
+                onTajweedClick = {
+                    if (!showTajweed && !viewModel.isTajweedAvailable) {
+                        Toast.makeText(context, "Tajweed data not downloaded yet. Please download it from Settings.", Toast.LENGTH_LONG).show()
+                    } else {
+                        viewModel.changeTajweed(!showTajweed)
+                    }
+                },
+                onBookmarkClick = {
+                    val oldState = isBookmarked
+                    val newState = !oldState
+                    isBookmarked = newState
+                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "👆 CLICK | surah=$surahNumber | bookmarkId=$bookmarkId | old_state=$oldState | new_state=$newState")
 
-                coroutineScope.launch {
-                    userDataRepository.setNewsResourceBookmarked(bookmarkId, newState)
-                    android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | bookmarkId=$bookmarkId | state=$newState")
-                }
-            },
-            onMoreClick = {
-                // Toggle floating toolbar visibility
-                showFloatingToolbar = !showFloatingToolbar
-                // When showing, ensure it's expanded
-                if (showFloatingToolbar) {
-                    isFloatingToolbarExpanded = true
-                }
-            },
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+                    coroutineScope.launch {
+                        userDataRepository.setNewsResourceBookmarked(bookmarkId, newState)
+                        android.util.Log.d("QuranAlbumPlayer_BOOKMARK", "✅ CLICK_COMPLETE | surah=$surahNumber | bookmarkId=$bookmarkId | state=$newState")
+                    }
+                },
+                onMoreClick = {
+                    // Toggle floating toolbar visibility
+                    showFloatingToolbar = !showFloatingToolbar
+                    // When showing, ensure it's expanded
+                    if (showFloatingToolbar) {
+                        isFloatingToolbarExpanded = true
+                    }
+                },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
 
         // Floating Surah name that moves from info card to toolbar when scrolling.
@@ -1305,9 +1318,9 @@ fun SurahDetailScreen(
             }
             // Start floating names higher (12dp) to ensure good separation from translation text below
             val headerYPx = with(density) { (albumHeaderHeight + 12).dp.toPx() }
-            val toolbarYPx = with(density) { 21.dp.toPx() }  // Stop at toolbar level (locked position)
+            val toolbarYPx = with(density) { 21.dp.toPx() } // Stop at toolbar level (locked position)
             val startXPx = with(density) { 24.dp.toPx() }
-            val endXPx = with(density) { 56.dp.toPx() }  // Position after back button
+            val endXPx = with(density) { 56.dp.toPx() } // Position after back button
 
             // Use derivedStateOf for stable, optimized updates
             val floatingState by remember {
@@ -1324,7 +1337,7 @@ fun SurahDetailScreen(
             }
 
             val (namesYPx, progress, xOffsetPx) = floatingState
-            val scale = 1f - (progress * 0.4f)  // Scale down as it moves up
+            val scale = 1f - (progress * 0.4f) // Scale down as it moves up
             val contentColor = MaterialTheme.colorScheme.onSurface
 
             Box(
@@ -1335,10 +1348,10 @@ fun SurahDetailScreen(
                         scaleX = scale
                         scaleY = scale
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                    }
+                    },
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
                         text = surah.nameEnglish,
@@ -1346,17 +1359,17 @@ fun SurahDetailScreen(
                         fontWeight = FontWeight.Bold,
                         color = contentColor,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = surah.nameArabic,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
-                            fontWeight = FontWeight.Normal
+                            fontWeight = FontWeight.Normal,
                         ),
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -1378,19 +1391,19 @@ fun SurahDetailScreen(
                         Toast.makeText(
                             context,
                             "Translation applied with ${getAudioLanguageDisplayName(mappedAudioLanguage)} audio",
-                            Toast.LENGTH_SHORT
+                            Toast.LENGTH_SHORT,
                         ).show()
                     } else {
                         Toast.makeText(
                             context,
                             "Translation applied. Audio not available for ${viewModel.getTranslationName(translationCode)}, playing Arabic audio.",
-                            Toast.LENGTH_LONG
+                            Toast.LENGTH_LONG,
                         ).show()
                     }
 
                     showTranslationDialog = false
                 },
-                getTranslationDisplayName = { code -> viewModel.getTranslationName(code) }
+                getTranslationDisplayName = { code -> viewModel.getTranslationName(code) },
             )
         }
 
@@ -1405,11 +1418,11 @@ fun SurahDetailScreen(
                     Toast.makeText(
                         context,
                         "Arabic font changed to ${viewModel.getArabicFontDisplayName(fontName)}",
-                        Toast.LENGTH_SHORT
+                        Toast.LENGTH_SHORT,
                     ).show()
                     showFontDialog = false
                 },
-                getFontDisplayName = { font -> viewModel.getArabicFontDisplayName(font) }
+                getFontDisplayName = { font -> viewModel.getArabicFontDisplayName(font) },
             )
         }
 
@@ -1430,8 +1443,8 @@ fun SurahDetailScreen(
                     .background(Color.Black.copy(alpha = 0.30f))
                     .clickable(
                         indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) { showFloatingToolbar = false }
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { showFloatingToolbar = false },
             )
         }
         androidx.compose.animation.AnimatedVisibility(
@@ -1492,7 +1505,7 @@ fun SurahDetailScreen(
                             androidx.compose.animation.core.animate(
                                 offset,
                                 0f,
-                                animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1)
+                                animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1),
                             ) { value, _ ->
                                 sheetDragOffset = value
                             }
@@ -1520,8 +1533,11 @@ fun SurahDetailScreen(
                             onDragEnd = {
                                 // Keep the offset on dismiss so the exit animation
                                 // continues from the finger's release point.
-                                if (sheetDragOffset > 150f) showFloatingToolbar = false
-                                else sheetDragOffset = 0f
+                                if (sheetDragOffset > 150f) {
+                                    showFloatingToolbar = false
+                                } else {
+                                    sheetDragOffset = 0f
+                                }
                             },
                             onDragCancel = { sheetDragOffset = 0f },
                         )
@@ -1551,7 +1567,7 @@ fun SurahDetailScreen(
                                 .width(36.dp)
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
                         )
                     }
 
@@ -1583,7 +1599,7 @@ fun SurahDetailScreen(
                             .padding(horizontal = 20.dp)
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                     )
 
                     // Text size — small A, slider, big A (Play Books style).
@@ -1624,7 +1640,7 @@ fun SurahDetailScreen(
                             .padding(horizontal = 20.dp, vertical = 6.dp)
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                     )
 
                     // Alignment — compact segmented icons.
@@ -1771,8 +1787,11 @@ fun SurahDetailScreen(
                                         .padding(horizontal = 14.dp, vertical = 2.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(
-                                            if (fontSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                            else Color.Transparent
+                                            if (fontSelected) {
+                                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                            } else {
+                                                Color.Transparent
+                                            },
                                         )
                                         .clickable {
                                             viewModel.changeArabicFont(font)
@@ -1801,8 +1820,11 @@ fun SurahDetailScreen(
                                         fontFamily = getArabicFontFamilyForSelection(font),
                                         fontSize = 18.sp,
                                         maxLines = 1,
-                                        color = if (fontSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (fontSelected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     )
                                 }
                             }
@@ -1863,8 +1885,11 @@ fun SurahDetailScreen(
                                         .padding(horizontal = 14.dp, vertical = 2.dp)
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(
-                                            if (langSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                            else Color.Transparent
+                                            if (langSelected) {
+                                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                            } else {
+                                                Color.Transparent
+                                            },
                                         )
                                         .clickable {
                                             viewModel.changeTranslation(code, surahNumber)
@@ -1899,8 +1924,11 @@ fun SurahDetailScreen(
                                         },
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1,
-                                        color = if (langSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (langSelected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     )
                                 }
                             }
@@ -1918,7 +1946,7 @@ fun SurahDetailScreen(
                 onDismiss = {
                     showWordStudyDialog = false
                     viewModel.clearWordStudy()
-                }
+                },
             )
         }
 
@@ -1932,14 +1960,14 @@ fun SurahDetailScreen(
                 onDismiss = {
                     showTafseerDialog = false
                     viewModel.clearTafseer()
-                }
+                },
             )
         }
 
         // Tajweed Legend dialog
         if (showTajweedLegendDialog) {
             com.starception.submission.feature.surah.tajweed.TajweedLegendDialog(
-                onDismiss = { showTajweedLegendDialog = false }
+                onDismiss = { showTajweedLegendDialog = false },
             )
         }
 
@@ -2224,7 +2252,7 @@ private fun AlbumPlayerTopBar(
     onBookmarkClick: () -> Unit = {},
     onMoreClick: () -> Unit = {},
     onAllSurahsClick: () -> Unit = onBackClick,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Smooth transition based on collapseProgress (0 = transparent, 1 = solid)
     // Toolbar becomes transparent as user scrolls up, solid as user scrolls down
@@ -2236,7 +2264,7 @@ private fun AlbumPlayerTopBar(
         red = 1f + (surfaceColor.red - 1f) * collapseProgress,
         green = 1f + (surfaceColor.green - 1f) * collapseProgress,
         blue = 1f + (surfaceColor.blue - 1f) * collapseProgress,
-        alpha = 1f
+        alpha = 1f,
     )
 
     // Get short translation code for display
@@ -2302,7 +2330,7 @@ private fun AlbumPlayerTopBar(
         tonalElevation = (4 * collapseProgress).dp, // Smooth elevation transition
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp) // Minimal top padding since status bar is hidden by immersive mode
+            .padding(top = 8.dp), // Minimal top padding since status bar is hidden by immersive mode
     ) {
         Row(
             modifier = Modifier
@@ -2310,19 +2338,19 @@ private fun AlbumPlayerTopBar(
                 .height(64.dp)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             // LEFT SIDE - Back button only (floating surah name will animate here)
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = contentColor.copy(alpha = 0.15f)
+                color = contentColor.copy(alpha = 0.15f),
             ) {
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = contentColor
+                        tint = contentColor,
                     )
                 }
             }
@@ -2331,106 +2359,106 @@ private fun AlbumPlayerTopBar(
             // Shows as many icons as can fit, rest accessible via More menu
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(0.dp)
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 if (true) {
-                // Translation button - shown if space allows (priority 1)
-                if (showTranslation) {
-                    Surface(
-                        onClick = onTranslationClick,
-                        modifier = Modifier.size(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = contentColor.copy(alpha = 0.12f),
-                        contentColor = contentColor
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
+                    // Translation button - shown if space allows (priority 1)
+                    if (showTranslation) {
+                        Surface(
+                            onClick = onTranslationClick,
+                            modifier = Modifier.size(40.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = contentColor.copy(alpha = 0.12f),
+                            contentColor = contentColor,
                         ) {
-                            Text(
-                                text = translationDisplay,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = contentColor,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                Text(
+                                    text = translationDisplay,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = contentColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                    }
+
+                    // Bookmark button - shown if space allows (priority 2)
+                    if (showBookmark) {
+                        IconButton(
+                            onClick = onBookmarkClick,
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                                tint = contentColor,
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
-                }
 
-                // Bookmark button - shown if space allows (priority 2)
-                if (showBookmark) {
-                    IconButton(
-                        onClick = onBookmarkClick,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                            contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                            tint = contentColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-
-                // Font button - shown if space allows (priority 3)
-                if (showFont) {
-                    val fontDisplay = when (selectedArabicFont) {
-                        "pdms_saleem" -> "ص"
-                        "noor_e_hidayat" -> "ن"
-                        "thabit" -> "ث"
-                        "uthmani_script" -> "ع"
-                        "indopak_script" -> "پ"
-                        else -> "F"
-                    }
-                    Surface(
-                        onClick = onFontClick,
-                        modifier = Modifier.size(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = contentColor.copy(alpha = 0.12f),
-                        contentColor = contentColor
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.fillMaxSize()
+                    // Font button - shown if space allows (priority 3)
+                    if (showFont) {
+                        val fontDisplay = when (selectedArabicFont) {
+                            "pdms_saleem" -> "ص"
+                            "noor_e_hidayat" -> "ن"
+                            "thabit" -> "ث"
+                            "uthmani_script" -> "ع"
+                            "indopak_script" -> "پ"
+                            else -> "F"
+                        }
+                        Surface(
+                            onClick = onFontClick,
+                            modifier = Modifier.size(40.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = contentColor.copy(alpha = 0.12f),
+                            contentColor = contentColor,
                         ) {
-                            Text(
-                                text = fontDisplay,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = contentColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                Text(
+                                    text = fontDisplay,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = contentColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                    }
+
+                    // Tajweed toggle - shown if space allows (priority 4)
+                    if (showTajweedButton) {
+                        IconButton(
+                            onClick = onTajweedClick,
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                                contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
+                                tint = contentColor,
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
-                }
-
-                // Tajweed toggle - shown if space allows (priority 4)
-                if (showTajweedButton) {
-                    IconButton(
-                        onClick = onTajweedClick,
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                            contentDescription = if (showTajweed) "Disable Tajweed" else "Enable Tajweed",
-                            tint = contentColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
                 } // end hidden actions block
 
                 // More options menu - always shown (floating toolbar has all options)
                 IconButton(
                     onClick = onMoreClick,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(44.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "More options",
                         tint = contentColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
@@ -2451,9 +2479,9 @@ private fun AlbumPlayerContent(
     currentVolume: Float,
     currentPlayingSurahNumber: Int,
     // Passed from parent for proper recomposition
-    currentPlayingSurah: Surah?, 
+    currentPlayingSurah: Surah?,
     // Passed from parent for proper recomposition
-    currentPlayingAyahs: List<Ayah>?, 
+    currentPlayingAyahs: List<Ayah>?,
     showFabVisible: Boolean,
     selectedArabicFont: String,
     arabicFontSize: Float,
@@ -2513,7 +2541,7 @@ private fun AlbumPlayerContent(
     /** Search-driven jump target — forwarded to the Mushaf pager so it can
      *  snap to the page containing this ayah. 0 = no jump. */
     scrollToAyahForMushafJump: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Use current playing surah/ayahs if available, otherwise use original
     val displaySurah = currentPlayingSurah ?: surah
@@ -2558,9 +2586,9 @@ private fun AlbumPlayerContent(
     // Calculate total items for scrollbar state
     val totalItems = remember(displayAyahs, showMusicPlayer) {
         1 + // AlbumHeader
-        (if (showMusicPlayer) 1 else 0) + // MusicPlayerControls
-        (if (!showMusicPlayer) 1 else 0) + // AlbumInfoCard
-        displayAyahs.size // Ayah items
+            (if (showMusicPlayer) 1 else 0) + // MusicPlayerControls
+            (if (!showMusicPlayer) 1 else 0) + // AlbumInfoCard
+            displayAyahs.size // Ayah items
     }
 
     val scrollbarState = scrollState.scrollbarState(
@@ -2603,7 +2631,7 @@ private fun AlbumPlayerContent(
             kotlinx.coroutines.delay(80)
             scrollState.animateScrollToItem(
                 index = 1,
-                scrollOffset = 0
+                scrollOffset = 0,
             )
         }
     }
@@ -2647,19 +2675,19 @@ private fun AlbumPlayerContent(
                 firstItem == 0 && offset > 0 -> {
                     scrollState.animateScrollToItem(
                         index = 1,
-                        scrollOffset = 0
+                        scrollOffset = 0,
                     )
                 }
                 firstItem >= 1 && offset > 0 -> {
                     scrollState.animateScrollToItem(
                         index = 1,
-                        scrollOffset = 0
+                        scrollOffset = 0,
                     )
                 }
                 firstItem >= 2 -> {
                     scrollState.animateScrollToItem(
                         index = 1,
-                        scrollOffset = 0
+                        scrollOffset = 0,
                     )
                 }
             }
@@ -2715,7 +2743,7 @@ private fun AlbumPlayerContent(
                     } while (event.changes.any { it.pressed })
                     if (isPinching) onFontSizeChange(currentFontSizeState)
                 }
-            }
+            },
     ) {
         // Snap fling behavior for Mushaf mode - snaps to item boundaries
         val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = scrollState)
@@ -2724,252 +2752,252 @@ private fun AlbumPlayerContent(
             state = scrollState,
             contentPadding = PaddingValues(top = 0.dp), // No padding needed (status bar is hidden)
             flingBehavior = if (continuousReadingMode) snapFlingBehavior else androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior(),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
-        // Album Header with either FAB+Info Card OR Music Player Controls
-        item {
-            // Calculate scroll offset for parallax effect
-            val parallaxScrollOffset = if (scrollState.firstVisibleItemIndex == 0) {
-                scrollState.firstVisibleItemScrollOffset
-            } else {
-                0
-            }
+            // Album Header with either FAB+Info Card OR Music Player Controls
+            item {
+                // Calculate scroll offset for parallax effect
+                val parallaxScrollOffset = if (scrollState.firstVisibleItemIndex == 0) {
+                    scrollState.firstVisibleItemScrollOffset
+                } else {
+                    0
+                }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Eliminate white gap
-            ) {
-                Column {
-                    AlbumHeader(
-                        surah = surah,
-                        isLandscape = isLandscape,
-                        scrollOffset = parallaxScrollOffset
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh), // Eliminate white gap
+                ) {
+                    Column {
+                        AlbumHeader(
+                            surah = surah,
+                            isLandscape = isLandscape,
+                            scrollOffset = parallaxScrollOffset,
+                        )
 
-                    // Fixed-height container to prevent FAB position jump during transitions
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(if (isLandscape) 140.dp else 196.dp) // Reduced height in landscape
-                    ) {
-                        // Professional animated transition between AlbumInfoCard and MusicPlayerControls
-                        // Using AnimatedContent for smooth fade + slide transitions
-                        androidx.compose.animation.AnimatedContent(
-                            targetState = showMusicPlayer,
-                            transitionSpec = {
-                                if (targetState) {
-                                    // Expanding to Music Player: slide up + fade in
-                                    slideInVertically(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                        initialOffsetY = { it / 3 }
-                                    ) + fadeIn(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
-                                    ) togetherWith slideOutVertically(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                        targetOffsetY = { -it / 3 }
-                                    ) + fadeOut(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                        // Fixed-height container to prevent FAB position jump during transitions
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(if (isLandscape) 140.dp else 196.dp), // Reduced height in landscape
+                        ) {
+                            // Professional animated transition between AlbumInfoCard and MusicPlayerControls
+                            // Using AnimatedContent for smooth fade + slide transitions
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = showMusicPlayer,
+                                transitionSpec = {
+                                    if (targetState) {
+                                        // Expanding to Music Player: slide up + fade in
+                                        slideInVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            initialOffsetY = { it / 3 },
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        ) togetherWith slideOutVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            targetOffsetY = { -it / 3 },
+                                        ) + fadeOut(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        )
+                                    } else {
+                                        // Collapsing to Info Card: slide down + fade in
+                                        slideInVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            initialOffsetY = { -it / 3 },
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        ) togetherWith slideOutVertically(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                            targetOffsetY = { it / 3 },
+                                        ) + fadeOut(
+                                            animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                                        )
+                                    }
+                                },
+                                label = "Player Controls Transition",
+                                modifier = Modifier.fillMaxSize(),
+                            ) { showPlayer ->
+                                if (showPlayer) {
+                                    // Music Player Controls - show current playing surah name
+                                    MusicPlayerControls(
+                                        isPlaying = isPlaying,
+                                        currentProgress = currentProgress,
+                                        currentVolume = currentVolume,
+                                        surahName = displaySurah.nameEnglish,
+                                        surahNameArabic = displaySurah.nameArabic,
+                                        selectedArabicFont = selectedArabicFont,
+                                        onPlayPauseClick = onPlayPauseClick,
+                                        onRewindClick = onRewindClick,
+                                        onForwardClick = onForwardClick,
+                                        onVolumeChange = onVolumeChange,
+                                        onCollapse = onCollapseMusicPlayer,
                                     )
                                 } else {
-                                    // Collapsing to Info Card: slide down + fade in
-                                    slideInVertically(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                        initialOffsetY = { -it / 3 }
-                                    ) + fadeIn(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
-                                    ) togetherWith slideOutVertically(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
-                                        targetOffsetY = { it / 3 }
-                                    ) + fadeOut(
-                                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                                    // Album Info Card - show current playing surah info
+                                    AlbumInfoCard(
+                                        surah = displaySurah,
+                                        selectedArabicFont = selectedArabicFont,
+                                        collapseProgress = collapseProgress,
+                                        topics = topics,
+                                        onTopicClick = onTopicClick,
+                                        courseCompletionInfo = CourseProgressTracker.getSurahCourseCompletion(context, surah.number),
                                     )
                                 }
-                            },
-                            label = "Player Controls Transition",
-                            modifier = Modifier.fillMaxSize()
-                        ) { showPlayer ->
-                            if (showPlayer) {
-                                // Music Player Controls - show current playing surah name
-                                MusicPlayerControls(
-                                    isPlaying = isPlaying,
-                                    currentProgress = currentProgress,
-                                    currentVolume = currentVolume,
-                                    surahName = displaySurah.nameEnglish,
-                                    surahNameArabic = displaySurah.nameArabic,
-                                    selectedArabicFont = selectedArabicFont,
-                                    onPlayPauseClick = onPlayPauseClick,
-                                    onRewindClick = onRewindClick,
-                                    onForwardClick = onForwardClick,
-                                    onVolumeChange = onVolumeChange,
-                                    onCollapse = onCollapseMusicPlayer
-                                )
-                            } else {
-                                // Album Info Card - show current playing surah info
-                                AlbumInfoCard(
-                                    surah = displaySurah,
-                                    selectedArabicFont = selectedArabicFont,
-                                    collapseProgress = collapseProgress,
-                                    topics = topics,
-                                    onTopicClick = onTopicClick,
-                                    courseCompletionInfo = CourseProgressTracker.getSurahCourseCompletion(context, surah.number),
-                                )
                             }
                         }
                     }
-                }
 
-                // Floating Ayahs/Mushaf reading-mode toggle — hidden; mode is
-                // accessible via the More menu's floating bottom toolbar.
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = false,
-                    enter = scaleIn(
-                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                    exit = scaleOut(
-                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .offset(y = (-168.dp))
-                        .padding(start = 12.dp)
-                ) {
-                    ReadingModeToggle(
-                        isMushafMode = continuousReadingMode,
-                        onToggle = onToggleContinuousReadingMode
+                    // Floating Ayahs/Mushaf reading-mode toggle — hidden; mode is
+                    // accessible via the More menu's floating bottom toolbar.
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = false,
+                        enter = scaleIn(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                        exit = scaleOut(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .offset(y = (-168.dp))
+                            .padding(start = 12.dp),
+                    ) {
+                        ReadingModeToggle(
+                            isMushafMode = continuousReadingMode,
+                            onToggle = onToggleContinuousReadingMode,
+                        )
+                    }
+
+                    // FAB positioned with more overlap on the info card
+                    // Shows minimize icon when player controls are visible, play/pause when info card is showing
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showFabVisible,
+                        enter = scaleIn(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+                        exit = scaleOut(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                        ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
+                            .padding(end = 12.dp),
+                    ) {
+                        FloatingActionButton(
+                            onClick = {
+                                if (showMusicPlayer) {
+                                    // When player controls are showing, minimize/collapse the player
+                                    onCollapseMusicPlayer()
+                                } else {
+                                    // When info card is showing, control play/pause
+                                    onFabClick()
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    showMusicPlayer -> Icons.Default.CallReceived // Minimize icon (arrow into box) when player controls are visible
+                                    isPlaying -> Icons.Default.Pause // Pause when playing
+                                    else -> Icons.Default.PlayArrow // Play when paused
+                                },
+                                contentDescription = when {
+                                    showMusicPlayer -> "Minimize player"
+                                    isPlaying -> "Pause"
+                                    else -> "Play"
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Ayah content — Mushaf pager in Mushaf mode, individual ayah items otherwise
+            if (continuousReadingMode) {
+                item(key = "mushaf_pager_${displaySurah.number}") {
+                    MushafPagerView(
+                        ayahs = displayAyahs,
+                        arabicFont = selectedArabicFont,
+                        arabicFontSize = arabicFontSize,
+                        showTranslation = showTranslationInText,
+                        showTajweed = showTajweed,
+                        tajweedAnnotations = tajweedAnnotations,
+                        showBismillah = showBismillahRow,
+                        textAlignment = textAlignment,
+                        translationCode = currentTranslation,
+                        parentScrollState = scrollState,
+                        initialPage = initialMushafPage,
+                        surahNameArabic = displaySurah.nameArabic,
+                        surahNameEnglish = displaySurah.nameEnglish,
+                        scrollToAyah = scrollToAyahForMushafJump,
+                        highlightedAyahNumber = highlightedAyahNumber,
+                        onAyahLongPress = { ayahNumber ->
+                            selectedAyahForOptions = ayahNumber
+                            showBottomSheet = true
+                        },
+                        onPageChange = { current, _ ->
+                            onMushafPageChange(current)
+                        },
+                        onNavigateToPreviousSurah = onNavigateToPreviousSurah,
+                        onNavigateToNextSurah = onNavigateToNextSurah,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(mushafHeight),
                     )
                 }
-
-                // FAB positioned with more overlap on the info card
-                // Shows minimize icon when player controls are visible, play/pause when info card is showing
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showFabVisible,
-                    enter = scaleIn(
-                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                    exit = scaleOut(
-                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .offset(y = (-168.dp)) // Position FAB lower with more overlap on info card (75% on info card, 25% on artwork)
-                        .padding(end = 12.dp)
-                ) {
-                    FloatingActionButton(
-                        onClick = {
-                            if (showMusicPlayer) {
-                                // When player controls are showing, minimize/collapse the player
-                                onCollapseMusicPlayer()
-                            } else {
-                                // When info card is showing, control play/pause
-                                onFabClick()
-                            }
-                        },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Icon(
-                            imageVector = when {
-                                showMusicPlayer -> Icons.Default.CallReceived // Minimize icon (arrow into box) when player controls are visible
-                                isPlaying -> Icons.Default.Pause // Pause when playing
-                                else -> Icons.Default.PlayArrow // Play when paused
-                            },
-                            contentDescription = when {
-                                showMusicPlayer -> "Minimize player"
-                                isPlaying -> "Pause"
-                                else -> "Play"
-                            }
+            } else {
+                if (showBismillahRow) {
+                    item(key = "bismillah") {
+                        BismillahRow(
+                            arabicFont = selectedArabicFont,
+                            arabicFontSize = arabicFontSize,
+                            textAlignment = textAlignment,
                         )
                     }
                 }
-            }
-        }
-
-        // Ayah content — Mushaf pager in Mushaf mode, individual ayah items otherwise
-        if (continuousReadingMode) {
-            item(key = "mushaf_pager_${displaySurah.number}") {
-                MushafPagerView(
-                    ayahs = displayAyahs,
-                    arabicFont = selectedArabicFont,
-                    arabicFontSize = arabicFontSize,
-                    showTranslation = showTranslationInText,
-                    showTajweed = showTajweed,
-                    tajweedAnnotations = tajweedAnnotations,
-                    showBismillah = showBismillahRow,
-                    textAlignment = textAlignment,
-                    translationCode = currentTranslation,
-                    parentScrollState = scrollState,
-                    initialPage = initialMushafPage,
-                    surahNameArabic = displaySurah.nameArabic,
-                    surahNameEnglish = displaySurah.nameEnglish,
-                    scrollToAyah = scrollToAyahForMushafJump,
-                    highlightedAyahNumber = highlightedAyahNumber,
-                    onAyahLongPress = { ayahNumber ->
-                        selectedAyahForOptions = ayahNumber
-                        showBottomSheet = true
-                    },
-                    onPageChange = { current, _ ->
-                        onMushafPageChange(current)
-                    },
-                    onNavigateToPreviousSurah = onNavigateToPreviousSurah,
-                    onNavigateToNextSurah = onNavigateToNextSurah,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(mushafHeight)
-                )
-            }
-        } else {
-            if (showBismillahRow) {
-                item(key = "bismillah") {
-                    BismillahRow(
+                items(
+                    items = displayAyahs,
+                    key = { "${displaySurah.number}_${it.numberInSurah}" },
+                ) { ayah ->
+                    AyahTrackItem(
+                        ayah = ayah,
                         arabicFont = selectedArabicFont,
                         arabicFontSize = arabicFontSize,
-                        textAlignment = textAlignment
+                        textAlignment = textAlignment,
+                        showTranslation = showTranslationInText,
+                        showTajweed = showTajweed,
+                        tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
+                        isFavourite = ayah.numberInSurah in favouriteAyahs,
+                        hasNote = ayah.numberInSurah in ayahsWithNotes,
+                        isReciting = currentRecitingAyah == ayah.numberInSurah,
+                        isHighlighted = highlightedAyahNumber == ayah.numberInSurah,
+                        onClick = { onAyahClick(ayah) },
+                        onLongPress = {
+                            selectedAyahForOptions = ayah.numberInSurah
+                            showBottomSheet = true
+                        },
+                        onDoubleTap = {
+                            val ayahNumber = ayah.numberInSurah
+                            val isFavourite = ayahNumber in favouriteAyahs
+                            val newFavouriteStatus = !isFavourite
+
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
+                                favouriteAyahs = if (newFavouriteStatus) {
+                                    favouriteAyahs + ayahNumber
+                                } else {
+                                    favouriteAyahs - ayahNumber
+                                }
+                                val action = if (newFavouriteStatus) "added to" else "removed from"
+                                android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
                     )
                 }
             }
-            items(
-                items = displayAyahs,
-                key = { "${displaySurah.number}_${it.numberInSurah}" }
-            ) { ayah ->
-                AyahTrackItem(
-                    ayah = ayah,
-                    arabicFont = selectedArabicFont,
-                    arabicFontSize = arabicFontSize,
-                    textAlignment = textAlignment,
-                    showTranslation = showTranslationInText,
-                    showTajweed = showTajweed,
-                    tajweedAnnotations = tajweedAnnotations[ayah.numberInSurah],
-                    isFavourite = ayah.numberInSurah in favouriteAyahs,
-                    hasNote = ayah.numberInSurah in ayahsWithNotes,
-                    isReciting = currentRecitingAyah == ayah.numberInSurah,
-                    isHighlighted = highlightedAyahNumber == ayah.numberInSurah,
-                    onClick = { onAyahClick(ayah) },
-                    onLongPress = {
-                        selectedAyahForOptions = ayah.numberInSurah
-                        showBottomSheet = true
-                    },
-                    onDoubleTap = {
-                        val ayahNumber = ayah.numberInSurah
-                        val isFavourite = ayahNumber in favouriteAyahs
-                        val newFavouriteStatus = !isFavourite
-
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                            quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
-                            favouriteAyahs = if (newFavouriteStatus) {
-                                favouriteAyahs + ayahNumber
-                            } else {
-                                favouriteAyahs - ayahNumber
-                            }
-                            val action = if (newFavouriteStatus) "added to" else "removed from"
-                            android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                )
-            }
         }
-    }
 
         // Draggable scrollbar - matches ForYou tab and other pages
         scrollState.DraggableScrollbar(
@@ -2985,297 +3013,298 @@ private fun AlbumPlayerContent(
             ),
         )
 
-    // Material Design 3 Expressive Bottom Sheet for Ayah options (with integrated notes)
-    if (showBottomSheet && selectedAyahForOptions != null) {
-        val selectedAyah = ayahs.find { it.numberInSurah == selectedAyahForOptions }
-        val context = LocalContext.current
+        // Material Design 3 Expressive Bottom Sheet for Ayah options (with integrated notes)
+        if (showBottomSheet && selectedAyahForOptions != null) {
+            val selectedAyah = ayahs.find { it.numberInSurah == selectedAyahForOptions }
+            val context = LocalContext.current
 
-        ModalBottomSheet(
-            onDismissRequest = {
-                showBottomSheet = false
-                selectedAyahForOptions = null
-                bottomSheetMode = "menu"
-                noteText = ""
-                editingNote = null
-                existingNotes = emptyList()
-            },
-            sheetState = sheetState,
-            shape = NiaBottomSheetDefaults.FloatingShape,
-            containerColor = Color.Transparent,
-            contentColor = NiaBottomSheetDefaults.contentColor(),
-            scrimColor = NiaBottomSheetDefaults.scrimColor(),
-            tonalElevation = 0.dp,
-            dragHandle = null,
-        ) {
-            NiaBottomSheetTheme {
-                NiaBottomSheetFrame {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        // Content with padding - switches between menu, notes, tafseer, wordstudy modes
+            ModalBottomSheet(
+                onDismissRequest = {
+                    showBottomSheet = false
+                    selectedAyahForOptions = null
+                    bottomSheetMode = "menu"
+                    noteText = ""
+                    editingNote = null
+                    existingNotes = emptyList()
+                },
+                sheetState = sheetState,
+                shape = NiaBottomSheetDefaults.FloatingShape,
+                containerColor = Color.Transparent,
+                contentColor = NiaBottomSheetDefaults.contentColor(),
+                scrimColor = NiaBottomSheetDefaults.scrimColor(),
+                tonalElevation = 0.dp,
+                dragHandle = null,
+            ) {
+                NiaBottomSheetTheme {
+                    NiaBottomSheetFrame {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 16.dp)
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            // Animated content switch between modes
-                            AnimatedContent(
-                                targetState = bottomSheetMode,
-                                transitionSpec = {
-                                    if (targetState != "menu") {
-                                        // Entering sub-mode
-                                        slideInHorizontally { it } + fadeIn() togetherWith
-                                            slideOutHorizontally { -it } + fadeOut()
-                                    } else {
-                                        // Returning to menu
-                                        slideInHorizontally { -it } + fadeIn() togetherWith
-                                            slideOutHorizontally { it } + fadeOut()
-                                    }
-                                },
-                                label = "BottomSheetContent"
-                            ) { mode ->
-                                when (mode) {
-                                    "notes" -> {
-                                    // Notes UI integrated into bottom sheet
-                                    BottomSheetNotesContent(
-                                        surahNumber = surah.number,
-                                        ayahNumber = selectedAyahForOptions!!,
-                                        surahName = surah.nameEnglish,
-                                        existingNotes = existingNotes,
-                                        noteText = noteText,
-                                        editingNote = editingNote,
-                                        onNoteTextChange = { noteText = it },
-                                        onEditNote = { note ->
-                                            editingNote = note
-                                            noteText = note.noteText
-                                        },
-                                        onCancelEdit = {
-                                            editingNote = null
-                                            noteText = ""
-                                        },
-                                        onSaveNote = {
-                                            if (noteText.isNotBlank()) {
-                                                scope.launch {
-                                                    if (editingNote != null) {
-                                                        quranRepository.updateAyahNote(
-                                                            editingNote!!.copy(
-                                                                noteText = noteText.trim(),
-                                                                updatedAt = System.currentTimeMillis()
-                                                            )
-                                                        )
-                                                    } else {
-                                                        quranRepository.addAyahNote(surah.number, selectedAyahForOptions!!, noteText.trim())
+                            // Content with padding - switches between menu, notes, tafseer, wordstudy modes
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                            ) {
+                                // Animated content switch between modes
+                                AnimatedContent(
+                                    targetState = bottomSheetMode,
+                                    transitionSpec = {
+                                        if (targetState != "menu") {
+                                            // Entering sub-mode
+                                            slideInHorizontally { it } + fadeIn() togetherWith
+                                                slideOutHorizontally { -it } + fadeOut()
+                                        } else {
+                                            // Returning to menu
+                                            slideInHorizontally { -it } + fadeIn() togetherWith
+                                                slideOutHorizontally { it } + fadeOut()
+                                        }
+                                    },
+                                    label = "BottomSheetContent",
+                                ) { mode ->
+                                    when (mode) {
+                                        "notes" -> {
+                                            // Notes UI integrated into bottom sheet
+                                            BottomSheetNotesContent(
+                                                surahNumber = surah.number,
+                                                ayahNumber = selectedAyahForOptions!!,
+                                                surahName = surah.nameEnglish,
+                                                existingNotes = existingNotes,
+                                                noteText = noteText,
+                                                editingNote = editingNote,
+                                                onNoteTextChange = { noteText = it },
+                                                onEditNote = { note ->
+                                                    editingNote = note
+                                                    noteText = note.noteText
+                                                },
+                                                onCancelEdit = {
+                                                    editingNote = null
+                                                    noteText = ""
+                                                },
+                                                onSaveNote = {
+                                                    if (noteText.isNotBlank()) {
+                                                        scope.launch {
+                                                            if (editingNote != null) {
+                                                                quranRepository.updateAyahNote(
+                                                                    editingNote!!.copy(
+                                                                        noteText = noteText.trim(),
+                                                                        updatedAt = System.currentTimeMillis(),
+                                                                    ),
+                                                                )
+                                                            } else {
+                                                                quranRepository.addAyahNote(surah.number, selectedAyahForOptions!!, noteText.trim())
+                                                            }
+                                                            // Refresh notes list
+                                                            existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
+                                                            noteText = ""
+                                                            editingNote = null
+                                                        }
                                                     }
-                                                    // Refresh notes list
-                                                    existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
+                                                },
+                                                onDeleteNote = { note ->
+                                                    showDeleteNoteConfirmation = note
+                                                },
+                                                onBack = {
+                                                    bottomSheetMode = "menu"
                                                     noteText = ""
                                                     editingNote = null
-                                                }
-                                            }
-                                        },
-                                        onDeleteNote = { note ->
-                                            showDeleteNoteConfirmation = note
-                                        },
-                                        onBack = {
-                                            bottomSheetMode = "menu"
-                                            noteText = ""
-                                            editingNote = null
-                                        }
-                                    )
-                                    }
-                                    "tafseer" -> {
-                                        // Tafseer content in bottom sheet - use passed-in data
-                                        tafseerData?.let { data ->
-                                            BottomSheetTafseerContent(
-                                                tafseerData = data,
-                                                selectedTafseerBook = selectedTafseerBook,
-                                                selectedArabicFont = selectedArabicFont,
-                                                onTafseerBookSelected = onTafseerBookSelected,
-                                                // Translation parameters
-                                                selectedLanguage = tafseerTranslationLanguage,
-                                                selectedProvider = tafseerTranslationProvider,
-                                                translatedSaadi = translatedTafseerSaadi,
-                                                translatedMoysar = translatedTafseerMoysar,
-                                                translatedBaghawi = translatedTafseerBaghawi,
-                                                translatedWordMeanings = translatedWordMeanings,
-                                                isTranslating = isTafseerTranslating,
-                                                availableLanguages = availableTafseerTranslations,
-                                                availableProviders = availableTafseerProviders,
-                                                onLanguageChange = onTafseerLanguageChange,
-                                                onProviderChange = onTafseerProviderChange,
-                                                getLanguageName = getTafseerTranslationName,
-                                                onBack = {
-                                                    bottomSheetMode = "menu"
-                                                }
+                                                },
                                             )
-                                        } ?: run {
-                                            // Show loading indicator while data is being fetched
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(32.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CircularProgressIndicator()
+                                        }
+                                        "tafseer" -> {
+                                            // Tafseer content in bottom sheet - use passed-in data
+                                            tafseerData?.let { data ->
+                                                BottomSheetTafseerContent(
+                                                    tafseerData = data,
+                                                    selectedTafseerBook = selectedTafseerBook,
+                                                    selectedArabicFont = selectedArabicFont,
+                                                    onTafseerBookSelected = onTafseerBookSelected,
+                                                    // Translation parameters
+                                                    selectedLanguage = tafseerTranslationLanguage,
+                                                    selectedProvider = tafseerTranslationProvider,
+                                                    translatedSaadi = translatedTafseerSaadi,
+                                                    translatedMoysar = translatedTafseerMoysar,
+                                                    translatedBaghawi = translatedTafseerBaghawi,
+                                                    translatedWordMeanings = translatedWordMeanings,
+                                                    isTranslating = isTafseerTranslating,
+                                                    availableLanguages = availableTafseerTranslations,
+                                                    availableProviders = availableTafseerProviders,
+                                                    onLanguageChange = onTafseerLanguageChange,
+                                                    onProviderChange = onTafseerProviderChange,
+                                                    getLanguageName = getTafseerTranslationName,
+                                                    onBack = {
+                                                        bottomSheetMode = "menu"
+                                                    },
+                                                )
+                                            } ?: run {
+                                                // Show loading indicator while data is being fetched
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(32.dp),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    CircularProgressIndicator()
+                                                }
                                             }
                                         }
-                                    }
-                                    "wordstudy" -> {
-                                        // Word Study content in bottom sheet - use passed-in data
-                                        wordStudyData?.let { data ->
-                                            BottomSheetWordStudyContent(
-                                                wordStudyData = data,
-                                                selectedArabicFont = selectedArabicFont,
-                                                onBack = {
-                                                    bottomSheetMode = "menu"
+                                        "wordstudy" -> {
+                                            // Word Study content in bottom sheet - use passed-in data
+                                            wordStudyData?.let { data ->
+                                                BottomSheetWordStudyContent(
+                                                    wordStudyData = data,
+                                                    selectedArabicFont = selectedArabicFont,
+                                                    onBack = {
+                                                        bottomSheetMode = "menu"
+                                                    },
+                                                )
+                                            } ?: run {
+                                                // Show loading indicator while data is being fetched
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(32.dp),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    CircularProgressIndicator()
                                                 }
-                                            )
-                                        } ?: run {
-                                            // Show loading indicator while data is being fetched
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(32.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CircularProgressIndicator()
                                             }
                                         }
-                                    }
-                                    else -> {
-                                    // Actions list (menu mode)
-                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                        BottomSheetOption(
-                                            icon = Icons.Default.PlayArrow,
-                                            title = "Play Ayah",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                selectedAyahForOptions?.let { ayahNumber ->
-                                                    onPlayAyahClick(ayahNumber)
-                                                }
-                                                showBottomSheet = false
-                                            }
-                                        )
-
-                                        BottomSheetOption(
-                                            icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                            title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                selectedAyahForOptions?.let { ayahNumber ->
-                                                    val isFavourite = ayahNumber in favouriteAyahs
-                                                    val newFavouriteStatus = !isFavourite
-
-                                                    // Update database
-                                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                                        quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
-
-                                                        // Update UI state
-                                                        favouriteAyahs = if (newFavouriteStatus) {
-                                                            favouriteAyahs + ayahNumber
-                                                        } else {
-                                                            favouriteAyahs - ayahNumber
+                                        else -> {
+                                            // Actions list (menu mode)
+                                            Column(modifier = Modifier.fillMaxWidth()) {
+                                                BottomSheetOption(
+                                                    icon = Icons.Default.PlayArrow,
+                                                    title = "Play Ayah",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        selectedAyahForOptions?.let { ayahNumber ->
+                                                            onPlayAyahClick(ayahNumber)
                                                         }
+                                                        showBottomSheet = false
+                                                    },
+                                                )
 
-                                                        val action = if (newFavouriteStatus) "added to" else "removed from"
-                                                        android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                                showBottomSheet = false
-                                            }
-                                        )
+                                                BottomSheetOption(
+                                                    icon = if (selectedAyahForOptions in favouriteAyahs) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                                    title = if (selectedAyahForOptions in favouriteAyahs) "Remove Favourite" else "Add Favourite",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        selectedAyahForOptions?.let { ayahNumber ->
+                                                            val isFavourite = ayahNumber in favouriteAyahs
+                                                            val newFavouriteStatus = !isFavourite
 
-                                        // Add Note option - now switches to notes mode in same sheet
-                                        val hasExistingNote = selectedAyahForOptions?.let { it in ayahsWithNotes } == true
-                                        BottomSheetOption(
-                                            icon = if (hasExistingNote) Icons.Default.Edit else Icons.Default.NoteAdd,
-                                            title = if (hasExistingNote) "View Note" else "Add Note",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                // Load existing notes for this ayah
-                                                scope.launch {
-                                                    selectedAyahForOptions?.let { ayahNum ->
-                                                        existingNotes = quranRepository.getNotesForAyah(surah.number, ayahNum)
-                                                    }
-                                                }
-                                                // Switch to notes mode in same sheet
-                                                bottomSheetMode = "notes"
-                                            }
-                                        )
+                                                            // Update database
+                                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                                                quranRepository.setAyahFavourite(surah.number, ayahNumber, newFavouriteStatus)
 
-                                        BottomSheetOption(
-                                            icon = Icons.Default.ContentCopy,
-                                            title = "Copy",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                selectedAyah?.let { ayah ->
-                                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                                    val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
-                                                    clipboard.setPrimaryClip(clip)
-                                                    android.widget.Toast.makeText(context, "Ayah copied", android.widget.Toast.LENGTH_SHORT).show()
-                                                }
-                                                showBottomSheet = false
-                                            }
-                                        )
+                                                                // Update UI state
+                                                                favouriteAyahs = if (newFavouriteStatus) {
+                                                                    favouriteAyahs + ayahNumber
+                                                                } else {
+                                                                    favouriteAyahs - ayahNumber
+                                                                }
 
-                                        BottomSheetOption(
-                                            icon = Icons.Default.Share,
-                                            title = "Share",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                selectedAyah?.let { ayah ->
-                                                    val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
-                                                    val shareIntent = android.content.Intent().apply {
-                                                        action = android.content.Intent.ACTION_SEND
-                                                        type = "text/plain"
-                                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                                    }
-                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
-                                                }
-                                                showBottomSheet = false
-                                            }
-                                        )
+                                                                val action = if (newFavouriteStatus) "added to" else "removed from"
+                                                                android.widget.Toast.makeText(context, "Ayah $ayahNumber $action favourites", android.widget.Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }
+                                                        showBottomSheet = false
+                                                    },
+                                                )
 
-                                        BottomSheetOption(
-                                            icon = Icons.Default.MenuBook,
-                                            title = "Tafseer",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                // Load tafseer via callback and switch to tafseer mode
-                                                selectedAyahForOptions?.let { ayahNum ->
-                                                    onTafseerClick(ayahNum)
-                                                }
-                                                bottomSheetMode = "tafseer"
-                                            }
-                                        )
+                                                // Add Note option - now switches to notes mode in same sheet
+                                                val hasExistingNote = selectedAyahForOptions?.let { it in ayahsWithNotes } == true
+                                                BottomSheetOption(
+                                                    icon = if (hasExistingNote) Icons.Default.Edit else Icons.Default.NoteAdd,
+                                                    title = if (hasExistingNote) "View Note" else "Add Note",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        // Load existing notes for this ayah
+                                                        scope.launch {
+                                                            selectedAyahForOptions?.let { ayahNum ->
+                                                                existingNotes = quranRepository.getNotesForAyah(surah.number, ayahNum)
+                                                            }
+                                                        }
+                                                        // Switch to notes mode in same sheet
+                                                        bottomSheetMode = "notes"
+                                                    },
+                                                )
 
-                                        BottomSheetOption(
-                                            icon = Icons.Default.Book,
-                                            title = "Word Study",
-                                            description = "",
-                                            containerColor = Color.Transparent,
-                                            contentColor = Color.Transparent,
-                                            onClick = {
-                                                // Load word study via callback and switch to wordstudy mode
-                                                selectedAyahForOptions?.let { ayahNum ->
-                                                    onWordStudyClick(ayahNum)
-                                                }
-                                                bottomSheetMode = "wordstudy"
+                                                BottomSheetOption(
+                                                    icon = Icons.Default.ContentCopy,
+                                                    title = "Copy",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        selectedAyah?.let { ayah ->
+                                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                            val clip = android.content.ClipData.newPlainText("Ayah", ayah.text)
+                                                            clipboard.setPrimaryClip(clip)
+                                                            android.widget.Toast.makeText(context, "Ayah copied", android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        showBottomSheet = false
+                                                    },
+                                                )
+
+                                                BottomSheetOption(
+                                                    icon = Icons.Default.Share,
+                                                    title = "Share",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        selectedAyah?.let { ayah ->
+                                                            val shareText = "${surah.nameEnglish} ${selectedAyahForOptions}\n\n${ayah.text}"
+                                                            val shareIntent = android.content.Intent().apply {
+                                                                action = android.content.Intent.ACTION_SEND
+                                                                type = "text/plain"
+                                                                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                                            }
+                                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Ayah"))
+                                                        }
+                                                        showBottomSheet = false
+                                                    },
+                                                )
+
+                                                BottomSheetOption(
+                                                    icon = Icons.Default.MenuBook,
+                                                    title = "Tafseer",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        // Load tafseer via callback and switch to tafseer mode
+                                                        selectedAyahForOptions?.let { ayahNum ->
+                                                            onTafseerClick(ayahNum)
+                                                        }
+                                                        bottomSheetMode = "tafseer"
+                                                    },
+                                                )
+
+                                                BottomSheetOption(
+                                                    icon = Icons.Default.Book,
+                                                    title = "Word Study",
+                                                    description = "",
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = Color.Transparent,
+                                                    onClick = {
+                                                        // Load word study via callback and switch to wordstudy mode
+                                                        selectedAyahForOptions?.let { ayahNum ->
+                                                            onWordStudyClick(ayahNum)
+                                                        }
+                                                        bottomSheetMode = "wordstudy"
+                                                    },
+                                                )
                                             }
-                                        )
-                                    }
+                                        }
                                     }
                                 }
                             }
@@ -3283,48 +3312,47 @@ private fun AlbumPlayerContent(
                     }
                 }
             }
-        }
 
-        // Delete confirmation dialog for notes
-        if (showDeleteNoteConfirmation != null) {
-            AlertDialog(
-                onDismissRequest = { showDeleteNoteConfirmation = null },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                },
-                title = { Text("Delete Note?") },
-                text = { Text("This note will be permanently removed.") },
-                confirmButton = {
-                    NiaOutlinedButton(
-                        onClick = {
-                            showDeleteNoteConfirmation?.let { note ->
-                                scope.launch {
-                                    quranRepository.deleteAyahNote(note)
-                                    existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
-                                    if (editingNote?.id == note.id) {
-                                        editingNote = null
-                                        noteText = ""
+            // Delete confirmation dialog for notes
+            if (showDeleteNoteConfirmation != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteNoteConfirmation = null },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    title = { Text("Delete Note?") },
+                    text = { Text("This note will be permanently removed.") },
+                    confirmButton = {
+                        NiaOutlinedButton(
+                            onClick = {
+                                showDeleteNoteConfirmation?.let { note ->
+                                    scope.launch {
+                                        quranRepository.deleteAyahNote(note)
+                                        existingNotes = quranRepository.getNotesForAyah(surah.number, selectedAyahForOptions!!)
+                                        if (editingNote?.id == note.id) {
+                                            editingNote = null
+                                            noteText = ""
+                                        }
                                     }
                                 }
-                            }
-                            showDeleteNoteConfirmation = null
-                        },
-                    ) {
-                        Text("Delete")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteNoteConfirmation = null }) {
-                        Text("Cancel")
-                    }
-                }
-            )
+                                showDeleteNoteConfirmation = null
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteNoteConfirmation = null }) {
+                            Text("Cancel")
+                        }
+                    },
+                )
+            }
         }
-    }
     }
 }
 
@@ -3336,34 +3364,34 @@ private fun BottomSheetOption(
     containerColor: Color,
     contentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // YouTube-style clean list item
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        color = Color.Transparent
+        color = Color.Transparent,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Simple icon (no background container)
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
 
             // Text only (no description)
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -3387,30 +3415,30 @@ private fun BottomSheetNotesContent(
     onCancelEdit: () -> Unit,
     onSaveNote: () -> Unit,
     onDeleteNote: (com.starception.submission.core.qurandatabase.AyahNoteEntity) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val dateFormat = remember { java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()) }
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         // Header with back button and title
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -3420,12 +3448,12 @@ private fun BottomSheetNotesContent(
                     text = if (editingNote != null) "Edit Note" else "Notes",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "$surahName - Ayah $ayahNumber",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -3442,15 +3470,15 @@ private fun BottomSheetNotesContent(
             placeholder = {
                 Text(
                     "Write your thoughts...",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
             },
             textStyle = MaterialTheme.typography.bodyMedium,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-            )
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -3459,7 +3487,7 @@ private fun BottomSheetNotesContent(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (editingNote != null) {
                 TextButton(onClick = onCancelEdit) {
@@ -3478,12 +3506,12 @@ private fun BottomSheetNotesContent(
                 Icon(
                     imageVector = if (editingNote != null) Icons.Default.Check else Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     if (editingNote != null) "Update" else "Save",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -3495,31 +3523,31 @@ private fun BottomSheetNotesContent(
             // Section header with icon
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.Notes,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = "Your Notes",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(22.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "${existingNotes.size}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }
@@ -3532,53 +3560,57 @@ private fun BottomSheetNotesContent(
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 existingNotes.forEach { note ->
                     val isEditing = editingNote?.id == note.id
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = if (isEditing)
+                        color = if (isEditing) {
                             MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.surfaceContainerLow,
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
                         tonalElevation = if (isEditing) 4.dp else 1.dp,
                         shadowElevation = if (isEditing) 2.dp else 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(
                                 width = 1.dp,
-                                color = if (isEditing)
+                                color = if (isEditing) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                else
-                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(16.dp)
-                            )
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                            ),
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             // Note icon on the left
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = if (isEditing)
+                                color = if (isEditing) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                else
-                                    MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier.size(36.dp)
+                                } else {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                },
+                                modifier = Modifier.size(36.dp),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Description,
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp),
-                                        tint = if (isEditing)
+                                        tint = if (isEditing) {
                                             MaterialTheme.colorScheme.primary
-                                        else
+                                        } else {
                                             MaterialTheme.colorScheme.onSecondaryContainer
+                                        },
                                     )
                                 }
                             }
@@ -3586,74 +3618,77 @@ private fun BottomSheetNotesContent(
                             // Note content
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 Text(
                                     text = note.noteText,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isEditing)
+                                    color = if (isEditing) {
                                         MaterialTheme.colorScheme.onPrimaryContainer
-                                    else
-                                        MaterialTheme.colorScheme.onSurface,
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
                                     maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
                                 )
 
                                 // Timestamp with icon
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Schedule,
                                         contentDescription = null,
                                         modifier = Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.outline
+                                        tint = MaterialTheme.colorScheme.outline,
                                     )
                                     Text(
                                         text = dateFormat.format(java.util.Date(note.updatedAt)),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline
+                                        color = MaterialTheme.colorScheme.outline,
                                     )
                                 }
                             }
 
                             // Action buttons - tonal style
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 FilledTonalIconButton(
                                     onClick = { onEditNote(note) },
                                     modifier = Modifier.size(32.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = if (isEditing)
+                                        containerColor = if (isEditing) {
                                             MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        else
+                                        } else {
                                             MaterialTheme.colorScheme.surfaceContainerHighest
-                                    )
+                                        },
+                                    ),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit",
                                         modifier = Modifier.size(16.dp),
-                                        tint = if (isEditing)
+                                        tint = if (isEditing) {
                                             MaterialTheme.colorScheme.primary
-                                        else
+                                        } else {
                                             MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     )
                                 }
                                 FilledTonalIconButton(
                                     onClick = { onDeleteNote(note) },
                                     modifier = Modifier.size(32.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                    ),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete",
                                         modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = MaterialTheme.colorScheme.error,
                                     )
                                 }
                             }
@@ -3687,30 +3722,30 @@ private fun BottomSheetTafseerContent(
     onLanguageChange: (String) -> Unit = {},
     onProviderChange: (String) -> Unit = {},
     getLanguageName: (String) -> String = { it },
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         // Professional header with icon badge and language selector
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Back button
             FilledTonalIconButton(
                 onClick = onBack,
                 modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
@@ -3719,19 +3754,19 @@ private fun BottomSheetTafseerContent(
             // Title with icon
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.MenuBook,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
@@ -3741,13 +3776,13 @@ private fun BottomSheetTafseerContent(
                         text = "Tafseer",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "${tafseerData.surahNameArabic} · Ayah ${tafseerData.ayahNumber}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                        fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                     )
                 }
             }
@@ -3757,30 +3792,30 @@ private fun BottomSheetTafseerContent(
                 onClick = { showLanguageDialog = true },
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.height(36.dp)
+                modifier = Modifier.height(36.dp),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Language,
                         contentDescription = "Select Language",
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                     Text(
                         text = selectedLanguage.uppercase(),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                     if (isTranslating) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(14.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
@@ -3801,15 +3836,15 @@ private fun BottomSheetTafseerContent(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-                        )
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f),
+                        ),
                     ),
-                    shape = RoundedCornerShape(16.dp)
-                )
+                    shape = RoundedCornerShape(16.dp),
+                ),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = tafseerData.ayahText,
@@ -3817,10 +3852,10 @@ private fun BottomSheetTafseerContent(
                         fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                         fontSize = 22.sp,
                         lineHeight = 40.sp,
-                        fontWeight = FontWeight.Normal
+                        fontWeight = FontWeight.Normal,
                     ),
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -3831,39 +3866,41 @@ private fun BottomSheetTafseerContent(
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 listOf(
                     "saadi" to "As-Sa'di",
                     "moysar" to "Al-Moyassar",
-                    "baghawi" to "Al-Baghawi"
+                    "baghawi" to "Al-Baghawi",
                 ).forEach { (code, name) ->
                     val isSelected = selectedTafseerBook == code
                     Surface(
                         onClick = { onTafseerBookSelected(code) },
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected)
+                        color = if (isSelected) {
                             MaterialTheme.colorScheme.primaryContainer
-                        else
-                            Color.Transparent,
-                        modifier = Modifier.weight(1f)
+                        } else {
+                            Color.Transparent
+                        },
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text(
                             text = name,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (isSelected)
+                            color = if (isSelected) {
                                 MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant,
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp)
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
                         )
                     }
                 }
@@ -3902,13 +3939,13 @@ private fun BottomSheetTafseerContent(
                 .fillMaxWidth()
                 .heightIn(max = 280.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (displayText.isNotEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         // Show language indicator when translated
@@ -3916,25 +3953,25 @@ private fun BottomSheetTafseerContent(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(bottom = 8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Translate,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
                                     text = getLanguageName(selectedLanguage),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 if (isTranslating) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(12.dp),
                                         strokeWidth = 1.5.dp,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.primary,
                                     )
                                 }
                             }
@@ -3945,9 +3982,9 @@ private fun BottomSheetTafseerContent(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = if (selectedLanguage == "ar") getArabicFontFamilyForSelection(selectedArabicFont) else null,
                                 fontSize = 15.sp,
-                                lineHeight = 26.sp
+                                lineHeight = 26.sp,
                             ),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
@@ -3957,24 +3994,24 @@ private fun BottomSheetTafseerContent(
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lightbulb,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.tertiary
+                                tint = MaterialTheme.colorScheme.tertiary,
                             )
                             Text(
                                 text = "Word Meanings",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.tertiary
+                                color = MaterialTheme.colorScheme.tertiary,
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -3982,9 +4019,9 @@ private fun BottomSheetTafseerContent(
                             text = displayWordMeanings,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = if (selectedLanguage == "ar") getArabicFontFamilyForSelection(selectedArabicFont) else null,
-                                lineHeight = 22.sp
+                                lineHeight = 22.sp,
                             ),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
@@ -4001,7 +4038,7 @@ private fun BottomSheetTafseerContent(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 450.dp)
+                        .heightIn(max = 450.dp),
                 ) {
                     // Provider section
                     item {
@@ -4009,12 +4046,12 @@ private fun BottomSheetTafseerContent(
                             text = "Translation Provider",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     items(
                         items = availableProviders,
-                        key = { it.first }
+                        key = { it.first },
                     ) { (providerCode, providerName) ->
                         Row(
                             modifier = Modifier
@@ -4023,16 +4060,16 @@ private fun BottomSheetTafseerContent(
                                     onProviderChange(providerCode)
                                 }
                                 .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = providerCode == selectedProvider,
-                                onClick = { onProviderChange(providerCode) }
+                                onClick = { onProviderChange(providerCode) },
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = providerName,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                     }
@@ -4044,7 +4081,7 @@ private fun BottomSheetTafseerContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -4055,12 +4092,12 @@ private fun BottomSheetTafseerContent(
                             text = "Target Language",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     items(
                         items = availableLanguages,
-                        key = { it }
+                        key = { it },
                     ) { langCode ->
                         Row(
                             modifier = Modifier
@@ -4070,19 +4107,19 @@ private fun BottomSheetTafseerContent(
                                     showLanguageDialog = false
                                 }
                                 .padding(vertical = 6.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = langCode == selectedLanguage,
                                 onClick = {
                                     onLanguageChange(langCode)
                                     showLanguageDialog = false
-                                }
+                                },
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = getLanguageName(langCode),
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                     }
@@ -4092,7 +4129,7 @@ private fun BottomSheetTafseerContent(
                 TextButton(onClick = { showLanguageDialog = false }) {
                     Text("Done")
                 }
-            }
+            },
         )
     }
 }
@@ -4104,28 +4141,28 @@ private fun BottomSheetTafseerContent(
 private fun BottomSheetWordStudyContent(
     wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
     selectedArabicFont: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         // Professional header with icon badge
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Back button
             FilledTonalIconButton(
                 onClick = onBack,
                 modifier = Modifier.size(40.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
@@ -4134,19 +4171,19 @@ private fun BottomSheetWordStudyContent(
             // Title with icon
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.tertiaryContainer,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Book,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
@@ -4156,12 +4193,12 @@ private fun BottomSheetWordStudyContent(
                         text = "Word Study",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Ayah ${wordStudyData.ayahNumber}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -4181,15 +4218,15 @@ private fun BottomSheetWordStudyContent(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        )
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        ),
                     ),
-                    shape = RoundedCornerShape(16.dp)
-                )
+                    shape = RoundedCornerShape(16.dp),
+                ),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = wordStudyData.ayahText,
@@ -4197,10 +4234,10 @@ private fun BottomSheetWordStudyContent(
                         fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                         fontSize = 22.sp,
                         lineHeight = 40.sp,
-                        fontWeight = FontWeight.Normal
+                        fontWeight = FontWeight.Normal,
                     ),
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -4212,24 +4249,24 @@ private fun BottomSheetWordStudyContent(
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lightbulb,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
+                            tint = MaterialTheme.colorScheme.tertiary,
                         )
                         Text(
                             text = "Word Meanings",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.tertiary
+                            color = MaterialTheme.colorScheme.tertiary,
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -4238,16 +4275,16 @@ private fun BottomSheetWordStudyContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 250.dp)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(rememberScrollState()),
                     ) {
                         Text(
                             text = wordStudyData.meanings,
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                 fontSize = 15.sp,
-                                lineHeight = 26.sp
+                                lineHeight = 26.sp,
                             ),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
                     }
                 }
@@ -4261,7 +4298,7 @@ private fun AlbumHeader(
     surah: Surah,
     isLandscape: Boolean = false,
     // Scroll offset for parallax effect
-    scrollOffset: Int = 0 
+    scrollOffset: Int = 0,
 ) {
     // Reuse the exact chapter-specific artwork shown by the Quran Grid widget.
     val artwork = remember(surah.number) { surahArtworkRes(surah.number) }
@@ -4280,10 +4317,10 @@ private fun AlbumHeader(
                     // presence than the previous shallow 16:9 banner while
                     // preserving room for the Surah information below.
                     Modifier.aspectRatio(SURAH_ARTWORK_PORTRAIT_ASPECT_RATIO)
-                }
+                },
             )
             .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
-            .clipToBounds() // Clip the image so parallax doesn't overflow
+            .clipToBounds(), // Clip the image so parallax doesn't overflow
     ) {
         // Album cover image with parallax effect
         Image(
@@ -4300,7 +4337,7 @@ private fun AlbumHeader(
                         .coerceAtMost(size.height * 0.085f)
                 },
             contentScale = ContentScale.Crop,
-            alignment = Alignment.Center
+            alignment = Alignment.Center,
         )
 
         // The toolbar begins over this image, so preserve contrast across both
@@ -4313,8 +4350,8 @@ private fun AlbumHeader(
                         0f to Color.Black.copy(alpha = 0.20f),
                         0.4f to Color.Transparent,
                         1f to Color.Black.copy(alpha = 0.08f),
-                    )
-                )
+                    ),
+                ),
         )
     }
 }
@@ -4342,7 +4379,7 @@ private fun AlbumInfoCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .fillMaxHeight(),
     ) {
         val floatingNameSpacerHeight = if (courseCompletionInfo != null) 72.dp else 44.dp
 
@@ -4416,7 +4453,7 @@ private fun InfoChip(text: String) {
     NiaTopicTag(
         followed = true,
         onClick = {},
-        enabled = true  // Changed from false to true for better visibility
+        enabled = true, // Changed from false to true for better visibility
     ) {
         Text(text = text.uppercase(Locale.getDefault()))
     }
@@ -4556,7 +4593,7 @@ private fun MusicPlayerControls(
     onForwardClick: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onCollapse: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     // Player controls using theme colors for visibility of floating surah name overlay
     // Tap anywhere to collapse back to AlbumInfoCard with FAB
@@ -4566,16 +4603,16 @@ private fun MusicPlayerControls(
             .fillMaxHeight() // Fill parent Box container (196dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
+                indication = null,
             ) {
                 // Tap anywhere collapses to AlbumInfoCard
                 onCollapse()
             },
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         val contentColor = MaterialTheme.colorScheme.onSurface
         Column(
-            modifier = Modifier.padding(vertical = 12.dp)
+            modifier = Modifier.padding(vertical = 12.dp),
         ) {
             // Progress bar at top
             LinearProgressIndicator(
@@ -4596,44 +4633,44 @@ private fun MusicPlayerControls(
                     .fillMaxWidth()
                     .padding(horizontal = 48.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Previous button - simple icon
                 IconButton(
                     onClick = onRewindClick,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
                         tint = contentColor,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(28.dp),
                     )
                 }
 
                 // Play/Pause button - simple triangle/pause icon
                 IconButton(
                     onClick = onPlayPauseClick,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = contentColor,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(40.dp),
                     )
                 }
 
                 // Next button - simple icon
                 IconButton(
                     onClick = onForwardClick,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(40.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
                         tint = contentColor,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(28.dp),
                     )
                 }
             }
@@ -4646,13 +4683,13 @@ private fun MusicPlayerControls(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
                     imageVector = Icons.Default.VolumeDown,
                     contentDescription = "Volume down",
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
 
                 Slider(
@@ -4662,15 +4699,15 @@ private fun MusicPlayerControls(
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
                 )
 
                 Icon(
                     imageVector = Icons.Default.VolumeUp,
                     contentDescription = "Volume up",
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -4682,7 +4719,7 @@ private fun BismillahRow(
     arabicFont: String = "default",
     arabicFontSize: Float = 22f,
     textAlignment: String = "start",
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val bismillahText = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ"
     val textColor = MaterialTheme.colorScheme.onSurface
@@ -4695,7 +4732,7 @@ private fun BismillahRow(
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .padding(horizontal = 16.dp, vertical = 2.dp),
     )
 }
 
@@ -4708,7 +4745,7 @@ private fun ContinuousAyahsContent(
     tajweedAnnotations: Map<Int, List<com.starception.submission.feature.surah.tajweed.TajweedAnnotation>> = emptyMap(),
     showBismillah: Boolean = false,
     onAyahLongPress: (Int) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val markerColor = MaterialTheme.colorScheme.primary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -4736,7 +4773,7 @@ private fun ContinuousAyahsContent(
                         val annotated = com.starception.submission.feature.surah.tajweed.TajweedTextApplier.applyWithOverlap(
                             text = arabicText,
                             annotations = annotations,
-                            defaultStyle = SpanStyle()
+                            defaultStyle = SpanStyle(),
                         )
                         append(annotated)
                     } else {
@@ -4748,11 +4785,13 @@ private fun ContinuousAyahsContent(
 
                 // Append U+06DD end-of-ayah marker followed by Arabic-Indic verse number.
                 // Use 0.85.em so size scales with parent Text fontSize — no rebuild needed.
-                withStyle(SpanStyle(
-                    color = currentMarkerColor,
-                    fontSize = 0.85.em,
-                    fontFamily = ubuntuInspiredFontFamily
-                )) {
+                withStyle(
+                    SpanStyle(
+                        color = currentMarkerColor,
+                        fontSize = 0.85.em,
+                        fontFamily = ubuntuInspiredFontFamily,
+                    ),
+                ) {
                     append(" \u06DD${ayah.numberInSurah.toArabicIndic()}")
                 }
 
@@ -4770,9 +4809,9 @@ private fun ContinuousAyahsContent(
                 detectTapGestures(
                     onLongPress = {
                         if (ayahs.isNotEmpty()) onAyahLongPress(ayahs.first().numberInSurah)
-                    }
+                    },
                 )
-            }
+            },
     ) {
         val density = LocalDensity.current
         val availableHeightPx = with(density) { maxHeight.toPx() }
@@ -4788,15 +4827,15 @@ private fun ContinuousAyahsContent(
             val style = baseStyle.copy(
                 fontSize = fontSizeSp.sp,
                 textAlign = TextAlign.End,
-                lineHeight = (fontSizeSp * lineSpacingMultiplier).sp
+                lineHeight = (fontSizeSp * lineSpacingMultiplier).sp,
             )
             val result = textMeasurer.measure(
                 text = annotatedString,
                 style = style,
                 constraints = androidx.compose.ui.unit.Constraints(
-                    maxWidth = availableWidthPx.toInt()
+                    maxWidth = availableWidthPx.toInt(),
                 ),
-                density = density
+                density = density,
             )
             return result.size.height
         }
@@ -4823,12 +4862,12 @@ private fun ContinuousAyahsContent(
             style = baseStyle.copy(
                 fontSize = scaledFontSize.sp,
                 textAlign = TextAlign.End,
-                lineHeight = (scaledFontSize * lineSpacingMultiplier).sp
+                lineHeight = (scaledFontSize * lineSpacingMultiplier).sp,
             ),
             overflow = TextOverflow.Clip,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = horizontalPaddingDp, vertical = verticalPaddingDp)
+                .padding(horizontal = horizontalPaddingDp, vertical = verticalPaddingDp),
         )
     }
 }
@@ -4844,10 +4883,12 @@ private fun ContinuousAyahsContent(
  * one em lets another Quran word fit on many otherwise sparse justified lines.
  */
 private const val MARKER_HEIGHT_EM = 0.92f
+
 /** Translation text is intentionally quieter than Arabic, but its terminal
  * rosette should remain the same physical size as every Arabic ayah rosette. */
 private const val MUSHAF_TRANSLATION_FONT_SCALE = 0.65f
 private const val TRANSLATION_MARKER_EM_SCALE = 1f / MUSHAF_TRANSLATION_FONT_SCALE
+
 /** Ring height as a fraction of the slot height. */
 private const val MARKER_ORNAMENT_FILL = 0.74f
 
@@ -4900,8 +4941,10 @@ private fun pauseMarkGlyph(mark: String): String = buildString {
         )
     }
 }
+
 /** Quran.com-style end-of-ayah rings are circular. */
 private const val MARKER_ASPECT = 1f
+
 /** Gap reserved in the text flow on each side of the ornament. This sets how
  *  much ink-free room the slot contributes; the drawing pass then CENTRES the
  *  ornament in the true ink gap (see computeInkMarkerGeometries), so the space
@@ -4912,6 +4955,7 @@ private const val MARKER_ASPECT = 1f
  *  by somewhat less than the amount removed here. */
 private const val MARKER_GAP_BEFORE_EM = 0.08f
 private const val MARKER_GAP_AFTER_EM = 0.08f
+
 /** Visual gap between the ornament and the MEASURED ink edge of the ayah's
  *  last word. Placement is ink-accurate (see computeInkMarkerGeometries): the
  *  page text is rendered once to an offscreen bitmap and the true glyph edges
@@ -4925,6 +4969,7 @@ private const val MARKER_INK_GAP_EM = 0.08f
  * mode the page-like word count and balanced line lengths it needs.
  */
 private const val MUSHAF_TYPESETTING_SCALE = 0.68f
+
 /** Offscreen ink-scan bitmap scale (half resolution is ample for edges). */
 private const val MARKER_INK_SCAN_SCALE = 0.5f
 
@@ -4937,8 +4982,7 @@ private val MUSHAF_WORD_CLOUD_RADIUS = 16.dp
 /** Joins neighbouring selected words on the same visual line into one cloud.
  * Distant justified words remain separate, while normal word spacing no longer
  * produces a row of overlapping pill/scallop shapes. */
-private fun List<androidx.compose.ui.geometry.Rect>.toWordCloudClusters():
-    List<androidx.compose.ui.geometry.Rect> {
+private fun List<androidx.compose.ui.geometry.Rect>.toWordCloudClusters(): List<androidx.compose.ui.geometry.Rect> {
     if (isEmpty()) return emptyList()
 
     fun union(
@@ -5081,16 +5125,19 @@ private fun mushafLineFillerPlaceholder(maxWidthPx: Int, emPx: Float): androidx.
         androidx.compose.ui.unit.TextUnit(0.1f, androidx.compose.ui.unit.TextUnitType.Em),
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
     )
+
 /** Drawn ornament width in em. */
 private const val MARKER_ORNAMENT_WIDTH_EM = MARKER_HEIGHT_EM * MARKER_ORNAMENT_FILL * MARKER_ASPECT
+
 /** Total slot width reserved in the text flow. */
 private const val MARKER_SLOT_WIDTH_EM =
     MARKER_GAP_BEFORE_EM + MARKER_ORNAMENT_WIDTH_EM + MARKER_GAP_AFTER_EM
+
 /** Invisible formatting chars that may trail an ayah's last word before its
  *  marker slot (RLM, LRM, ZWSP, BOM, WORD JOINER) — skipped when locating the
  *  final base letter for overhang compensation. */
 private val MARKER_TRAILING_INVISIBLES =
-    charArrayOf('‏', '‎', '​', '﻿', '⁠')
+    charArrayOf('\u200F', '\u200E', '\u200B', '\uFEFF', '\u2060')
 
 /**
  * Per-line rectangles covering [start, end) — one clean box per visual line.
@@ -5452,7 +5499,6 @@ private fun splitTrailingPauseMark(raw: String): Pair<String, String> {
     return "" to marks.reverse().toString()
 }
 
-
 /**
  * Ink-accurate marker placement for ONE page, self-contained: measures the page
  * text itself (same style/width the paginator used, so positions match the
@@ -5479,7 +5525,8 @@ private fun computeInkMarkerGeometries(
     if (markerAnnotations.isEmpty()) return emptyList()
 
     val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
+        MARKER_SLOT_WIDTH_EM.em,
+        MARKER_HEIGHT_EM.em,
         androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
     )
     val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
@@ -5535,221 +5582,226 @@ private fun computeInkMarkerGeometries(
         val result = mutableListOf<MarkerGeometry>()
         layout.placeholderRects.forEachIndexed { i, rect ->
             if (!isActive()) throw kotlinx.coroutines.CancellationException()
-        if (rect == null) return@forEachIndexed
-        val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
-        if (annotation.item == MUSHAF_LINE_FILLER_TAG) return@forEachIndexed
-        // The slot holds the digits and, after the separator, the ayah's pause mark.
-        val slotText = pageText.text.substring(annotation.start, annotation.end)
-        val digits = slotText.substringBefore(PAUSE_MARK_SEPARATOR)
-        val pauseMark = slotText.substringAfter(PAUSE_MARK_SEPARATOR, "")
-        val h = rect.height * MARKER_ORNAMENT_FILL
-        val w = h * MARKER_ASPECT
+            if (rect == null) return@forEachIndexed
+            val annotation = markerAnnotations.getOrNull(i) ?: return@forEachIndexed
+            if (annotation.item == MUSHAF_LINE_FILLER_TAG) return@forEachIndexed
+            // The slot holds the digits and, after the separator, the ayah's pause mark.
+            val slotText = pageText.text.substring(annotation.start, annotation.end)
+            val digits = slotText.substringBefore(PAUSE_MARK_SEPARATOR)
+            val pauseMark = slotText.substringAfter(PAUSE_MARK_SEPARATOR, "")
+            val h = rect.height * MARKER_ORNAMENT_FILL
+            val w = h * MARKER_ASPECT
 
-        val markerLine = layout.getLineForOffset(annotation.start)
-        // Scan only the CENTRAL span of the ornament. The medallion is a
-        // circle, so ink at its extreme top/bottom rows can only touch the
-        // sparse outer flourish — while those rows are exactly where glyphs
-        // of NEIGHBOURING lines overshoot their boxes (marker 52 of Al-A'raf:
-        // the hamza+damma stack of the line below poked 6px into the band's
-        // bottom edge mid-gap and split the true gap in two). Trimming to the
-        // solid ring's collision zone excludes both maddas above and
-        // next-line stack tips below without missing real tails, which sweep
-        // through the middle.
-        val ornTop = rect.top + (rect.height - h) / 2f
-        val bandTop = ((ornTop + 0.12f * h) * scale).toInt()
-        val bandBottom = ((ornTop + 0.88f * h) * scale).toInt()
-        var nextCharIdx = annotation.end
-        while (nextCharIdx < pageText.length &&
-            (pageText.text[nextCharIdx].isWhitespace() ||
-                pageText.text[nextCharIdx] in MARKER_TRAILING_INVISIBLES)
-        ) {
-            nextCharIdx++
-        }
-        val nextOnSameLine = nextCharIdx < pageText.length &&
-            layout.getLineForOffset(nextCharIdx) == markerLine
-
-        val lineLeft = layout.getLineLeft(markerLine)
-        val lineRight = layout.getLineRight(markerLine)
-        val slotCenter = (rect.left + rect.right) / 2f
-        val belongsToTranslation = pageText
-            .getStringAnnotations(
-                tag = MUSHAF_TRANSLATION_TAG,
-                start = annotation.start,
-                end = annotation.end,
-            )
-            .isNotEmpty()
-        val window = 2f * emPx
-        // Line extent in scan-bitmap columns — the outward ink walks stop here so
-        // a marker can never drift into a neighbouring line's margin.
-        val lineLeftPx = (lineLeft * scale).toInt().coerceAtLeast(0)
-        val lineRightPx = (lineRight * scale).toInt().coerceAtMost(pixels.width - 1)
-
-        var detectedGapLeft: Float? = null
-        var detectedGapRight: Float? = null
-        val centerX: Float
-        if (belongsToTranslation) {
-            // Translation markers already sit in an explicit LTR placeholder
-            // immediately after the translated text. Arabic ink-gap scanning
-            // is direction-specific and can drag that slot back across Bengali
-            // glyphs, so preserve the layout engine's authoritative position.
-            centerX = slotCenter
-        } else if (nextOnSameLine) {
-            // Both neighbours share this line. Naive edge scans fail when a deep
-            // tail sweeps across the slot (both scans land inside the SAME glyph
-            // run — marker 43 of Al-Muddaththir measured a 2px "gap"). Instead,
-            // find the LARGEST ink-free run of columns in the window and center
-            // the medallion in it: that is the true white gap between the two
-            // words regardless of how far any tail intrudes.
-            //
-            // The window MUST reach into both words' ink or the gap gets cut at
-            // the window edge and the midpoint biases toward it (markers 49/52 of
-            // Al-A'raf sat left-of-center on justify-stretched lines). The next
-            // word's layout position bounds the left side exactly.
-            val nextWordX = layout.getHorizontalPosition(nextCharIdx, usePrimaryDirection = true)
-            val winLPx = minOf(rect.left - window, nextWordX - 1.5f * emPx).coerceAtLeast(lineLeft)
-            val winL = (winLPx * scale).toInt().coerceAtLeast(0)
-            val winR = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
-            // Among all ink-free runs, pick the one that OVERLAPS THE SLOT most
-            // (ties broken by width) — the slot is where layout reserved space
-            // between the two words, so that run IS the inter-word gap. Picking
-            // the globally widest run instead can select white space beyond the
-            // NEXT word (marker 52 of Al-A'raf landed on top of it that way).
-            // A run can only host the medallion if it is at least as wide as the
-            // ornament, so width gates candidacy BEFORE overlap ranks it. Without
-            // that gate a hairline stroke splitting the true gap lets a sliver win
-            // on overlap alone: Ar-Rahman marker 3 centred a 98px medallion in a
-            // 34px fragment — an 11px swash tip had cut the real 394px gap in two,
-            // and the fragment sat dead-centre in the slot so it out-scored it —
-            // planting the ornament on top of the final noon of ٱلْإِنسَٰنَ.
-            // Fitting runs are ranked by slot overlap exactly as before; only when
-            // NO run fits do we fall back to the original overlap-only choice, so
-            // lines whose gap is genuinely narrower than the ornament (Al-A'raf
-            // 49/52, Al-Muddaththir 43) keep their tuned placement untouched.
-            val slotL = (rect.left * scale).toInt()
-            val slotR = (rect.right * scale).toInt()
-            val minFitW = w * scale
-            var bestGapL = -1
-            var bestGapR = -1
-            var bestOverlap = -1
-            var bestWidth = -1
-            var bestFits = false
-            var runStart = -1
-            var x = winL
-            while (x <= winR + 1) {
-                val ink = x <= winR && columnHasInk(x, bandTop, bandBottom)
-                if (!ink && runStart < 0) runStart = x
-                if ((ink || x == winR + 1) && runStart >= 0) {
-                    val runEnd = x
-                    val overlap = (minOf(runEnd, slotR) - maxOf(runStart, slotL)).coerceAtLeast(0)
-                    val width = runEnd - runStart
-                    val fits = width >= minFitW
-                    val better = when {
-                        fits != bestFits -> fits
-                        overlap != bestOverlap -> overlap > bestOverlap
-                        else -> width > bestWidth
-                    }
-                    if (better) {
-                        bestFits = fits
-                        bestOverlap = overlap
-                        bestWidth = width
-                        bestGapL = runStart
-                        bestGapR = runEnd
-                    }
-                    runStart = -1
-                }
-                x++
-            }
-            centerX = if (bestGapL >= 0) {
-                // The scan window is derived from the slot and the next word's
-                // layout position, so it can CLIP the chosen run; centring in a
-                // clipped run biases the medallion toward the clipped side —
-                // Ar-Rahman 55:3 ended up 69px from its own verse but 228px from
-                // the next word. Walk both edges out to the real ink (bounded by
-                // the line's own extent) and centre in the TRUE gap, so the space
-                // reads even on both sides. Runs already bounded by ink don't move.
-                var trueL = bestGapL
-                while (trueL - 1 >= lineLeftPx && !columnHasInk(trueL - 1, bandTop, bandBottom)) trueL--
-                var trueR = bestGapR
-                while (trueR + 1 <= lineRightPx && !columnHasInk(trueR + 1, bandTop, bandBottom)) trueR++
-                detectedGapLeft = trueL / scale
-                detectedGapRight = trueR / scale
-                ((trueL + trueR) / 2f) / scale
-            } else {
-                slotCenter // window solid with ink — degenerate; keep the slot center
-            }
-        } else {
-            // Line-end marker: hug the verse at the measured ink edge. Scanning
-            // from the line's empty left region cannot start inside a glyph.
-            var rightInk = rect.right
-            var x = (lineLeft * scale).toInt().coerceAtLeast(0)
-            val maxX = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
-            while (x <= maxX) {
-                if (columnHasInk(x, bandTop, bandBottom)) { rightInk = x / scale; break }
-                x++
-            }
-            // No text follows on this line, so the space after the ornament is
-            // free — sense both sides and centre between the line's end and the
-            // verse's ink edge rather than hugging at a fixed gap. Hugging gave
-            // line-end markers ~0.3em of breathing room while mid-line ones sit
-            // at 0.6-1.5em, which read as cramped against the verse. Still never
-            // closer than MARKER_INK_GAP_EM, and never outside the line.
-            centerX = ((lineLeft + rightInk) / 2f)
-                .coerceAtMost(rightInk - MARKER_INK_GAP_EM * emPx - w / 2f)
-                .coerceAtLeast(lineLeft + w / 2f)
-        }
-        // The default font-metric center sits slightly below the visible center
-        // of Bengali/Latin translation glyphs. Nudge only the compact gloss
-        // ornament upward; Arabic markers retain their measured placement.
-        val translationOpticalOffsetY = if (belongsToTranslation) -h * 0.10f else 0f
-        // Prefer keeping a mid-line ornament inside its placeholder, but never
-        // enforce that preference by pushing it out of the ink-safe interval.
-        // Arabic final forms can overhang deeply into the nominal slot (most
-        // visibly in short Surahs such as Al-Kafirun); the old slot-only clamp
-        // placed the ornament back on top of that measured ink.
-        val safeCenterX = if (nextOnSameLine && !belongsToTranslation) {
-            val slotMin = rect.left + w / 2f
-            val slotMax = rect.right - w / 2f
-            val gapLeft = detectedGapLeft
-            val gapRight = detectedGapRight
-            if (gapLeft != null && gapRight != null) {
-                val minimumInkGap = MARKER_INK_GAP_EM * emPx
-                val inkMin = gapLeft + minimumInkGap + w / 2f
-                val inkMax = gapRight - minimumInkGap - w / 2f
-                val intersectionMin = maxOf(slotMin, inkMin)
-                val intersectionMax = minOf(slotMax, inkMax)
-                when {
-                    // Ideal: both the reserved slot and measured ink clearance agree.
-                    intersectionMin <= intersectionMax ->
-                        centerX.coerceIn(intersectionMin, intersectionMax)
-                    // Deep glyph overhang: prioritize the real ink-safe interval.
-                    inkMin <= inkMax -> centerX.coerceIn(inkMin, inkMax)
-                    // The gap cannot provide the preferred clearance, but can at
-                    // least contain the complete ornament without touching ink.
-                    gapRight - gapLeft >= w -> centerX.coerceIn(
-                        gapLeft + w / 2f,
-                        gapRight - w / 2f,
+            val markerLine = layout.getLineForOffset(annotation.start)
+            // Scan only the CENTRAL span of the ornament. The medallion is a
+            // circle, so ink at its extreme top/bottom rows can only touch the
+            // sparse outer flourish — while those rows are exactly where glyphs
+            // of NEIGHBOURING lines overshoot their boxes (marker 52 of Al-A'raf:
+            // the hamza+damma stack of the line below poked 6px into the band's
+            // bottom edge mid-gap and split the true gap in two). Trimming to the
+            // solid ring's collision zone excludes both maddas above and
+            // next-line stack tips below without missing real tails, which sweep
+            // through the middle.
+            val ornTop = rect.top + (rect.height - h) / 2f
+            val bandTop = ((ornTop + 0.12f * h) * scale).toInt()
+            val bandBottom = ((ornTop + 0.88f * h) * scale).toInt()
+            var nextCharIdx = annotation.end
+            while (nextCharIdx < pageText.length &&
+                (
+                    pageText.text[nextCharIdx].isWhitespace() ||
+                        pageText.text[nextCharIdx] in MARKER_TRAILING_INVISIBLES
                     )
-                    else -> centerX.coerceIn(slotMin, slotMax)
+            ) {
+                nextCharIdx++
+            }
+            val nextOnSameLine = nextCharIdx < pageText.length &&
+                layout.getLineForOffset(nextCharIdx) == markerLine
+
+            val lineLeft = layout.getLineLeft(markerLine)
+            val lineRight = layout.getLineRight(markerLine)
+            val slotCenter = (rect.left + rect.right) / 2f
+            val belongsToTranslation = pageText
+                .getStringAnnotations(
+                    tag = MUSHAF_TRANSLATION_TAG,
+                    start = annotation.start,
+                    end = annotation.end,
+                )
+                .isNotEmpty()
+            val window = 2f * emPx
+            // Line extent in scan-bitmap columns — the outward ink walks stop here so
+            // a marker can never drift into a neighbouring line's margin.
+            val lineLeftPx = (lineLeft * scale).toInt().coerceAtLeast(0)
+            val lineRightPx = (lineRight * scale).toInt().coerceAtMost(pixels.width - 1)
+
+            var detectedGapLeft: Float? = null
+            var detectedGapRight: Float? = null
+            val centerX: Float
+            if (belongsToTranslation) {
+                // Translation markers already sit in an explicit LTR placeholder
+                // immediately after the translated text. Arabic ink-gap scanning
+                // is direction-specific and can drag that slot back across Bengali
+                // glyphs, so preserve the layout engine's authoritative position.
+                centerX = slotCenter
+            } else if (nextOnSameLine) {
+                // Both neighbours share this line. Naive edge scans fail when a deep
+                // tail sweeps across the slot (both scans land inside the SAME glyph
+                // run — marker 43 of Al-Muddaththir measured a 2px "gap"). Instead,
+                // find the LARGEST ink-free run of columns in the window and center
+                // the medallion in it: that is the true white gap between the two
+                // words regardless of how far any tail intrudes.
+                //
+                // The window MUST reach into both words' ink or the gap gets cut at
+                // the window edge and the midpoint biases toward it (markers 49/52 of
+                // Al-A'raf sat left-of-center on justify-stretched lines). The next
+                // word's layout position bounds the left side exactly.
+                val nextWordX = layout.getHorizontalPosition(nextCharIdx, usePrimaryDirection = true)
+                val winLPx = minOf(rect.left - window, nextWordX - 1.5f * emPx).coerceAtLeast(lineLeft)
+                val winL = (winLPx * scale).toInt().coerceAtLeast(0)
+                val winR = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
+                // Among all ink-free runs, pick the one that OVERLAPS THE SLOT most
+                // (ties broken by width) — the slot is where layout reserved space
+                // between the two words, so that run IS the inter-word gap. Picking
+                // the globally widest run instead can select white space beyond the
+                // NEXT word (marker 52 of Al-A'raf landed on top of it that way).
+                // A run can only host the medallion if it is at least as wide as the
+                // ornament, so width gates candidacy BEFORE overlap ranks it. Without
+                // that gate a hairline stroke splitting the true gap lets a sliver win
+                // on overlap alone: Ar-Rahman marker 3 centred a 98px medallion in a
+                // 34px fragment — an 11px swash tip had cut the real 394px gap in two,
+                // and the fragment sat dead-centre in the slot so it out-scored it —
+                // planting the ornament on top of the final noon of ٱلْإِنسَٰنَ.
+                // Fitting runs are ranked by slot overlap exactly as before; only when
+                // NO run fits do we fall back to the original overlap-only choice, so
+                // lines whose gap is genuinely narrower than the ornament (Al-A'raf
+                // 49/52, Al-Muddaththir 43) keep their tuned placement untouched.
+                val slotL = (rect.left * scale).toInt()
+                val slotR = (rect.right * scale).toInt()
+                val minFitW = w * scale
+                var bestGapL = -1
+                var bestGapR = -1
+                var bestOverlap = -1
+                var bestWidth = -1
+                var bestFits = false
+                var runStart = -1
+                var x = winL
+                while (x <= winR + 1) {
+                    val ink = x <= winR && columnHasInk(x, bandTop, bandBottom)
+                    if (!ink && runStart < 0) runStart = x
+                    if ((ink || x == winR + 1) && runStart >= 0) {
+                        val runEnd = x
+                        val overlap = (minOf(runEnd, slotR) - maxOf(runStart, slotL)).coerceAtLeast(0)
+                        val width = runEnd - runStart
+                        val fits = width >= minFitW
+                        val better = when {
+                            fits != bestFits -> fits
+                            overlap != bestOverlap -> overlap > bestOverlap
+                            else -> width > bestWidth
+                        }
+                        if (better) {
+                            bestFits = fits
+                            bestOverlap = overlap
+                            bestWidth = width
+                            bestGapL = runStart
+                            bestGapR = runEnd
+                        }
+                        runStart = -1
+                    }
+                    x++
+                }
+                centerX = if (bestGapL >= 0) {
+                    // The scan window is derived from the slot and the next word's
+                    // layout position, so it can CLIP the chosen run; centring in a
+                    // clipped run biases the medallion toward the clipped side —
+                    // Ar-Rahman 55:3 ended up 69px from its own verse but 228px from
+                    // the next word. Walk both edges out to the real ink (bounded by
+                    // the line's own extent) and centre in the TRUE gap, so the space
+                    // reads even on both sides. Runs already bounded by ink don't move.
+                    var trueL = bestGapL
+                    while (trueL - 1 >= lineLeftPx && !columnHasInk(trueL - 1, bandTop, bandBottom)) trueL--
+                    var trueR = bestGapR
+                    while (trueR + 1 <= lineRightPx && !columnHasInk(trueR + 1, bandTop, bandBottom)) trueR++
+                    detectedGapLeft = trueL / scale
+                    detectedGapRight = trueR / scale
+                    ((trueL + trueR) / 2f) / scale
+                } else {
+                    slotCenter // window solid with ink — degenerate; keep the slot center
                 }
             } else {
-                centerX.coerceIn(slotMin, slotMax)
+                // Line-end marker: hug the verse at the measured ink edge. Scanning
+                // from the line's empty left region cannot start inside a glyph.
+                var rightInk = rect.right
+                var x = (lineLeft * scale).toInt().coerceAtLeast(0)
+                val maxX = ((rect.right + window) * scale).toInt().coerceAtMost(pixels.width - 1)
+                while (x <= maxX) {
+                    if (columnHasInk(x, bandTop, bandBottom)) {
+                        rightInk = x / scale
+                        break
+                    }
+                    x++
+                }
+                // No text follows on this line, so the space after the ornament is
+                // free — sense both sides and centre between the line's end and the
+                // verse's ink edge rather than hugging at a fixed gap. Hugging gave
+                // line-end markers ~0.3em of breathing room while mid-line ones sit
+                // at 0.6-1.5em, which read as cramped against the verse. Still never
+                // closer than MARKER_INK_GAP_EM, and never outside the line.
+                centerX = ((lineLeft + rightInk) / 2f)
+                    .coerceAtMost(rightInk - MARKER_INK_GAP_EM * emPx - w / 2f)
+                    .coerceAtLeast(lineLeft + w / 2f)
             }
-        } else {
-            centerX
-        }
-        result.add(
-            MarkerGeometry(
-                digits = digits,
-                isTranslation = belongsToTranslation,
-                centerX = safeCenterX,
-                centerY = rect.center.y + translationOpticalOffsetY,
-                left = safeCenterX - w / 2f,
-                top = rect.top + (rect.height - h) / 2f + translationOpticalOffsetY,
-                w = w,
-                h = h,
-                pauseMark = pauseMark,
-            ),
-        )
+            // The default font-metric center sits slightly below the visible center
+            // of Bengali/Latin translation glyphs. Nudge only the compact gloss
+            // ornament upward; Arabic markers retain their measured placement.
+            val translationOpticalOffsetY = if (belongsToTranslation) -h * 0.10f else 0f
+            // Prefer keeping a mid-line ornament inside its placeholder, but never
+            // enforce that preference by pushing it out of the ink-safe interval.
+            // Arabic final forms can overhang deeply into the nominal slot (most
+            // visibly in short Surahs such as Al-Kafirun); the old slot-only clamp
+            // placed the ornament back on top of that measured ink.
+            val safeCenterX = if (nextOnSameLine && !belongsToTranslation) {
+                val slotMin = rect.left + w / 2f
+                val slotMax = rect.right - w / 2f
+                val gapLeft = detectedGapLeft
+                val gapRight = detectedGapRight
+                if (gapLeft != null && gapRight != null) {
+                    val minimumInkGap = MARKER_INK_GAP_EM * emPx
+                    val inkMin = gapLeft + minimumInkGap + w / 2f
+                    val inkMax = gapRight - minimumInkGap - w / 2f
+                    val intersectionMin = maxOf(slotMin, inkMin)
+                    val intersectionMax = minOf(slotMax, inkMax)
+                    when {
+                        // Ideal: both the reserved slot and measured ink clearance agree.
+                        intersectionMin <= intersectionMax ->
+                            centerX.coerceIn(intersectionMin, intersectionMax)
+                        // Deep glyph overhang: prioritize the real ink-safe interval.
+                        inkMin <= inkMax -> centerX.coerceIn(inkMin, inkMax)
+                        // The gap cannot provide the preferred clearance, but can at
+                        // least contain the complete ornament without touching ink.
+                        gapRight - gapLeft >= w -> centerX.coerceIn(
+                            gapLeft + w / 2f,
+                            gapRight - w / 2f,
+                        )
+                        else -> centerX.coerceIn(slotMin, slotMax)
+                    }
+                } else {
+                    centerX.coerceIn(slotMin, slotMax)
+                }
+            } else {
+                centerX
+            }
+            result.add(
+                MarkerGeometry(
+                    digits = digits,
+                    isTranslation = belongsToTranslation,
+                    centerX = safeCenterX,
+                    centerY = rect.center.y + translationOpticalOffsetY,
+                    left = safeCenterX - w / 2f,
+                    top = rect.top + (rect.height - h) / 2f + translationOpticalOffsetY,
+                    w = w,
+                    h = h,
+                    pauseMark = pauseMark,
+                ),
+            )
         }
         return result
     } finally {
@@ -5797,7 +5849,7 @@ private fun MushafPageWithFrame(
     inkGeometries: List<MarkerGeometry>? = null,
     /** Shared show/hide progress so removal waits for the fade-out to finish. */
     translationVisibility: Float = 1f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -6033,7 +6085,7 @@ private fun MushafPageWithFrame(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(surfaceColor)
+            .background(surfaceColor),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (showBismillah) {
@@ -6043,20 +6095,20 @@ private fun MushafPageWithFrame(
                         .padding(
                             start = horizontalPadding,
                             end = horizontalPadding,
-                            top = topPadding
+                            top = topPadding,
                         )
                         .height(bismillahHeightDp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Normal,
                             fontSize = 20.sp,
-                            fontFamily = getArabicFontFamily(arabicFont)
+                            fontFamily = getArabicFontFamily(arabicFont),
                         ),
                         color = onSurfaceColor,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -6125,8 +6177,8 @@ private fun MushafPageWithFrame(
                             start = horizontalPadding,
                             end = horizontalPadding,
                             top = topPadding + bismillahHeightDp,
-                            bottom = bottomPadding
-                        )
+                            bottom = bottomPadding,
+                        ),
                 ) {
                     val geoms = inkGeometries ?: return@Canvas
                     if (markerAlpha <= 0.01f) return@Canvas
@@ -6143,8 +6195,6 @@ private fun MushafPageWithFrame(
                     }
                 }
             }
-
-
 
             Text(
                 text = pageText,
@@ -6177,7 +6227,7 @@ private fun MushafPageWithFrame(
                         start = horizontalPadding,
                         end = horizontalPadding,
                         top = topPadding + bismillahHeightDp,
-                        bottom = bottomPadding
+                        bottom = bottomPadding,
                     )
                     // Attached only on the live page — an off-page detector is still
                     // a hit-test target, and the topmost one wins, so leaving it on
@@ -6260,8 +6310,8 @@ private fun MushafPageWithFrame(
                                 }
                         } else {
                             Modifier
-                        }
-                    )
+                        },
+                    ),
             )
 
             // Tajweed, painted over the finished layout.
@@ -6294,7 +6344,6 @@ private fun MushafPageWithFrame(
                     }
                 }
             }
-
 
             // Reveal the inserted gloss without changing the text being measured.
             // The mask shares the Text's exact content bounds, and its annotated
@@ -6329,8 +6378,8 @@ private fun MushafPageWithFrame(
                             start = horizontalPadding,
                             end = horizontalPadding,
                             top = topPadding + bismillahHeightDp,
-                            bottom = bottomPadding
-                        )
+                            bottom = bottomPadding,
+                        ),
                 ) {
                     val geoms = inkGeometries ?: return@Canvas
                     if (markerAlpha <= 0.01f) return@Canvas
@@ -6390,9 +6439,7 @@ private fun MushafPageWithFrame(
                         }
                     }
                 }
-
             }
-
         }
     }
 }
@@ -6429,7 +6476,7 @@ private fun MushafPagerView(
     onPageChange: (current: Int, total: Int) -> Unit = { _, _ -> },
     onNavigateToPreviousSurah: () -> Unit = {},
     onNavigateToNextSurah: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     if (ayahs.isEmpty()) return
 
@@ -6517,8 +6564,10 @@ private fun MushafPagerView(
     // both sides regardless of font, size, or justification stretch, so we
     // don't need to reserve variable-width slots up front.
     val ornamentPlaceholder = androidx.compose.ui.text.Placeholder(
-        MARKER_SLOT_WIDTH_EM.em, MARKER_HEIGHT_EM.em,
-        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)
+        MARKER_SLOT_WIDTH_EM.em,
+        MARKER_HEIGHT_EM.em,
+        androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
+    )
     val translationOrnamentPlaceholder = androidx.compose.ui.text.Placeholder(
         (MARKER_SLOT_WIDTH_EM * TRANSLATION_MARKER_EM_SCALE).em,
         (MARKER_HEIGHT_EM * TRANSLATION_MARKER_EM_SCALE).em,
@@ -6553,6 +6602,7 @@ private fun MushafPagerView(
             a.numberInSurah to a.text.split("\n\n").getOrNull(1)?.trim().orEmpty()
         }
     }
+
     /**
      * A direct gesture can still reveal one translation while the global preference is
      * off. When it is on, every available translation is composed into the reading flow.
@@ -6716,7 +6766,7 @@ private fun MushafPagerView(
 
     // ---- old per-ayah measurement removed; drawing pass handles positioning ----
     /* removed:
-        val invisiblesForMeasure = charArrayOf('‏', '‎', '​', '﻿', '⁠')
+        val invisiblesForMeasure = charArrayOf('‏', '‎', '​', '', '⁠')
         val emPx = fontSizePx
 
         val perAyahBucket = mutableMapOf<Int, Int>()
@@ -6811,7 +6861,7 @@ private fun MushafPagerView(
         }
         MushafMarkerData(built, placeholderRanges, inlineMap)
     }
-    */
+     */
 
     // Taken straight from the master string's construction, so the ranges that drive page
     // slicing, tap hit-testing and highlighting cannot disagree with the text they index.
@@ -6825,7 +6875,7 @@ private fun MushafPagerView(
     val isEdgeControlTouchActive by rememberUpdatedState(edgeControlTouchActive)
 
     Column(
-        modifier = modifier.background(surfaceColor)
+        modifier = modifier.background(surfaceColor),
     ) {
         val scope = rememberCoroutineScope()
 
@@ -6871,7 +6921,7 @@ private fun MushafPagerView(
                                     if (totalMove > touchSlop) {
                                         directionDecided = true
                                         isVerticalScroll = totalDy > totalDx
-                                        }
+                                    }
                                 }
 
                                 if (directionDecided && !isVerticalScroll) {
@@ -6930,7 +6980,7 @@ private fun MushafPagerView(
                             }
                         }
                     }
-                }
+                },
         ) {
             val availableWidthPx = with(density) { (maxWidth - horizontalPadding * 2).toPx() }
             val fullPageHeightPx = with(density) {
@@ -6980,12 +7030,16 @@ private fun MushafPagerView(
             )
 
             val paginatedPages = remember(
-                masterString, typesetFontSize, arabicFont,
-                availableWidthPx, fullPageHeightPx, firstPageHeightPx
+                masterString,
+                typesetFontSize,
+                arabicFont,
+                availableWidthPx,
+                fullPageHeightPx,
+                firstPageHeightPx,
             ) {
                 if (masterString.text.isEmpty() || availableWidthPx <= 0f || fullPageHeightPx <= 0f) {
                     return@remember listOf(
-                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed)
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed),
                     )
                 }
 
@@ -6993,15 +7047,15 @@ private fun MushafPagerView(
                     text = masterString,
                     style = measureStyle,
                     constraints = androidx.compose.ui.unit.Constraints(
-                        maxWidth = availableWidthPx.toInt()
+                        maxWidth = availableWidthPx.toInt(),
                     ),
                     placeholders = markerPlaceholders,
-                    density = density
+                    density = density,
                 )
 
                 if (fullLayout.lineCount == 0) {
                     return@remember listOf(
-                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed)
+                        PaginatedPage(masterString, 1, showBismillah, ayahCharRanges, markerData.tajweed),
                     )
                 }
 
@@ -7073,7 +7127,9 @@ private fun MushafPagerView(
                         val overlapEnd = minOf(range.last, endCharIndex - 1)
                         if (overlapStart <= overlapEnd) {
                             ayahNum to ((overlapStart - startCharIndex) until (overlapEnd - startCharIndex + 1))
-                        } else null
+                        } else {
+                            null
+                        }
                     }
 
                     val usedHeightPx =
@@ -7084,8 +7140,11 @@ private fun MushafPagerView(
                     val pageTajweed = markerData.tajweed.mapNotNull { span ->
                         val start = maxOf(span.start, startCharIndex)
                         val end = minOf(span.end, endCharIndex)
-                        if (end <= start) null
-                        else TajweedSpan(start - startCharIndex, end - startCharIndex, span.color)
+                        if (end <= start) {
+                            null
+                        } else {
+                            TajweedSpan(start - startCharIndex, end - startCharIndex, span.color)
+                        }
                     }
 
                     val isFinalPage = endCharIndex >= masterString.length
@@ -7106,14 +7165,16 @@ private fun MushafPagerView(
                         typesetFontSize * lineSpacingMultiplier +
                             stretchPerGapPx / (density.density * density.fontScale)
 
-                    pages.add(PaginatedPage(
-                        text = pageString,
-                        pageNumber = pageNum,
-                        showBismillah = showBismillah && pageNum == 1,
-                        ayahRanges = pageAyahRanges,
-                        tajweed = pageTajweed,
-                        lineHeightSp = stretchedLineHeightSp,
-                    ))
+                    pages.add(
+                        PaginatedPage(
+                            text = pageString,
+                            pageNumber = pageNum,
+                            showBismillah = showBismillah && pageNum == 1,
+                            ayahRanges = pageAyahRanges,
+                            tajweed = pageTajweed,
+                            lineHeightSp = stretchedLineHeightSp,
+                        ),
+                    )
 
                     currentLine += linesOnPage
                     pageNum++
@@ -7409,7 +7470,7 @@ private fun MushafPagerView(
                         val preview = if (committedFontSize > 0f) arabicFontSize / committedFontSize else 1f
                         scaleX = preview
                         scaleY = preview
-                    }
+                    },
             ) { pageIndex ->
                 val page = paginatedPages.getOrNull(pageIndex) ?: return@HorizontalPager
                 MushafPageWithFrame(
@@ -7448,7 +7509,7 @@ private fun MushafPagerView(
                         toggleInlineTranslation(ayahNumber)
                     },
                     onAyahRub = toggleInlineTranslation,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
@@ -7805,8 +7866,16 @@ private fun getArabicFontFamily(arabicFont: String): androidx.compose.ui.text.fo
 
 private fun Int.toArabicIndic(): String = this.toString().map { c ->
     when (c) {
-        '0' -> '٠'; '1' -> '١'; '2' -> '٢'; '3' -> '٣'; '4' -> '٤'
-        '5' -> '٥'; '6' -> '٦'; '7' -> '٧'; '8' -> '٨'; '9' -> '٩'
+        '0' -> '٠'
+        '1' -> '١'
+        '2' -> '٢'
+        '3' -> '٣'
+        '4' -> '٤'
+        '5' -> '٥'
+        '6' -> '٦'
+        '7' -> '٧'
+        '8' -> '٨'
+        '9' -> '٩'
         else -> c
     }
 }.joinToString("")
@@ -7985,7 +8054,7 @@ private fun AyahTrackItem(
     isHighlighted: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit = {},
-    onDoubleTap: () -> Unit = {}
+    onDoubleTap: () -> Unit = {},
 ) {
     // Keep the terminal Waqf sign with the end-of-Ayah marker, matching the
     // Mushaf renderer. Leaving the combining mark in the Arabic sentence lets
@@ -8007,7 +8076,9 @@ private fun AyahTrackItem(
     }
     val highlightBorderColor = if (isHighlighted && !isReciting) {
         MaterialTheme.colorScheme.tertiary
-    } else Color.Transparent
+    } else {
+        Color.Transparent
+    }
     Surface(
         color = highlightColor,
         modifier = Modifier
@@ -8024,15 +8095,15 @@ private fun AyahTrackItem(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
-                onDoubleClick = onDoubleTap
-            )
+                onDoubleClick = onDoubleTap,
+            ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             AyahOrnamentMarker(
                 ayahNumber = ayah.numberInSurah,
@@ -8060,7 +8131,7 @@ private fun AyahTrackItem(
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = horizontalAlignment
+                horizontalAlignment = horizontalAlignment,
             ) {
                 // Arabic text with user-selected font and size
                 val arabicTextStyle = getArabicFontStyle(arabicFont, arabicFontSize)
@@ -8070,13 +8141,13 @@ private fun AyahTrackItem(
                     val annotatedArabicText = com.starception.submission.feature.surah.tajweed.TajweedTextApplier.applyWithOverlap(
                         text = arabicText,
                         annotations = tajweedAnnotations,
-                        defaultStyle = androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurface)
+                        defaultStyle = androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurface),
                     )
                     Text(
                         text = annotatedArabicText,
                         style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
                         textAlign = textAlign,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
                     Text(
@@ -8084,22 +8155,22 @@ private fun AyahTrackItem(
                         style = MaterialTheme.typography.bodyLarge.merge(arabicTextStyle),
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = textAlign,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
 
                 // Translation text with 2:1 ratio (translation is 1/2 of Arabic size)
                 if (showTranslation && translationText != null && translationText.isNotBlank()) {
-                    val translationFontSize = arabicFontSize * 0.5f  // 2:1 ratio (50%)
+                    val translationFontSize = arabicFontSize * 0.5f // 2:1 ratio (50%)
                     Text(
                         text = translationText,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = translationFontSize.sp,
-                            lineHeight = (translationFontSize * 1.5f).sp
+                            lineHeight = (translationFontSize * 1.5f).sp,
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = textAlign,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -8109,7 +8180,7 @@ private fun AyahTrackItem(
     // Divider
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
     )
 }
 
@@ -8123,42 +8194,42 @@ private fun getArabicFontStyle(fontName: String, fontSize: Float = 22f): android
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.5.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
         "noor_e_hidayat" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.NoorEHidayat,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.4.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
         "thabit" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.Thabit,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.3.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
         "uthmani_script" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.UthmanicScript,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.6.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
         "indopak_script" -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.IndoPakScript,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.7.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
         else -> androidx.compose.ui.text.TextStyle(
             fontFamily = QuranFonts.PDMSSaleem,
             fontSize = fontSize.sp,
             fontWeight = FontWeight.Normal,
             letterSpacing = 0.5.sp,
-            lineHeight = (fontSize * lineHeightMultiplier).sp
+            lineHeight = (fontSize * lineHeightMultiplier).sp,
         )
     }
 }
@@ -8185,13 +8256,12 @@ private fun FloatingActionToolbar(
     // Tajweed toggle
     showTajweed: Boolean = false,
     onTajweedClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-
     // Use Box with consistent positioning to prevent movement
     Box(
         modifier = modifier,
-        contentAlignment = if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart
+        contentAlignment = if (isOnRightSide) Alignment.TopEnd else Alignment.TopStart,
     ) {
         // Render only the active state to avoid touch interception issues
         if (!isExpanded) {
@@ -8202,14 +8272,14 @@ private fun FloatingActionToolbar(
                         topStart = 50.dp,
                         topEnd = 0.dp,
                         bottomEnd = 0.dp,
-                        bottomStart = 50.dp
+                        bottomStart = 50.dp,
                     )
                 } else {
                     RoundedCornerShape(
                         topStart = 0.dp,
                         topEnd = 50.dp,
                         bottomEnd = 50.dp,
-                        bottomStart = 0.dp
+                        bottomStart = 0.dp,
                     )
                 },
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -8222,114 +8292,114 @@ private fun FloatingActionToolbar(
                             onDrag(dragAmount)
                         }
                     }
-                    .clickable { onExpandedChange(true) }
+                    .clickable { onExpandedChange(true) },
             ) {
                 Row(
                     modifier = Modifier
                         .padding(vertical = 16.dp, horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = if (isOnRightSide) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
                         contentDescription = "Expand toolbar",
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
         } else {
             // Expanded state - offset from edge for better look
             Box(modifier = Modifier.padding(start = 16.dp)) {
-            Surface(
-                shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 4.dp,
-                shadowElevation = 4.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                Surface(
+                    shape = RoundedCornerShape(50), // Make container very rounded/pill-shaped
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 4.dp,
+                    shadowElevation = 4.dp,
                 ) {
-                    // Collapse button at the top
-                    FloatingToolbarButton(
-                        icon = Icons.Default.ChevronLeft,
-                        contentDescription = "Collapse toolbar",
-                        selected = false,
-                        onClick = { onExpandedChange(false) }
-                    )
+                    Column(
+                        modifier = Modifier.padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        // Collapse button at the top
+                        FloatingToolbarButton(
+                            icon = Icons.Default.ChevronLeft,
+                            contentDescription = "Collapse toolbar",
+                            selected = false,
+                            onClick = { onExpandedChange(false) },
+                        )
 
-                    // Increase font size button
-                    FloatingToolbarButton(
-                        icon = Icons.Default.TextIncrease,
-                        contentDescription = "Increase font size",
-                        selected = false,
-                        onClick = onIncreaseFontSize,
-                        enabled = currentFontSize < maxFontSize
-                    )
+                        // Increase font size button
+                        FloatingToolbarButton(
+                            icon = Icons.Default.TextIncrease,
+                            contentDescription = "Increase font size",
+                            selected = false,
+                            onClick = onIncreaseFontSize,
+                            enabled = currentFontSize < maxFontSize,
+                        )
 
-                    // Decrease font size button
-                    FloatingToolbarButton(
-                        icon = Icons.Default.TextDecrease,
-                        contentDescription = "Decrease font size",
-                        selected = false,
-                        onClick = onDecreaseFontSize,
-                        enabled = currentFontSize > minFontSize
-                    )
+                        // Decrease font size button
+                        FloatingToolbarButton(
+                            icon = Icons.Default.TextDecrease,
+                            contentDescription = "Decrease font size",
+                            selected = false,
+                            onClick = onDecreaseFontSize,
+                            enabled = currentFontSize > minFontSize,
+                        )
 
-                    // Text alignment buttons - show all three options
-                    FloatingToolbarButton(
-                        icon = Icons.Default.FormatAlignLeft,
-                        contentDescription = "Align text to start",
-                        selected = textAlignment == "start",
-                        onClick = { onSetAlignment("start") }
-                    )
+                        // Text alignment buttons - show all three options
+                        FloatingToolbarButton(
+                            icon = Icons.Default.FormatAlignLeft,
+                            contentDescription = "Align text to start",
+                            selected = textAlignment == "start",
+                            onClick = { onSetAlignment("start") },
+                        )
 
-                    FloatingToolbarButton(
-                        icon = Icons.Default.FormatAlignCenter,
-                        contentDescription = "Align text to center",
-                        selected = textAlignment == "center",
-                        onClick = { onSetAlignment("center") }
-                    )
+                        FloatingToolbarButton(
+                            icon = Icons.Default.FormatAlignCenter,
+                            contentDescription = "Align text to center",
+                            selected = textAlignment == "center",
+                            onClick = { onSetAlignment("center") },
+                        )
 
-                    FloatingToolbarButton(
-                        icon = Icons.Default.FormatAlignRight,
-                        contentDescription = "Align text to end",
-                        selected = textAlignment == "end",
-                        onClick = { onSetAlignment("end") }
-                    )
+                        FloatingToolbarButton(
+                            icon = Icons.Default.FormatAlignRight,
+                            contentDescription = "Align text to end",
+                            selected = textAlignment == "end",
+                            onClick = { onSetAlignment("end") },
+                        )
 
-                    FloatingToolbarButton(
-                        icon = Icons.Default.FormatAlignJustify,
-                        contentDescription = "Justify text",
-                        selected = textAlignment == "justify",
-                        onClick = { onSetAlignment("justify") }
-                    )
+                        FloatingToolbarButton(
+                            icon = Icons.Default.FormatAlignJustify,
+                            contentDescription = "Justify text",
+                            selected = textAlignment == "justify",
+                            onClick = { onSetAlignment("justify") },
+                        )
 
-                    // Toggle translation visibility
-                    FloatingToolbarButton(
-                        icon = if (showTranslation) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (showTranslation) "Hide translation" else "Show translation",
-                        selected = showTranslation,
-                        onClick = onToggleTranslation
-                    )
+                        // Toggle translation visibility
+                        FloatingToolbarButton(
+                            icon = if (showTranslation) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (showTranslation) "Hide translation" else "Show translation",
+                            selected = showTranslation,
+                            onClick = onToggleTranslation,
+                        )
 
-                    // Tajweed toggle button
-                    FloatingToolbarButton(
-                        icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
-                        contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
-                        selected = showTajweed,
-                        onClick = onTajweedClick
-                    )
+                        // Tajweed toggle button
+                        FloatingToolbarButton(
+                            icon = if (showTajweed) Icons.Rounded.CheckCircle else Icons.Rounded.CheckCircleOutline,
+                            contentDescription = if (showTajweed) "Disable Tajweed colors" else "Enable Tajweed colors",
+                            selected = showTajweed,
+                            onClick = onTajweedClick,
+                        )
 
-                    // Font selection button
-                    FloatingToolbarButton(
-                        icon = Icons.Default.FontDownload,
-                        contentDescription = "Select Arabic font",
-                        selected = false,
-                        onClick = onFontClick
-                    )
+                        // Font selection button
+                        FloatingToolbarButton(
+                            icon = Icons.Default.FontDownload,
+                            contentDescription = "Select Arabic font",
+                            selected = false,
+                            onClick = onFontClick,
+                        )
+                    }
                 }
-            }
             }
         }
     }
@@ -8342,7 +8412,7 @@ private fun FloatingToolbarButton(
     selected: Boolean = false,
     onClick: () -> Unit = {},
     enabled: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     if (selected) {
         // Darker filled circular button when selected
@@ -8355,13 +8425,13 @@ private fun FloatingToolbarButton(
                 containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 contentColor = MaterialTheme.colorScheme.surface,
                 disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                disabledContentColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-            )
+                disabledContentColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+            ),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
         }
     } else {
@@ -8369,14 +8439,17 @@ private fun FloatingToolbarButton(
         IconButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.size(48.dp)
+            modifier = modifier.size(48.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-                      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                modifier = Modifier.size(20.dp)
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                },
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -8546,7 +8619,7 @@ private fun SurahFontGlyphChip(
                 .width(18.dp)
                 .height(2.5.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
         )
     }
 }
@@ -8557,10 +8630,16 @@ private fun SurahTuneChip(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = if (active) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
-        contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (active) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
+        },
+        contentColor = if (active) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         border = if (active) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)) else null,
     ) {
         Text(
@@ -8603,8 +8682,11 @@ private fun SettingsStepperButton(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -8619,10 +8701,16 @@ private fun SettingsIconChoice(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val container = if (selected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.surface
-    val tint = if (selected) MaterialTheme.colorScheme.onPrimary
-    else MaterialTheme.colorScheme.onSurfaceVariant
+    val container = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val tint = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -8649,10 +8737,16 @@ private fun SettingsRowItem(
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val container = if (active) MaterialTheme.colorScheme.primaryContainer
-    else MaterialTheme.colorScheme.surface
-    val contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer
-    else MaterialTheme.colorScheme.onSurface
+    val container = if (active) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val contentColor = if (active) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -8693,7 +8787,7 @@ private fun BottomToolbarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    isActive: Boolean = false
+    isActive: Boolean = false,
 ) {
     val containerColor = when {
         isActive -> MaterialTheme.colorScheme.primaryContainer
@@ -8710,24 +8804,24 @@ private fun BottomToolbarItem(
         enabled = enabled,
         modifier = modifier.widthIn(min = 56.dp),
         shape = RoundedCornerShape(12.dp),
-        color = containerColor
+        color = containerColor,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = contentColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = contentColor,
-                maxLines = 1
+                maxLines = 1,
             )
         }
     }
@@ -8739,7 +8833,7 @@ private fun TranslationSelectionDialog(
     currentTranslation: String,
     onDismiss: () -> Unit,
     onTranslationSelected: (String) -> Unit,
-    getTranslationDisplayName: (String) -> String
+    getTranslationDisplayName: (String) -> String,
 ) {
     // Filter out any translations with empty or blank display names
     val validTranslations = remember(availableTranslations) {
@@ -8755,27 +8849,27 @@ private fun TranslationSelectionDialog(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 400.dp)
+                    .heightIn(max = 400.dp),
             ) {
                 items(
                     items = validTranslations,
-                    key = { it }
+                    key = { it },
                 ) { translationCode ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onTranslationSelected(translationCode) }
                             .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = translationCode == currentTranslation,
-                            onClick = { onTranslationSelected(translationCode) }
+                            onClick = { onTranslationSelected(translationCode) },
                         )
                         Spacer(Modifier.width(16.dp))
                         Text(
                             text = getTranslationDisplayName(translationCode),
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
                 }
@@ -8786,7 +8880,7 @@ private fun TranslationSelectionDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
 
@@ -8796,7 +8890,7 @@ private fun FontSelectionDialog(
     currentFont: String,
     onDismiss: () -> Unit,
     onFontSelected: (String) -> Unit,
-    getFontDisplayName: (String) -> String
+    getFontDisplayName: (String) -> String,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -8805,27 +8899,27 @@ private fun FontSelectionDialog(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp)
+                    .heightIn(max = 300.dp),
             ) {
                 items(
                     items = availableFonts,
-                    key = { it }
+                    key = { it },
                 ) { fontName ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onFontSelected(fontName) }
                             .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = fontName == currentFont,
-                            onClick = { onFontSelected(fontName) }
+                            onClick = { onFontSelected(fontName) },
                         )
                         Spacer(Modifier.width(16.dp))
                         Text(
                             text = getFontDisplayName(fontName),
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge,
                         )
                     }
                 }
@@ -8836,7 +8930,7 @@ private fun FontSelectionDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
 
@@ -8862,7 +8956,7 @@ private fun getAudioLanguageDisplayName(language: AudioLanguage): String {
  */
 @HiltViewModel
 class QuranRepositoryHolder @Inject constructor(
-    val repository: QuranRepository
+    val repository: QuranRepository,
 ) : ViewModel()
 
 /**
@@ -8870,7 +8964,7 @@ class QuranRepositoryHolder @Inject constructor(
  */
 @HiltViewModel
 class UserDataRepositoryHolder @Inject constructor(
-    val repository: UserDataRepository
+    val repository: UserDataRepository,
 ) : ViewModel()
 
 /**
@@ -8881,11 +8975,11 @@ class UserDataRepositoryHolder @Inject constructor(
 fun WordStudyDialog(
     wordStudyData: com.starception.submission.core.qurandatabase.AyahMeaningsItem,
     selectedArabicFont: String = "pdms_saleem",
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Card(
             modifier = Modifier
@@ -8893,8 +8987,8 @@ fun WordStudyDialog(
                 .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -8903,7 +8997,7 @@ fun WordStudyDialog(
                         .fillMaxWidth()
                         .padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -8911,26 +9005,26 @@ fun WordStudyDialog(
                                 imageVector = Icons.Default.Book,
                                 contentDescription = "Word Study",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = "Word Study",
                                 style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                         Text(
                             text = "Ayah ${wordStudyData.ayahNumber}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                         )
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
+                            contentDescription = "Close",
                         )
                     }
                 }
@@ -8942,7 +9036,7 @@ fun WordStudyDialog(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     // Arabic text card
                     item {
@@ -8950,8 +9044,8 @@ fun WordStudyDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
                         ) {
                             Text(
                                 text = wordStudyData.ayahText,
@@ -8959,10 +9053,10 @@ fun WordStudyDialog(
                                     fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                     fontSize = 26.sp,
                                     lineHeight = 44.sp,
-                                    fontWeight = FontWeight.Normal
+                                    fontWeight = FontWeight.Normal,
                                 ),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(20.dp)
+                                modifier = Modifier.padding(20.dp),
                             )
                         }
                     }
@@ -8971,23 +9065,23 @@ fun WordStudyDialog(
                     if (wordStudyData.meanings.isNotEmpty()) {
                         item {
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Lightbulb,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.tertiary,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(24.dp),
                                     )
                                     Text(
                                         text = "Word Meanings",
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.tertiary
+                                        color = MaterialTheme.colorScheme.tertiary,
                                     )
                                 }
 
@@ -8995,8 +9089,8 @@ fun WordStudyDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    ),
                                 ) {
                                     Text(
                                         text = wordStudyData.meanings,
@@ -9004,10 +9098,10 @@ fun WordStudyDialog(
                                             fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                             fontSize = 19.sp,
                                             lineHeight = 36.sp,
-                                            fontWeight = FontWeight.Normal
+                                            fontWeight = FontWeight.Normal,
                                         ),
                                         textAlign = TextAlign.Justify,
-                                        modifier = Modifier.padding(20.dp)
+                                        modifier = Modifier.padding(20.dp),
                                     )
                                 }
                             }
@@ -9041,7 +9135,7 @@ fun TafseerDialog(
     selectedTafseerBook: String,
     selectedArabicFont: String = "pdms_saleem",
     onTafseerBookSelected: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var selectedTabIndex by remember {
         mutableStateOf(
@@ -9050,7 +9144,7 @@ fun TafseerDialog(
                 "moysar" -> 1
                 "baghawi" -> 2
                 else -> 0
-            }
+            },
         )
     }
 
@@ -9067,7 +9161,7 @@ fun TafseerDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Card(
             modifier = Modifier
@@ -9075,8 +9169,8 @@ fun TafseerDialog(
                 .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -9085,7 +9179,7 @@ fun TafseerDialog(
                         .fillMaxWidth()
                         .padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -9093,26 +9187,26 @@ fun TafseerDialog(
                                 imageVector = Icons.Default.MenuBook,
                                 contentDescription = "Tafseer",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = "Tafseer",
                                 style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                         Text(
                             text = "${tafseerData.surahNameArabic} - آيَة ${tafseerData.ayahNumber}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                            fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                         )
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
+                            contentDescription = "Close",
                         )
                     }
                 }
@@ -9126,8 +9220,8 @@ fun TafseerDialog(
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
                 ) {
                     Text(
                         text = tafseerData.ayahText,
@@ -9135,17 +9229,17 @@ fun TafseerDialog(
                             fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                             fontSize = 26.sp,
                             lineHeight = 44.sp,
-                            fontWeight = FontWeight.Normal
+                            fontWeight = FontWeight.Normal,
                         ),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(20.dp)
+                        modifier = Modifier.padding(20.dp),
                     )
                 }
 
                 // Tabs
                 PrimaryTabRow(
                     selectedTabIndex = selectedTabIndex,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 ) {
                     Tab(
                         selected = selectedTabIndex == 0,
@@ -9153,19 +9247,19 @@ fun TafseerDialog(
                         text = {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 8.dp),
                             ) {
                                 Text(
                                     "As-Sa'di",
-                                    fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal,
                                 )
                                 Text(
                                     "معاصر",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                 )
                             }
-                        }
+                        },
                     )
                     Tab(
                         selected = selectedTabIndex == 1,
@@ -9173,19 +9267,19 @@ fun TafseerDialog(
                         text = {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 8.dp),
                             ) {
                                 Text(
                                     "Al-Moyassar",
-                                    fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal,
                                 )
                                 Text(
                                     "مُبسّط",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                 )
                             }
-                        }
+                        },
                     )
                     Tab(
                         selected = selectedTabIndex == 2,
@@ -9193,26 +9287,26 @@ fun TafseerDialog(
                         text = {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                modifier = Modifier.padding(vertical = 8.dp),
                             ) {
                                 Text(
                                     "Al-Baghawi",
-                                    fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal,
                                 )
                                 Text(
                                     "كلاسيكي",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                                    fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                 )
                             }
-                        }
+                        },
                     )
                 }
 
                 // Content with pager
                 val pagerState = rememberPagerState(
                     initialPage = selectedTabIndex,
-                    pageCount = { 3 }
+                    pageCount = { 3 },
                 )
 
                 LaunchedEffect(selectedTabIndex) {
@@ -9225,7 +9319,7 @@ fun TafseerDialog(
 
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     val tafseerText = when (page) {
                         0 -> tafseerData.tafseerSaadi
@@ -9238,15 +9332,15 @@ fun TafseerDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         if (tafseerText.isNotEmpty()) {
                             item {
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    ),
                                 ) {
                                     Text(
                                         text = tafseerText,
@@ -9254,10 +9348,10 @@ fun TafseerDialog(
                                             fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                             fontSize = 19.sp,
                                             lineHeight = 36.sp,
-                                            fontWeight = FontWeight.Normal
+                                            fontWeight = FontWeight.Normal,
                                         ),
                                         textAlign = TextAlign.Justify,
-                                        modifier = Modifier.padding(20.dp)
+                                        modifier = Modifier.padding(20.dp),
                                     )
                                 }
                             }
@@ -9268,8 +9362,8 @@ fun TafseerDialog(
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    ),
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -9277,14 +9371,14 @@ fun TafseerDialog(
                                                 imageVector = Icons.Default.Lightbulb,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(20.dp),
-                                                tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 "معاني الكلمات",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Normal,
-                                                fontFamily = getArabicFontFamilyForSelection(selectedArabicFont)
+                                                fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(12.dp))
@@ -9294,9 +9388,9 @@ fun TafseerDialog(
                                                 fontFamily = getArabicFontFamilyForSelection(selectedArabicFont),
                                                 fontSize = 17.sp,
                                                 lineHeight = 30.sp,
-                                                fontWeight = FontWeight.Normal
+                                                fontWeight = FontWeight.Normal,
                                             ),
-                                            textAlign = TextAlign.Justify
+                                            textAlign = TextAlign.Justify,
                                         )
                                     }
                                 }
@@ -9309,9 +9403,6 @@ fun TafseerDialog(
     }
 }
 
-
-
-
 /**
  * Routes physical volume key presses from MainActivity.onKeyDown into the
  * MushafPagerView while it is composed. Bound on enter (DisposableEffect),
@@ -9319,6 +9410,7 @@ fun TafseerDialog(
  */
 object MushafKeyBus {
     @Volatile private var next: (() -> Unit)? = null
+
     @Volatile private var prev: (() -> Unit)? = null
     fun bind(next: () -> Unit, prev: () -> Unit) {
         this.next = next
@@ -9344,7 +9436,7 @@ object MushafKeyBus {
 private fun ReadingModeToggle(
     isMushafMode: Boolean,
     onToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val pillShape = RoundedCornerShape(percent = 50)
@@ -9354,9 +9446,9 @@ private fun ReadingModeToggle(
         targetValue = if (isMushafMode) 1f else 0f,
         animationSpec = androidx.compose.animation.core.spring(
             dampingRatio = 0.75f,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
         ),
-        label = "selectionSlide"
+        label = "selectionSlide",
     )
 
     Surface(
@@ -9365,7 +9457,7 @@ private fun ReadingModeToggle(
             .width(240.dp),
         shape = pillShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shadowElevation = 8.dp
+        shadowElevation = 8.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.padding(5.dp)) {
             val segmentWidth = maxWidth / 2f
@@ -9377,7 +9469,7 @@ private fun ReadingModeToggle(
                     .offset(x = indicatorOffset)
                     .width(segmentWidth)
                     .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary, pillShape)
+                    .background(MaterialTheme.colorScheme.primary, pillShape),
             )
 
             Row(modifier = Modifier.fillMaxSize()) {
@@ -9391,7 +9483,7 @@ private fun ReadingModeToggle(
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                             onToggle()
                         }
-                    }
+                    },
                 )
                 ReadingModeSegment(
                     icon = Icons.Default.MenuBook,
@@ -9403,7 +9495,7 @@ private fun ReadingModeToggle(
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                             onToggle()
                         }
-                    }
+                    },
                 )
             }
         }
@@ -9416,7 +9508,7 @@ private fun ReadingModeSegment(
     label: String,
     selectionFraction: Float,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val onPrimary = MaterialTheme.colorScheme.onPrimary
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
@@ -9427,17 +9519,17 @@ private fun ReadingModeSegment(
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null,
-                onClick = onClick
+                onClick = onClick,
             )
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(18.dp),
         )
         Text(
             text = label,
@@ -9445,7 +9537,7 @@ private fun ReadingModeSegment(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            softWrap = false
+            softWrap = false,
         )
     }
 }

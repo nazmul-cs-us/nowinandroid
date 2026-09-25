@@ -23,6 +23,9 @@ plugins {
 android {
     namespace = "com.starception.submission.core.data"
     testOptions.unitTests.isIncludeAndroidResources = true
+    // android.util.Log is an unimplemented stub on the JVM and throws by
+    // default; the repositories log heavily, so mirror :app's workaround.
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {

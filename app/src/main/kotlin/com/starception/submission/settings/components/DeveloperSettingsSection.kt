@@ -1,7 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,13 +26,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +56,7 @@ data class DeveloperSettingsState(
     val quranicDuasInfo: DatabaseDisplayInfo? = null,
     val isRefreshing: Boolean = false,
     val refreshingDatabase: String? = null,
-    val lastRefreshResult: RefreshResult? = null
+    val lastRefreshResult: RefreshResult? = null,
 )
 
 /**
@@ -56,7 +67,7 @@ data class DatabaseDisplayInfo(
     val itemCount: Int,
     val itemLabel: String = "items",
     val lastModified: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )
 
 /**
@@ -65,7 +76,7 @@ data class DatabaseDisplayInfo(
 data class RefreshResult(
     val databaseName: String,
     val success: Boolean,
-    val message: String
+    val message: String,
 )
 
 @Composable
@@ -76,22 +87,22 @@ fun DeveloperSettingsSection(
     onRefreshDuas: () -> Unit,
     onRefreshQuranicDuas: () -> Unit,
     onRefreshAll: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         // Warning banner
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
             ),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
+                .padding(bottom = 16.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(12.dp),
             ) {
                 FlaticonIcon(
                     glyph = FlaticonIcons.WARNING,
@@ -103,7 +114,7 @@ fun DeveloperSettingsSection(
                 Text(
                     text = "Debug builds only. Refreshing will reload databases from assets.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
         }
@@ -117,12 +128,12 @@ fun DeveloperSettingsSection(
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.errorContainer
-                        }
+                        },
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
+                        .padding(bottom = 16.dp),
                 ) {
                     Text(
                         text = result.message,
@@ -132,7 +143,7 @@ fun DeveloperSettingsSection(
                         } else {
                             MaterialTheme.colorScheme.onErrorContainer
                         },
-                        modifier = Modifier.padding(12.dp)
+                        modifier = Modifier.padding(12.dp),
                     )
                 }
             }
@@ -144,7 +155,7 @@ fun DeveloperSettingsSection(
                 info = info,
                 isRefreshing = state.isRefreshing && state.refreshingDatabase == "news",
                 onRefresh = onRefreshNews,
-                enabled = !state.isRefreshing
+                enabled = !state.isRefreshing,
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -155,7 +166,7 @@ fun DeveloperSettingsSection(
                 info = info,
                 isRefreshing = state.isRefreshing && state.refreshingDatabase == "topics",
                 onRefresh = onRefreshTopics,
-                enabled = !state.isRefreshing
+                enabled = !state.isRefreshing,
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -166,7 +177,7 @@ fun DeveloperSettingsSection(
                 info = info,
                 isRefreshing = state.isRefreshing && state.refreshingDatabase == "duas",
                 onRefresh = onRefreshDuas,
-                enabled = !state.isRefreshing
+                enabled = !state.isRefreshing,
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -177,7 +188,7 @@ fun DeveloperSettingsSection(
                 info = info,
                 isRefreshing = state.isRefreshing && state.refreshingDatabase == "quranic_duas",
                 onRefresh = onRefreshQuranicDuas,
-                enabled = !state.isRefreshing
+                enabled = !state.isRefreshing,
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -186,7 +197,7 @@ fun DeveloperSettingsSection(
         RefreshAllCard(
             isRefreshing = state.isRefreshing && state.refreshingDatabase == "all",
             enabled = !state.isRefreshing,
-            onRefreshAll = onRefreshAll
+            onRefreshAll = onRefreshAll,
         )
     }
 }
@@ -196,7 +207,7 @@ private fun RefreshAllCard(
     isRefreshing: Boolean,
     enabled: Boolean,
     onRefreshAll: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         NiaOutlinedButton(
@@ -204,18 +215,18 @@ private fun RefreshAllCard(
             enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(56.dp),
         ) {
             if (isRefreshing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(22.dp),
                     strokeWidth = 2.5.dp,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Refreshing...",
-                    style = MaterialTheme.typography.labelLarge
+                    style = MaterialTheme.typography.labelLarge,
                 )
             } else {
                 FlaticonIcon(
@@ -226,7 +237,7 @@ private fun RefreshAllCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Refresh All Databases",
-                    style = MaterialTheme.typography.labelLarge
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
         }
@@ -240,7 +251,7 @@ private fun RefreshAllCard(
                     .height(4.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
             )
         }
     }
@@ -252,57 +263,57 @@ private fun DatabaseInfoCard(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
         shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text(
                     text = info.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${info.itemCount} ${info.itemLabel}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "Modified: ${formatDate(info.lastModified)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "Size: ${formatSize(info.sizeBytes)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             IconButton(
                 onClick = onRefresh,
-                enabled = enabled && !isRefreshing
+                enabled = enabled && !isRefreshing,
             ) {
                 if (isRefreshing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     FlaticonIcon(

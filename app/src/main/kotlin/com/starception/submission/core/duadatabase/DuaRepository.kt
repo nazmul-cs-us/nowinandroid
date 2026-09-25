@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.duadatabase
 
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +27,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class DuaRepository @Inject constructor(
-    private val duaDao: DuaDao
+    private val duaDao: DuaDao,
 ) {
     // ============= Metadata =============
 
@@ -202,7 +218,7 @@ class DuaRepository @Inject constructor(
         return ChapterWithDuas(
             chapter = chapter,
             invocations = invocations,
-            footnotes = footnotes
+            footnotes = footnotes,
         )
     }
 
@@ -253,7 +269,7 @@ class DuaRepository @Inject constructor(
             DuaCategoryWithCount(
                 category = category,
                 chapterCount = matchingChapters.size,
-                totalDuaCount = matchingChapters.sumOf { it.duaCount }
+                totalDuaCount = matchingChapters.sumOf { it.duaCount },
             )
         }.filter { it.chapterCount > 0 }
     }
@@ -267,16 +283,16 @@ enum class DuaCategory(
     val displayName: String,
     val arabicName: String,
     val keywords: List<String>,
-    val icon: String
+    val icon: String,
 ) {
     MORNING_EVENING(
         displayName = "Morning & Evening",
         arabicName = "أذكار الصباح والمساء",
         keywords = listOf(
             "morning", "evening", "waking", "sleep", "sleeping", "night",
-            "dream", "turning over", "unrest", "retiring"
+            "dream", "turning over", "unrest", "retiring",
         ),
-        icon = "🌅"
+        icon = "🌅",
     ),
     PRAYER(
         displayName = "Prayer",
@@ -284,27 +300,27 @@ enum class DuaCategory(
         keywords = listOf(
             "prayer", "salah", "mosque", "ablution", "athan", "salam",
             "prostrat", "bowing", "rukoo", "sujood", "tashahhud", "witr",
-            "qunoot", "recitation", "quran"
+            "qunoot", "recitation", "quran",
         ),
-        icon = "🕌"
+        icon = "🕌",
     ),
     HOME(
         displayName = "Home & Daily",
         arabicName = "المنزل واليومية",
         keywords = listOf(
             "home", "entering", "leaving", "garment", "toilet", "undressing",
-            "dressing", "wearing", "new garment"
+            "dressing", "wearing", "new garment",
         ),
-        icon = "🏠"
+        icon = "🏠",
     ),
     FOOD_DRINK(
         displayName = "Food & Drink",
         arabicName = "الطعام والشراب",
         keywords = listOf(
             "eating", "food", "drink", "meal", "fast", "fasting", "break",
-            "fruit", "host", "completing the meal"
+            "fruit", "host", "completing the meal",
         ),
-        icon = "🍽️"
+        icon = "🍽️",
     ),
     TRAVEL(
         displayName = "Travel",
@@ -312,9 +328,9 @@ enum class DuaCategory(
         keywords = listOf(
             "travel", "journey", "transport", "vehicle", "mounting", "town",
             "village", "market", "ascending", "descending", "returning",
-            "lodging", "resident", "traveller", "stumbles", "dawn approaches"
+            "lodging", "resident", "traveller", "stumbles", "dawn approaches",
         ),
-        icon = "✈️"
+        icon = "✈️",
     ),
     PROTECTION(
         displayName = "Protection",
@@ -322,27 +338,32 @@ enum class DuaCategory(
         keywords = listOf(
             "refuge", "protection", "evil", "fear", "devil", "shaytan",
             "dajjal", "whispering", "eye", "omens", "obstinate", "ward off",
-            "children", "startled", "enemy", "authority", "people"
+            "children", "startled", "enemy", "authority", "people",
         ),
-        icon = "🛡️"
+        icon = "🛡️",
     ),
     DISTRESS(
         displayName = "Distress & Anxiety",
         arabicName = "الكرب والقلق",
         keywords = listOf(
             "distress", "anxiety", "sorrow", "difficult", "afflict", "debt",
-            "mishap", "overtaken", "trial", "tribulation", "angry", "insulted"
+            "mishap", "overtaken", "trial", "tribulation", "angry", "insulted",
         ),
-        icon = "💔"
+        icon = "💔",
     ),
     HEALTH(
         displayName = "Health & Sickness",
         arabicName = "الصحة والمرض",
         keywords = listOf(
-            "sick", "pain", "health", "visiting", "body", "hope of life",
-            "nearing death"
+            "sick",
+            "pain",
+            "health",
+            "visiting",
+            "body",
+            "hope of life",
+            "nearing death",
         ),
-        icon = "🏥"
+        icon = "🏥",
     ),
     SOCIAL(
         displayName = "Social & Etiquette",
@@ -351,80 +372,101 @@ enum class DuaCategory(
             "guest", "newlywed", "marriage", "sneezing", "favour", "praise",
             "greeting", "gift", "love", "sitting", "gathering", "kafir",
             "etiquette", "wealth", "debtor", "offer", "muslim", "news",
-            "pleasing", "displeasing", "pleasant", "amazement", "delight"
+            "pleasing", "displeasing", "pleasant", "amazement", "delight",
         ),
-        icon = "👥"
+        icon = "👥",
     ),
     DEATH(
         displayName = "Death & Funeral",
         arabicName = "الموت والجنازة",
         keywords = listOf(
             "death", "deceased", "funeral", "grave", "calamity", "condolence",
-            "burying", "closing eyes", "nearing death", "advancement of reward"
+            "burying", "closing eyes", "nearing death", "advancement of reward",
         ),
-        icon = "⚰️"
+        icon = "⚰️",
     ),
     WEATHER(
         displayName = "Weather & Nature",
         arabicName = "الطقس والطبيعة",
         keywords = listOf(
             "rain", "wind", "thunder", "storm", "skies", "rainfall",
-            "crescent", "moon", "rooster", "dogs", "barking"
+            "crescent", "moon", "rooster", "dogs", "barking",
         ),
-        icon = "🌧️"
+        icon = "🌧️",
     ),
     HAJJ(
         displayName = "Hajj & Umrah",
         arabicName = "الحج والعمرة",
         keywords = listOf(
             "hajj", "safa", "marwah", "talbiyah", "jamarat", "arafah",
-            "black stone", "yemeni", "sacred site", "pebble", "mashaar"
+            "black stone", "yemeni", "sacred site", "pebble", "mashaar",
         ),
-        icon = "🕋"
+        icon = "🕋",
     ),
     FORGIVENESS(
         displayName = "Forgiveness & Repentance",
         arabicName = "الاستغفار والتوبة",
         keywords = listOf(
-            "forgiveness", "repent", "repentance", "sin", "expiation",
-            "seeking forgiveness", "shirk", "committing"
+            "forgiveness",
+            "repent",
+            "repentance",
+            "sin",
+            "expiation",
+            "seeking forgiveness",
+            "shirk",
+            "committing",
         ),
-        icon = "🤲"
+        icon = "🤲",
     ),
     GUIDANCE(
         displayName = "Guidance & Faith",
         arabicName = "الهداية والإيمان",
         keywords = listOf(
-            "guidance", "istikharah", "doubt", "faith", "seeking guidance"
+            "guidance",
+            "istikharah",
+            "doubt",
+            "faith",
+            "seeking guidance",
         ),
-        icon = "✨"
+        icon = "✨",
     ),
     REMEMBRANCE(
         displayName = "Remembrance & Dhikr",
         arabicName = "الذكر والأذكار",
         keywords = listOf(
-            "remembrance", "glorification", "tasbeeh", "excellence",
-            "prophet", "prayers upon"
+            "remembrance",
+            "glorification",
+            "tasbeeh",
+            "excellence",
+            "prophet",
+            "prayers upon",
         ),
-        icon = "📿"
+        icon = "📿",
     ),
     FAMILY(
         displayName = "Family & Marriage",
         arabicName = "الأسرة والزواج",
         keywords = listOf(
-            "groom", "wedding", "sexual", "intercourse", "children",
-            "newlywed", "marriage"
+            "groom",
+            "wedding",
+            "sexual",
+            "intercourse",
+            "children",
+            "newlywed",
+            "marriage",
         ),
-        icon = "👨‍👩‍👧‍👦"
+        icon = "👨‍👩‍👧‍👦",
     ),
     SACRIFICE(
         displayName = "Sacrifice & Worship",
         arabicName = "الذبيحة والعبادة",
         keywords = listOf(
-            "slaughtering", "sacrifice", "offering"
+            "slaughtering",
+            "sacrifice",
+            "offering",
         ),
-        icon = "🐑"
-    )
+        icon = "🐑",
+    ),
 }
 
 /**
@@ -433,5 +475,5 @@ enum class DuaCategory(
 data class DuaCategoryWithCount(
     val category: DuaCategory,
     val chapterCount: Int,
-    val totalDuaCount: Int
+    val totalDuaCount: Int,
 )

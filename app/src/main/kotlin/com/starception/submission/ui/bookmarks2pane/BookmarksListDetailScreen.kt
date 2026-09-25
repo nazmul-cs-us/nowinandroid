@@ -58,7 +58,6 @@ import com.starception.submission.core.model.data.UserNewsResource
 import com.starception.submission.core.ui.extractHadithInfo
 import com.starception.submission.core.ui.extractSurahNumber
 import com.starception.submission.feature.bookmarks.BookmarksRoute
-import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute as BookmarksNavRoute
 import com.starception.submission.feature.dua.DuaDetailScreen
 import com.starception.submission.feature.hadith.HadithDetailScreen
 import com.starception.submission.feature.surah.SurahDetailScreen
@@ -66,6 +65,7 @@ import com.starception.submission.ui.foryou2pane.NewsResourceDetailPane
 import com.starception.submission.ui.foryou2pane.NewsResourceDetailPlaceholder
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import com.starception.submission.feature.bookmarks.navigation.BookmarksRoute as BookmarksNavRoute
 
 fun NavGraphBuilder.bookmarksListDetailScreen(
     titleRes: Int,
@@ -118,7 +118,11 @@ internal fun BookmarksListDetailScreen(
 
     BookmarksListDetailScreen(
         selectedNewsResource = selectedNewsResource,
-        onNewsResourceClick = if (isLandscape) {{ viewModel.onNewsResourceClick(it.id) }} else null,
+        onNewsResourceClick = if (isLandscape) {
+            { viewModel.onNewsResourceClick(it.id) }
+        } else {
+            null
+        },
         onToggleBookmark = { viewModel.toggleBookmark(it) },
         onBackClick = { viewModel.clearSelection() },
         onTopicClick = onTopicClick,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.starception.submission.download.AssetRepository
 import com.whispercpp.media.decodeWaveFile
 import com.whispercpp.recorder.Recorder
 import com.whispercpp.whisper.WhisperContext
-import com.starception.submission.download.AssetRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,7 +122,7 @@ class WhisperVoiceService @Inject constructor(
                 Log.i(TAG, "Trying bundled assets: $MODEL_ASSET_PATH")
                 whisperContext = WhisperContext.createContextFromAsset(
                     context.assets,
-                    MODEL_ASSET_PATH
+                    MODEL_ASSET_PATH,
                 )
                 loaded = true
                 Log.i(TAG, "Loaded model from bundled assets")
@@ -180,7 +180,7 @@ class WhisperVoiceService @Inject constructor(
      */
     suspend fun startListening(
         durationMs: Long = DEFAULT_LISTENING_DURATION_MS,
-        callback: VoiceRecognitionCallback
+        callback: VoiceRecognitionCallback,
     ) = withContext(Dispatchers.IO) {
         // Check model is loaded
         if (!isModelReady()) {
@@ -233,7 +233,7 @@ class WhisperVoiceService @Inject constructor(
                     scope.launch(Dispatchers.Main) {
                         callback.onAmplitudeUpdate(amplitude)
                     }
-                }
+                },
             )
 
             delay(durationMs)
@@ -258,7 +258,6 @@ class WhisperVoiceService @Inject constructor(
             withContext(Dispatchers.Main) {
                 callback.onResult(result)
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "Error during voice recognition", e)
             withContext(Dispatchers.Main) {
@@ -344,7 +343,7 @@ class WhisperVoiceService @Inject constructor(
             val bufferSize = AudioTrack.getMinBufferSize(
                 sampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+                AudioFormat.ENCODING_PCM_16BIT,
             )
 
             debugAudioTrack = AudioTrack.Builder()
@@ -352,14 +351,14 @@ class WhisperVoiceService @Inject constructor(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
+                        .build(),
                 )
                 .setAudioFormat(
                     AudioFormat.Builder()
                         .setSampleRate(sampleRate)
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
+                        .build(),
                 )
                 .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size * 2))
                 .setTransferMode(AudioTrack.MODE_STATIC)
@@ -376,7 +375,6 @@ class WhisperVoiceService @Inject constructor(
             stopDebugPlayback()
 
             withContext(Dispatchers.Main) { onComplete() }
-
         } catch (e: Exception) {
             Log.e(TAG, "Error playing back recording", e)
             stopDebugPlayback()
@@ -423,7 +421,7 @@ class WhisperVoiceService @Inject constructor(
             // Common Whisper misrecognitions of "yes"
             "one is", "ones", "once", "want", "wants", "ya", "yas",
             "yess", "yea", "uh huh", "mhm", "mm hmm", "mmhmm",
-            "absolutely", "definitely", "of course"
+            "absolutely", "definitely", "of course",
         )
 
         // Check for no variants
@@ -433,7 +431,7 @@ class WhisperVoiceService @Inject constructor(
             "negative", "cancel", "don't", "stop",
             // Common variations and misrecognitions
             "now", "know", "naw", "na", "uh uh", "mm mm", "nuh uh",
-            "never", "not now", "pass", "next"
+            "never", "not now", "pass", "next",
         )
 
         // Check yes patterns

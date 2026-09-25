@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ class SherpaOnnxKwsService @Inject constructor(
     // Recording state
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
-    private var isListening = false  // Prevent concurrent listening
+    private var isListening = false // Prevent concurrent listening
     private var lastRecordingData: FloatArray? = null
     private var debugAudioTrack: AudioTrack? = null
 
@@ -159,7 +159,8 @@ class SherpaOnnxKwsService @Inject constructor(
             val keywordsPath = extractAssetFile(KEYWORDS_FILE)
 
             if (encoderPath == null || decoderPath == null || joinerPath == null ||
-                tokensPath == null || keywordsPath == null) {
+                tokensPath == null || keywordsPath == null
+            ) {
                 Log.e(TAG, "Failed to extract model files")
                 return@withContext false
             }
@@ -175,7 +176,7 @@ class SherpaOnnxKwsService @Inject constructor(
             val transducerConfig = OnlineTransducerModelConfig(
                 encoder = encoderPath,
                 decoder = decoderPath,
-                joiner = joinerPath
+                joiner = joinerPath,
             )
 
             // Configure online model
@@ -184,13 +185,13 @@ class SherpaOnnxKwsService @Inject constructor(
                 tokens = tokensPath,
                 numThreads = 2,
                 debug = false,
-                provider = "cpu"
+                provider = "cpu",
             )
 
             // Configure feature extraction
             val featConfig = FeatureConfig(
                 sampleRate = SAMPLE_RATE,
-                featureDim = 80
+                featureDim = 80,
             )
 
             // Configure keyword spotter
@@ -200,23 +201,22 @@ class SherpaOnnxKwsService @Inject constructor(
                 featConfig = featConfig,
                 modelConfig = modelConfig,
                 keywordsFile = keywordsPath,
-                keywordsThreshold = 0.1f,  // Lowered from 0.25 for better sensitivity
-                keywordsScore = 1.0f,       // Lowered from 1.5 for easier detection
+                keywordsThreshold = 0.1f, // Lowered from 0.25 for better sensitivity
+                keywordsScore = 1.0f, // Lowered from 1.5 for easier detection
                 maxActivePaths = 4,
-                numTrailingBlanks = 1       // Reduced from 2 for faster detection
+                numTrailingBlanks = 1, // Reduced from 2 for faster detection
             )
 
             // Create keyword spotter (not using asset manager since we extracted files)
             kws = KeywordSpotter(
                 assetManager = null,
-                config = kwsConfig
+                config = kwsConfig,
             )
 
             isModelLoaded = true
             val loadTime = System.currentTimeMillis() - startTime
             Log.i(TAG, "Sherpa-ONNX KWS model loaded successfully in ${loadTime}ms")
             true
-
         } catch (e: Exception) {
             Log.e(TAG, "Error loading KWS model", e)
             isModelLoaded = false
@@ -268,7 +268,7 @@ class SherpaOnnxKwsService @Inject constructor(
      */
     suspend fun startListening(
         durationMs: Long = DEFAULT_LISTENING_DURATION_MS,
-        callback: VoiceRecognitionCallback
+        callback: VoiceRecognitionCallback,
     ) = withContext(Dispatchers.IO) {
         // Prevent concurrent listening
         if (isListening) {
@@ -322,7 +322,6 @@ class SherpaOnnxKwsService @Inject constructor(
 
             // Release the stream
             stream.release()
-
         } catch (e: Exception) {
             Log.e(TAG, "Error during voice recognition", e)
             callback.onListeningStopped()
@@ -460,7 +459,6 @@ class SherpaOnnxKwsService @Inject constructor(
                 lastRecordingData = capturedAudio.toFloatArray()
             }
             return ""
-
         } catch (e: Exception) {
             Log.e(TAG, "Error in streamAndDetect", e)
             stopRecording()
@@ -620,7 +618,7 @@ class SherpaOnnxKwsService @Inject constructor(
                         .setSampleRate(SAMPLE_RATE)
                         .setChannelMask(CHANNEL_CONFIG)
                         .setEncoding(AUDIO_FORMAT)
-                        .build()
+                        .build(),
                 )
                 .setBufferSizeInBytes(actualBufferSize)
 
@@ -653,7 +651,7 @@ class SherpaOnnxKwsService @Inject constructor(
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
-                actualBufferSize
+                actualBufferSize,
             )
         }
     }
@@ -684,7 +682,8 @@ class SherpaOnnxKwsService @Inject constructor(
         // If no built-in mic found, return first non-Bluetooth device
         for (device in devices) {
             if (device.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO &&
-                device.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                device.type != AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+            ) {
                 Log.i(TAG, "🎤 Using fallback device: ${device.productName}")
                 return device
             }
@@ -740,7 +739,8 @@ class SherpaOnnxKwsService @Inject constructor(
             lowerKeyword.contains("yup") ||
             lowerKeyword.contains("sure") ||
             lowerKeyword.contains("okay") ||
-            lowerKeyword.contains("ok")) {
+            lowerKeyword.contains("ok")
+        ) {
             return VoiceResult.Yes
         }
 
@@ -750,7 +750,8 @@ class SherpaOnnxKwsService @Inject constructor(
             lowerKeyword.contains("nope") ||
             lowerKeyword.contains("nah") ||
             lowerKeyword.contains("stop") ||
-            lowerKeyword.contains("skip")) {
+            lowerKeyword.contains("skip")
+        ) {
             return VoiceResult.No
         }
 
@@ -799,7 +800,7 @@ class SherpaOnnxKwsService @Inject constructor(
             val bufferSize = AudioTrack.getMinBufferSize(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+                AudioFormat.ENCODING_PCM_16BIT,
             )
 
             debugAudioTrack = AudioTrack.Builder()
@@ -807,14 +808,14 @@ class SherpaOnnxKwsService @Inject constructor(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
+                        .build(),
                 )
                 .setAudioFormat(
                     AudioFormat.Builder()
                         .setSampleRate(SAMPLE_RATE)
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .build()
+                        .build(),
                 )
                 .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size * 2))
                 .setTransferMode(AudioTrack.MODE_STATIC)
@@ -889,7 +890,7 @@ class SherpaOnnxKwsService @Inject constructor(
                 override fun onStatusUpdate(message: String) {
                     Log.i(TAG, "📢 Status: $message")
                 }
-            }
+            },
         )
     }
 }

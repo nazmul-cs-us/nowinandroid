@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import androidx.room.Dao
@@ -15,119 +31,123 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface QuranDao {
-    
+
     // ============= Surah Queries =============
-    
+
     /**
      * Get all Surahs
      */
     @Query("SELECT * FROM surahs ORDER BY number ASC")
     fun getAllSurahs(): Flow<List<SurahEntity>>
-    
+
     /**
      * Get all Surahs (one-time read)
      */
     @Query("SELECT * FROM surahs ORDER BY number ASC")
     suspend fun getAllSurahsOnce(): List<SurahEntity>
-    
+
     /**
      * Get a specific Surah by ID
      */
     @Query("SELECT * FROM surahs WHERE id = :surahId")
     suspend fun getSurahById(surahId: Int): SurahEntity?
-    
+
     /**
      * Get a specific Surah by number
      */
     @Query("SELECT * FROM surahs WHERE number = :surahNumber")
     suspend fun getSurahByNumber(surahNumber: Int): SurahEntity?
-    
+
     /**
      * Get Surahs by revelation type
      */
     @Query("SELECT * FROM surahs WHERE type = :revelationType ORDER BY number ASC")
     fun getSurahsByType(revelationType: String): Flow<List<SurahEntity>>
-    
+
     /**
      * Search Surahs by name (Arabic or English)
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM surahs 
         WHERE name_ar LIKE '%' || :query || '%' 
            OR name_en LIKE '%' || :query || '%'
            OR name_en_translation LIKE '%' || :query || '%'
         ORDER BY number ASC
-    """)
+    """,
+    )
     fun searchSurahs(query: String): Flow<List<SurahEntity>>
-    
+
     // ============= Ayah Queries =============
-    
+
     /**
      * Get all Ayahs for a specific Surah
      */
     @Query("SELECT * FROM ayahs WHERE surah_id = :surahId ORDER BY number_in_surah ASC")
     fun getAyahsBySurah(surahId: Int): Flow<List<AyahEntity>>
-    
+
     /**
      * Get all Ayahs for a specific Surah (one-time read)
      */
     @Query("SELECT * FROM ayahs WHERE surah_id = :surahId ORDER BY number_in_surah ASC")
     suspend fun getAyahsBySurahOnce(surahId: Int): List<AyahEntity>
-    
+
     /**
      * Get all Ayahs for a specific Surah by surah number (using JOIN)
      * This is useful when surah_id might differ between databases
      */
-    @Query("""
+    @Query(
+        """
         SELECT ayahs.* FROM ayahs 
         INNER JOIN surahs ON ayahs.surah_id = surahs.id 
         WHERE surahs.number = :surahNumber 
         ORDER BY ayahs.number_in_surah ASC
-    """)
+    """,
+    )
     suspend fun getAyahsBySurahNumber(surahNumber: Int): List<AyahEntity>
-    
+
     /**
      * Get a specific Ayah by its global number
      */
     @Query("SELECT * FROM ayahs WHERE number = :ayahNumber")
     suspend fun getAyahByNumber(ayahNumber: Int): AyahEntity?
-    
+
     /**
      * Get a specific Ayah by ID
      */
     @Query("SELECT * FROM ayahs WHERE id = :ayahId")
     suspend fun getAyahById(ayahId: Int): AyahEntity?
-    
+
     /**
      * Get Ayahs by page number
      */
     @Query("SELECT * FROM ayahs WHERE page = :pageNumber ORDER BY number ASC")
     fun getAyahsByPage(pageNumber: Int): Flow<List<AyahEntity>>
-    
+
     /**
      * Get Ayahs by Juz number
      */
     @Query("SELECT * FROM ayahs WHERE juz_id = :juzNumber ORDER BY number ASC")
     fun getAyahsByJuz(juzNumber: Int): Flow<List<AyahEntity>>
-    
+
     /**
      * Get Ayahs by Hizb number
      */
     @Query("SELECT * FROM ayahs WHERE hizb_id = :hizbNumber ORDER BY number ASC")
     fun getAyahsByHizb(hizbNumber: Int): Flow<List<AyahEntity>>
-    
+
     /**
      * Get all Ayahs with Sajda (prostration)
      */
     @Query("SELECT * FROM ayahs WHERE sajda = 1 ORDER BY number ASC")
     fun getSajdaAyahs(): Flow<List<AyahEntity>>
-    
+
     /**
      * Search Ayahs by text content
      */
     @Query("SELECT * FROM ayahs WHERE text LIKE '%' || :query || '%' ORDER BY number ASC")
     fun searchAyahs(query: String): Flow<List<AyahEntity>>
-    
+
     /**
      * Search Ayahs by text content with limit
      */
@@ -140,29 +160,31 @@ interface QuranDao {
      * become no-ops. `ORDER BY length(text)` is a cheap relevance proxy — shorter
      * ayahs containing all tokens are usually the targeted verse.
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM ayahs
         WHERE text LIKE '%' || :t0 || '%'
           AND (:t1 = '' OR text LIKE '%' || :t1 || '%')
           AND (:t2 = '' OR text LIKE '%' || :t2 || '%')
         ORDER BY length(text) ASC, number ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAyahsMultiToken(
         t0: String,
         t1: String,
         t2: String,
         limit: Int,
     ): List<AyahEntity>
-    
+
     // ============= Combined Queries =============
-    
+
     /**
      * Get count of Ayahs in a Surah
      */
     @Query("SELECT COUNT(*) FROM ayahs WHERE surah_id = :surahId")
     suspend fun getAyahCount(surahId: Int): Int
-    
+
     /**
      * Get Surah with its Ayah count
      */
@@ -173,7 +195,7 @@ interface QuranDao {
         val ayahCount = getAyahCount(entityId)
         return surahEntity.toSurah(ayahCount)
     }
-    
+
     /**
      * Get all Surahs with their Ayah counts
      */
@@ -186,13 +208,13 @@ interface QuranDao {
             surahEntity.toSurah(ayahCount)
         }
     }
-    
+
     /**
      * Get total number of Ayahs in the Quran
      */
     @Query("SELECT COUNT(*) FROM ayahs")
     suspend fun getTotalAyahCount(): Int
-    
+
     /**
      * Get range of Ayahs (for pagination)
      */
@@ -311,4 +333,3 @@ interface QuranDao {
     @Query("SELECT * FROM ayah_notes WHERE note_text LIKE '%' || :query || '%' ORDER BY updated_at DESC")
     fun searchNotesFlow(query: String): Flow<List<AyahNoteEntity>>
 }
-

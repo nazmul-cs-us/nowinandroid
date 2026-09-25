@@ -1,22 +1,66 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.util
 
 import android.app.AlarmManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.content.res.AssetFileDescriptor
+import android.media.AudioManager
+import android.media.MediaPlayer
+import android.media.ToneGenerator
 import android.os.Build
+import android.os.IBinder
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.util.Log
-import android.media.ToneGenerator
-import android.media.AudioManager
-import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.google.android.gms.location.ActivityTransition
+import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.core.hadithdatabase.HadithDatabase
+import com.starception.submission.core.hadithdatabase.HadithRepository
+import com.starception.submission.core.translation.TranslationService
+import com.starception.submission.download.AssetRepository
+import com.starception.submission.download.AudioDownloadHelper
+import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.feature.course.QuranListeningProgress
+import com.starception.submission.feature.quran.QuranData
+import com.starception.submission.feature.quran.QuranPlaybackService
+import com.starception.submission.prayer.util.FileLogger
+import com.starception.submission.sensor.ActivityDetectionService
+import com.starception.submission.services.DrivingAudioService
+import com.starception.submission.voice.EnglishTtsTextNormalizer
+import com.starception.submission.voice.SherpaOnnxKwsService
+import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
+import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.voice.VoiceCompletionManager
+import com.starception.submission.voice.WhisperVoiceService
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,45 +68,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import android.speech.tts.UtteranceProgressListener
-import com.starception.submission.download.AssetRepository
-import com.starception.submission.download.AudioDownloadHelper
-import com.starception.submission.sensor.ActivityDetectionService
-import com.starception.submission.config.ActivityDetectionConfig
-import com.starception.submission.config.TravelDuaSettings
-import com.starception.submission.feature.course.CourseProgressTracker
-import com.starception.submission.core.hadithdatabase.HadithDatabase
-import com.starception.submission.core.hadithdatabase.HadithRepository
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
-import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
-import com.starception.submission.core.translation.TranslationService
-import com.starception.submission.voice.VoiceCompletionManager
-import com.starception.submission.voice.WhisperVoiceService
-import com.starception.submission.voice.SherpaOnnxTtsService
-import com.starception.submission.voice.SherpaOnnxKwsService
-import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
-import com.starception.submission.voice.EnglishTtsTextNormalizer
-import com.starception.submission.feature.course.QuranListeningProgress
-import com.starception.submission.feature.quran.QuranPlaybackService
-import com.starception.submission.feature.quran.QuranData
-import com.starception.submission.prayer.util.FileLogger
-import android.content.ComponentName
-import android.content.Intent
-import android.content.ServiceConnection
-import android.os.IBinder
-import com.starception.submission.services.DrivingAudioService
-import com.google.android.gms.location.ActivityTransition
 import java.util.Locale
 
 /**
  * Notification mode for activity changes
  */
 enum class NotificationMode {
-    SPEAKER,   // Sound + Vibrate
-    VIBRATE,   // Vibrate only
-    MUTE       // No notification
+    SPEAKER, // Sound + Vibrate
+    VIBRATE, // Vibrate only
+    MUTE, // No notification
 }
 
 /**
@@ -71,7 +85,7 @@ enum class NotificationMode {
  * This provides a way for the ActivityDetectionService to update the current activity
  * and for UI components to observe the current activity state. It integrates with
  * our new sensor-based activity detection system.
- * 
+ *
  * Notification Mode Persistence:
  * - Stores user's notification preference (SPEAKER/VIBRATE/MUTE)
  * - Persists across app restarts using SharedPreferences
@@ -96,28 +110,30 @@ object ActivityTracker {
 
     private const val PREFS_NAME = "activity_tracker_prefs"
     private const val KEY_NOTIFICATION_MODE = "notification_mode"
-    
+
     private val _currentActivity = MutableStateFlow("Initializing...")
     val currentActivity: StateFlow<String> = _currentActivity.asStateFlow()
-    
+
     private val _phonePosition = MutableStateFlow("UNKNOWN")
     val phonePosition: StateFlow<String> = _phonePosition.asStateFlow()
 
-    private val _notificationMode = MutableStateFlow(NotificationMode.MUTE)  // Default to silent mode
+    private val _notificationMode = MutableStateFlow(NotificationMode.MUTE) // Default to silent mode
     val notificationMode: StateFlow<NotificationMode> = _notificationMode.asStateFlow()
 
     // Deprecated - kept for backwards compatibility
     @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
-    private val _isBeepEnabled = MutableStateFlow(false)  // Default false since MUTE is default
+    private val _isBeepEnabled = MutableStateFlow(false)
+
+    // Default false since MUTE is default
     @Deprecated("Use notificationMode instead", ReplaceWith("notificationMode"))
     val isBeepEnabled: StateFlow<Boolean> = _isBeepEnabled.asStateFlow()
-    
+
     private var activityDetectionService: ActivityDetectionService? = null
     private var isInitialized = false
     private var context: Context? = null
     private var toneGenerator: ToneGenerator? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var hadithMediaPlayer: MediaPlayer? = null  // Separate player for hadith audio
+    private var hadithMediaPlayer: MediaPlayer? = null // Separate player for hadith audio
 
     // TextToSpeech for hadith playback after travel dua
     private var textToSpeech: TextToSpeech? = null
@@ -131,9 +147,9 @@ object ActivityTracker {
     // Voice completion for hands-free lesson completion
     private var whisperVoiceService: WhisperVoiceService? = null
     private var sherpaOnnxTtsService: SherpaOnnxTtsService? = null
-    private var sherpaOnnxKwsService: SherpaOnnxKwsService? = null  // Fast keyword spotting (~100ms vs 26s Whisper)
+    private var sherpaOnnxKwsService: SherpaOnnxKwsService? = null // Fast keyword spotting (~100ms vs 26s Whisper)
     private var voiceCompletionManager: VoiceCompletionManager? = null
-    private var currentHadithNumber: Int = 0  // Track current hadith for TTS completion
+    private var currentHadithNumber: Int = 0 // Track current hadith for TTS completion
 
     // Quran Listening Course - Service binding
     private var quranService: QuranPlaybackService? = null
@@ -172,7 +188,7 @@ object ActivityTracker {
         if (sherpaOnnxTtsService == null) {
             val entryPoint = EntryPointAccessors.fromApplication(
                 ctx.applicationContext,
-                SherpaOnnxTtsEntryPoint::class.java
+                SherpaOnnxTtsEntryPoint::class.java,
             )
             sherpaOnnxTtsService = entryPoint.sherpaOnnxTtsService()
             Log.i("ActivityTracker", "🔊 Using shared Hilt TTS service (same as VoiceCompletionManager)")
@@ -224,7 +240,7 @@ object ActivityTracker {
 
     // Callback for activity change (used to update notification immediately)
     private var activityChangeCallback: ((String) -> Unit)? = null
-    
+
     // Dua cooldown tracking - MUST be persisted to survive app restarts
     private var lastDuaPlayTime: Long = 0L
     private var lastDrivingTime: Long = 0L
@@ -232,10 +248,10 @@ object ActivityTracker {
     private var googleDrivingConfirmed = false
 
     // Gap tolerance tracking - continue countdown if driving resumes within gap tolerance
-    private var drivingStopTime: Long = 0L  // When driving stopped
-    private var accumulatedDrivingTime: Long = 0L  // Accumulated driving time in ms
-    private var drivingStartTime: Long = 0L  // When current driving session started
-    private var duaPlayedForCurrentSession: Boolean = false  // Whether dua already played for current accumulation
+    private var drivingStopTime: Long = 0L // When driving stopped
+    private var accumulatedDrivingTime: Long = 0L // Accumulated driving time in ms
+    private var drivingStartTime: Long = 0L // When current driving session started
+    private var duaPlayedForCurrentSession: Boolean = false // Whether dua already played for current accumulation
 
     // Travel dua settings (loaded from SharedPreferences, can be updated from settings screen)
     private var travelDuaEnabled: Boolean = true
@@ -344,7 +360,7 @@ object ActivityTracker {
             val callback = object : ActivityDetectionService.ActivityChangeCallback {
                 override fun onActivityChanged(
                     newActivity: ActivityDetectionService.ActivityType,
-                    previousActivity: ActivityDetectionService.ActivityType
+                    previousActivity: ActivityDetectionService.ActivityType,
                 ) {
                     updateActivityFromSensor(activityToString(newActivity))
                     // Update phone position
@@ -361,7 +377,7 @@ object ActivityTracker {
                         posture: com.starception.submission.ml.SalahPosture,
                         confidence: Float,
                         prayerState: com.starception.submission.ml.SalahSequenceValidator.PrayerState,
-                        rakahCount: Int
+                        rakahCount: Int,
                     ) {
                         // Update activity display with current posture and rak'ah count
                         val confirmed = prayerState == com.starception.submission.ml.SalahSequenceValidator.PrayerState.CONFIRMED
@@ -374,7 +390,7 @@ object ActivityTracker {
                         }
                         wasPrayerConfirmed = confirmed
                     }
-                }
+                },
             )
 
             // Start activity detection with handler for background operation
@@ -401,15 +417,15 @@ object ActivityTracker {
      */
     private fun getMissingPermissions(context: Context): String {
         val missing = mutableListOf<String>()
-        
+
         // Check location permissions
         val hasLocationFine = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasLocationCoarse = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
+
         if (!hasLocationFine && !hasLocationCoarse) {
             missing.add("Location")
         }
-        
+
         // Check activity recognition permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val hasActivityRecognition = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
@@ -417,10 +433,10 @@ object ActivityTracker {
                 missing.add("Activity")
             }
         }
-        
+
         return if (missing.isEmpty()) "unknown" else missing.joinToString(", ")
     }
-    
+
     /**
      * Update the current activity (called from ActivityDetectionService callback)
      * IMPROVED: Smart gap tolerance for travel dua
@@ -571,12 +587,11 @@ object ActivityTracker {
 
             // Check if this is a resume within gap tolerance (e.g., after traffic light)
             if (resumedWithinTripGap) {
-
                 // If dua already played for this trip/session, never replay within gap tolerance.
                 if (duaPlayedForCurrentSession) {
                     Log.i(
                         "ActivityTracker",
-                        "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - dua already played for this session, skipping replay"
+                        "🚦 Driving resumed within ${gapSinceLastDriving / 1000}s gap - dua already played for this session, skipping replay",
                     )
                 } else if (accumulatedDrivingTime > 0) {
                     // RESUME: Continue countdown with accumulated time
@@ -676,7 +691,7 @@ object ActivityTracker {
             }
             ?.apply()
     }
-    
+
     /**
      * Update phone position from service (NEW - research paper method)
      */
@@ -688,7 +703,7 @@ object ActivityTracker {
             }
         }
     }
-    
+
     /**
      * Get current activity synchronously for UI
      */
@@ -721,10 +736,10 @@ object ActivityTracker {
                 return service.getCurrentPosition().name
             }
         }
-        
+
         return _phonePosition.value
     }
-    
+
     /**
      * Stop activity detection
      *
@@ -781,7 +796,7 @@ object ActivityTracker {
             Log.d("ActivityTracker", "🧹 Released audio resources")
         }
     }
-    
+
     /**
      * Convert ActivityType enum to user-friendly string
      */
@@ -806,14 +821,14 @@ object ActivityTracker {
             ActivityDetectionService.ActivityType.UNKNOWN -> "Unknown"
         }
     }
-    
+
     /**
      * Check if activity detection is running
      */
     fun isDetectionActive(): Boolean {
         return activityDetectionService?.isRunning() ?: false
     }
-    
+
     /**
      * Re-initialize after permissions might have been granted
      */
@@ -824,14 +839,14 @@ object ActivityTracker {
             initialize(context)
         }
     }
-    
+
     /**
      * Check if permissions are missing
      */
     fun arePermissionsMissing(context: Context): Boolean {
         return activityDetectionService?.hasRequiredPermissions() != true
     }
-    
+
     /**
      * Play notification when activity changes (based on selected mode)
      * Only plays sound/vibration when:
@@ -1018,7 +1033,7 @@ object ActivityTracker {
             clearPendingAlarmState(ctx)
         }
     }
-    
+
     /**
      * Cancel pending dua playback
      */
@@ -1157,7 +1172,6 @@ object ActivityTracker {
 
             Log.i("ActivityTracker", "📚 Next hadith: #$nextHadithNumber, useBengaliAudio=$useBengaliAudio")
             return Triple(nextHadithNumber, hadithText, useBengaliAudio)
-
         } catch (e: Exception) {
             Log.e("ActivityTracker", "Error getting hadith info: ${e.message}")
             return null
@@ -1290,7 +1304,7 @@ object ActivityTracker {
                         "daily_bukhari",
                         "hadith_$hadithNumber",
                         "Hadith #$hadithNumber",
-                        isManualTriggerMode
+                        isManualTriggerMode,
                     )
                 }
 
@@ -1364,9 +1378,9 @@ object ActivityTracker {
                             "daily_bukhari",
                             "hadith_$hadithNumber",
                             "Hadith #$hadithNumber",
-                            isManualTriggerMode
+                            isManualTriggerMode,
                         )
-                    }
+                    },
                 )
 
                 if (!success) {
@@ -1444,7 +1458,7 @@ object ActivityTracker {
                             "daily_bukhari",
                             "hadith_$hadithNum",
                             "Hadith #$hadithNum",
-                            isManualTriggerMode
+                            isManualTriggerMode,
                         )
                     }
                 }
@@ -1558,7 +1572,7 @@ object ActivityTracker {
                     onComplete = {
                         Log.d("ActivityTracker", "🗣️ Feedback complete: \"$message\"")
                         onComplete()
-                    }
+                    },
                 )
 
                 if (!success) {
@@ -1587,7 +1601,7 @@ object ActivityTracker {
         courseId: String,
         lessonId: String,
         lessonTitle: String,
-        bypassDrivingCheck: Boolean = false
+        bypassDrivingCheck: Boolean = false,
     ) {
         // Only trigger if currently driving (unless bypassing for manual test)
         if (!bypassDrivingCheck && _currentActivity.value != "Driving") {
@@ -1693,7 +1707,7 @@ object ActivityTracker {
                                 isManualTriggerMode = false
                             }
                         }
-                    }
+                    },
                 )
             } catch (e: Exception) {
                 Log.e("ActivityTracker", "❌ Error in voice completion: ${e.message}", e)
@@ -1806,7 +1820,6 @@ object ActivityTracker {
             } else {
                 startQuranPlayback(ctx, progress)
             }
-
         } catch (e: Exception) {
             Log.e("ActivityTracker", "🕌 Error in playQuranListeningIfEnrolled: ${e.message}", e)
         }
@@ -1841,7 +1854,7 @@ object ActivityTracker {
             quranService?.playSurahForCourse(
                 surahIndex = progress.currentSurahIndex,
                 startPosition = progress.currentPositionMs,
-                forCourse = true
+                forCourse = true,
             )
 
             Log.i("ActivityTracker", "🕌 ▶️ Started Quran playback for course mode")
@@ -1874,7 +1887,7 @@ object ActivityTracker {
         ctx: Context,
         lessonId: String,
         lessonTitle: String,
-        surahIndex: Int
+        surahIndex: Int,
     ) {
         // Only trigger if currently driving (unless in manual trigger mode)
         if (!isManualTriggerMode && _currentActivity.value != "Driving") {
@@ -1953,7 +1966,7 @@ object ActivityTracker {
                         speakFeedback(ctx, "Could not hear response. Continuing to next surah.") {
                             completeQuranLessonAndContinue(ctx, surahIndex)
                         }
-                    }
+                    },
                 )
             } catch (e: Exception) {
                 Log.e("ActivityTracker", "🕌 ❌ Error in Quran voice completion: ${e.message}", e)
@@ -1990,7 +2003,7 @@ object ActivityTracker {
         quranService?.playSurahForCourse(
             surahIndex = nextSurahIndex,
             startPosition = 0,
-            forCourse = true
+            forCourse = true,
         )
     }
 
@@ -2123,7 +2136,6 @@ object ActivityTracker {
                     Log.i("ActivityTracker", "🧪 Starting voice completion test...")
                     Log.i("ActivityTracker", "🧪 🎤 Say 'YES' or 'NO' when prompted!")
                     voiceCompletionManager?.runTest()
-
                 } catch (e: Exception) {
                     Log.e("ActivityTracker", "🧪 TEST FAILED: ${e.message}", e)
                 }
@@ -2156,7 +2168,6 @@ object ActivityTracker {
 
                     Log.i("ActivityTracker", "🧪 🎤 Say 'YES' or 'NO' within 5 seconds!")
                     sherpaOnnxKwsService?.runTest()
-
                 } catch (e: Exception) {
                     Log.e("ActivityTracker", "🧪 TEST FAILED: ${e.message}", e)
                 }
@@ -2171,16 +2182,16 @@ object ActivityTracker {
     private fun loadNotificationMode(context: Context): NotificationMode {
         return try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val modeName = prefs.getString(KEY_NOTIFICATION_MODE, NotificationMode.MUTE.name)  // Default to silent
+            val modeName = prefs.getString(KEY_NOTIFICATION_MODE, NotificationMode.MUTE.name) // Default to silent
             val mode = NotificationMode.valueOf(modeName ?: NotificationMode.MUTE.name)
             Log.d("ActivityTracker", "📥 Loaded notification mode from storage: $mode")
             mode
         } catch (e: Exception) {
             Log.e("ActivityTracker", "❌ Failed to load notification mode, using default: ${e.message}")
-            NotificationMode.MUTE  // Default to silent mode
+            NotificationMode.MUTE // Default to silent mode
         }
     }
-    
+
     /**
      * Save notification mode to SharedPreferences
      */
@@ -2195,7 +2206,7 @@ object ActivityTracker {
             Log.e("ActivityTracker", "❌ Failed to save notification mode: ${e.message}")
         }
     }
-    
+
     /**
      * Cycle through notification modes: Speaker → Vibrate → Mute → Speaker
      * Now with automatic persistence!
@@ -2215,9 +2226,9 @@ object ActivityTracker {
             NotificationMode.MUTE -> "Mute"
         }
         Log.d("ActivityTracker", "🔔 Notification mode changed to: $modeText")
-        
+
         // Save to persistent storage if context provided
-        context?.let { 
+        context?.let {
             saveNotificationMode(it, _notificationMode.value)
             Log.d("ActivityTracker", "💾 Preference saved and will persist across app restarts")
         }
@@ -2231,9 +2242,9 @@ object ActivityTracker {
         // Update deprecated field for backwards compatibility
         _isBeepEnabled.value = (mode != NotificationMode.MUTE)
         Log.d("ActivityTracker", "🔔 Notification mode set to: $mode")
-        
+
         // Save to persistent storage if context provided
-        context?.let { 
+        context?.let {
             saveNotificationMode(it, mode)
             Log.d("ActivityTracker", "💾 Preference saved")
         }

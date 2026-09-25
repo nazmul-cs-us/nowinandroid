@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.services
 
 import android.app.Notification
@@ -73,6 +89,7 @@ class ChapterRecitationService : Service() {
     private var currentTitle: String = ""
     private var currentSubtitle: String = ""
     private var isContinuousHandoff = false
+
     // Sherpa/Android TTS owns its audio pipeline, but still needs this service's
     // MediaSession and foreground notification. In that mode there is no MediaPlayer.
     private var isExternalPlayback = false
@@ -149,7 +166,9 @@ class ChapterRecitationService : Service() {
                     subtitle,
                     continuousHandoff,
                 )
-            ) return
+            ) {
+                return
+            }
 
             val intent = Intent(context, ChapterRecitationService::class.java).apply {
                 action = ACTION_PLAY_SOURCE
@@ -300,10 +319,18 @@ class ChapterRecitationService : Service() {
                         togglePlayPause()
                     }
                 }
-                override fun onSkipToNext() { skipHadith(next = true) }
-                override fun onSkipToPrevious() { skipHadith(next = false) }
-                override fun onSeekTo(pos: Long) { seekTo(pos.toInt()) }
-                override fun onStop() { stopPlaybackAndSelf() }
+                override fun onSkipToNext() {
+                    skipHadith(next = true)
+                }
+                override fun onSkipToPrevious() {
+                    skipHadith(next = false)
+                }
+                override fun onSeekTo(pos: Long) {
+                    seekTo(pos.toInt())
+                }
+                override fun onStop() {
+                    stopPlaybackAndSelf()
+                }
             })
             isActive = true
         }
@@ -376,7 +403,10 @@ class ChapterRecitationService : Service() {
         isExternalPlayback = false
         releaseExternalPlaybackWakeLock()
 
-        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
         val player = MediaPlayer()
         player.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
         player.setAudioAttributes(
@@ -466,7 +496,10 @@ class ChapterRecitationService : Service() {
     }
 
     private fun startExternalPlayback(title: String, subtitle: String) {
-        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
         mediaPlayer = null
         currentSource = null
         currentTitle = title
@@ -502,7 +535,10 @@ class ChapterRecitationService : Service() {
         bookPlaylistJob?.cancel()
         stopCurrentBookRenderer()
         stopProgressUpdates()
-        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
         mediaPlayer = null
 
         bookPlaylistPaused = false
@@ -742,8 +778,11 @@ class ChapterRecitationService : Service() {
                     ChapterRecitationState.publishProgress(0, prepared.duration)
                     if (!bookPlaylistPaused) prepared.start()
                     updatePlaybackState(
-                        if (bookPlaylistPaused) PlaybackStateCompat.STATE_PAUSED
-                        else PlaybackStateCompat.STATE_PLAYING,
+                        if (bookPlaylistPaused) {
+                            PlaybackStateCompat.STATE_PAUSED
+                        } else {
+                            PlaybackStateCompat.STATE_PLAYING
+                        },
                     )
                     updateNotification()
                     startProgressUpdates()
@@ -774,7 +813,10 @@ class ChapterRecitationService : Service() {
         recordingContinuation = null
         recordingPrepared = false
         stopProgressUpdates()
-        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
         mediaPlayer = null
         currentSource = null
         if (bookRenderer == BookRenderer.RECORDING) bookRenderer = BookRenderer.NONE
@@ -802,8 +844,12 @@ class ChapterRecitationService : Service() {
         fun start(tts: TextToSpeech) {
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) = Unit
-                override fun onDone(id: String?) { if (id == utteranceId) finish(true) }
-                override fun onError(id: String?) { if (id == utteranceId) finish(false) }
+                override fun onDone(id: String?) {
+                    if (id == utteranceId) finish(true)
+                }
+                override fun onError(id: String?) {
+                    if (id == utteranceId) finish(false)
+                }
                 override fun onStop(id: String?, interrupted: Boolean) {
                     if (id == utteranceId) finish(false)
                 }
@@ -850,8 +896,11 @@ class ChapterRecitationService : Service() {
             return
         }
         if (isExternalPlayback) {
-            if (ChapterRecitationState.isPlaying) pauseExternalPlayback()
-            else resumeExternalPlayback()
+            if (ChapterRecitationState.isPlaying) {
+                pauseExternalPlayback()
+            } else {
+                resumeExternalPlayback()
+            }
             return
         }
         val player = mediaPlayer ?: return
@@ -965,7 +1014,10 @@ class ChapterRecitationService : Service() {
 
         if (!isExternalPlayback && isContinuousHandoff) {
             stopProgressUpdates()
-            mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+            mediaPlayer?.let {
+                runCatching { it.stop() }
+                it.release()
+            }
             mediaPlayer = null
             ChapterRecitationState.onHadithCompletion?.invoke()
         }
@@ -993,7 +1045,10 @@ class ChapterRecitationService : Service() {
         }
         ChapterRecitationState.setBookPlaylist(active = false)
         stopProgressUpdates()
-        mediaPlayer?.let { runCatching { it.stop() }; it.release() }
+        mediaPlayer?.let {
+            runCatching { it.stop() }
+            it.release()
+        }
         mediaPlayer = null
         currentSource = null
         isExternalPlayback = false
@@ -1086,7 +1141,9 @@ class ChapterRecitationService : Service() {
         }
         val contentIntent = packageManager.getLaunchIntentForPackage(packageName)
         val contentPending = PendingIntent.getActivity(
-            this, 0, contentIntent,
+            this,
+            0,
+            contentIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -1204,32 +1261,43 @@ class ChapterRecitationService : Service() {
 object ChapterRecitationState {
     /** (isPlaying, title, subtitle) */
     var onStateChanged: ((Boolean, String, String) -> Unit)? = null
+
     /** (positionMs, durationMs) */
     var onProgressChanged: ((Int, Int) -> Unit)? = null
+
     /** Independent observer for the app-wide media container. Kept separate from the app bridge
      * so feature playback bookkeeping cannot replace or miss the global UI listener. */
     var onGlobalStateChanged: ((Boolean, String, String) -> Unit)? = null
+
     /** Progress observer paired with [onGlobalStateChanged]. */
     var onGlobalProgressChanged: ((Int, Int) -> Unit)? = null
+
     /** Fired when a recitation finishes on its own (not a pause/stop) — drives dua auto-advance. */
     var onCompletion: (() -> Unit)? = null
+
     /** Fired when a downloaded Hadith recording naturally finishes. */
     var onHadithCompletion: (() -> Unit)? = null
+
     /** MediaSession play/pause request for audio rendered by an external TTS engine. */
     var onExternalToggle: (() -> Unit)? = null
+
     /** Distinct commands preserve a suspended Bukhari playlist instead of toggling it off. */
     var onExternalPause: (() -> Unit)? = null
     var onExternalPlay: (() -> Unit)? = null
+
     /** Car/Bluetooth transport controls. Return true when the playlist accepted the jump. */
     var onSkipNext: (() -> Boolean)? = null
     var onSkipPrevious: (() -> Boolean)? = null
+
     /** Independent book-screen observer; the foreground service remains the queue owner. */
     var onBookTrackChanged: ((hadithNumber: Int, isPlaying: Boolean, isActive: Boolean, collectionName: String) -> Unit)? = null
 
     @Volatile
     internal var onSourcePlaybackRequested: ((String, String, String, Boolean) -> Unit)? = null
+
     @Volatile
     internal var onExternalPlaybackRequested: ((String, String) -> Unit)? = null
+
     @Volatile
     internal var onStopRequested: (() -> Unit)? = null
 
@@ -1237,24 +1305,32 @@ object ChapterRecitationState {
     // recreated while the service kept playing (e.g. user closed and reopened the app).
     @Volatile var isPlaying: Boolean = false
         private set
+
     @Volatile var title: String = ""
         private set
+
     @Volatile var subtitle: String = ""
         private set
+
     @Volatile var positionMs: Int = 0
         private set
+
     @Volatile var durationMs: Int = 0
         private set
 
     /** True when a chapter recitation is currently active (playing or paused, not stopped). */
     @Volatile var isActive: Boolean = false
         private set
+
     @Volatile var isBookPlaylistActive: Boolean = false
         private set
+
     @Volatile var bookCurrentHadith: Int = 0
         private set
+
     @Volatile var bookRangeStart: Int = 0
         private set
+
     @Volatile var bookRangeEnd: Int = 0
         private set
 

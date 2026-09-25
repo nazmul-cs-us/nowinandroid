@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
 import androidx.compose.foundation.Canvas
@@ -60,11 +76,11 @@ import com.github.skydoves.colorpicker.compose.BrightnessSlider
 import com.github.skydoves.colorpicker.compose.ColorEnvelope
 import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
-import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
+import com.starception.submission.core.designsystem.component.NiaNavigationSuiteScaffold
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import com.starception.submission.core.designsystem.theme.LocalDarkTheme
 import com.starception.submission.core.designsystem.theme.NiaTheme
 import com.starception.submission.core.model.data.ThemeBrand
@@ -136,150 +152,150 @@ fun HsvColorWheelDialog(
     ) {
         NiaBottomSheetTheme {
             NiaBottomSheetFrame {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-            Text(
-                text = "Theme palette",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(
+                        text = "Theme palette",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
 
-            // Role selector
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                listOf("Primary", "Secondary", "Tertiary").forEachIndexed { idx, label ->
-                    SegmentedButton(
-                        selected = activeRole == idx,
-                        onClick = { activeRole = idx },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = 3),
-                        colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    ) {
-                        Text(label, style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-
-            // Library HSV picker
-            HsvColorPicker(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-                controller = controller,
-                wheelImageBitmap = thumbBitmap,
-                initialColor = initialPrimary,
-                onColorChanged = { envelope: ColorEnvelope ->
-                    if (envelope.fromUser) {
-                        when (activeRole) {
-                            0 -> primary = envelope.color
-                            1 -> secondary = envelope.color
-                            else -> tertiary = envelope.color
+                    // Role selector
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        listOf("Primary", "Secondary", "Tertiary").forEachIndexed { idx, label ->
+                            SegmentedButton(
+                                selected = activeRole == idx,
+                                onClick = { activeRole = idx },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = 3),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
                         }
                     }
-                },
-            )
 
-            // Brightness rail. The library slider clips its thumb at the track's
-            // rounded ends (thumb center travels to x = width inside a clipped
-            // canvas), so we draw our own rail with inset thumb travel. An
-            // invisible library slider stays attached because the controller only
-            // persists the brightness channel across wheel drags when its
-            // internal isAttachedBrightnessSlider flag is set.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp),
-            ) {
-                BrightnessSlider(
-                    modifier = Modifier
-                        .size(1.dp)
-                        .alpha(0f),
-                    controller = controller,
-                    initialColor = initialPrimary,
-                )
-                BrightnessRail(
-                    activeColor = activeColor,
-                    controller = controller,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            // Hex value + active swatch
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(activeColor)
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            RoundedCornerShape(8.dp),
-                        ),
-                )
-                Text(
-                    text = "#%06X".format(activeColor.toArgb() and 0xFFFFFF),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
-            // Palette preview strip
-            PalettePreview(
-                primary = primary,
-                secondary = secondary,
-                tertiary = tertiary,
-                activeIndex = activeRole,
-            )
-
-            // Reference palettes
-            Text(
-                text = "Start from a theme",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ReferencePaletteRow(
-                onPalettePicked = { (p, s, t) ->
-                    primary = p
-                    secondary = s
-                    tertiary = t
-                    controller.selectByColor(
-                        when (activeRole) {
-                            0 -> p
-                            1 -> s
-                            else -> t
+                    // Library HSV picker
+                    HsvColorPicker(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        controller = controller,
+                        wheelImageBitmap = thumbBitmap,
+                        initialColor = initialPrimary,
+                        onColorChanged = { envelope: ColorEnvelope ->
+                            if (envelope.fromUser) {
+                                when (activeRole) {
+                                    0 -> primary = envelope.color
+                                    1 -> secondary = envelope.color
+                                    else -> tertiary = envelope.color
+                                }
+                            }
                         },
-                        fromUser = false,
                     )
-                },
-            )
 
-            // Action row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = { showPreview = true }) { Text("Preview") }
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("Cancel") }
-                Spacer(modifier = Modifier.size(8.dp))
-                TextButton(onClick = { onConfirm(primary, secondary, tertiary) }) {
-                    Text("Save")
+                    // Brightness rail. The library slider clips its thumb at the track's
+                    // rounded ends (thumb center travels to x = width inside a clipped
+                    // canvas), so we draw our own rail with inset thumb travel. An
+                    // invisible library slider stays attached because the controller only
+                    // persists the brightness channel across wheel drags when its
+                    // internal isAttachedBrightnessSlider flag is set.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp),
+                    ) {
+                        BrightnessSlider(
+                            modifier = Modifier
+                                .size(1.dp)
+                                .alpha(0f),
+                            controller = controller,
+                            initialColor = initialPrimary,
+                        )
+                        BrightnessRail(
+                            activeColor = activeColor,
+                            controller = controller,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+
+                    // Hex value + active swatch
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(activeColor)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    RoundedCornerShape(8.dp),
+                                ),
+                        )
+                        Text(
+                            text = "#%06X".format(activeColor.toArgb() and 0xFFFFFF),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    // Palette preview strip
+                    PalettePreview(
+                        primary = primary,
+                        secondary = secondary,
+                        tertiary = tertiary,
+                        activeIndex = activeRole,
+                    )
+
+                    // Reference palettes
+                    Text(
+                        text = "Start from a theme",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ReferencePaletteRow(
+                        onPalettePicked = { (p, s, t) ->
+                            primary = p
+                            secondary = s
+                            tertiary = t
+                            controller.selectByColor(
+                                when (activeRole) {
+                                    0 -> p
+                                    1 -> s
+                                    else -> t
+                                },
+                                fromUser = false,
+                            )
+                        },
+                    )
+
+                    // Action row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = { showPreview = true }) { Text("Preview") }
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(onClick = onDismiss) { Text("Cancel") }
+                        Spacer(modifier = Modifier.size(8.dp))
+                        TextButton(onClick = { onConfirm(primary, secondary, tertiary) }) {
+                            Text("Save")
+                        }
+                    }
                 }
-            }
-            }
             }
         }
     }
@@ -396,7 +412,7 @@ private fun ThemePreviewScreen(
             ) {
                 TextButton(onClick = onBack) { Text("Back") }
                 NiaOutlinedButton(
-                    onClick = onApply
+                    onClick = onApply,
                 ) {
                     Text("Apply theme")
                 }

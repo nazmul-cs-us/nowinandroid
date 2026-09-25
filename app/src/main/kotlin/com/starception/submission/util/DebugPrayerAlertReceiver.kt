@@ -1,23 +1,19 @@
 /*
- * Debug-only BroadcastReceiver to simulate a prayer alert in PullToSyncContainer.
- * Lets us verify the stacked layout when both media (driving Surah) and a prayer
- * alert (Go to mosque) are live without waiting for a real prayer window.
+ * Copyright 2026 The Android Open Source Project
  *
- * Usage:
- *   Show a "Go to mosque" alert for Maghrib, 18 min left of a 30 min window:
- *     adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_PRAYER_ALERT \
- *       --es prayer Maghrib --es phase GO_TO_MOSQUE --ei countdown 18 --ei total 30 \
- *       -n com.starception.submission.demo.debug/com.starception.submission.util.DebugPrayerAlertReceiver
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *   Show "Fajr in 15m" countdown:
- *     adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_PRAYER_ALERT \
- *       --es prayer Fajr --es phase BEFORE_PRAYER --ei countdown 15 --ei total 30 \
- *       -n com.starception.submission.demo.debug/com.starception.submission.util.DebugPrayerAlertReceiver
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *   Clear the simulated alert:
- *     adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_PRAYER_ALERT --ez clear true \
- *       -n com.starception.submission.demo.debug/com.starception.submission.util.DebugPrayerAlertReceiver
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.starception.submission.util
 
 import android.content.BroadcastReceiver

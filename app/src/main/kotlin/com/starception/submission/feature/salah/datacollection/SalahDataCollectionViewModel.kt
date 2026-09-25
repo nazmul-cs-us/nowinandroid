@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.datacollection
 
 import android.app.Application
@@ -6,8 +22,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.starception.submission.core.duadatabase.DuaRepository
 import com.starception.submission.download.AssetDownloadManager
-import com.starception.submission.settings.components.TtsVoice
-import com.starception.submission.ui.AppTaskProgressBus
 import com.starception.submission.feature.salah.visualization.PosePlaybackSource
 import com.starception.submission.feature.salah.visualization.TwoRakahDuaCatalog
 import com.starception.submission.feature.salah.visualization.VisualizationMode
@@ -19,6 +33,8 @@ import com.starception.submission.ml.SalahBatchInference
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
 import com.starception.submission.sensor.SalahDataCollectionService
+import com.starception.submission.settings.components.TtsVoice
+import com.starception.submission.ui.AppTaskProgressBus
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.EntryPoint
@@ -35,11 +51,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 enum class GuidedRecordingState {
     IDLE,
+
     /** Synthesising every spoken line before the session, so it never stalls mid-posture. */
     PREPARING,
     WELCOME,
@@ -47,7 +63,7 @@ enum class GuidedRecordingState {
     RECORDING_POSTURE,
     POSTURE_TRANSITION,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
 }
 
 data class SalahDataCollectionUiState(
@@ -145,49 +161,59 @@ data class GuidedStep(
  */
 val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
     GuidedStep(
-        SalahPosture.QIYAM, isTransition = false,
+        SalahPosture.QIYAM,
+        isTransition = false,
         instruction = "Stand upright in the prayer position, with your hands folded. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.RUKU, isTransition = false,
+        SalahPosture.RUKU,
+        isTransition = false,
         instruction = "Now bow into ruku, with your hands on your knees. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.QIYAM_RISING, isTransition = true,
+        SalahPosture.QIYAM_RISING,
+        isTransition = true,
         instruction = "Stay in ruku. Do not move yet. When you hear move now, rise from ruku until you are fully upright. Stop in standing, and do not start going down.",
         recordingLabel = "Ruku → Standing",
         movementCue = "Move now. Rise from ruku until you are fully upright, then stop.",
     ),
     GuidedStep(
-        SalahPosture.GOING_TO_SUJUD, isTransition = true,
+        SalahPosture.GOING_TO_SUJUD,
+        isTransition = true,
         instruction = "You should now be fully upright after ruku. Stay standing and do not move yet. When you hear move now, lower from standing into the first prostration.",
         recordingLabel = "Standing → First Sujud",
         movementCue = "Move now. From standing, lower smoothly into the first prostration.",
     ),
     GuidedStep(
-        SalahPosture.SUJUD, isTransition = false,
+        SalahPosture.SUJUD,
+        isTransition = false,
         instruction = "Remain in the first prostration, or sujud. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.JALSA, isTransition = false,
+        SalahPosture.JALSA,
+        isTransition = false,
         instruction = "Now sit up into the seated position between the two prostrations. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.GOING_TO_SUJUD, isTransition = true,
+        SalahPosture.GOING_TO_SUJUD,
+        isTransition = true,
         instruction = "You should now be seated between the two prostrations. Stay seated and do not move yet. When you hear move now, lower from sitting into the second prostration.",
         recordingLabel = "Sitting → Second Sujud",
         movementCue = "Move now. From sitting, lower smoothly into the second prostration.",
     ),
     GuidedStep(
-        SalahPosture.SUJUD, isTransition = false,
+        SalahPosture.SUJUD,
+        isTransition = false,
         instruction = "Remain in the second prostration, or sujud. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.TASHAHHUD, isTransition = false,
+        SalahPosture.TASHAHHUD,
+        isTransition = false,
         instruction = "Now sit up into the seated position for tashahhud. Become still. Keep holding until the next instruction.",
     ),
     GuidedStep(
-        SalahPosture.RISING_TO_QIYAM, isTransition = true,
+        SalahPosture.RISING_TO_QIYAM,
+        isTransition = true,
         instruction = "Remain seated after tashahhud and do not move yet. When you hear move now, rise naturally into the next rak‘ah and stop fully upright.",
         recordingLabel = "Tashahhud → Next Rak‘ah",
         movementCue = "Move now. Rise naturally into the next rak‘ah and stop fully upright.",
@@ -196,39 +222,47 @@ val GUIDED_POSTURE_SEQUENCE: List<GuidedStep> = listOf(
 
 private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture) {
     SalahPosture.QIYAM -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Move into qiyam. Stand upright with your hands folded, become still, and keep holding until recording finishes.",
     )
     SalahPosture.RUKU -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Move into ruku with your hands on your knees, become still, and keep holding until recording finishes.",
     )
     SalahPosture.SUJUD -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Move fully into sujud, become still, and keep holding until recording finishes.",
     )
     SalahPosture.JALSA -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Sit upright between the two prostrations, become still, and keep holding until recording finishes.",
     )
     SalahPosture.TASHAHHUD -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Sit in the tashahhud position, become still, and keep holding until recording finishes.",
     )
     SalahPosture.QIYAM_RISING -> GuidedStep(
-        posture, isTransition = true,
+        posture,
+        isTransition = true,
         instruction = "Begin fully in ruku and do not move yet. When you hear move now, rise until you are fully upright, then stop.",
         recordingLabel = "Ruku → Standing",
         movementCue = "Move now. Rise from ruku until you are fully upright, then stop.",
     )
     SalahPosture.GOING_TO_SUJUD -> GuidedStep(
-        posture, isTransition = true,
+        posture,
+        isTransition = true,
         instruction = "For this take, choose either standing to first sujud or sitting to second sujud. Begin in that start position and do not move yet. When you hear move now, lower fully into sujud.",
         recordingLabel = "Lowering → Sujud",
         movementCue = "Move now. Lower smoothly from your chosen start position into sujud.",
     )
     SalahPosture.RISING_TO_QIYAM -> GuidedStep(
-        posture, isTransition = true,
+        posture,
+        isTransition = true,
         instruction = "For this take, begin either in the second sujud or seated after tashahhud. Do not move yet. When you hear move now, rise naturally into the next rak‘ah and stop fully upright.",
         recordingLabel = "Rise to Next Rak‘ah",
         movementCue = "Move now. Rise naturally into the next rak‘ah and stop fully upright.",
@@ -238,7 +272,8 @@ private fun focusedGuidedStep(posture: SalahPosture): GuidedStep = when (posture
     // voice suggested, when the value of this class is precisely its variety — it is
     // collected with plain (unguided) recording instead.
     SalahPosture.NOT_PRAYING -> GuidedStep(
-        posture, isTransition = false,
+        posture,
+        isTransition = false,
         instruction = "Negative examples are not guided. Use Start Recording and go about " +
             "any activity that is not prayer.",
     )
@@ -323,7 +358,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
     private fun getEntryPoint(): SherpaOnnxTtsEntryPoint =
         EntryPointAccessors.fromApplication(
             getApplication<Application>().applicationContext,
-            SherpaOnnxTtsEntryPoint::class.java
+            SherpaOnnxTtsEntryPoint::class.java,
         )
 
     private fun getTtsService(): SherpaOnnxTtsService {
@@ -488,7 +523,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     sessionId = collectionService.sessionId,
                     totalSamples = 0,
                     postureCounts = emptyMap(),
-                    lastSample = null
+                    lastSample = null,
                 )
             }
         }
@@ -514,7 +549,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 currentPosture = SalahPosture.QIYAM,
                 totalSamples = afterCount,
                 postureCounts = collectionService.getSessionStats().first,
-                trimmedSamples = trimmed
+                trimmedSamples = trimmed,
             )
         }
         refreshFileList()
@@ -601,7 +636,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     dataFiles = files,
                     totalDataSizeKb = totalSizeKb,
                     globalPostureCounts = globalCounts,
-                    globalTotalSamples = globalTotal
+                    globalTotalSamples = globalTotal,
                 )
             }
             // Restore cached quality results for the listed files (mtime-keyed).
@@ -687,13 +722,18 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     "Turn up the media volume. " +
                     "Place the phone fully inside one trouser pocket, in the position you normally carry it. " +
                     "Leave the phone in the same pocket for the entire session. " +
-                    (if (isSpecific) {
-                        "You will record only ${focusedStep.recordingLabel}. " +
-                            if (focusedStep.isTransition) {
-                                "The guide will capture $FOCUSED_MOVEMENT_REPETITIONS separate repetitions. Return to the starting position only while capture is paused. "
-                            } else ""
-                    } else
-                        "After bowing, rise fully upright and wait for a separate instruction before lowering into prostration. ") +
+                    (
+                        if (isSpecific) {
+                            "You will record only ${focusedStep.recordingLabel}. " +
+                                if (focusedStep.isTransition) {
+                                    "The guide will capture $FOCUSED_MOVEMENT_REPETITIONS separate repetitions. Return to the starting position only while capture is paused. "
+                                } else {
+                                    ""
+                                }
+                        } else {
+                            "After bowing, rise fully upright and wait for a separate instruction before lowering into prostration. "
+                        }
+                        ) +
                     "Follow only the voice instructions. Move immediately when an instruction begins with: now. " +
                     "If an instruction says: do not move yet, wait for the separate cue: move now."
 
@@ -781,7 +821,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     sessionId = collectionService.sessionId,
                     totalSamples = 0,
                     postureCounts = emptyMap(),
-                    lastSample = null
+                    lastSample = null,
                 )
             }
 
@@ -824,7 +864,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                         } else {
                             step.recordingLabel
                         },
-                        currentPosture = posture
+                        currentPosture = posture,
                     )
                 }
 
@@ -887,7 +927,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                     isRecording = false,
                     totalSamples = afterCount,
                     postureCounts = collectionService.getSessionStats().first,
-                    currentPosture = SalahPosture.QIYAM
+                    currentPosture = SalahPosture.QIYAM,
                 )
             }
 
@@ -979,7 +1019,7 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
                 guidedState = GuidedRecordingState.CANCELLED,
                 guidedMessage = "Cancelled by user. Any completed posture segments remain saved.",
                 isRecording = false,
-                currentPosture = SalahPosture.QIYAM
+                currentPosture = SalahPosture.QIYAM,
             )
         }
         refreshFileList()
@@ -1019,16 +1059,16 @@ class SalahDataCollectionViewModel(application: Application) : AndroidViewModel(
         text: String,
         onPlaybackStart: (() -> Unit)? = null,
     ): Boolean = try {
-            val tts = getTtsService()
-            tts.speakCachedOrGenerate(
-                text = text,
-                onPlaybackStart = onPlaybackStart,
-                retainCache = true,
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "TTS speak failed: ${e.message}")
-            false
-        }
+        val tts = getTtsService()
+        tts.speakCachedOrGenerate(
+            text = text,
+            onPlaybackStart = onPlaybackStart,
+            retainCache = true,
+        )
+    } catch (e: Exception) {
+        Log.w(TAG, "TTS speak failed: ${e.message}")
+        false
+    }
 
     // 3D Visualization methods
 

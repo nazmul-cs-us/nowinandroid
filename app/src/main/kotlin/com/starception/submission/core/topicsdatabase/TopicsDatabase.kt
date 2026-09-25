@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.topicsdatabase
 
 import android.content.Context
@@ -23,7 +39,7 @@ import java.io.FileOutputStream
 @Database(
     entities = [TopicEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class TopicsDatabase : RoomDatabase() {
 
@@ -44,7 +60,7 @@ abstract class TopicsDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     TopicsDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
                     .createFromAsset("databases/$DATABASE_NAME")
                     .fallbackToDestructiveMigration()
@@ -86,7 +102,6 @@ abstract class TopicsDatabase : RoomDatabase() {
                     android.util.Log.d(TAG, "User Topics: $userCount")
                 }
                 userCursor.close()
-
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error logging database info", e)
             }
@@ -152,7 +167,7 @@ abstract class TopicsDatabase : RoomDatabase() {
                     val assetDb = SQLiteDatabase.openDatabase(
                         tempFile.absolutePath,
                         null,
-                        SQLiteDatabase.OPEN_READONLY
+                        SQLiteDatabase.OPEN_READONLY,
                     )
 
                     val topics = mutableListOf<TopicEntity>()
@@ -172,19 +187,21 @@ abstract class TopicsDatabase : RoomDatabase() {
                         val createdAt = cursor.getColumnIndex("created_at").takeIf { it >= 0 }?.let { cursor.getString(it) }
                         val updatedAt = cursor.getColumnIndex("updated_at").takeIf { it >= 0 }?.let { cursor.getString(it) }
 
-                        topics.add(TopicEntity(
-                            id = id,
-                            name = name,
-                            shortDescription = shortDescription,
-                            longDescription = longDescription,
-                            url = url,
-                            imageUrl = imageUrl,
-                            icon = icon,
-                            isSystem = isSystem,
-                            isUserCreated = isUserCreated,
-                            createdAt = createdAt,
-                            updatedAt = updatedAt
-                        ))
+                        topics.add(
+                            TopicEntity(
+                                id = id,
+                                name = name,
+                                shortDescription = shortDescription,
+                                longDescription = longDescription,
+                                url = url,
+                                imageUrl = imageUrl,
+                                icon = icon,
+                                isSystem = isSystem,
+                                isUserCreated = isUserCreated,
+                                createdAt = createdAt,
+                                updatedAt = updatedAt,
+                            ),
+                        )
                     }
                     cursor.close()
                     assetDb.close()
@@ -222,7 +239,7 @@ abstract class TopicsDatabase : RoomDatabase() {
                     name = "Topics",
                     itemCount = count,
                     lastModified = dbFile.lastModified(),
-                    sizeBytes = dbFile.length()
+                    sizeBytes = dbFile.length(),
                 )
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error getting database info", e)
@@ -239,5 +256,5 @@ data class TopicsDatabaseInfo(
     val name: String,
     val itemCount: Int,
     val lastModified: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.model
 
 import java.time.LocalTime
@@ -11,13 +27,13 @@ import java.time.LocalTime
 data class PrayerTimeSuggestion(
     val prayerName: String,
     // Suggested offset in minutes
-    val suggestedOffset: Int,       
+    val suggestedOffset: Int,
     // User's current offset
-    val currentOffset: Int,          
+    val currentOffset: Int,
     val ourCalculatedTime: LocalTime,
     val referenceTime: LocalTime,
     // referenceTime - ourCalculatedTime
-    val differenceMinutes: Int       
+    val differenceMinutes: Int,
 ) {
     /**
      * Returns true if the suggestion differs from current user offset.
@@ -62,7 +78,7 @@ data class DayPrayerSuggestions(
     val maghrib: PrayerTimeSuggestion?,
     val isha: PrayerTimeSuggestion?,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 ) {
     companion object {
         val EMPTY = DayPrayerSuggestions(
@@ -70,7 +86,7 @@ data class DayPrayerSuggestions(
             dhuhr = null,
             asr = null,
             maghrib = null,
-            isha = null
+            isha = null,
         )
 
         val LOADING = DayPrayerSuggestions(
@@ -79,7 +95,7 @@ data class DayPrayerSuggestions(
             asr = null,
             maghrib = null,
             isha = null,
-            isLoading = true
+            isLoading = true,
         )
     }
 

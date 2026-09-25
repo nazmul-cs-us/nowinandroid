@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
-import androidx.navigation.NavType
 import androidx.navigation.compose.composable
-import androidx.navigation.navArgument
 import com.starception.submission.core.designsystem.animation.NiaTransitions
-import com.starception.submission.feature.course.CourseScreen
 import com.starception.submission.feature.course.CourseDetailScreen
 import com.starception.submission.feature.course.CourseProgressTracker
+import com.starception.submission.feature.course.CourseScreen
 import com.starception.submission.feature.course.getAvailableCourses
 import kotlinx.serialization.Serializable
 
@@ -92,7 +90,7 @@ fun NavGraphBuilder.courseScreen(
                         context,
                         course.id,
                         lesson.id,
-                        lesson.title
+                        lesson.title,
                     )
 
                     // Navigate based on course type

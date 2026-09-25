@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.starception.submission.widget.samples.text.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -38,50 +38,43 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
+import androidx.core.content.res.ResourcesCompat
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.Action
+import androidx.glance.action.clickable
+import androidx.glance.appwidget.AndroidRemoteViews
+import androidx.glance.appwidget.components.CircleIconButton
+import androidx.glance.appwidget.components.Scaffold
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.background
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
+import androidx.glance.layout.wrapContentHeight
+import androidx.glance.layout.wrapContentWidth
+import androidx.glance.unit.ColorProvider
+import com.starception.submission.R
+import com.starception.submission.widget.FadingHorizontalSeparator
+import com.starception.submission.widget.LocalWidgetHostBackground
+import com.starception.submission.widget.WidgetFontWeight
 import com.starception.submission.widget.WidgetText
 import com.starception.submission.widget.WidgetTextAlign
 import com.starception.submission.widget.arabicFontResourceFor
-import com.starception.submission.widget.WidgetFontWeight
-import com.starception.submission.widget.FadingHorizontalSeparator
-import androidx.core.content.res.ResourcesCompat
-import androidx.glance.appwidget.AndroidRemoteViews
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.layout.Spacer
-import androidx.glance.layout.Box
-import androidx.glance.layout.height
-import androidx.glance.layout.Row
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.wrapContentWidth
-import androidx.glance.layout.wrapContentHeight
-import androidx.glance.text.TextAlign
-import androidx.glance.ColorFilter
-import androidx.glance.layout.size
-import androidx.glance.layout.width
-import androidx.glance.action.Action
-import androidx.glance.appwidget.lazy.LazyColumn
-import androidx.glance.appwidget.lazy.itemsIndexed
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.components.CircleIconButton
-import androidx.glance.appwidget.components.Scaffold
-import androidx.glance.appwidget.components.TitleBar
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Column
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.padding
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
-import com.starception.submission.R
-import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.captionFontSizeAndMaxLines
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.contentSize
 import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.widgetPadding
-import com.starception.submission.widget.samples.text.layout.WidgetTextDimensions.primaryTextFontSizeAndMaxLines
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
 import com.starception.submission.widget.samples.utils.FontUtils.calculateFontSizeAndMaxLines
 
@@ -107,285 +100,287 @@ import com.starception.submission.widget.samples.utils.FontUtils.calculateFontSi
  */
 @Composable
 fun LongTextLayout(
-  title: String,
-  @DrawableRes titleIconRes: Int,
-  titleIconTint: Boolean = true,
-  @DrawableRes titleBarActionIconRes: Int? = null,
-  titleBarActionIconContentDescription: String? = null,
-  titleBarAction: Action? = null,
-  data: LongTextLayoutData,
-  action: Action? = null,
+    title: String,
+    @DrawableRes titleIconRes: Int,
+    titleIconTint: Boolean = true,
+    @DrawableRes titleBarActionIconRes: Int? = null,
+    titleBarActionIconContentDescription: String? = null,
+    titleBarAction: Action? = null,
+    data: LongTextLayoutData,
+    action: Action? = null,
 ) {
-  val showTitleBar = LongTextLayoutSize.fromLocalSize() != LongTextLayoutSize.XSmall
-  val scaffoldTopPadding = if (showTitleBar) {
-    0.dp
-  } else {
-    widgetPadding
-  }
+    val showTitleBar = LongTextLayoutSize.fromLocalSize() != LongTextLayoutSize.XSmall
+    val scaffoldTopPadding = if (showTitleBar) {
+        0.dp
+    } else {
+        widgetPadding
+    }
 
-  Scaffold(
-    backgroundColor = LocalWidgetHostBackground.current,
-    horizontalPadding = widgetPadding,
-    modifier = GlanceModifier
-      .padding(
-        bottom = widgetPadding,
-        top = scaffoldTopPadding
-      ),
-    titleBar = {
-      if (showTitleBar) {
-        TitleBarContent(
-          titleIconRes,
-          titleIconTint,
-          title,
-          titleBarAction,
-          titleBarActionIconRes,
-          titleBarActionIconContentDescription
+    Scaffold(
+        backgroundColor = LocalWidgetHostBackground.current,
+        horizontalPadding = widgetPadding,
+        modifier = GlanceModifier
+            .padding(
+                bottom = widgetPadding,
+                top = scaffoldTopPadding,
+            ),
+        titleBar = {
+            if (showTitleBar) {
+                TitleBarContent(
+                    titleIconRes,
+                    titleIconTint,
+                    title,
+                    titleBarAction,
+                    titleBarActionIconRes,
+                    titleBarActionIconContentDescription,
+                )
+            }
+        },
+    ) {
+        TextStack(
+            data = data,
+            verticalAlignment = if (showTitleBar) {
+                Alignment.Bottom
+            } else {
+                Alignment.CenterVertically
+            },
+            action = action,
         )
-      }
-    },
-  ) {
-    TextStack(
-      data = data,
-      verticalAlignment = if (showTitleBar) {
-        Alignment.Bottom
-      } else Alignment.CenterVertically,
-      action = action,
-    )
-  }
+    }
 }
 
 @Composable
 private fun TitleBarContent(
-  titleIconRes: Int,
-  titleIconTint: Boolean,
-  title: String,
-  titleBarAction: Action?,
-  titleBarActionIconRes: Int?,
-  titleBarActionIconContentDescription: String?,
+    titleIconRes: Int,
+    titleIconTint: Boolean,
+    title: String,
+    titleBarAction: Action?,
+    titleBarActionIconRes: Int?,
+    titleBarActionIconContentDescription: String?,
 ) {
-  // Glance's TitleBar is not used here, for the same reason the prayer widget stopped
-  // using it: its title is a Glance Text, which cannot carry the bundled Ubuntu Sans. The
-  // two widgets sat on the same home screen with their headers in different typefaces.
-  // This is the arrangement TitleBar draws — start icon, title, trailing action — rebuilt
-  // so the title is a WidgetText.
-  Row(
-    modifier = GlanceModifier
-      .fillMaxWidth()
-      .padding(start = widgetPadding, end = 4.dp, top = 4.dp, bottom = 4.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    // Fully qualified: this file declares its own private Image() further down.
-    androidx.glance.Image(
-      provider = ImageProvider(titleIconRes),
-      contentDescription = null,
-      colorFilter = if (titleIconTint) ColorFilter.tint(GlanceTheme.colors.primary) else null,
-      modifier = GlanceModifier.size(22.dp),
-    )
-    Spacer(modifier = GlanceModifier.width(8.dp))
-    WidgetText(
-      text = title.takeIf { showTitle() } ?: "",
-      size = 16.sp,
-      color = GlanceTheme.colors.onSurface,
-      weight = WidgetFontWeight.Bold,
-      modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-    )
-    if (titleBarAction != null && titleBarActionIconRes != null) {
-      CircleIconButton(
-        imageProvider = ImageProvider(titleBarActionIconRes),
-        contentDescription = titleBarActionIconContentDescription,
-        contentColor = GlanceTheme.colors.secondary,
-        backgroundColor = null, // transparent
-        onClick = titleBarAction
-      )
+    // Glance's TitleBar is not used here, for the same reason the prayer widget stopped
+    // using it: its title is a Glance Text, which cannot carry the bundled Ubuntu Sans. The
+    // two widgets sat on the same home screen with their headers in different typefaces.
+    // This is the arrangement TitleBar draws — start icon, title, trailing action — rebuilt
+    // so the title is a WidgetText.
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .padding(start = widgetPadding, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Fully qualified: this file declares its own private Image() further down.
+        androidx.glance.Image(
+            provider = ImageProvider(titleIconRes),
+            contentDescription = null,
+            colorFilter = if (titleIconTint) ColorFilter.tint(GlanceTheme.colors.primary) else null,
+            modifier = GlanceModifier.size(22.dp),
+        )
+        Spacer(modifier = GlanceModifier.width(8.dp))
+        WidgetText(
+            text = title.takeIf { showTitle() } ?: "",
+            size = 16.sp,
+            color = GlanceTheme.colors.onSurface,
+            weight = WidgetFontWeight.Bold,
+            modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+        )
+        if (titleBarAction != null && titleBarActionIconRes != null) {
+            CircleIconButton(
+                imageProvider = ImageProvider(titleBarActionIconRes),
+                contentDescription = titleBarActionIconContentDescription,
+                contentColor = GlanceTheme.colors.secondary,
+                backgroundColor = null, // transparent
+                onClick = titleBarAction,
+            )
+        }
     }
-  }
 }
 
 @Composable
 private fun TextStack(
-  data: LongTextLayoutData,
-  verticalAlignment: Alignment.Vertical,
-  action: Action?,
+    data: LongTextLayoutData,
+    verticalAlignment: Alignment.Vertical,
+    action: Action?,
 ) {
-  // Sized from the card, not from the text.
-  //
-  // The sample sized the body by shrinking it until the whole string fitted, which made
-  // the type a function of content length: a short dua rendered large and a long hadith
-  // small, so the same widget changed its typography every time it refreshed. That is
-  // defensible when the text must fit a fixed box, and pointless now that it scrolls.
-  val width = LocalSize.current.width
-  // The body leads the card. It was one step smaller than the header above it, which put
-  // the least important text on the card in the largest type — the prayer widget beside it
-  // opens with its content at ~20sp, and these two should read as the same family.
-  val bodySize = when {
-    width >= 300.dp -> 20.sp
-    width >= 220.dp -> 19.sp
-    else -> 18.sp
-  }
-  // Set against the app's own Arabic, not against the Latin body beside it. The reader
-  // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
-  // 1.15x the body this came out around 22sp — the same face, but visibly smaller and
-  // tighter than the app, which is what made the widget's Arabic look like a different
-  // font. A widget card cannot carry 34sp, so this takes the ratio rather than the value.
-  val arabicSize = (bodySize.value * 1.55f).sp
+    // Sized from the card, not from the text.
+    //
+    // The sample sized the body by shrinking it until the whole string fitted, which made
+    // the type a function of content length: a short dua rendered large and a long hadith
+    // small, so the same widget changed its typography every time it refreshed. That is
+    // defensible when the text must fit a fixed box, and pointless now that it scrolls.
+    val width = LocalSize.current.width
+    // The body leads the card. It was one step smaller than the header above it, which put
+    // the least important text on the card in the largest type — the prayer widget beside it
+    // opens with its content at ~20sp, and these two should read as the same family.
+    val bodySize = when {
+        width >= 300.dp -> 20.sp
+        width >= 220.dp -> 19.sp
+        else -> 18.sp
+    }
+    // Set against the app's own Arabic, not against the Latin body beside it. The reader
+    // has the Surah/Dua screens rendering at arabic_font_size (~34sp by default), and at
+    // 1.15x the body this came out around 22sp — the same face, but visibly smaller and
+    // tighter than the app, which is what made the widget's Arabic look like a different
+    // font. A widget card cannot carry 34sp, so this takes the ratio rather than the value.
+    val arabicSize = (bodySize.value * 1.55f).sp
 
-  // Always carry the original after the English translation. The previous fit estimate
-  // could suppress Arabic even when the launcher had ample room for it; the scrollable
-  // content already handles genuinely long reminders without dropping either language.
-  val arabic = data.arabic
+    // Always carry the original after the English translation. The previous fit estimate
+    // could suppress Arabic even when the launcher had ample room for it; the scrollable
+    // content already handles genuinely long reminders without dropping either language.
+    val arabic = data.arabic
 
-  // LazyColumn, not Column, because the content is no longer a sample string of known
-  // length: a Bukhari hadith or a Fortress dua can run to a paragraph, and a Column simply
-  // truncated it — the reader got an ellipsis and no way to see the rest without opening
-  // the app. A LazyColumn is the one scrollable container RemoteViews accepts, so it is
-  // what lets the card show all of it.
-  //
-  // maxLines goes with it. It existed to stop overflow in a fixed-height Column; keeping
-  // it here would cap the text at the same place while giving it somewhere to scroll to,
-  // which is the worst of both.
-  val hasSource = data.sourceName != null || data.sourceDetail != null
+    // LazyColumn, not Column, because the content is no longer a sample string of known
+    // length: a Bukhari hadith or a Fortress dua can run to a paragraph, and a Column simply
+    // truncated it — the reader got an ellipsis and no way to see the rest without opening
+    // the app. A LazyColumn is the one scrollable container RemoteViews accepts, so it is
+    // what lets the card show all of it.
+    //
+    // maxLines goes with it. It existed to stop overflow in a fixed-height Column; keeping
+    // it here would cap the text at the same place while giving it somewhere to scroll to,
+    // which is the worst of both.
+    val hasSource = data.sourceName != null || data.sourceDetail != null
 
-  // Keep the source visible without drawing it over the reminder. The list receives the
-  // remaining height and scrolls independently; the footer is a normal sibling beneath it,
-  // so even the final Arabic line can scroll fully into view instead of disappearing under
-  // a frosted overlay.
-  Column(
-    modifier = GlanceModifier.fillMaxSize(),
-    verticalAlignment = verticalAlignment,
-  ) {
-    LazyColumn(
-      modifier = if (hasSource) {
-        GlanceModifier.fillMaxWidth().defaultWeight()
-      } else {
-        GlanceModifier.fillMaxSize()
-      },
+    // Keep the source visible without drawing it over the reminder. The list receives the
+    // remaining height and scrolls independently; the footer is a normal sibling beneath it,
+    // so even the final Arabic line can scroll fully into view instead of disappearing under
+    // a frosted overlay.
+    Column(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = verticalAlignment,
     ) {
-      item {
-        Column(modifier = GlanceModifier.maybeClickable(action)) {
-        Spacer(modifier = GlanceModifier.height(8.dp))
-        // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
-        // prayer widget beside it. Glance cannot carry a bundled font — see
-        // widget_text_regular.xml — so the two cards were in different typefaces on the
-        // same home screen, which reads as an unfinished app rather than a design.
-        // The same treatment the prayer card gives "Next Prayer": accent colour, bold. In
-        // muted secondary at Medium it read as a caption on the text rather than a label
-        // for it, and at a glance the card did not say whether it was showing a hadith or
-        // a dua — which is the first thing it should answer.
-        if (data.contentTitle != null) {
-          Row(
-            modifier = GlanceModifier
-              .wrapContentWidth()
-              .height(36.dp)
-              .background(GlanceTheme.colors.primaryContainer)
-              .cornerRadius(50.dp)
-              .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            WidgetText(
-              text = data.caption.uppercase(),
-              size = 11.sp,
-              color = GlanceTheme.colors.onPrimaryContainer,
-              weight = WidgetFontWeight.Medium,
-              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-            )
-          }
-          Spacer(modifier = GlanceModifier.height(8.dp))
-          WidgetText(
-            text = data.contentTitle,
-            size = if (width >= 300.dp) 20.sp else 19.sp,
-            color = GlanceTheme.colors.onSurface,
-            weight = WidgetFontWeight.Bold,
-            maxLines = 2,
-            modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
-          )
-        } else {
-          Row(
-            modifier = GlanceModifier
-              .wrapContentWidth()
-              .height(36.dp)
-              .background(GlanceTheme.colors.primaryContainer)
-              .cornerRadius(50.dp)
-              .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            WidgetText(
-              text = data.caption.uppercase(),
-              size = 11.sp,
-              color = GlanceTheme.colors.onPrimaryContainer,
-              weight = WidgetFontWeight.Medium,
-              modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-            )
-          }
+        LazyColumn(
+            modifier = if (hasSource) {
+                GlanceModifier.fillMaxWidth().defaultWeight()
+            } else {
+                GlanceModifier.fillMaxSize()
+            },
+        ) {
+            item {
+                Column(modifier = GlanceModifier.maybeClickable(action)) {
+                    Spacer(modifier = GlanceModifier.height(8.dp))
+                    // WidgetText, not Glance's Text, so this card is set in Ubuntu Sans like the
+                    // prayer widget beside it. Glance cannot carry a bundled font — see
+                    // widget_text_regular.xml — so the two cards were in different typefaces on the
+                    // same home screen, which reads as an unfinished app rather than a design.
+                    // The same treatment the prayer card gives "Next Prayer": accent colour, bold. In
+                    // muted secondary at Medium it read as a caption on the text rather than a label
+                    // for it, and at a glance the card did not say whether it was showing a hadith or
+                    // a dua — which is the first thing it should answer.
+                    if (data.contentTitle != null) {
+                        Row(
+                            modifier = GlanceModifier
+                                .wrapContentWidth()
+                                .height(36.dp)
+                                .background(GlanceTheme.colors.primaryContainer)
+                                .cornerRadius(50.dp)
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            WidgetText(
+                                text = data.caption.uppercase(),
+                                size = 11.sp,
+                                color = GlanceTheme.colors.onPrimaryContainer,
+                                weight = WidgetFontWeight.Medium,
+                                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                            )
+                        }
+                        Spacer(modifier = GlanceModifier.height(8.dp))
+                        WidgetText(
+                            text = data.contentTitle,
+                            size = if (width >= 300.dp) 20.sp else 19.sp,
+                            color = GlanceTheme.colors.onSurface,
+                            weight = WidgetFontWeight.Bold,
+                            maxLines = 2,
+                            modifier = GlanceModifier.fillMaxWidth().wrapContentHeight(),
+                        )
+                    } else {
+                        Row(
+                            modifier = GlanceModifier
+                                .wrapContentWidth()
+                                .height(36.dp)
+                                .background(GlanceTheme.colors.primaryContainer)
+                                .cornerRadius(50.dp)
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            WidgetText(
+                                text = data.caption.uppercase(),
+                                size = 11.sp,
+                                color = GlanceTheme.colors.onPrimaryContainer,
+                                weight = WidgetFontWeight.Medium,
+                                modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                            )
+                        }
+                    }
+                    Spacer(
+                        modifier = GlanceModifier.height(
+                            if (data.contentTitle != null) 6.dp else 12.dp,
+                        ),
+                    )
+                    WidgetText(
+                        text = data.text,
+                        size = bodySize,
+                        color = GlanceTheme.colors.onSurface,
+                        // The regular RemoteViews layout enables inter-word justification for the
+                        // reminder's multi-line dua/hadith body. Headers keep their existing alignment.
+                        weight = WidgetFontWeight.Regular,
+                        // The whole point of the scrolling container: let it run.
+                        maxLines = 100,
+                    )
+                    if (arabic != null) {
+                        Spacer(modifier = GlanceModifier.height(6.dp))
+                        Column(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                // Do not paint a container here. The Arabic bitmap has an alpha channel and
+                                // should reveal the same widget surface/gradient as the surrounding hadith.
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            ArabicWidgetBitmapText(
+                                text = arabic,
+                                size = arabicSize,
+                                width = contentSize.width - 24.dp,
+                                color = GlanceTheme.colors.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
         }
-        Spacer(
-          modifier = GlanceModifier.height(
-            if (data.contentTitle != null) 6.dp else 12.dp,
-          ),
-        )
-        WidgetText(
-          text = data.text,
-          size = bodySize,
-          color = GlanceTheme.colors.onSurface,
-          // The regular RemoteViews layout enables inter-word justification for the
-          // reminder's multi-line dua/hadith body. Headers keep their existing alignment.
-          weight = WidgetFontWeight.Regular,
-          // The whole point of the scrolling container: let it run.
-          maxLines = 100,
-        )
-        if (arabic != null) {
-          Spacer(modifier = GlanceModifier.height(6.dp))
-          Column(
-            modifier = GlanceModifier
-              .fillMaxWidth()
-              // Do not paint a container here. The Arabic bitmap has an alpha channel and
-              // should reveal the same widget surface/gradient as the surrounding hadith.
-              .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-          ) {
-            ArabicWidgetBitmapText(
-              text = arabic,
-              size = arabicSize,
-              width = contentSize.width - 24.dp,
-              color = GlanceTheme.colors.onSurface,
-            )
-          }
-        }
-        }
-      }
-    }
 
-    if (hasSource) {
-      FadingHorizontalSeparator()
-      Row(
-        modifier = GlanceModifier
-          .fillMaxWidth()
-          .padding(top = 9.dp, bottom = 2.dp)
-          .maybeClickable(action),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        WidgetText(
-          text = data.sourceName.orEmpty(),
-          size = 12.sp,
-          color = GlanceTheme.colors.outline,
-          weight = WidgetFontWeight.Medium,
-          modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
-        )
-        Spacer(modifier = GlanceModifier.defaultWeight())
-        if (data.sourceDetail != null) {
-          WidgetText(
-            text = data.sourceDetail,
-            size = 12.sp,
-            color = GlanceTheme.colors.outline,
-            weight = WidgetFontWeight.Medium,
-            // The chapter title a dua cites can be a full sentence; it gives way to the
-            // book name rather than pushing it off the card.
-            modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
-            align = WidgetTextAlign.End,
-          )
+        if (hasSource) {
+            FadingHorizontalSeparator()
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .padding(top = 9.dp, bottom = 2.dp)
+                    .maybeClickable(action),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WidgetText(
+                    text = data.sourceName.orEmpty(),
+                    size = 12.sp,
+                    color = GlanceTheme.colors.outline,
+                    weight = WidgetFontWeight.Medium,
+                    modifier = GlanceModifier.wrapContentWidth().wrapContentHeight(),
+                )
+                Spacer(modifier = GlanceModifier.defaultWeight())
+                if (data.sourceDetail != null) {
+                    WidgetText(
+                        text = data.sourceDetail,
+                        size = 12.sp,
+                        color = GlanceTheme.colors.outline,
+                        weight = WidgetFontWeight.Medium,
+                        // The chapter title a dua cites can be a full sentence; it gives way to the
+                        // book name rather than pushing it off the card.
+                        modifier = GlanceModifier.defaultWeight().wrapContentHeight(),
+                        align = WidgetTextAlign.End,
+                    )
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /**
@@ -395,128 +390,129 @@ private fun TextStack(
  */
 @Composable
 private fun ArabicWidgetBitmapText(
-  text: String,
-  size: TextUnit,
-  width: Dp,
-  color: ColorProvider,
+    text: String,
+    size: TextUnit,
+    width: Dp,
+    color: ColorProvider,
 ) {
-  val context = LocalContext.current
-  val metrics = context.resources.displayMetrics
-  val widthPx = (width.value * metrics.density).toInt().coerceAtLeast(1)
-  val textSizePx = TypedValue.applyDimension(
-    TypedValue.COMPLEX_UNIT_SP,
-    size.value,
-    metrics,
-  )
-  val currentTextColor = color.getColor(context).toArgb()
-  val lightTextColor = color.getColor(context.withNightMode(night = false)).toArgb()
-  val darkTextColor = color.getColor(context.withNightMode(night = true)).toArgb()
-  val fontRes = arabicFontResourceFor(context)
-  val bitmap = remember(text, widthPx, textSizePx, fontRes) {
-    renderArabicBitmap(
-      text = text,
-      widthPx = widthPx,
-      textSizePx = textSizePx,
-      typeface = ResourcesCompat.getFont(context, fontRes),
-      densityDpi = metrics.densityDpi,
+    val context = LocalContext.current
+    val metrics = context.resources.displayMetrics
+    val widthPx = (width.value * metrics.density).toInt().coerceAtLeast(1)
+    val textSizePx = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,
+        size.value,
+        metrics,
     )
-  }
-  val height = (bitmap.height / metrics.density).dp
-  val remoteViews = remember(bitmap, currentTextColor, lightTextColor, darkTextColor) {
-    RemoteViews(context.packageName, R.layout.widget_arabic_bitmap).apply {
-      setImageViewBitmap(R.id.widget_arabic_image, bitmap)
-      setContentDescription(R.id.widget_arabic_image, text)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        setColorInt(
-          R.id.widget_arabic_image,
-          "setColorFilter",
-          lightTextColor,
-          darkTextColor,
+    val currentTextColor = color.getColor(context).toArgb()
+    val lightTextColor = color.getColor(context.withNightMode(night = false)).toArgb()
+    val darkTextColor = color.getColor(context.withNightMode(night = true)).toArgb()
+    val fontRes = arabicFontResourceFor(context)
+    val bitmap = remember(text, widthPx, textSizePx, fontRes) {
+        renderArabicBitmap(
+            text = text,
+            widthPx = widthPx,
+            textSizePx = textSizePx,
+            typeface = ResourcesCompat.getFont(context, fontRes),
+            densityDpi = metrics.densityDpi,
         )
-      } else {
-        setInt(R.id.widget_arabic_image, "setColorFilter", currentTextColor)
-      }
     }
-  }
+    val height = (bitmap.height / metrics.density).dp
+    val remoteViews = remember(bitmap, currentTextColor, lightTextColor, darkTextColor) {
+        RemoteViews(context.packageName, R.layout.widget_arabic_bitmap).apply {
+            setImageViewBitmap(R.id.widget_arabic_image, bitmap)
+            setContentDescription(R.id.widget_arabic_image, text)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setColorInt(
+                    R.id.widget_arabic_image,
+                    "setColorFilter",
+                    lightTextColor,
+                    darkTextColor,
+                )
+            } else {
+                setInt(R.id.widget_arabic_image, "setColorFilter", currentTextColor)
+            }
+        }
+    }
 
-  AndroidRemoteViews(
-    remoteViews = remoteViews,
-    modifier = GlanceModifier.fillMaxWidth().height(height),
-  )
+    AndroidRemoteViews(
+        remoteViews = remoteViews,
+        modifier = GlanceModifier.fillMaxWidth().height(height),
+    )
 }
 
 private fun renderArabicBitmap(
-  text: String,
-  widthPx: Int,
-  textSizePx: Float,
-  typeface: android.graphics.Typeface?,
-  densityDpi: Int,
+    text: String,
+    widthPx: Int,
+    textSizePx: Float,
+    typeface: android.graphics.Typeface?,
+    densityDpi: Int,
 ): Bitmap {
-  val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG or TextPaint.SUBPIXEL_TEXT_FLAG).apply {
-    this.textSize = textSizePx
-    // Keep the glyph bitmap theme-neutral; RemoteViews applies the day/night tint.
-    color = Color.WHITE
-    this.typeface = typeface
-  }
-  val layout = StaticLayout.Builder
-    .obtain(text, 0, text.length, paint, widthPx)
-    // Match the in-app Mushaf treatment: paragraph-quality wrapping distributes the
-    // Arabic across the available measure, while the final line remains RTL-start
-    // aligned instead of being stranded in the centre of the card.
-    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-    .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
-    .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
-    .setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
-    // Compose's Arabic detail styles disable platform font padding. Do the equivalent
-    // before rasterising so the widget does not add an empty band above and below it.
-    .setIncludePad(false)
-    // Indo-Pak reports an unusually tall ascent/descent box around its marks. Even the
-    // nominal 1.0 baseline interval therefore leaves a conspicuous empty band between
-    // lines; tighten that metrics box while retaining clearance for the diacritics.
-    .setLineSpacing(0f, 0.78f)
-    .setTextDirection(TextDirectionHeuristics.RTL)
-    .build()
-  return Bitmap.createBitmap(widthPx, layout.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-    .also { bitmap ->
-      bitmap.density = densityDpi
-      layout.draw(Canvas(bitmap))
+    val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG or TextPaint.SUBPIXEL_TEXT_FLAG).apply {
+        this.textSize = textSizePx
+        // Keep the glyph bitmap theme-neutral; RemoteViews applies the day/night tint.
+        color = Color.WHITE
+        this.typeface = typeface
     }
+    val layout = StaticLayout.Builder
+        .obtain(text, 0, text.length, paint, widthPx)
+        // Match the in-app Mushaf treatment: paragraph-quality wrapping distributes the
+        // Arabic across the available measure, while the final line remains RTL-start
+        // aligned instead of being stranded in the centre of the card.
+        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+        .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+        .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+        .setJustificationMode(Layout.JUSTIFICATION_MODE_INTER_WORD)
+        // Compose's Arabic detail styles disable platform font padding. Do the equivalent
+        // before rasterising so the widget does not add an empty band above and below it.
+        .setIncludePad(false)
+        // Indo-Pak reports an unusually tall ascent/descent box around its marks. Even the
+        // nominal 1.0 baseline interval therefore leaves a conspicuous empty band between
+        // lines; tighten that metrics box while retaining clearance for the diacritics.
+        .setLineSpacing(0f, 0.78f)
+        .setTextDirection(TextDirectionHeuristics.RTL)
+        .build()
+    return Bitmap.createBitmap(widthPx, layout.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        .also { bitmap ->
+            bitmap.density = densityDpi
+            layout.draw(Canvas(bitmap))
+        }
 }
 
 private fun Context.withNightMode(night: Boolean): Context {
-  val configuration = Configuration(resources.configuration)
-  configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-    if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-  return createConfigurationContext(configuration)
+    val configuration = Configuration(resources.configuration)
+    configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+        if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+    return createConfigurationContext(configuration)
 }
 
 private enum class LongTextLayoutSize {
-  XSmall,
-  Normal;
+    XSmall,
+    Normal,
+    ;
 
-  companion object {
-    @Composable
-    fun fromLocalSize(): LongTextLayoutSize {
-      return if (LocalSize.current.height <= 180.dp) {
-        XSmall
-      } else {
-        Normal
-      }
+    companion object {
+        @Composable
+        fun fromLocalSize(): LongTextLayoutSize {
+            return if (LocalSize.current.height <= 180.dp) {
+                XSmall
+            } else {
+                Normal
+            }
+        }
     }
-  }
 }
 
 @Composable
 private fun showTitle(): Boolean {
-  return LocalSize.current.width >= 260.dp
+    return LocalSize.current.width >= 260.dp
 }
 
 private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
-  return if (action != null) {
-    this.clickable(action)
-  } else {
-    this
-  }
+    return if (action != null) {
+        this.clickable(action)
+    } else {
+        this
+    }
 }
 
 /**
@@ -531,72 +527,72 @@ private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
  * author's name in an "article of the day" widget.
  */
 data class LongTextLayoutData(
-  val key: String,
-  val text: String,
-  val caption: String,
-  /** Optional descriptive heading, currently used for Fortress dua chapter titles. */
-  val contentTitle: String? = null,
-  /** Arabic original, rendered under the text when the card has height to spare. */
-  val arabic: String? = null,
-  /** Book the text came from, shown in the always-visible footer. */
-  val sourceName: String? = null,
-  /** Where in that book, shown at the end of the always-visible footer. */
-  val sourceDetail: String? = null,
+    val key: String,
+    val text: String,
+    val caption: String,
+    /** Optional descriptive heading, currently used for Fortress dua chapter titles. */
+    val contentTitle: String? = null,
+    /** Arabic original, rendered under the text when the card has height to spare. */
+    val arabic: String? = null,
+    /** Book the text came from, shown in the always-visible footer. */
+    val sourceName: String? = null,
+    /** Where in that book, shown at the end of the always-visible footer. */
+    val sourceDetail: String? = null,
 )
 
 internal object WidgetTextDimensions {
-  val widgetPadding = 16.dp
-  private val titleBarHeight: Dp
-    @Composable get() = if (LongTextLayoutSize.fromLocalSize() == LongTextLayoutSize.XSmall) {
-      0.dp
-    } else {
-      56.dp
+    val widgetPadding = 16.dp
+    private val titleBarHeight: Dp
+        @Composable get() = if (LongTextLayoutSize.fromLocalSize() == LongTextLayoutSize.XSmall) {
+            0.dp
+        } else {
+            56.dp
+        }
+
+    /** Height and width in dp available to main content (excluding title bar, padding, spacing). */
+    val contentSize: DpSize
+        @Composable get() {
+            val size = LocalSize.current
+
+            return DpSize(
+                width = size.width - (2 * widgetPadding),
+                height = size.height - widgetPadding - titleBarHeight,
+            )
+        }
+
+    // Upper and lower bounds for the caption.
+    internal val minCaptionFontSize = 12.sp // low - GM3 Label Medium
+    internal val maxCaptionFontSize = 14.sp // high - GM3 Label Large
+
+    // Upper bound for primary text.
+    internal val maxPrimaryTextFontSize = 28.sp // GM3 Headline Medium
+
+    // For a font size 16 of primary text, we want caption to be of size 14.
+    internal const val CAPTION_TO_PRIMARY_TEXT_RATIO = 0.875f
+
+    @Composable
+    fun primaryTextFontSizeAndMaxLines(text: String): Pair<TextUnit, Int> {
+        val size = LocalSize.current
+        // Primary text and caption share 70:30 height within the area available for texts.
+        val availableHeightForPrimaryText = Dp(0.70f * contentSize.height.value)
+        // In this layout, texts take up entire horizontal space except the paddings on the sides.
+        val availableWidthForPrimaryText = size.width - (widgetPadding * 2)
+
+        return calculateFontSizeAndMaxLines(
+            context = LocalContext.current,
+            text = text,
+            availableWidth = availableWidthForPrimaryText,
+            availableHeight = availableHeightForPrimaryText,
+            minFontSize = (minCaptionFontSize.value / CAPTION_TO_PRIMARY_TEXT_RATIO).sp,
+            maxFontSize = maxPrimaryTextFontSize,
+        )
     }
 
-  /** Height and width in dp available to main content (excluding title bar, padding, spacing). */
-  val contentSize: DpSize
-    @Composable get() {
-      val size = LocalSize.current
-
-      return DpSize(
-        width = size.width - (2 * widgetPadding),
-        height = size.height - widgetPadding - titleBarHeight
-      )
+    fun captionFontSizeAndMaxLines(primaryFontSize: TextUnit): Pair<TextUnit, Int> {
+        val estimatedFontSize = primaryFontSize.value * CAPTION_TO_PRIMARY_TEXT_RATIO
+        val captionMaxLines = 1 // Caption is always 1 line.
+        return estimatedFontSize.coerceAtMost(maxCaptionFontSize.value).sp to captionMaxLines
     }
-
-  // Upper and lower bounds for the caption.
-  internal val minCaptionFontSize = 12.sp // low - GM3 Label Medium
-  internal val maxCaptionFontSize = 14.sp // high - GM3 Label Large
-
-  // Upper bound for primary text.
-  internal val maxPrimaryTextFontSize = 28.sp // GM3 Headline Medium
-
-  // For a font size 16 of primary text, we want caption to be of size 14.
-  internal const val CAPTION_TO_PRIMARY_TEXT_RATIO = 0.875f
-
-  @Composable
-  fun primaryTextFontSizeAndMaxLines(text: String): Pair<TextUnit, Int> {
-    val size = LocalSize.current
-    // Primary text and caption share 70:30 height within the area available for texts.
-    val availableHeightForPrimaryText = Dp(0.70f * contentSize.height.value)
-    // In this layout, texts take up entire horizontal space except the paddings on the sides.
-    val availableWidthForPrimaryText = size.width - (widgetPadding * 2)
-
-    return calculateFontSizeAndMaxLines(
-      context = LocalContext.current,
-      text = text,
-      availableWidth = availableWidthForPrimaryText,
-      availableHeight = availableHeightForPrimaryText,
-      minFontSize = (minCaptionFontSize.value / CAPTION_TO_PRIMARY_TEXT_RATIO).sp,
-      maxFontSize = maxPrimaryTextFontSize
-    )
-  }
-
-  fun captionFontSizeAndMaxLines(primaryFontSize: TextUnit): Pair<TextUnit, Int> {
-    val estimatedFontSize = primaryFontSize.value * CAPTION_TO_PRIMARY_TEXT_RATIO
-    val captionMaxLines = 1 // Caption is always 1 line.
-    return estimatedFontSize.coerceAtMost(maxCaptionFontSize.value).sp to captionMaxLines
-  }
 }
 
 /**
@@ -605,7 +601,6 @@ internal object WidgetTextDimensions {
  * Previewing them at standard & min-max sizes allows us to adjust font sizes if needed. Use the
  * Preview annotation to view the widget at specific width / height.
  */
-
 
 /**
  * Previews of the long text layout with longer caption and shorter main text
@@ -623,21 +618,21 @@ internal object WidgetTextDimensions {
 
 @Composable
 private fun LongTextLayoutPreview(text: String, caption: String) {
-  val context = LocalContext.current
+    val context = LocalContext.current
 
-  LongTextLayout(
-    title = context.getString(R.string.sample_long_text_app_widget_name),
-    titleIconRes = R.drawable.ic_widget_daily_reminder_flaticon,
-    titleBarActionIconRes = R.drawable.sample_refresh_icon,
-    titleBarActionIconContentDescription = context.getString(
-      R.string.sample_refresh_icon_button_label
-    ),
-    titleBarAction = null,
-    data = LongTextLayoutData(
-      key = "1",
-      text = text,
-      caption = caption,
-    ),
-    action = actionStartDemoActivity("1"),
-  )
+    LongTextLayout(
+        title = context.getString(R.string.sample_long_text_app_widget_name),
+        titleIconRes = R.drawable.ic_widget_daily_reminder_flaticon,
+        titleBarActionIconRes = R.drawable.sample_refresh_icon,
+        titleBarActionIconContentDescription = context.getString(
+            R.string.sample_refresh_icon_button_label,
+        ),
+        titleBarAction = null,
+        data = LongTextLayoutData(
+            key = "1",
+            text = text,
+            caption = caption,
+        ),
+        action = actionStartDemoActivity("1"),
+    )
 }

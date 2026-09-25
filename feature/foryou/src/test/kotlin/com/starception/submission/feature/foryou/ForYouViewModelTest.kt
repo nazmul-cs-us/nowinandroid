@@ -88,26 +88,26 @@ class ForYouViewModelTest {
     }
 
     @Test
-    fun stateIsInitiallyLoading() = runTest {
+    fun stateIsInitiallyNotShownWithEmptyFeed() = runTest {
         assertEquals(
-            OnboardingUiState.Loading,
+            OnboardingUiState.NotShown,
             viewModel.onboardingUiState.value,
         )
-        assertEquals(NewsFeedUiState.Loading, viewModel.feedState.value)
+        assertEquals(NewsFeedUiState.Success(emptyList()), viewModel.feedState.value)
     }
 
     @Test
-    fun stateIsLoadingWhenFollowedTopicsAreLoading() = runTest {
+    fun onboardingIsShownWhenFollowedTopicsAreSent() = runTest {
         backgroundScope.launch(UnconfinedTestDispatcher()) { viewModel.onboardingUiState.collect() }
         backgroundScope.launch(UnconfinedTestDispatcher()) { viewModel.feedState.collect() }
 
         topicsRepository.sendTopics(sampleTopics)
+        userDataRepository.setFollowedTopicIds(emptySet())
 
-        assertEquals(
-            OnboardingUiState.Loading,
-            viewModel.onboardingUiState.value,
-        )
-        assertEquals(NewsFeedUiState.Loading, viewModel.feedState.value)
+        val onboardingState = viewModel.onboardingUiState.value
+        assertTrue(onboardingState is OnboardingUiState.Shown)
+        assertEquals(sampleTopics.size, (onboardingState as OnboardingUiState.Shown).topics.size)
+        assertEquals(NewsFeedUiState.Success(emptyList()), viewModel.feedState.value)
     }
 
     @Test
@@ -123,14 +123,14 @@ class ForYouViewModelTest {
     }
 
     @Test
-    fun onboardingStateIsLoadingWhenTopicsAreLoading() = runTest {
+    fun onboardingStaysNotShownUntilTopicsEmit() = runTest {
         backgroundScope.launch(UnconfinedTestDispatcher()) { viewModel.onboardingUiState.collect() }
         backgroundScope.launch(UnconfinedTestDispatcher()) { viewModel.feedState.collect() }
 
         userDataRepository.setFollowedTopicIds(emptySet())
 
         assertEquals(
-            OnboardingUiState.Loading,
+            OnboardingUiState.NotShown,
             viewModel.onboardingUiState.value,
         )
         assertEquals(NewsFeedUiState.Success(emptyList()), viewModel.feedState.value)
@@ -265,7 +265,7 @@ class ForYouViewModelTest {
             OnboardingUiState.NotShown,
             viewModel.onboardingUiState.value,
         )
-        assertEquals(NewsFeedUiState.Loading, viewModel.feedState.value)
+        assertEquals(NewsFeedUiState.Success(feed = emptyList()), viewModel.feedState.value)
 
         newsRepository.sendNewsResources(sampleNewsResources)
 

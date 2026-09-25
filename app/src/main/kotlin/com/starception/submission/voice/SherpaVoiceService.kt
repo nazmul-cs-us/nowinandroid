@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,14 +24,14 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.k2fsa.sherpa.onnx.EndpointConfig
+import com.k2fsa.sherpa.onnx.EndpointRule
+import com.k2fsa.sherpa.onnx.FeatureConfig
+import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
 import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OnlineStream
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
-import com.k2fsa.sherpa.onnx.OnlineModelConfig
-import com.k2fsa.sherpa.onnx.FeatureConfig
-import com.k2fsa.sherpa.onnx.EndpointConfig
-import com.k2fsa.sherpa.onnx.EndpointRule
 import com.starception.submission.download.AssetRepository
 import com.starception.submission.feature.search.VoiceSearchService
 import kotlinx.coroutines.CoroutineScope
@@ -111,7 +111,6 @@ class SherpaVoiceService(
                 _isInitialized.value = success
                 _statusMessage.value = if (success) "Sherpa ready" else "Failed to load"
                 onComplete?.invoke(success)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing Sherpa-ONNX", e)
                 _statusMessage.value = "Init failed"
@@ -128,7 +127,7 @@ class SherpaVoiceService(
             val joinerPath = copyAssetToFiles("$ASSETS_DIR/$JOINER_FILE", JOINER_FILE)
             val tokensPath = copyAssetToFiles("$ASSETS_DIR/$TOKENS_FILE", TOKENS_FILE)
 
-            Log.i(TAG, "Model files copied: encoder=${encoderPath.length()/1024}KB")
+            Log.i(TAG, "Model files copied: encoder=${encoderPath.length() / 1024}KB")
 
             // Create transducer model config
             val transducerConfig = OnlineTransducerModelConfig(
@@ -175,7 +174,6 @@ class SherpaVoiceService(
 
             Log.i(TAG, "Sherpa-ONNX initialized successfully")
             return true
-
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Sherpa-ONNX", e)
             return false
@@ -206,7 +204,7 @@ class SherpaVoiceService(
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -256,7 +254,7 @@ class SherpaVoiceService(
         val bufferSize = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
+            AudioFormat.ENCODING_PCM_16BIT,
         )
 
         try {
@@ -265,7 +263,7 @@ class SherpaVoiceService(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
+                bufferSize,
             )
 
             audioRecord?.startRecording()
@@ -301,7 +299,6 @@ class SherpaVoiceService(
                     }
                 }
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "Recording error", e)
         } finally {

@@ -1,6 +1,20 @@
-package com.starception.submission.prayer.receiver
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+package com.starception.submission.prayer.receiver
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,45 +22,44 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.starception.submission.MainActivity
-import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
-import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.work.*
+import com.starception.submission.MainActivity
 import com.starception.submission.R
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.getPrayerWeatherInsightForNotification
+import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
+import com.starception.submission.prayer.service.AdhanPlaybackService
 import com.starception.submission.prayer.silent.PrayerSilentModeController
-import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.prayer.util.FileLogger
+import com.starception.submission.prayer.worker.PrayerNotificationWorker
 import com.starception.submission.sync.workers.DelegatingWorker
 import com.starception.submission.sync.workers.delegatedData
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
  * Prayer Notification Broadcast Receiver
- * 
+ *
  * This receiver handles AlarmManager-triggered prayer notifications
  * and converts them to WorkManager jobs for better reliability.
- * 
+ *
  * This is particularly useful for:
  * - Android versions below 6.0 (API 23)
  * - Exact timing requirements
  * - Fallback when WorkManager fails
  */
 class PrayerNotificationReceiver : BroadcastReceiver() {
-    
+
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -75,14 +88,29 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 details = mapOf(
                     "notificationType" to notificationType,
                     "scheduledPrayerTime" to prayerTime,
-                    "source" to "AlarmManager"
-                )
+                    "source" to "AlarmManager",
+                ),
             )
 
             // The alarm fires whenever EITHER notification or silent-mode is enabled.
             // Only show the notification banner if this prayer's notification toggle is on.
             if (isNotificationEnabledForPrayer(context, prayerName)) {
                 showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
+                // The adhan is played by AdhanPlaybackService (volume-controlled,
+                // mutable via volume keys / Mute action) rather than the old
+                // notification-channel sound, which could do neither.
+                val preferences = readNotificationPreferences(context)
+                if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
+                    preferences?.isAdhanEnabledForPrayer(prayerName) == true
+                ) {
+                    AdhanPlaybackService.start(
+                        context = context,
+                        prayerName = prayerName,
+                        volumePercent = preferences.getAdhanVolumeForPrayer(prayerName),
+                    )
+                } else {
+                    Log.d(TAG, "🔇 Adhan off for $prayerName — playing silent notification only")
+                }
             } else {
                 Log.d(TAG, "🔕 Notifications off for $prayerName — skipping banner (silent mode may still fire)")
             }
@@ -90,25 +118,27 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME) {
                 maybeEnableSilentMode(context, prayerName)
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ PrayerNotificationReceiver failed", e)
             FileLogger.e(TAG, "PrayerNotificationReceiver failed", e)
         }
     }
-    
+
     private fun isNotificationEnabledForPrayer(context: Context, prayerName: String): Boolean {
+        return readNotificationPreferences(context)?.isNotificationEnabledForPrayer(prayerName) ?: true
+    }
+
+    private fun readNotificationPreferences(context: Context): PrayerNotificationPreferences? {
         return try {
             val prefs = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
-            val json = prefs.getString("notification_preferences_json", null) ?: return true
-            val parsed = Json { ignoreUnknownKeys = true }.decodeFromString(
+            val json = prefs.getString("notification_preferences_json", null) ?: return null
+            Json { ignoreUnknownKeys = true }.decodeFromString(
                 PrayerNotificationPreferences.serializer(),
                 json,
             )
-            parsed.isNotificationEnabledForPrayer(prayerName)
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error reading per-prayer notification pref", e)
-            true
+            Log.e(TAG, "❌ Error reading notification preferences", e)
+            null
         }
     }
 
@@ -135,7 +165,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
         context: Context,
         prayerName: String,
         prayerTime: String,
-        notificationType: String
+        notificationType: String,
     ) {
         val inputData = Data.Builder()
             .putAll(PrayerNotificationWorker::class.delegatedData())
@@ -143,7 +173,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             .putString(PrayerNotificationWorker.PRAYER_TIME_KEY, prayerTime)
             .putString(PrayerNotificationWorker.NOTIFICATION_TYPE_KEY, notificationType)
             .build()
-        
+
         val workRequest = OneTimeWorkRequestBuilder<DelegatingWorker>()
             .setInputData(inputData)
             .setInitialDelay(0, TimeUnit.MILLISECONDS) // Execute immediately
@@ -154,22 +184,22 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
                     .setRequiresBatteryNotLow(false)
                     .setRequiresCharging(false)
-                    .build()
+                    .build(),
             )
             .build()
-        
+
         val workManager = WorkManager.getInstance(context)
         workManager.enqueue(workRequest)
-        
+
         Log.d(TAG, "✅ Scheduled WorkManager job for $prayerName")
     }
-    
+
     private suspend fun showPrayerNotification(
         context: Context,
         prayerName: String,
         prayerTime: String,
         notificationType: String,
-        priorMinutes: Int = PrayerNotificationWorker.DEFAULT_PRIOR_MINUTES
+        priorMinutes: Int = PrayerNotificationWorker.DEFAULT_PRIOR_MINUTES,
     ) {
         try {
             // Create notification channel
@@ -191,9 +221,9 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             }
             val contentPendingIntent = PendingIntent.getActivity(
                 context,
-                notificationId + 100,  // Unique request code
+                notificationId + 100, // Unique request code
                 openAppIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
             // Create large icon from app launcher icon
@@ -226,15 +256,15 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setCategory(NotificationCompat.CATEGORY_ALARM)
                     .setAutoCancel(true)
                     .setOngoing(false)
-                    // The channel is the sole Adhan playback owner. On Android 7.x,
-                    // where channels do not exist, this sound URI provides the same
-                    // single playback path.
-                    .setSound(adhanSoundUri(context))
+                    // The adhan plays via AdhanPlaybackService; the channel and
+                    // the notification itself stay silent on every Android
+                    // version so the two never double up.
+                    .setSound(null)
                     .setDefaults(
                         NotificationCompat.DEFAULT_VIBRATE or
                             NotificationCompat.DEFAULT_LIGHTS,
                     )
-                    .setContentIntent(contentPendingIntent)  // Open app when tapped
+                    .setContentIntent(contentPendingIntent) // Open app when tapped
                     .build()
             } else {
                 // Prayer reminder notification - X minutes before prayer (user configurable)
@@ -260,7 +290,7 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     .setAutoCancel(true)
                     .setOngoing(false)
                     .setDefaults(NotificationCompat.DEFAULT_VIBRATE)
-                    .setContentIntent(contentPendingIntent)  // Open app when tapped
+                    .setContentIntent(contentPendingIntent) // Open app when tapped
                     .build()
             }
 
@@ -268,27 +298,31 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
             notificationManager.notify(notificationId, notification)
 
             Log.d(TAG, "📱 Posted prayer notification: $prayerName ($notificationType) at $prayerTime (priorMinutes: $priorMinutes)")
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to show prayer notification", e)
         }
     }
-    
+
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val audioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .build()
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // The adhan now plays through AdhanPlaybackService, so the prayer
+            // channel itself is silent. Channel settings are immutable after
+            // creation, so existing installs — whose legacy channel has the
+            // adhan hard-wired as its sound — are migrated to a fresh silent
+            // channel ID and the legacy loud channel is deleted.
+            notificationManager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+
             val prayerChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Prayer time notifications with Adhan sound"
+                description = "Prayer time notifications (adhan plays separately)"
                 enableLights(true)
                 enableVibration(true)
-                setSound(adhanSoundUri(context), audioAttributes)
+                setSound(null, null)
             }
             val reminderChannel = NotificationChannel(
                 REMINDER_CHANNEL_ID,
@@ -300,21 +334,19 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 enableVibration(true)
                 setSound(null, null)
             }
-            
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
             notificationManager.createNotificationChannels(
                 listOf(prayerChannel, reminderChannel),
             )
         }
     }
 
-    private fun adhanSoundUri(context: Context): Uri = Uri.parse(
-        "android.resource://${context.packageName}/${R.raw.short_adhan}",
-    )
-    
     companion object {
         private const val TAG = "PrayerNotificationReceiver"
-        private const val CHANNEL_ID = "prayer_scheduled_notifications"
+
+        // v2: silent channel — the adhan plays through AdhanPlaybackService
+        private const val CHANNEL_ID = "prayer_scheduled_notifications_v2"
+        private const val LEGACY_CHANNEL_ID = "prayer_scheduled_notifications"
         private const val CHANNEL_NAME = "Scheduled Prayer Notifications"
         private const val REMINDER_CHANNEL_ID = "prayer_reminder_notifications"
         private const val REMINDER_CHANNEL_NAME = "Prayer Reminders"

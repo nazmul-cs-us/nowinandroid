@@ -1,7 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -11,14 +26,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +42,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -79,7 +87,7 @@ fun EnhancedInteractivePrayerDial(
     timeAdjustment: Int,
     onTimeAdjusted: (Int) -> Unit,
     onSaveAdjustment: (String, Int) -> Unit,
-    onResetAdjustment: () -> Unit
+    onResetAdjustment: () -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -128,32 +136,32 @@ fun EnhancedInteractivePrayerDial(
             "fajr" -> listOf(
                 Color(0xFF1A237E), // Deep blue night
                 Color(0xFF3949AB), // Morning blue
-                Color(0xFF7986CB)  // Light morning
+                Color(0xFF7986CB), // Light morning
             )
             "dhuhr" -> listOf(
                 Color(0xFFFFB300), // Bright sun
                 Color(0xFFFFD54F), // Noon yellow
-                Color(0xFFFFF59D)  // Light yellow
+                Color(0xFFFFF59D), // Light yellow
             )
             "asr" -> listOf(
                 Color(0xFFFF6F00), // Afternoon orange
                 Color(0xFFFF8F00), // Golden
-                Color(0xFFFFB300)  // Light golden
+                Color(0xFFFFB300), // Light golden
             )
             "maghrib" -> listOf(
                 Color(0xFFD32F2F), // Sunset red
                 Color(0xFFE64A19), // Orange sunset
-                Color(0xFFFF6E40)  // Light sunset
+                Color(0xFFFF6E40), // Light sunset
             )
             "isha" -> listOf(
                 Color(0xFF1A237E), // Night blue
                 Color(0xFF283593), // Deep night
-                Color(0xFF303F9F)  // Dark blue
+                Color(0xFF303F9F), // Dark blue
             )
             else -> listOf(
                 Color(0xFF00BCD4), // Default cyan
                 Color(0xFF00ACC1),
-                Color(0xFF0097A7)
+                Color(0xFF0097A7),
             )
         }
     }
@@ -166,18 +174,18 @@ fun EnhancedInteractivePrayerDial(
         },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "dialScale"
+        label = "dialScale",
     )
 
     val knobScale by animateFloatAsState(
         targetValue = if (isDragging) 1.1f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "knobScale"
+        label = "knobScale",
     )
 
     // Pulsating glow animation
@@ -187,9 +195,9 @@ fun EnhancedInteractivePrayerDial(
         targetValue = 0.8f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "glowAlpha"
+        label = "glowAlpha",
     )
 
     // Magnetic snapping helper
@@ -222,20 +230,20 @@ fun EnhancedInteractivePrayerDial(
                         colors = listOf(
                             Color.Black.copy(alpha = 0.2f),
                             Color.Black.copy(alpha = 0.1f),
-                            Color.Transparent
+                            Color.Transparent,
                         ),
-                        radius = size.minDimension / 2 * 1.2f
+                        radius = size.minDimension / 2 * 1.2f,
                     ),
-                    radius = size.minDimension / 2
+                    radius = size.minDimension / 2,
                 )
             }
             .blur(radius = if (isDragging) 0.dp else 0.dp) // Optional blur for background
             .background(
                 brush = Brush.radialGradient(
                     colors = prayerGradient.map { it.copy(alpha = 0.15f) },
-                    radius = 400f
+                    radius = 400f,
                 ),
-                shape = CircleShape
+                shape = CircleShape,
             )
             .border(
                 width = 1.dp,
@@ -243,12 +251,12 @@ fun EnhancedInteractivePrayerDial(
                     colors = listOf(
                         Color.White.copy(alpha = 0.6f),
                         Color.White.copy(alpha = 0.2f),
-                        Color.White.copy(alpha = 0.6f)
-                    )
+                        Color.White.copy(alpha = 0.6f),
+                    ),
                 ),
-                shape = CircleShape
+                shape = CircleShape,
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Main dial canvas
         Canvas(
@@ -259,7 +267,7 @@ fun EnhancedInteractivePrayerDial(
                         onDragStart = { offset ->
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val distanceFromCenter = sqrt(
-                                (offset.x - center.x).pow(2) + (offset.y - center.y).pow(2)
+                                (offset.x - center.x).pow(2) + (offset.y - center.y).pow(2),
                             )
 
                             val outerRadius = min(size.width, size.height) * 0.5f
@@ -268,14 +276,14 @@ fun EnhancedInteractivePrayerDial(
                                 showGhostPreview = true
                                 lastAngle = atan2(
                                     offset.y - center.y,
-                                    offset.x - center.x
+                                    offset.x - center.x,
                                 ) * 180f / PI.toFloat()
                                 accumulatedAngle = 0f
 
                                 // Create ripple effect at touch point
                                 rippleState = RippleState(
                                     center = offset,
-                                    startTime = System.currentTimeMillis()
+                                    startTime = System.currentTimeMillis(),
                                 )
 
                                 // Cancel auto-save timer
@@ -308,13 +316,13 @@ fun EnhancedInteractivePrayerDial(
                                     onSaveAdjustment(prayerName, currentAdjustment)
                                 }
                             }
-                        }
+                        },
                     ) { change, _ ->
                         if (isDragging) {
                             val center = Offset(size.width / 2f, size.height / 2f)
                             val fingerAngle = atan2(
                                 change.position.y - center.y,
-                                change.position.x - center.x
+                                change.position.x - center.x,
                             ) * 180f / PI.toFloat()
 
                             var angleDiff = fingerAngle - lastAngle
@@ -336,7 +344,8 @@ fun EnhancedInteractivePrayerDial(
                             // Haptic feedback for every 5-minute change
                             val currentTime = System.currentTimeMillis()
                             if (newAdjustment != currentAdjustment &&
-                                currentTime - lastHapticTime > 50) {
+                                currentTime - lastHapticTime > 50
+                            ) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 lastHapticTime = currentTime
 
@@ -351,7 +360,7 @@ fun EnhancedInteractivePrayerDial(
                             lastAngle = fingerAngle
                         }
                     }
-                }
+                },
         ) {
             val center = this.center
             val radius = min(size.width, size.height) * 0.4f
@@ -370,7 +379,7 @@ fun EnhancedInteractivePrayerDial(
                 showGhostPreview = showGhostPreview,
                 ghostAngle = ghostAngle,
                 particles = particles,
-                rippleState = rippleState
+                rippleState = rippleState,
             )
         }
 
@@ -406,20 +415,20 @@ fun EnhancedInteractivePrayerDial(
                     brush = Brush.verticalGradient(
                         colors = listOf(
                             Color.White.copy(alpha = 0.1f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    )
+                            Color.White.copy(alpha = 0.05f),
+                        ),
+                    ),
                 )
                 .border(
                     width = 1.dp,
                     color = Color.White.copy(alpha = 0.3f),
-                    shape = CircleShape
+                    shape = CircleShape,
                 ),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 // Prayer name with gradient text
                 Text(
@@ -428,10 +437,10 @@ fun EnhancedInteractivePrayerDial(
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
                         brush = Brush.linearGradient(
-                            colors = prayerGradient
-                        )
+                            colors = prayerGradient,
+                        ),
                     ),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -446,31 +455,31 @@ fun EnhancedInteractivePrayerDial(
                         shadow = Shadow(
                             color = Color.Black.copy(alpha = 0.3f),
                             offset = Offset(2f, 2f),
-                            blurRadius = 4f
-                        )
+                            blurRadius = 4f,
+                        ),
                     ),
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
 
                 // Adjustment indicator with animation
                 AnimatedVisibility(
                     visible = currentAdjustment != 0,
                     enter = expandVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeIn(animationSpec = tween(200, easing = LinearOutSlowInEasing)),
-                    exit = shrinkVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing))
+                    exit = shrinkVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeOut(animationSpec = tween(200, easing = FastOutSlowInEasing)),
                 ) {
                     Text(
                         text = formatAdjustment(currentAdjustment),
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
                         ),
                         color = when {
                             currentAdjustment > 0 -> Color(0xFF4CAF50)
                             currentAdjustment < 0 -> Color(0xFFFF5252)
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -482,7 +491,7 @@ fun EnhancedInteractivePrayerDial(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Preset adjustment buttons
                 listOf(-15, -5, 0, +5, +15).forEach { preset ->
@@ -505,20 +514,20 @@ fun EnhancedInteractivePrayerDial(
                             }
                         },
                         modifier = Modifier.size(48.dp),
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         if (preset == 0) {
                             Icon(
                                 Icons.AutoMirrored.Default.Undo,
                                 contentDescription = "Undo - Restore original offset",
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
                             )
                         } else {
                             Text(
                                 text = "${if (preset > 0) "+" else ""}$preset",
                                 style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                )
+                                    fontWeight = FontWeight.Bold,
+                                ),
                             )
                         }
                     }
@@ -542,7 +551,7 @@ private fun DrawScope.drawEnhancedDial(
     showGhostPreview: Boolean,
     ghostAngle: Float,
     particles: List<Particle>,
-    rippleState: RippleState?
+    rippleState: RippleState?,
 ) {
     val outerRadius = radius * 1.15f
 
@@ -556,12 +565,12 @@ private fun DrawScope.drawEnhancedDial(
             brush = Brush.radialGradient(
                 colors = listOf(
                     prayerGradient[0].copy(alpha = rippleAlpha * 0.3f),
-                    Color.Transparent
+                    Color.Transparent,
                 ),
-                radius = rippleRadius
+                radius = rippleRadius,
             ),
             radius = rippleRadius,
-            center = it.center
+            center = it.center,
         )
     }
 
@@ -572,12 +581,12 @@ private fun DrawScope.drawEnhancedDial(
             colors = listOf(
                 Color.Black.copy(alpha = 0.3f),
                 Color.Black.copy(alpha = 0.15f),
-                Color.Transparent
+                Color.Transparent,
             ),
-            radius = outerRadius + 10f
+            radius = outerRadius + 10f,
         ),
         radius = outerRadius + 10f,
-        center = center
+        center = center,
     )
 
     // Layer 2: Glass background
@@ -585,23 +594,23 @@ private fun DrawScope.drawEnhancedDial(
         brush = Brush.radialGradient(
             colors = listOf(
                 Color.White.copy(alpha = 0.2f),
-                Color.White.copy(alpha = 0.1f)
+                Color.White.copy(alpha = 0.1f),
             ),
-            radius = outerRadius
+            radius = outerRadius,
         ),
         radius = outerRadius,
-        center = center
+        center = center,
     )
 
     // Layer 3: Glass border with gradient
     drawCircle(
         brush = Brush.sweepGradient(
             colors = prayerGradient.map { it.copy(alpha = 0.5f) } + prayerGradient.first().copy(alpha = 0.5f),
-            center = center
+            center = center,
         ),
         radius = outerRadius,
         center = center,
-        style = Stroke(width = 2f)
+        style = Stroke(width = 2f),
     )
 
     // Calculate time angle
@@ -627,7 +636,7 @@ private fun DrawScope.drawEnhancedDial(
             lerp(
                 prayerGradient[colorIndex],
                 prayerGradient.getOrElse(colorIndex + 1) { prayerGradient.last() },
-                colorProgress
+                colorProgress,
             )
         } else {
             Color.Gray.copy(alpha = 0.3f)
@@ -636,8 +645,8 @@ private fun DrawScope.drawEnhancedDial(
         val tickLength = when {
             i % 30 == 0 -> 20f // Hour marks
             i % 10 == 0 -> 15f // 10-minute marks
-            i % 5 == 0 -> 12f  // 5-minute marks
-            else -> 8f         // Minute marks
+            i % 5 == 0 -> 12f // 5-minute marks
+            else -> 8f // Minute marks
         }
 
         val tickWidth = when {
@@ -654,14 +663,14 @@ private fun DrawScope.drawEnhancedDial(
             color = tickColor,
             start = Offset(
                 center.x + startRadius * cos(tickAngle).toFloat(),
-                center.y + startRadius * sin(tickAngle).toFloat()
+                center.y + startRadius * sin(tickAngle).toFloat(),
             ),
             end = Offset(
                 center.x + endRadius * cos(tickAngle).toFloat(),
-                center.y + endRadius * sin(tickAngle).toFloat()
+                center.y + endRadius * sin(tickAngle).toFloat(),
             ),
             strokeWidth = tickWidth,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
     }
 
@@ -669,16 +678,16 @@ private fun DrawScope.drawEnhancedDial(
     drawArc(
         brush = Brush.sweepGradient(
             colors = prayerGradient + prayerGradient.first(),
-            center = center
+            center = center,
         ),
         startAngle = -90f,
         sweepAngle = ((currentAngle + 90f) % 360),
         useCenter = false,
         style = Stroke(
             width = 8f + if (isDragging) 4f else 0f,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         ),
-        alpha = glowAlpha
+        alpha = glowAlpha,
     )
 
     // Draw ghost preview if dragging
@@ -687,19 +696,19 @@ private fun DrawScope.drawEnhancedDial(
         val ghostRadius = outerRadius - 15f
         val ghostCenter = Offset(
             center.x + ghostRadius * cos(ghostAngleRad),
-            center.y + ghostRadius * sin(ghostAngleRad)
+            center.y + ghostRadius * sin(ghostAngleRad),
         )
 
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
                     prayerGradient[0].copy(alpha = 0.3f),
-                    Color.Transparent
+                    Color.Transparent,
                 ),
-                radius = 20f
+                radius = 20f,
             ),
             radius = 20f,
-            center = ghostCenter
+            center = ghostCenter,
         )
     }
 
@@ -708,7 +717,7 @@ private fun DrawScope.drawEnhancedDial(
     val indicatorRadius = outerRadius - 15f
     val indicatorCenter = Offset(
         center.x + indicatorRadius * cos(indicatorAngleRad),
-        center.y + indicatorRadius * sin(indicatorAngleRad)
+        center.y + indicatorRadius * sin(indicatorAngleRad),
     )
 
     // Knob glow effect
@@ -717,12 +726,12 @@ private fun DrawScope.drawEnhancedDial(
             colors = listOf(
                 prayerGradient[0].copy(alpha = glowAlpha * 0.5f),
                 prayerGradient[1].copy(alpha = glowAlpha * 0.3f),
-                Color.Transparent
+                Color.Transparent,
             ),
-            radius = 30f * knobScale
+            radius = 30f * knobScale,
         ),
         radius = 30f * knobScale,
-        center = indicatorCenter
+        center = indicatorCenter,
     )
 
     // Main knob with gradient
@@ -730,10 +739,10 @@ private fun DrawScope.drawEnhancedDial(
     drawCircle(
         brush = Brush.radialGradient(
             colors = prayerGradient,
-            radius = knobRadius
+            radius = knobRadius,
         ),
         radius = knobRadius,
-        center = indicatorCenter
+        center = indicatorCenter,
     )
 
     // Knob border
@@ -741,7 +750,7 @@ private fun DrawScope.drawEnhancedDial(
         color = Color.White,
         radius = knobRadius + 2f,
         center = indicatorCenter,
-        style = Stroke(width = 2f)
+        style = Stroke(width = 2f),
     )
 
     // Inner shine
@@ -750,13 +759,13 @@ private fun DrawScope.drawEnhancedDial(
             colors = listOf(
                 Color.White.copy(alpha = 0.8f),
                 Color.White.copy(alpha = 0.4f),
-                Color.Transparent
+                Color.Transparent,
             ),
             radius = knobRadius * 0.7f,
-            center = indicatorCenter - Offset(knobRadius * 0.2f, knobRadius * 0.2f)
+            center = indicatorCenter - Offset(knobRadius * 0.2f, knobRadius * 0.2f),
         ),
         radius = knobRadius * 0.5f,
-        center = indicatorCenter - Offset(knobRadius * 0.2f, knobRadius * 0.2f)
+        center = indicatorCenter - Offset(knobRadius * 0.2f, knobRadius * 0.2f),
     )
 
     // Draw particles
@@ -764,7 +773,7 @@ private fun DrawScope.drawEnhancedDial(
         drawCircle(
             color = particle.color.copy(alpha = particle.alpha),
             radius = particle.size,
-            center = Offset(particle.x, particle.y)
+            center = Offset(particle.x, particle.y),
         )
     }
 }
@@ -778,7 +787,7 @@ data class Particle(
     var size: Float,
     var color: Color,
     var alpha: Float,
-    var life: Float
+    var life: Float,
 ) {
     fun update(): Particle {
         x += vx
@@ -793,7 +802,7 @@ data class Particle(
 
 data class RippleState(
     val center: Offset,
-    val startTime: Long
+    val startTime: Long,
 )
 
 fun generateParticles(count: Int): List<Particle> {
@@ -808,10 +817,10 @@ fun generateParticles(count: Int): List<Particle> {
                 Color(0xFF26C6DA),
                 Color(0xFF00ACC1),
                 Color(0xFF4CAF50),
-                Color(0xFFFFB300)
+                Color(0xFFFFB300),
             ).random(),
             alpha = 1f,
-            life = 1f
+            life = 1f,
         )
     }
 }
@@ -844,7 +853,7 @@ fun formatAdjustment(adjustment: Int): String {
 fun adjustTimeByMinutesForDisplay(originalTime: LocalTime, minutes: Int): String {
     val adjustedDateTime = LocalDateTime.of(
         LocalDate.now(),
-        originalTime
+        originalTime,
     ).plusMinutes(minutes.toLong())
 
     val adjustedTime = adjustedDateTime.toLocalTime()
@@ -864,6 +873,6 @@ fun lerp(start: Color, end: Color, fraction: Float): Color {
         red = start.red + (end.red - start.red) * fraction,
         green = start.green + (end.green - start.green) * fraction,
         blue = start.blue + (end.blue - start.blue) * fraction,
-        alpha = start.alpha + (end.alpha - start.alpha) * fraction
+        alpha = start.alpha + (end.alpha - start.alpha) * fraction,
     )
 }

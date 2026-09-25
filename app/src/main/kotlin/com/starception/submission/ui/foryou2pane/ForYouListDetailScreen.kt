@@ -116,7 +116,11 @@ internal fun ForYouListDetailScreen(
 
     ForYouListDetailScreen(
         selectedNewsResource = selectedNewsResource,
-        onNewsResourceClick = if (isLandscape) {{ viewModel.onNewsResourceClick(it.id) }} else null,
+        onNewsResourceClick = if (isLandscape) {
+            { viewModel.onNewsResourceClick(it.id) }
+        } else {
+            null
+        },
         onToggleBookmark = { viewModel.toggleBookmark(it) },
         onBackClick = { viewModel.clearSelection() },
         onTopicClick = onTopicClick,

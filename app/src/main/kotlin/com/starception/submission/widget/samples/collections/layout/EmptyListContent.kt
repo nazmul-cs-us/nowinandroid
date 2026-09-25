@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -11,13 +27,13 @@ import com.starception.submission.widget.samples.utils.ActionUtils
  */
 @Composable
 internal fun EmptyListContent() {
-  val context = LocalContext.current
+    val context = LocalContext.current
 
-  NoDataContent(
-    noDataText = context.getString(R.string.sample_no_data_text),
-    noDataIconRes = R.drawable.sample_no_data_icon,
-    actionButtonText = context.getString(R.string.sample_add_button_text),
-    actionButtonIcon = R.drawable.sample_add_icon,
-    actionButtonOnClick = ActionUtils.actionStartDemoActivity("on-click of add item button")
-  )
+    NoDataContent(
+        noDataText = context.getString(R.string.sample_no_data_text),
+        noDataIconRes = R.drawable.sample_no_data_icon,
+        actionButtonText = context.getString(R.string.sample_add_button_text),
+        actionButtonIcon = R.drawable.sample_add_icon,
+        actionButtonOnClick = ActionUtils.actionStartDemoActivity("on-click of add item button"),
+    )
 }

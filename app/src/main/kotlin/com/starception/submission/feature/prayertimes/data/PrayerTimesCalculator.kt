@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.data
 
 import android.content.Context
@@ -6,9 +22,9 @@ import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
 import com.starception.submission.prayer.service.resolvePrayerTimeZoneOffset
-import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.time.LocalDate
 
@@ -29,60 +45,60 @@ interface PrayerTimeCalculatorEntryPoint {
 
 /**
  * Islamic Prayer Times Calculator - Advanced Calculation Engine
- * 
+ *
  * A comprehensive prayer times calculation system that handles location services,
  * user preferences, caching, and multiple calculation methods to provide accurate
  * Islamic prayer times for any location worldwide.
- * 
+ *
  * ## Core Features:
  * - **Multi-Source Location**: GPS, Network, Cached, and Manual locations
  * - **Smart Caching**: Intelligent cache system prevents redundant calculations
  * - **Fallback Strategy**: Graceful degradation when services are unavailable
  * - **Multiple Methods**: Support for various Islamic calculation methods
  * - **Performance Optimized**: 3-second location timeout prevents UI freezing
- * 
+ *
  * ## Calculation Flow:
  * 1. **Location Resolution**: Try cached → GPS → network → user saved → default
  * 2. **Settings Retrieval**: Load user's calculation method and preferences
  * 3. **Prayer Times Calculation**: Use astronomical algorithms for precise times
  * 4. **Result Caching**: Cache results for instant subsequent access
  * 5. **Error Handling**: Graceful fallback to default location if needed
- * 
+ *
  * ## Architecture:
  * - **Entry Point Pattern**: Uses Hilt EntryPoint for dependency injection
  * - **Service Coordination**: Orchestrates multiple specialized services
  * - **Async Operations**: Non-blocking location requests with coroutines
  * - **Error Resilience**: Multiple fallback strategies for robust operation
- * 
+ *
  * ## Usage:
  * ```kotlin
  * val calculator = PrayerTimesCalculator(context)
  * val prayerTimes = calculator.calculateDefaultPrayerTimes()
  * ```
- * 
+ *
  * ## Performance Notes:
  * - First calculation: ~3 seconds max (location timeout)
  * - Subsequent calculations: ~50ms (from cache)
  * - Memory efficient: Caches only essential data
  * - Battery optimized: Minimizes GPS usage
- * 
+ *
  * @param context Android context for accessing system services
  * @author Prayer Times Development Team
  * @version 2.0 - Enhanced with caching and fallback strategies
  */
 class PrayerTimesCalculator(private val context: Context) {
-    
+
     companion object {
         private const val TAG = "PrayerTimesCalculator"
     }
-    
+
     /**
      * MAIN CALCULATION METHOD: Calculate prayer times with smart caching and fallbacks
-     * 
+     *
      * This is the primary method used throughout the app for getting prayer times.
-     * 
+     *
      * @param forceGpsRefresh If true, skips saved location and forces fresh GPS fetch (for pull-to-refresh)
-     * 
+     *
      * CALCULATION FLOW:
      * 1. Check cache first (instant if available)
      * 2. Get user settings (saved location preference, calculation method)
@@ -90,17 +106,17 @@ class PrayerTimesCalculator(private val context: Context) {
      * 4. Calculate prayer times using astronomical formulas
      * 5. Cache results for future use
      * 6. Handle all errors gracefully with fallbacks
-     * 
+     *
      * CACHING STRATEGY:
      * - Returns cached data immediately if available for today
      * - Caches new calculations for instant future access
      * - Uses cached location when GPS is slow/unavailable
-     * 
+     *
      * ERROR HANDLING:
      * - Falls back to cached data on calculation errors
      * - Uses Dubai as final location fallback
      * - Never returns null (always provides some prayer times)
-     * 
+     *
      * EDIT THIS TO:
      * - Change calculation priority order
      * - Modify caching behavior
@@ -114,14 +130,14 @@ class PrayerTimesCalculator(private val context: Context) {
         android.util.Log.i(TAG, "=".repeat(90))
         android.util.Log.i(TAG, "🔆 Starting multi-stage prayer calculation with intelligent fallbacks")
         android.util.Log.i(TAG, "")
-        
+
         return try {
             // STEP 1: Get all required services
             android.util.Log.i(TAG, "🔄 STEP 1: SERVICE INITIALIZATION")
             android.util.Log.i(TAG, "Obtaining required services via Hilt dependency injection")
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
-                PrayerTimeCalculatorEntryPoint::class.java
+                PrayerTimeCalculatorEntryPoint::class.java,
             )
             val calculator = entryPoint.prayerTimeCalculatorService()
             val locationService = entryPoint.enhancedLocationService()
@@ -129,7 +145,7 @@ class PrayerTimesCalculator(private val context: Context) {
             val cache = entryPoint.locationCache()
             android.util.Log.i(TAG, "✅ All required services obtained successfully")
             android.util.Log.i(TAG, "")
-            
+
             // STEP 2: Check cache first for instant results (SKIP if forceGpsRefresh)
             android.util.Log.i(TAG, "🔄 STEP 2: CACHE VALIDATION")
             if (forceGpsRefresh) {
@@ -152,7 +168,7 @@ class PrayerTimesCalculator(private val context: Context) {
             }
             android.util.Log.i(TAG, "💾 CACHE MISS/SKIPPED - Proceeding with fresh calculation")
             android.util.Log.i(TAG, "")
-            
+
             // STEP 3: Get user prayer settings (wait for proper loading)
             android.util.Log.i(TAG, "🔄 STEP 3: USER SETTINGS LOADING")
             android.util.Log.i(TAG, "Loading user prayer calculation preferences and configuration")
@@ -170,7 +186,7 @@ class PrayerTimesCalculator(private val context: Context) {
                 android.util.Log.w("PrayerCalculation", "Failed to load user settings, using defaults: ${e.message}")
                 PrayerSettings() // Fallback to default
             }
-            
+
             // STEP 4: SMART LOCATION DETERMINATION - Multi-level fallback system
             android.util.Log.i(TAG, "🔄 STEP 4: INTELLIGENT LOCATION DETERMINATION")
             android.util.Log.i(TAG, "Applying intelligent multi-tier location resolution strategy")
@@ -180,7 +196,7 @@ class PrayerTimesCalculator(private val context: Context) {
             if (userSettings.location != null) {
                 android.util.Log.d("PrayerCalculation", "  Saved location: ${userSettings.location!!.getDisplayName()}")
             }
-            
+
             // DEBUG: Check cache status regardless of permissions
             val freshCachedLocation = cache.getCachedLocation()
             val anyCachedLocation = cache.getAnyCachedLocation()
@@ -191,31 +207,31 @@ class PrayerTimesCalculator(private val context: Context) {
                 val cacheAge = cache.getCacheStatus()
                 android.util.Log.d("PrayerCalculation", "  Cache age: $cacheAge")
             }
-            
+
             // NEW IMPROVED PRIORITY ORDER (Prefers cached over Dubai):
             // 1. User's manually saved location (highest priority - user choice)
             //    SKIPPED during pull-to-refresh (forceGpsRefresh=true) to force fresh GPS
-            // 2. Recent cached GPS location (fast - within 30 minutes) 
+            // 2. Recent cached GPS location (fast - within 30 minutes)
             // 3. Fresh GPS location with 3-second timeout (prevents elevator hangs)
             // 4. ANY cached location (even if old) - KEEPS USER'S LAST KNOWN LOCATION
             // 5. Dubai default location (final fallback - only if never cached)
-            // 
+            //
             // KEY IMPROVEMENT: We now prefer old cached location over Dubai default!
             // This means if user was previously in New York and disables location,
             // we keep showing New York prayer times instead of switching to Dubai.
             // Only use Dubai if user never enabled location before.
-            
+
             // Log if we're forcing GPS refresh (pull-to-refresh)
             if (forceGpsRefresh) {
                 android.util.Log.d("PrayerCalculation", "🔄 FORCE GPS REFRESH MODE: Skipping saved location to fetch fresh GPS")
             }
-            
+
             val resolvedLocation = when {
                 // PRIORITY 1: User's saved location (user manually set their location)
                 // BUT: Skip if forceGpsRefresh=true (pull-to-refresh) or if it has "Current Location" bug
-                userSettings.location != null && 
-                !forceGpsRefresh && 
-                !userSettings.location!!.city.contains("Current Location", ignoreCase = true) -> {
+                userSettings.location != null &&
+                    !forceGpsRefresh &&
+                    !userSettings.location!!.city.contains("Current Location", ignoreCase = true) -> {
                     android.util.Log.d("PrayerCalculation", "✓ PRIORITY 1: Using user's saved location")
                     android.util.Log.d("PrayerCalculation", "  Location: ${userSettings.location!!.getDisplayName()}")
                     android.util.Log.d("PrayerCalculation", "  Coordinates: ${userSettings.location!!.latitude}, ${userSettings.location!!.longitude}")
@@ -223,7 +239,7 @@ class PrayerTimesCalculator(private val context: Context) {
                     android.util.Log.w("PrayerCalculation", "   Because user has a previously saved location in settings")
                     userSettings.location!!
                 }
-                
+
                 // PRIORITY 2-4: GPS and cached location strategies (if user granted permission)
                 // This also handles the case where saved location has "Current Location" bug
                 locationService.hasLocationPermission() || (userSettings.location != null && userSettings.location!!.city.contains("Current Location", ignoreCase = true)) -> {
@@ -245,16 +261,16 @@ class PrayerTimesCalculator(private val context: Context) {
                             cachedLocation // Use cached if it's fresh (within 30 minutes)
                         } else {
                             android.util.Log.d("PrayerCalculation", "No recent cached location, trying fresh GPS...")
-                            
+
                             // Check if we have ANY cached location (even if old) before trying GPS
                             val oldCachedLocation = cache.getAnyCachedLocation()
                             android.util.Log.d("PrayerCalculation", "Any cached location available (even old): ${oldCachedLocation != null}")
-                            
+
                             // PRIORITY 3: Try fresh GPS with 3-second timeout (fast, prevents hangs)
                             val gpsStartTime = System.currentTimeMillis()
                             val androidLocation = locationService.getLocationQuick().getOrNull()
                             val gpsTime = System.currentTimeMillis() - gpsStartTime
-                            
+
                             androidLocation?.let { androidLoc ->
                                 android.util.Log.d("PrayerCalculation", "✓ PRIORITY 3: GPS location obtained in ${gpsTime}ms")
                                 android.util.Log.d("PrayerCalculation", "  GPS Coordinates: ${androidLoc.latitude}, ${androidLoc.longitude}")
@@ -288,7 +304,7 @@ class PrayerTimesCalculator(private val context: Context) {
                                             area = oldCachedLocation.area,
                                             subLocality = oldCachedLocation.subLocality,
                                             thoroughfare = oldCachedLocation.thoroughfare,
-                                            administrativeArea = oldCachedLocation.administrativeArea
+                                            administrativeArea = oldCachedLocation.administrativeArea,
                                         )
                                         android.util.Log.d("PrayerCalculation", "  ✓ Using cached city name: ${mergedLocation.getDisplayName()}")
                                         mergedLocation
@@ -300,7 +316,7 @@ class PrayerTimesCalculator(private val context: Context) {
                                 }
                             } ?: run {
                                 android.util.Log.w("PrayerCalculation", "GPS failed after ${gpsTime}ms")
-                                
+
                                 // PRIORITY 4: Use any cached location (even if old) instead of Dubai
                                 if (oldCachedLocation != null) {
                                     android.util.Log.d("PrayerCalculation", "✓ PRIORITY 4: Using old cached location instead of Dubai fallback")
@@ -328,13 +344,13 @@ class PrayerTimesCalculator(private val context: Context) {
                         }
                     }
                 }
-                
+
                 // PRIORITY 5: Final fallback - use any cached location or Dubai default
                 else -> {
                     android.util.Log.w("PrayerCalculation", "=== LOCATION PERMISSION DENIED OR DISABLED ===")
                     android.util.Log.w("PrayerCalculation", "User has turned off location permission or location services")
                     android.util.Log.w("PrayerCalculation", "Checking for ANY cached location from previous sessions...")
-                    
+
                     // Try any cached location (regardless of age) before falling back to Dubai
                     val fallbackLocation = cache.getAnyCachedLocation()
                     if (fallbackLocation != null) {
@@ -353,7 +369,7 @@ class PrayerTimesCalculator(private val context: Context) {
                     }
                 }
             }
-            
+
             // Repair locations cached by older builds, where Bangladesh was
             // incorrectly swallowed by India's broad coordinate range (UTC+5:30).
             val location = if (
@@ -379,7 +395,7 @@ class PrayerTimesCalculator(private val context: Context) {
             android.util.Log.d("PrayerCalculation", "Final location: ${location.getDisplayName()}")
             android.util.Log.d("PrayerCalculation", "Final coordinates: ${location.latitude}, ${location.longitude}")
             android.util.Log.d("PrayerCalculation", "Calculation method: ${userSettings.calculationMethod.name}")
-            
+
             val calcStartTime = System.currentTimeMillis()
             val calculatedTimes = calculator.calculatePrayerTimes(today, location, userSettings)
             val calcDuration = System.currentTimeMillis() - calcStartTime
@@ -396,7 +412,7 @@ class PrayerTimesCalculator(private val context: Context) {
             val newLocationHasRealCityName = location.city.isNotBlank() && !isCoordinatesString(location.city)
             val oldLocation = userSettings.location
             val oldLocationHasRealCityName = oldLocation?.city?.isNotBlank() == true &&
-                                              !isCoordinatesString(oldLocation.city)
+                !isCoordinatesString(oldLocation.city)
 
             // If geocoding failed (coordinates only), use cached location's city/country with new GPS coordinates
             val correctedLocation = if (!newLocationHasRealCityName && oldLocationHasRealCityName && oldLocation != null) {
@@ -409,7 +425,7 @@ class PrayerTimesCalculator(private val context: Context) {
                     area = oldLocation.area,
                     subLocality = oldLocation.subLocality,
                     thoroughfare = oldLocation.thoroughfare,
-                    administrativeArea = oldLocation.administrativeArea
+                    administrativeArea = oldLocation.administrativeArea,
                 )
             } else {
                 location
@@ -434,7 +450,7 @@ class PrayerTimesCalculator(private val context: Context) {
             } else {
                 android.util.Log.w("PrayerCalculation", "✗ Prayer times calculation returned null after ${calcDuration}ms")
             }
-            
+
             // STEP 6: SAVE LOCATION TO SETTINGS for notification service access
             android.util.Log.d("PrayerCalculation", "STEP 6a: Saving location to settings for notification service")
             try {
@@ -496,7 +512,7 @@ class PrayerTimesCalculator(private val context: Context) {
             } catch (e: Exception) {
                 android.util.Log.w("PrayerCalculation", "Failed to save location to settings: ${e.message}")
             }
-            
+
             // STEP 7: CACHE THE RESULTS for instant future access
             android.util.Log.d("PrayerCalculation", "STEP 7: Caching results for future use")
             if (finalCalculatedTimes != null) {
@@ -533,20 +549,20 @@ class PrayerTimesCalculator(private val context: Context) {
             android.util.Log.e(TAG, "=".repeat(90))
             android.util.Log.e(TAG, "⚡ Failure Time: ${totalTime}ms")
             android.util.Log.e("PrayerCalculation", "Error during prayer times calculation: ${e.message}", e)
-            
+
             // ERROR RECOVERY: Try cached data as emergency fallback
             android.util.Log.d("PrayerCalculation", "Attempting error recovery using cached data...")
-            // 
+            //
             // This ensures the app never completely fails - it will show something
             // even if all location and calculation services fail.
             try {
                 val entryPoint = EntryPointAccessors.fromApplication(
                     context.applicationContext,
-                    PrayerTimeCalculatorEntryPoint::class.java
+                    PrayerTimeCalculatorEntryPoint::class.java,
                 )
                 val cache = entryPoint.locationCache()
                 val cachedData = cache.getCachedPrayerTimes()
-                
+
                 if (cachedData != null) {
                     val (cachedPrayerTimes, cachedDate, cachedLocationName) = cachedData
                     android.util.Log.d("PrayerCalculation", "Found emergency cached data: date=$cachedDate, location=$cachedLocationName")
@@ -562,25 +578,25 @@ class PrayerTimesCalculator(private val context: Context) {
                 android.util.Log.e("PrayerCalculation", "Emergency cache recovery also failed: ${cacheError.message}")
                 // Even cache failed - this is very rare
             }
-            
+
             android.util.Log.w("PrayerCalculation", "All recovery methods failed, returning default fallback")
             // ABSOLUTE FINAL FALLBACK: Return null but with clear location indicator
             // This will trigger the app to show Dubai prayer times from PrayerTimeCalculatorService
             Pair(null, "Dubai, UAE (Default)")
         }
     }
-    
+
     /**
      * DEFAULT LOCATION PROVIDER: Provides Dubai coordinates as reliable fallback
-     * 
+     *
      * This ensures the app always has a location to calculate prayer times with,
      * even when GPS fails or user denies location permission.
-     * 
+     *
      * WHY DUBAI:
      * - Central location in Muslim world
      * - Well-known prayer time reference
      * - Reliable timezone (UAE +4)
-     * 
+     *
      * EDIT THIS TO:
      * - Change default city (coordinates, timezone)
      * - Add multiple default locations based on region
@@ -588,14 +604,14 @@ class PrayerTimesCalculator(private val context: Context) {
      */
     private fun getDefaultLocation(): Location {
         return Location(
-            latitude = 25.2048,    // Dubai coordinates - EDIT these for different default city
+            latitude = 25.2048, // Dubai coordinates - EDIT these for different default city
             longitude = 55.2708,
-            timeZoneOffset = 4.0,   // UAE timezone (+4 GMT) - EDIT for different timezone
-            city = "Dubai",         // EDIT for different default city
-            country = "UAE"         // EDIT for different default country
+            timeZoneOffset = 4.0, // UAE timezone (+4 GMT) - EDIT for different timezone
+            city = "Dubai", // EDIT for different default city
+            country = "UAE", // EDIT for different default country
         )
     }
-    
+
     /**
      * Calculate prayer times for specific location and settings
      * @param location The geographic location
@@ -606,17 +622,17 @@ class PrayerTimesCalculator(private val context: Context) {
     suspend fun calculatePrayerTimes(
         location: Location,
         settings: PrayerSettings = PrayerSettings(),
-        date: LocalDate = LocalDate.now()
+        date: LocalDate = LocalDate.now(),
     ): Pair<DayPrayerTimes?, String> {
         return try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 context.applicationContext,
-                PrayerTimeCalculatorEntryPoint::class.java
+                PrayerTimeCalculatorEntryPoint::class.java,
             )
             val calculator = entryPoint.prayerTimeCalculatorService()
-            
+
             val calculatedTimes = calculator.calculatePrayerTimes(date, location, settings)
-            
+
             Pair(calculatedTimes, location.getDisplayName())
         } catch (e: Exception) {
             Pair(null, location.getDisplayName())

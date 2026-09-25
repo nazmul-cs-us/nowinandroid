@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.repository
 
 import android.util.Log
@@ -28,7 +44,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class PrayerTimeSuggestionRepository @Inject constructor(
-    private val aladhanApiService: AladhanApiService
+    private val aladhanApiService: AladhanApiService,
 ) {
     companion object {
         private const val TAG = "PrayerSuggestionRepo"
@@ -52,7 +68,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
      */
     suspend fun fetchSuggestions(
         ourCalculatedTimes: DayPrayerTimes,
-        settings: PrayerSettings
+        settings: PrayerSettings,
     ): DayPrayerSuggestions {
         val location = ourCalculatedTimes.location
         val date = ourCalculatedTimes.date.toLocalDate()
@@ -71,7 +87,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
             val referenceTimes = aladhanApiService.fetchPrayerTimes(
                 location = location,
                 date = date,
-                calculationMethod = settings.calculationMethod
+                calculationMethod = settings.calculationMethod,
             )
 
             if (referenceTimes == null) {
@@ -82,7 +98,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
                     asr = null,
                     maghrib = null,
                     isha = null,
-                    error = "Failed to fetch reference times"
+                    error = "Failed to fetch reference times",
                 )
                 _suggestions.value = errorResult
                 return errorResult
@@ -92,7 +108,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
             val suggestions = calculateSuggestions(
                 ourTimes = ourCalculatedTimes,
                 referenceTimes = referenceTimes,
-                currentOffsets = settings.timeOffsets
+                currentOffsets = settings.timeOffsets,
             )
 
             // Update cache
@@ -106,7 +122,6 @@ class PrayerTimeSuggestionRepository @Inject constructor(
             logSuggestions(suggestions)
 
             return suggestions
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error calculating suggestions: ${e.message}", e)
             val errorResult = DayPrayerSuggestions(
@@ -115,7 +130,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
                 asr = null,
                 maghrib = null,
                 isha = null,
-                error = e.message
+                error = e.message,
             )
             _suggestions.value = errorResult
             return errorResult
@@ -128,7 +143,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
     private fun calculateSuggestions(
         ourTimes: DayPrayerTimes,
         referenceTimes: AladhanPrayerTimes,
-        currentOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets
+        currentOffsets: com.starception.submission.prayer.model.PrayerTimeOffsets,
     ): DayPrayerSuggestions {
         Log.d(TAG, "📊 Calculating suggestions...")
         Log.d(TAG, "   Our times vs Reference times:")
@@ -138,32 +153,32 @@ class PrayerTimeSuggestionRepository @Inject constructor(
                 prayerName = "Fajr",
                 ourTime = ourTimes.fajr,
                 referenceTime = referenceTimes.fajr,
-                currentOffset = currentOffsets.fajr
+                currentOffset = currentOffsets.fajr,
             ),
             dhuhr = createSuggestion(
                 prayerName = "Dhuhr",
                 ourTime = ourTimes.dhuhr,
                 referenceTime = referenceTimes.dhuhr,
-                currentOffset = currentOffsets.dhuhr
+                currentOffset = currentOffsets.dhuhr,
             ),
             asr = createSuggestion(
                 prayerName = "Asr",
                 ourTime = ourTimes.asr,
                 referenceTime = referenceTimes.asr,
-                currentOffset = currentOffsets.asr
+                currentOffset = currentOffsets.asr,
             ),
             maghrib = createSuggestion(
                 prayerName = "Maghrib",
                 ourTime = ourTimes.maghrib,
                 referenceTime = referenceTimes.maghrib,
-                currentOffset = currentOffsets.maghrib
+                currentOffset = currentOffsets.maghrib,
             ),
             isha = createSuggestion(
                 prayerName = "Isha",
                 ourTime = ourTimes.isha,
                 referenceTime = referenceTimes.isha,
-                currentOffset = currentOffsets.isha
-            )
+                currentOffset = currentOffsets.isha,
+            ),
         )
     }
 
@@ -177,7 +192,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
         prayerName: String,
         ourTime: LocalTime,
         referenceTime: LocalTime?,
-        currentOffset: Int
+        currentOffset: Int,
     ): PrayerTimeSuggestion? {
         if (referenceTime == null) {
             Log.w(TAG, "   ⚠️ $prayerName: No reference time available")
@@ -195,7 +210,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
             currentOffset = currentOffset,
             ourCalculatedTime = ourTime,
             referenceTime = referenceTime,
-            differenceMinutes = diffMinutes
+            differenceMinutes = diffMinutes,
         )
     }
 
@@ -241,7 +256,7 @@ class PrayerTimeSuggestionRepository @Inject constructor(
             suggestions.dhuhr,
             suggestions.asr,
             suggestions.maghrib,
-            suggestions.isha
+            suggestions.isha,
         ).forEach { suggestion ->
             val status = if (suggestion.hasDifferentSuggestion()) {
                 "📌 DIFFERENT (current: ${suggestion.getFormattedCurrentOffset()}, suggest: ${suggestion.getFormattedSuggestion()})"

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.datacollection
 
 import android.content.Context
@@ -29,7 +45,7 @@ data class PostureSegment(
     val posture: SalahPosture,
     val predictedPosture: SalahPosture,
     val confidence: Float,
-    val wasEdited: Boolean = false
+    val wasEdited: Boolean = false,
 )
 
 data class PrayerReviewState(
@@ -86,24 +102,34 @@ class PrayerReviewViewModel @Inject constructor(
                     while (i < rawLines.size) {
                         val json = JSONObject(rawLines[i])
                         val postureName = json.optString("posture", "QIYAM")
-                        val posture = try { SalahPosture.valueOf(postureName) } catch (_: Exception) { SalahPosture.QIYAM }
+                        val posture = try {
+                            SalahPosture.valueOf(postureName)
+                        } catch (_: Exception) {
+                            SalahPosture.QIYAM
+                        }
                         val confidence = json.optDouble("predicted_confidence", 0.5).toFloat()
 
                         val startIdx = i
                         while (i < rawLines.size) {
                             val nextJson = JSONObject(rawLines[i])
-                            val nextPosture = try { SalahPosture.valueOf(nextJson.optString("posture", "QIYAM")) } catch (_: Exception) { SalahPosture.QIYAM }
+                            val nextPosture = try {
+                                SalahPosture.valueOf(nextJson.optString("posture", "QIYAM"))
+                            } catch (_: Exception) {
+                                SalahPosture.QIYAM
+                            }
                             if (nextPosture != posture) break
                             i++
                         }
 
-                        segments.add(PostureSegment(
-                            startIndex = startIdx,
-                            endIndex = i - 1,
-                            posture = posture,
-                            predictedPosture = posture,
-                            confidence = confidence
-                        ))
+                        segments.add(
+                            PostureSegment(
+                                startIndex = startIdx,
+                                endIndex = i - 1,
+                                posture = posture,
+                                predictedPosture = posture,
+                                confidence = confidence,
+                            ),
+                        )
                     }
 
                     // Count postures
@@ -117,7 +143,7 @@ class PrayerReviewViewModel @Inject constructor(
                         segments = segments,
                         totalSamples = rawLines.size,
                         postureCounts = counts,
-                        isLoading = false
+                        isLoading = false,
                     )
 
                     // Instant quality check: recordings open this screen right after
@@ -196,7 +222,7 @@ class PrayerReviewViewModel @Inject constructor(
 
     fun selectSegment(index: Int) {
         _state.value = _state.value.copy(
-            selectedSegmentIndex = if (_state.value.selectedSegmentIndex == index) null else index
+            selectedSegmentIndex = if (_state.value.selectedSegmentIndex == index) null else index,
         )
     }
 
@@ -276,7 +302,7 @@ class PrayerReviewViewModel @Inject constructor(
                         }
                         val renamed = File(
                             file.parentFile,
-                            SalahDataCollectionService.REVIEWED_FILE_PREFIX + suffix
+                            SalahDataCollectionService.REVIEWED_FILE_PREFIX + suffix,
                         )
                         if (file.renameTo(renamed)) {
                             savedPath = renamed.absolutePath

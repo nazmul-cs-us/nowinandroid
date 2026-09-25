@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.media
 
 import android.content.ComponentName
@@ -9,9 +25,9 @@ import android.util.Log
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.QuranPlaybackService
-import com.starception.submission.services.DrivingAudioService
-import com.starception.submission.services.ChapterRecitationState
 import com.starception.submission.services.ChapterRecitationService
+import com.starception.submission.services.ChapterRecitationState
+import com.starception.submission.services.DrivingAudioService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,10 +89,13 @@ class GlobalMediaViewModel(
         // ---- Fortress (chapter recitation) — mirrors the hadith callback pattern ----
         /** Notify state changes from ChapterAudioController (via the app bridge). */
         var onFortressPlaybackChanged: ((isPlaying: Boolean, title: String) -> Unit)? = null
+
         /** Progress updates (position/duration in ms) for the mini-bar sweep. */
         var onFortressProgressChanged: ((currentPosition: Int, duration: Int) -> Unit)? = null
+
         /** Reverse channel: mini-bar play/pause → toggle ChapterAudioController. */
         var onFortressPlayPauseRequested: (() -> Unit)? = null
+
         /** Reverse channel: mini-bar seek → seek ChapterAudioController. */
         var onFortressSeekRequested: ((position: Int) -> Unit)? = null
     }
@@ -106,9 +125,11 @@ class GlobalMediaViewModel(
                 } else if (quranService?.getCurrentPosition() == 0) {
                     // Playback stopped completely
                     if (activeSource is MediaSource.Quran) {
-                        _controllerState.update { it.copy(
-                            playback = it.playback.copy(isPlaying = false)
-                        )}
+                        _controllerState.update {
+                            it.copy(
+                                playback = it.playback.copy(isPlaying = false),
+                            )
+                        }
                     }
                 } else {
                     // Just paused
@@ -228,7 +249,7 @@ class GlobalMediaViewModel(
                         playback = current.playback.copy(
                             currentPosition = currentPosition,
                             duration = duration,
-                        )
+                        ),
                     )
                 }
             }
@@ -249,7 +270,7 @@ class GlobalMediaViewModel(
                         playback = current.playback.copy(
                             currentPosition = currentPosition,
                             duration = duration,
-                        )
+                        ),
                     )
                 }
             }
@@ -285,10 +306,12 @@ class GlobalMediaViewModel(
         } else {
             updateQuranState()
         }
-        _controllerState.update { it.copy(
-            isVisible = true,
-            hasLanguageToggle = true,
-        )}
+        _controllerState.update {
+            it.copy(
+                isVisible = true,
+                hasLanguageToggle = true,
+            )
+        }
     }
 
     /**
@@ -308,10 +331,12 @@ class GlobalMediaViewModel(
                 ?: DrivingAudioService.PlaybackState.IDLE
             updateDrivingState(state)
         }
-        _controllerState.update { it.copy(
-            isVisible = true,
-            hasLanguageToggle = false,
-        )}
+        _controllerState.update {
+            it.copy(
+                isVisible = true,
+                hasLanguageToggle = false,
+            )
+        }
     }
 
     /**
@@ -574,15 +599,17 @@ class GlobalMediaViewModel(
                 AudioLanguage.ENGLISH_TRANSLATION -> AudioLanguage.ARABIC_ONLY
             }
             quranService?.setAudioLanguage(next)
-            _controllerState.update { it.copy(
-                currentLanguage = next,
-                playback = it.playback.copy(
-                    source = MediaSource.Quran(
-                        surahIndex = quranService?.getCurrentSurahIndex() ?: 0,
-                        audioLanguage = next,
-                    )
+            _controllerState.update {
+                it.copy(
+                    currentLanguage = next,
+                    playback = it.playback.copy(
+                        source = MediaSource.Quran(
+                            surahIndex = quranService?.getCurrentSurahIndex() ?: 0,
+                            audioLanguage = next,
+                        ),
+                    ),
                 )
-            )}
+            }
         }
     }
 
@@ -679,7 +706,7 @@ class GlobalMediaViewModel(
                                     currentPosition = service.getCurrentPosition(),
                                     duration = service.getDuration(),
                                     isPlaying = true,
-                                )
+                                ),
                             )
                         }
                     }

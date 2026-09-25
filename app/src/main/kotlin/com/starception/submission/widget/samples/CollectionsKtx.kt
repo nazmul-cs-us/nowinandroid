@@ -21,7 +21,6 @@ package com.starception.submission.widget.samples
  * from java.util.Collection
  */
 fun <T> MutableList<T>.removeIf(filter: (T) -> Boolean): Boolean {
-
     var removed = false
     var toRemove = mutableListOf<T>()
 
@@ -34,10 +33,9 @@ fun <T> MutableList<T>.removeIf(filter: (T) -> Boolean): Boolean {
 
     removeAll(toRemove)
     return removed
-
 }
 
-fun <K, V> MutableMap<K,V>.computeIfAbsent(key : K, calulation :(K)->V):V? {
+fun <K, V> MutableMap<K, V>.computeIfAbsent(key: K, calulation: (K) -> V): V? {
     var value = get(key)
 
     if (value == null) {

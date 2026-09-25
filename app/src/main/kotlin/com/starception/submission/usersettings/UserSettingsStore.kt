@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.usersettings
 
 import com.starception.submission.prayer.model.AsrMadhhab
@@ -63,9 +79,11 @@ class UserSettingsStore @Inject constructor(
 
     companion object {
         const val KEY_LAST_KNOWN_COUNTRY = "last_known_country_code"
+
         // Country the user explicitly chose to NOT switch to ("Keep current"); suppresses re-prompts
         // for that country only. Cleared when they return to the active country.
         const val KEY_DECLINED_COUNTRY = "declined_country_code"
+
         // Global (not per-country) notification preferences, JSON-encoded, synced to the cloud.
         const val KEY_NOTIFICATION_PREFS_JSON = "notification_preferences_json"
         const val KEY_LAST_LOCAL_CHANGE_AT = "last_local_change_at"

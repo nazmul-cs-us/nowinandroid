@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.clickable
@@ -36,18 +52,18 @@ fun AiSuggestionBadge(
     baseColor: Color,
     enabled: Boolean = true,
     onApplySuggestion: ((Int) -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hasDifferentSuggestion = suggestion != null && suggestion.suggestedOffset != currentOffset
 
     Box(
-        modifier = modifier.padding(bottom = 2.dp, end = if (hasDifferentSuggestion) 10.dp else 0.dp)
+        modifier = modifier.padding(bottom = 2.dp, end = if (hasDifferentSuggestion) 10.dp else 0.dp),
     ) {
         Text(
             text = formatOffset(currentOffset),
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
             color = if (currentOffset != 0) baseColor.copy(alpha = 0.85f) else baseColor.copy(alpha = 0.6f),
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
         )
 
         // Show sparkle as superscript if AI suggestion differs - tap to apply
@@ -61,7 +77,7 @@ fun AiSuggestionBadge(
                     .alpha(if (enabled) 1f else 0.45f)
                     .clickable(enabled = enabled) {
                         onApplySuggestion(suggestion!!.suggestedOffset)
-                    }
+                    },
             )
         }
     }

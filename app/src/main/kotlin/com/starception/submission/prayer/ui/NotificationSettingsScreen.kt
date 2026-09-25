@@ -1,5 +1,22 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -18,15 +35,13 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
-import androidx.compose.ui.draw.rotate
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
-import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.prayer.model.PrayerNotificationPreferences
 
 /**
  * Clean list-based notification settings screen
@@ -37,7 +52,7 @@ fun NotificationSettingsScreen(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
     onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     BackHandler {
         onBackClick()
@@ -49,30 +64,30 @@ fun NotificationSettingsScreen(
                 title = {
                     Text(
                         "Notification Settings",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
-        modifier = modifier
+        modifier = modifier,
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
         ) {
             // Master toggle
             ListItem(
@@ -80,24 +95,25 @@ fun NotificationSettingsScreen(
                     Text(
                         "Prayer Notifications",
                         style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                 },
                 supportingContent = {
                     Text(
                         if (preferences.notificationsEnabled) "Enabled" else "Disabled",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 },
                 leadingContent = {
                     Icon(
-                        imageVector = if (preferences.notificationsEnabled)
+                        imageVector = if (preferences.notificationsEnabled) {
                             Icons.Default.NotificationsActive
-                        else
-                            Icons.Default.Notifications,
+                        } else {
+                            Icons.Default.Notifications
+                        },
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 },
                 trailingContent = {
@@ -105,9 +121,9 @@ fun NotificationSettingsScreen(
                         checked = preferences.notificationsEnabled,
                         onCheckedChange = { enabled ->
                             onPreferencesChanged(preferences.copy(notificationsEnabled = enabled))
-                        }
+                        },
                     )
-                }
+                },
             )
 
             HorizontalDivider()
@@ -116,15 +132,15 @@ fun NotificationSettingsScreen(
             AnimatedVisibility(
                 visible = preferences.notificationsEnabled,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 Column(
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp),
                 ) {
                     // Prior Notification Section - Collapsible
                     CollapsibleSection(
                         title = "Prior Notification",
-                        subtitle = "Minutes before prayer"
+                        subtitle = "Minutes before prayer",
                     ) {
                         SliderListItem("Fajr", preferences.fajrPriorMinutes, 60) { value ->
                             onPreferencesChanged(preferences.copy(fajrPriorMinutes = value))
@@ -146,7 +162,7 @@ fun NotificationSettingsScreen(
                     // Go to Mosque Section - Collapsible
                     CollapsibleSection(
                         title = "Go to Mosque Phase",
-                        subtitle = "Duration after prayer starts"
+                        subtitle = "Duration after prayer starts",
                     ) {
                         SliderListItem("Fajr", preferences.fajrGoToMosqueDuration, 45) { value ->
                             onPreferencesChanged(preferences.copy(fajrGoToMosqueDuration = value))
@@ -168,7 +184,7 @@ fun NotificationSettingsScreen(
                     // Per-prayer toggles - Collapsible
                     CollapsibleSection(
                         title = "Prayer Toggles",
-                        subtitle = "Enable for specific prayers"
+                        subtitle = "Enable for specific prayers",
                     ) {
                         ToggleListItem("Fajr", preferences.fajrNotificationEnabled) { enabled ->
                             onPreferencesChanged(preferences.copy(fajrNotificationEnabled = enabled))
@@ -200,7 +216,7 @@ private fun CollapsibleSection(
     subtitle: String,
     modifier: Modifier = Modifier,
     initiallyExpanded: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
 
@@ -210,9 +226,9 @@ private fun CollapsibleSection(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
-        border = CardDefaults.outlinedCardBorder()
+        border = CardDefaults.outlinedCardBorder(),
     ) {
         Column {
             // Clickable header
@@ -222,37 +238,39 @@ private fun CollapsibleSection(
                     .clickable { isExpanded = !isExpanded }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = if (isExpanded)
+                        imageVector = if (isExpanded) {
                             Icons.Default.KeyboardArrowUp
-                        else
-                            Icons.Default.KeyboardArrowDown,
+                        } else {
+                            Icons.Default.KeyboardArrowDown
+                        },
                         contentDescription = if (isExpanded) "Collapse" else "Expand",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
                 Icon(
-                    imageVector = if (isExpanded)
+                    imageVector = if (isExpanded) {
                         Icons.Default.KeyboardArrowUp
-                    else
-                        Icons.Default.KeyboardArrowDown,
+                    } else {
+                        Icons.Default.KeyboardArrowDown
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
@@ -260,12 +278,12 @@ private fun CollapsibleSection(
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 Column {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     content()
@@ -282,45 +300,47 @@ private fun SliderListItem(
     value: Int,
     maxValue: Int,
     modifier: Modifier = Modifier,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
             text = prayerName,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.width(60.dp)
+            modifier = Modifier.width(60.dp),
         )
 
         Slider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.toInt()) },
             valueRange = 0f..maxValue.toFloat(),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
 
         Surface(
-            color = if (value > 0)
+            color = if (value > 0) {
                 MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(6.dp)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+            shape = RoundedCornerShape(6.dp),
         ) {
             Text(
                 text = if (value == 0) "Off" else "${value}m",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
-                color = if (value > 0)
+                color = if (value > 0) {
                     MaterialTheme.colorScheme.onPrimaryContainer
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
     }
@@ -331,23 +351,23 @@ private fun ToggleListItem(
     prayerName: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    onEnabledChange: (Boolean) -> Unit
+    onEnabledChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = prayerName,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Switch(
             checked = enabled,
-            onCheckedChange = onEnabledChange
+            onCheckedChange = onEnabledChange,
         )
     }
 }

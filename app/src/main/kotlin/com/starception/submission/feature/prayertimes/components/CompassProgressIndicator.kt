@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import android.content.Context
@@ -10,32 +26,24 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Navigation
-
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
-import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -48,29 +56,29 @@ import kotlin.math.*
 
 /**
  * Enhanced Qibla Compass Component
- * 
+ *
  * A modern Islamic compass that combines prayer time countdown with Qibla direction indicator.
  * Uses Material 3 design principles with Islamic theming for religious applications.
- * 
+ *
  * ## Key Features:
  * - **Circular Progress Arc**: 10% arc that rotates to point toward Mecca (Qibla direction)
  * - **Prayer Time Display**: Shows remaining time until next prayer inside the compass
  * - **Islamic Theming**: Green color scheme with 🕋 Kaaba emoji for religious context
  * - **Real-time Updates**: Responds to device orientation changes via magnetometer sensor
  * - **Material 3 Design**: Clean, modern UI that integrates seamlessly with prayer apps
- * 
+ *
  * ## Design Philosophy:
  * - **Clean & Minimal**: No sensor status indicators or visual clutter
  * - **Islamic Colors**: Traditional green (#10B981) representing Islamic culture
  * - **Perfect Circle**: Clean white background with subtle border
  * - **Responsive**: Smooth animations using spring physics for natural feel
- * 
+ *
  * ## Technical Implementation:
  * - Uses `CircularProgressIndicator` for the Qibla direction arc
  * - Integrates with device magnetometer for compass functionality
  * - Location-based Qibla calculation using GPS coordinates
  * - Lifecycle-aware sensor management to preserve battery
- * 
+ *
  * @param progress Float value representing prayer time progress (not used for arc display)
  * @param timeText String showing time remaining until next prayer (e.g., "2h 57m")
  * @param modifier Modifier for styling and layout customization
@@ -85,12 +93,12 @@ fun CompassProgressIndicator(
     locationService: EnhancedLocationService? = null,
     userLatitude: Double = 0.0,
     userLongitude: Double = 0.0,
-    showGlobe: Boolean = false
+    showGlobe: Boolean = false,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     // COMPASS STATE - Modified for Qibla direction
     var compassDegree by remember { mutableFloatStateOf(0f) }
     var currentDegree by remember { mutableFloatStateOf(0f) }
@@ -107,12 +115,12 @@ fun CompassProgressIndicator(
     // Throttling for compass updates to prevent flickering
     var lastCompassUpdateTime by remember { mutableLongStateOf(0L) }
     val COMPASS_UPDATE_INTERVAL_MS = 50L // Update at most every 50ms (20 updates per second)
-    
+
     // SENSOR MANAGEMENT - Use TYPE_ORIENTATION for compass, TYPE_MAGNETIC_FIELD for accuracy
     val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val orientationSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION) }
     val magneticSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
-    
+
     // ORIENTATION SENSOR LISTENER - For compass direction
     val orientationListener = remember {
         object : SensorEventListener {
@@ -123,7 +131,7 @@ fun CompassProgressIndicator(
                     return
                 }
                 lastCompassUpdateTime = currentTime
-                
+
                 // Get device's magnetic north direction
                 val magneticNorth = Math.round(event!!.values[0]).toFloat()
                 compassDegree = magneticNorth
@@ -132,19 +140,19 @@ fun CompassProgressIndicator(
                     isInitializing = false
                 }
             }
-            
+
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
                 // Debounced via magnetic field listener — no direct update here
             }
         }
     }
-    
+
     // MAGNETIC FIELD SENSOR LISTENER - For accurate sensor strength detection
     val magneticFieldListener = remember {
         object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 if (event == null) return
-                
+
                 // Calculate magnetic field strength: sqrt(x^2 + y^2 + z^2)
                 val x = event.values[0]
                 val y = event.values[1]
@@ -174,13 +182,13 @@ fun CompassProgressIndicator(
                     }
                 }
             }
-            
+
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
                 // Debounced via onSensorChanged — no direct update here
             }
         }
     }
-    
+
     // INITIALIZATION DELAY - Prevent red flicker on refresh
     LaunchedEffect(Unit) {
         // Allow sensor to initialize properly before showing accuracy colors
@@ -189,7 +197,7 @@ fun CompassProgressIndicator(
             isInitializing = false
         }
     }
-    
+
     // GET USER LOCATION FOR QIBLA CALCULATION
     LaunchedEffect(locationService) {
         locationService?.let { service ->
@@ -200,18 +208,18 @@ fun CompassProgressIndicator(
                         // Calculate Qibla direction from user's location
                         qiblaDirection = calculateQiblaDirection(
                             lat1 = location.latitude,
-                            lon1 = location.longitude
+                            lon1 = location.longitude,
                         ).toFloat()
                     },
                     onFailure = {
                         // Use default Qibla direction (approximation) if location fails
                         qiblaDirection = 0f
-                    }
+                    },
                 )
             }
         }
     }
-    
+
     // QIBLA COMPASS ANIMATION - Needle points to Qibla direction
     // Combine device orientation with Qibla direction to show where Qibla is
     val targetDegree = -(compassDegree - qiblaDirection) // Point needle toward Qibla
@@ -221,33 +229,33 @@ fun CompassProgressIndicator(
         android.util.Log.d("QiblaCompass", "compassDegree=$compassDegree, qiblaDirection=$qiblaDirection, targetDegree=$targetDegree")
     }
     val currentDegreeState = remember { mutableFloatStateOf(targetDegree) }
-    
+
     // Calculate the shortest rotation path
     LaunchedEffect(targetDegree) {
         val currentValue = currentDegreeState.floatValue
         val diff = targetDegree - currentValue
-        
+
         // Normalize difference to [-180, 180] range
         val normalizedDiff = when {
             diff > 180f -> diff - 360f
             diff < -180f -> diff + 360f
             else -> diff
         }
-        
+
         currentDegreeState.floatValue = currentValue + normalizedDiff
     }
-    
+
     val animatedCompassDegree by animateFloatAsState(
         targetValue = currentDegreeState.floatValue,
         animationSpec = NiaMotion.spatialFast(),
-        label = "compassRotation"
+        label = "compassRotation",
     )
-    
+
     // Update current degree for rotation animation (same as original)
     LaunchedEffect(animatedCompassDegree) {
         currentDegree = animatedCompassDegree
     }
-    
+
     // LIFECYCLE MANAGEMENT - Register both sensors
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -257,17 +265,17 @@ fun CompassProgressIndicator(
                     // Register orientation sensor for compass direction
                     orientationSensor?.let {
                         sensorManager.registerListener(
-                            orientationListener, 
-                            it, 
-                            SensorManager.SENSOR_DELAY_GAME
+                            orientationListener,
+                            it,
+                            SensorManager.SENSOR_DELAY_GAME,
                         )
                     }
                     // Register magnetic field sensor for accuracy detection
                     magneticSensor?.let {
                         sensorManager.registerListener(
-                            magneticFieldListener, 
-                            it, 
-                            SensorManager.SENSOR_DELAY_GAME
+                            magneticFieldListener,
+                            it,
+                            SensorManager.SENSOR_DELAY_GAME,
                         )
                     }
                 }
@@ -280,32 +288,31 @@ fun CompassProgressIndicator(
                 else -> {}
             }
         }
-        
+
         lifecycleOwner.lifecycle.addObserver(observer)
-        
+
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             sensorManager.unregisterListener(orientationListener)
             sensorManager.unregisterListener(magneticFieldListener)
         }
     }
-    
-    
+
     // Helper functions for sensor accuracy testing
-    fun getAccuracyColor(accuracy: Int): Color = when(accuracy) {
+    fun getAccuracyColor(accuracy: Int): Color = when (accuracy) {
         SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF10B981)
         SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> Color(0xFFFFA500)
         SensorManager.SENSOR_STATUS_ACCURACY_LOW -> Color(0xFFFF6B6B)
         else -> Color(0xFFFF4444) // UNRELIABLE - Red
     }
-    
-    fun getAccuracyText(accuracy: Int): String = when(accuracy) {
+
+    fun getAccuracyText(accuracy: Int): String = when (accuracy) {
         SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "High Accuracy"
         SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "Medium Accuracy"
         SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "Low Accuracy - Calibrate"
         else -> "Move in Figure-8 Pattern" // UNRELIABLE
     }
-    
+
     val accuracyColor = if (isInitializing) Color(0xFF10B981) else getAccuracyColor(sensorAccuracy)
     val needsCalibration = !isInitializing && sensorAccuracy <= SensorManager.SENSOR_STATUS_ACCURACY_LOW
 
@@ -314,27 +321,27 @@ fun CompassProgressIndicator(
     val normalizedAngleEarly = ((qiblaAngleEarly % 360f) + 360f) % 360f
     val angularDistance = minOf(
         kotlin.math.abs(normalizedAngleEarly),
-        kotlin.math.abs(normalizedAngleEarly - 360f)
+        kotlin.math.abs(normalizedAngleEarly - 360f),
     )
     val isNearQibla = angularDistance <= 5f
 
     // ENHANCED DESIGN - Better Qibla identification with accuracy feedback
     Box(
         modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Animated glow intensity — blooms fully when aligned, dims when far off
         val glowAlpha by animateFloatAsState(
             targetValue = when {
-                isInitializing    -> 0f
-                needsCalibration  -> 0f
-                isNearQibla       -> 1f
+                isInitializing -> 0f
+                needsCalibration -> 0f
+                isNearQibla -> 1f
                 angularDistance < 45f -> 0.55f
                 angularDistance < 90f -> 0.30f
-                else              -> 0.15f
+                else -> 0.15f
             },
             animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_1),
-            label = "glowAlpha"
+            label = "glowAlpha",
         )
         val glowColor = if (isNearQibla) Color(0xFF10B981) else accuracyColor
 
@@ -342,7 +349,7 @@ fun CompassProgressIndicator(
         Canvas(
             modifier = Modifier
                 .size(size)
-                .rotate(animatedCompassDegree)
+                .rotate(animatedCompassDegree),
         ) {
             val center = Offset(this.size.width / 2f, this.size.height / 2f)
             val radius = (this.size.minDimension / 2f) - 1.dp.toPx()
@@ -398,17 +405,17 @@ fun CompassProgressIndicator(
         val arcAlpha by animateFloatAsState(
             targetValue = if (isNearQibla) 0f else 1f,
             animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
-            label = "arcAlpha"
+            label = "arcAlpha",
         )
         val arcScale by animateFloatAsState(
             targetValue = if (isNearQibla) 0.2f else 1f,
             animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
-            label = "arcScale"
+            label = "arcScale",
         )
         val arcProgress by animateFloatAsState(
             targetValue = if (isNearQibla) 0.03f else 0.15f,
             animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_3),
-            label = "arcProgress"
+            label = "arcProgress",
         )
 
         // Stroke width scales with compass size: ~3.5% of diameter, clamped 7–10dp
@@ -418,7 +425,7 @@ fun CompassProgressIndicator(
 
         // Debug logging for alignment detection
         android.util.Log.d("QiblaAlignment", "animatedCompassDegree=$animatedCompassDegree, normalizedAngle=$normalizedAngleEarly, angularDistance=$angularDistance, isNearQibla=$isNearQibla, needsCalibration=$needsCalibration")
-        
+
         // Stable rotation direction with time-based debounce to prevent rapid toggling
         val stableDirection = remember { mutableStateOf<Boolean?>(null) }
         val lastDirectionChangeTime = remember { mutableStateOf(0L) }
@@ -440,7 +447,7 @@ fun CompassProgressIndicator(
             // Direction wants to change
             val timeSinceLastChange = currentTime - lastDirectionChangeTime.value
             val isVeryClearDirection = normalizedAngleEarly < 30f || normalizedAngleEarly > 330f ||
-                                       (normalizedAngleEarly > 150f && normalizedAngleEarly < 210f)
+                (normalizedAngleEarly > 150f && normalizedAngleEarly < 210f)
 
             if (timeSinceLastChange > 800 || isVeryClearDirection) {
                 // Allow the change
@@ -455,19 +462,19 @@ fun CompassProgressIndicator(
             // Direction hasn't changed, keep it
             rawNeedsClockwise
         }
-        
+
         val kaabaScale by animateFloatAsState(
             targetValue = if (isNearQibla) 1.35f else 1f, // Subtle scale increase
             animationSpec = spring(
                 dampingRatio = 0.7f, // Less bouncy, more controlled
-                stiffness = 400f // Quick but smooth
+                stiffness = 400f, // Quick but smooth
             ),
-            label = "kaabaScale"
+            label = "kaabaScale",
         )
         val kaabaGlow by animateFloatAsState(
             targetValue = if (isNearQibla) 1f else 0f,
             animationSpec = NiaMotion.standardTween(NiaMotion.Duration.MEDIUM_4),
-            label = "kaabaGlow"
+            label = "kaabaGlow",
         )
         // Subtle breathing effect for Kaaba when aligned
         val infiniteTransition = rememberInfiniteTransition(label = "kaabaPulse")
@@ -476,12 +483,11 @@ fun CompassProgressIndicator(
             targetValue = 1.06f, // Very subtle pulse
             animationSpec = infiniteRepeatable(
                 animation = tween(1200, easing = FastOutSlowInEasing), // Slower, calmer
-                repeatMode = RepeatMode.Reverse
+                repeatMode = RepeatMode.Reverse,
             ),
-            label = "kaabaPulseAnim"
+            label = "kaabaPulseAnim",
         )
         val effectiveKaabaScale = if (isNearQibla) kaabaScale * kaabaPulse else kaabaScale
-
 
         // Kaaba icon positioned INSIDE the compass (not on arc track)
         // Hide when showing globe (globe has its own Kaaba marker)
@@ -497,7 +503,7 @@ fun CompassProgressIndicator(
 
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Subtle glow effect behind Kaaba when aligned
                 if (kaabaGlow > 0.1f) {
@@ -509,8 +515,8 @@ fun CompassProgressIndicator(
                             .graphicsLayer { alpha = kaabaGlow * 0.4f }
                             .background(
                                 Color(0xFF10B981).copy(alpha = 0.25f), // Softer green
-                                shape = CircleShape
-                            )
+                                shape = CircleShape,
+                            ),
                     )
                 }
 
@@ -523,18 +529,17 @@ fun CompassProgressIndicator(
                         .graphicsLayer {
                             scaleX = effectiveKaabaScale
                             scaleY = effectiveKaabaScale
-                        }
+                        },
                 )
             }
         }
-        
-        
+
         // Enhanced center content with integrated facing status or globe
         Box(
             modifier = Modifier
                 .size(size)
                 .padding(if (showGlobe) 0.dp else 16.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             if (showGlobe && userLatitude != 0.0 && userLongitude != 0.0) {
                 // Globe is a FrameLayout[WorldWindow + RingOverlayView].
@@ -549,26 +554,26 @@ fun CompassProgressIndicator(
                     else -> glowColor.toArgb()
                 }
                 SimpleGlobeView(
-                    userLatitude       = userLatitude,
-                    userLongitude      = userLongitude,
-                    modifier           = Modifier.size(size),
-                    ringStrokeWidthPx  = sw,
-                    ringColor          = 0xFFFFFFFF.toInt(),
-                    ringTintColor      = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f).toArgb(),
-                    arcColor           = arcColorInt,
-                    arcStartAngleDeg   = -90f,
-                    arcSweepDeg        = arcProgress * 360f,
-                    arcRotationDeg     = animatedCompassDegree,
+                    userLatitude = userLatitude,
+                    userLongitude = userLongitude,
+                    modifier = Modifier.size(size),
+                    ringStrokeWidthPx = sw,
+                    ringColor = 0xFFFFFFFF.toInt(),
+                    ringTintColor = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f).toArgb(),
+                    arcColor = arcColorInt,
+                    arcStartAngleDeg = -90f,
+                    arcSweepDeg = arcProgress * 360f,
+                    arcRotationDeg = animatedCompassDegree,
                     // Hidden on the globe: the heading cone already conveys direction,
                     // so the rotating accuracy arc (red when calibrating) is dropped to
                     // keep the globe clean. arcColor still drives the cone color.
-                    showArc            = false,
-                    deviceHeadingDeg   = compassDegree,
+                    showArc = false,
+                    deviceHeadingDeg = compassDegree,
                 )
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     // Qibla direction with status - no emoji since Kaaba icon is shown separately
                     val displayText = if (needsCalibration) {
@@ -578,7 +583,6 @@ fun CompassProgressIndicator(
                     } else {
                         "Qibla"
                     }
-
 
                     Text(
                         text = displayText,
@@ -622,63 +626,66 @@ fun CompassProgressIndicator(
                             fontWeight = if (isNearQibla && !needsCalibration) FontWeight.Medium else FontWeight.Medium,
                             fontSize = 13.sp,
                             lineHeight = 15.sp,
-                            modifier = Modifier.padding(top = 6.dp)
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
                 }
             }
         }
-        
+
         // Ring and arc Compose Canvases — only used in non-globe mode.
         // In globe mode the ring/arc are drawn by RingOverlayView inside SimpleGlobeView,
         // because Compose Canvas siblings are invisible behind the GLSurfaceView GL overlay.
-        if (!showGlobe) Canvas(modifier = Modifier.size(size)) {
-            val center = Offset(this.size.width / 2f, this.size.height / 2f)
-            val sw = ringStrokeWidth.toPx()
-            // Outer edge sits just inside the clip boundary: radius + sw/2 = halfSize - 0.5px
-            val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
+        if (!showGlobe) {
+            Canvas(modifier = Modifier.size(size)) {
+                val center = Offset(this.size.width / 2f, this.size.height / 2f)
+                val sw = ringStrokeWidth.toPx()
+                // Outer edge sits just inside the clip boundary: radius + sw/2 = halfSize - 0.5px
+                val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
 
-            // White base track
-            drawCircle(color = Color.White, radius = ringRadius, center = center, style = Stroke(width = sw))
-            // Accuracy tint overlay
-            drawCircle(color = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f), radius = ringRadius, center = center, style = Stroke(width = sw))
+                // White base track
+                drawCircle(color = Color.White, radius = ringRadius, center = center, style = Stroke(width = sw))
+                // Accuracy tint overlay
+                drawCircle(color = glowColor.copy(alpha = if (isNearQibla) 0.4f else 0.3f), radius = ringRadius, center = center, style = Stroke(width = sw))
+            }
         }
 
         // Mercury-like arc — rotates to point toward Qibla, settles at 12 o'clock when aligned.
         // startAngle is pre-centered so arc midpoint is at 12 o'clock when rotation = 0.
-        if (!showGlobe) Canvas(
-            modifier = Modifier
-                .size(size)
-                .rotate(animatedCompassDegree)
-                .graphicsLayer {
-                    alpha = arcAlpha
-                    scaleX = arcScale
-                    scaleY = arcScale
-                }
-        ) {
-            val center = Offset(this.size.width / 2f, this.size.height / 2f)
-            val sw = ringStrokeWidth.toPx()
-            val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
+        if (!showGlobe) {
+            Canvas(
+                modifier = Modifier
+                    .size(size)
+                    .rotate(animatedCompassDegree)
+                    .graphicsLayer {
+                        alpha = arcAlpha
+                        scaleX = arcScale
+                        scaleY = arcScale
+                    },
+            ) {
+                val center = Offset(this.size.width / 2f, this.size.height / 2f)
+                val sw = ringStrokeWidth.toPx()
+                val ringRadius = (this.size.minDimension / 2f) - sw / 2f - 0.5f
 
-            val arcColor = when {
-                isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF00C853)
-                needsCalibration -> Color(0xFFFF4444)
-                else -> accuracyColor
+                val arcColor = when {
+                    isNearQibla && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> Color(0xFF00C853)
+                    needsCalibration -> Color(0xFFFF4444)
+                    else -> accuracyColor
+                }
+                drawArc(
+                    color = arcColor,
+                    startAngle = -90f - arcProgress * 180f, // center arc at 12 o'clock (top)
+                    sweepAngle = arcProgress * 360f,
+                    useCenter = false,
+                    topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
+                    size = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
+                    style = Stroke(width = sw, cap = StrokeCap.Round),
+                )
             }
-            drawArc(
-                color = arcColor,
-                startAngle = -90f - arcProgress * 180f,  // center arc at 12 o'clock (top)
-                sweepAngle = arcProgress * 360f,
-                useCenter = false,
-                topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
-                size = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
-                style = Stroke(width = sw, cap = StrokeCap.Round)
-            )
         }
 
         // Note: Calibration message removed - now handled by CompassPopupScreen
         // The popup will automatically show when sensor accuracy is poor
-
     }
 }
 
@@ -687,7 +694,7 @@ fun CompassProgressIndicator(
 
 // Note: drawCompassNeedle function removed as we replaced the traditional compass needle
 // with a cleaner Material 3 CircularProgressIndicator approach for better UX and performance.
-// 
+//
 // ## Design Evolution:
 // - Old: Traditional compass needle with arrowhead pointing to Qibla
 // - New: 10% circular progress arc that rotates to indicate Qibla direction
@@ -696,7 +703,7 @@ fun CompassProgressIndicator(
 /* ============================================================================
  * COMPONENT ARCHITECTURE & USAGE
  * ============================================================================
- * 
+ *
  * ## Integration Example:
  * ```kotlin
  * CompassProgressIndicator(
@@ -706,21 +713,20 @@ fun CompassProgressIndicator(
  *     locationService = locationService
  * )
  * ```
- * 
+ *
  * ## State Management:
  * - **Sensor Management**: Automatic lifecycle-aware sensor registration/unregistration
  * - **Location Updates**: Real-time Qibla calculation based on GPS coordinates
  * - **Orientation Changes**: Smooth animation response to device rotation
  * - **Battery Optimization**: Sensors only active when component is visible
- * 
+ *
  * ## Color Scheme:
  * - **Primary Green**: #10B981 (Islamic traditional color)
  * - **Background**: White with subtle black border
  * - **Text**: High contrast black with Islamic green accent
- * 
+ *
  * ## Performance Notes:
  * - Uses hardware-accelerated Canvas drawing for smooth animations
  * - Spring-based physics for natural movement feel
  * - Optimized sensor sampling to balance accuracy with battery life
  * ============================================================================ */
-

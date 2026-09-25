@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.sensor
 
 import android.content.Context
@@ -5,26 +21,22 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
 import android.util.Log
 import com.starception.submission.ml.SalahDataSample
 import com.starception.submission.ml.SalahPosture
-import java.io.BufferedReader
+import org.json.JSONObject
 import java.io.BufferedWriter
 import java.io.File
-import java.io.FileReader
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.atan2
 import kotlin.math.sqrt
-import org.json.JSONObject
 
 /**
  * Service that records accelerometer + gyroscope sensor data for salah posture training.
@@ -54,8 +66,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
 
         /** Filename prefix for live-prayer recordings pending review (see [getGlobalPostureCounts]). */
         const val LIVE_FILE_PREFIX = "salah_live_"
+
         /** Filename prefix for guided recordings with instruction-derived labels. */
         const val GUIDED_FILE_PREFIX = "salah_guided_"
+
         /** Filename prefix for live recordings after explicit human review. */
         const val REVIEWED_FILE_PREFIX = "salah_reviewed_"
 
@@ -85,6 +99,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
     var sessionId: String = ""
         private set
     private var isRecording = false
+
     @Volatile
     private var isSampleCaptureEnabled = false
     private var isLiveMode: Boolean = false
@@ -140,7 +155,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "starception:SalahDataCollection"
+            "starception:SalahDataCollection",
         ).apply {
             // Safety timeout slightly past the max session length
             acquire(MAX_PRAYER_DURATION_MS + 60_000L)
@@ -330,7 +345,11 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                 kept.forEach { line ->
                     try {
                         val postureName = JSONObject(line).optString("posture", "")
-                        val posture = try { SalahPosture.valueOf(postureName) } catch (_: Exception) { null }
+                        val posture = try {
+                            SalahPosture.valueOf(postureName)
+                        } catch (_: Exception) {
+                            null
+                        }
                         if (posture != null) {
                             postureCounts[posture] = (postureCounts[posture] ?: 0) + 1
                         }
@@ -528,13 +547,13 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
         val pitch = Math.toDegrees(atan2(avgAccelY.toDouble(), avgAccelZ.toDouble())).toFloat()
         val roll = Math.toDegrees(atan2(avgAccelX.toDouble(), avgAccelZ.toDouble())).toFloat()
         val accelMag = sqrt(
-            avgAccelX * avgAccelX + avgAccelY * avgAccelY + avgAccelZ * avgAccelZ
+            avgAccelX * avgAccelX + avgAccelY * avgAccelY + avgAccelZ * avgAccelZ,
         )
         val avgGyroX = gx.average().toFloat()
         val avgGyroY = gy.average().toFloat()
         val avgGyroZ = gz.average().toFloat()
         val gyroMag = sqrt(
-            avgGyroX * avgGyroX + avgGyroY * avgGyroY + avgGyroZ * avgGyroZ
+            avgGyroX * avgGyroX + avgGyroY * avgGyroY + avgGyroZ * avgGyroZ,
         )
 
         val sample = SalahDataSample(
@@ -550,7 +569,7 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
             pitch = pitch,
             roll = roll,
             accelMagnitude = accelMag,
-            gyroMagnitude = gyroMag
+            gyroMagnitude = gyroMag,
         )
 
         // Write to JSONL file
@@ -803,7 +822,8 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                     val json = JSONObject(line)
                     when (json.optString("collection_mode", "")) {
                         CollectionMode.MANUAL.jsonValue,
-                        CollectionMode.GUIDED.jsonValue -> Unit
+                        CollectionMode.GUIDED.jsonValue,
+                        -> Unit
                         CollectionMode.LIVE.jsonValue -> if (!json.optBoolean("human_reviewed", false)) {
                             return "Live · needs review"
                         }
@@ -847,8 +867,10 @@ class SalahDataCollectionService(private val context: Context) : SensorEventList
                             val mode = json.optString("collection_mode", "")
                             val isEligible = mode == CollectionMode.MANUAL.jsonValue ||
                                 mode == CollectionMode.GUIDED.jsonValue ||
-                                (mode == CollectionMode.LIVE.jsonValue &&
-                                    json.optBoolean("human_reviewed", false))
+                                (
+                                    mode == CollectionMode.LIVE.jsonValue &&
+                                        json.optBoolean("human_reviewed", false)
+                                    )
                             if (isEligible && posture.isNotEmpty()) {
                                 counts[posture] = (counts[posture] ?: 0) + 1
                                 total++

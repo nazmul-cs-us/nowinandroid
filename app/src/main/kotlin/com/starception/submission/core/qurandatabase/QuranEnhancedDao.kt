@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import androidx.room.Dao
@@ -20,14 +36,16 @@ interface QuranEnhancedDao {
      * Get all Ayahs for a specific Surah
      * Returns lightweight basic model for list display
      */
-    @Query("""
+    @Query(
+        """
         SELECT id, sora as surahNumber, sora_name_en as surahNameEnglish,
                sora_name_ar as surahNameArabic, aya_no as ayahNumber,
                aya_text as ayahText, page as pageNumber, jozz as juz
         FROM quran
         WHERE sora = :surahNumber
         ORDER BY aya_no ASC
-    """)
+    """,
+    )
     suspend fun getAyahsBySurah(surahNumber: Int): List<QuranAyahBasic>
 
     /**
@@ -66,31 +84,36 @@ interface QuranEnhancedDao {
      * Get list of all Surahs with their first Ayah info
      * Useful for Surah selection screen
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT sora as surahNumber, sora_name_en as surahNameEnglish,
                sora_name_ar as surahNameArabic,
                (SELECT COUNT(*) FROM quran q2 WHERE q2.sora = quran.sora) as ayahCount
         FROM quran
         ORDER BY sora ASC
-    """)
+    """,
+    )
     suspend fun getAllSurahs(): List<SurahInfo>
 
     /**
      * Get Surah information by number
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT sora as surahNumber, sora_name_en as surahNameEnglish,
                sora_name_ar as surahNameArabic,
                (SELECT COUNT(*) FROM quran q2 WHERE q2.sora = quran.sora) as ayahCount
         FROM quran
         WHERE sora = :surahNumber
-    """)
+    """,
+    )
     suspend fun getSurahInfo(surahNumber: Int): SurahInfo?
 
     /**
      * Search Surahs by name (Arabic or English)
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT sora as surahNumber, sora_name_en as surahNameEnglish,
                sora_name_ar as surahNameArabic,
                (SELECT COUNT(*) FROM quran q2 WHERE q2.sora = quran.sora) as ayahCount
@@ -98,7 +121,8 @@ interface QuranEnhancedDao {
         WHERE sora_name_ar LIKE '%' || :query || '%'
            OR sora_name_en LIKE '%' || :query || '%'
         ORDER BY sora ASC
-    """)
+    """,
+    )
     suspend fun searchSurahs(query: String): List<SurahInfo>
 
     // ============= Page-Based Queries (Mushaf Layout) =============
@@ -107,14 +131,16 @@ interface QuranEnhancedDao {
      * Get all Ayahs on a specific page
      * For traditional Mushaf page display
      */
-    @Query("""
+    @Query(
+        """
         SELECT id, sora as surahNumber, aya_no as ayahNumber,
                aya_text as ayahText, page as pageNumber,
                line_start as lineStart, line_end as lineEnd
         FROM quran
         WHERE page = :pageNumber
         ORDER BY line_start ASC, aya_no ASC
-    """)
+    """,
+    )
     suspend fun getAyahsByPage(pageNumber: Int): List<QuranAyahPage>
 
     /**
@@ -127,17 +153,19 @@ interface QuranEnhancedDao {
      * Get Ayahs by line range on a page
      * For line-by-line audio playback
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM quran
         WHERE page = :pageNumber
           AND line_start >= :startLine
           AND line_end <= :endLine
         ORDER BY line_start ASC, aya_no ASC
-    """)
+    """,
+    )
     suspend fun getAyahsByLineRange(
         pageNumber: Int,
         startLine: Int,
-        endLine: Int
+        endLine: Int,
     ): List<QuranEnhancedEntity>
 
     /**
@@ -163,12 +191,14 @@ interface QuranEnhancedDao {
     /**
      * Get Juz information with Ayah counts
      */
-    @Query("""
+    @Query(
+        """
         SELECT DISTINCT jozz as juzNumber,
                (SELECT COUNT(*) FROM quran q2 WHERE q2.jozz = quran.jozz) as ayahCount
         FROM quran
         ORDER BY jozz ASC
-    """)
+    """,
+    )
     suspend fun getAllJuzInfo(): List<JuzInfo>
 
     // ============= Tafseer Queries =============
@@ -177,7 +207,8 @@ interface QuranEnhancedDao {
      * Get Tafseer for a specific Ayah
      * Returns all three Tafseer books plus related information
      */
-    @Query("""
+    @Query(
+        """
         SELECT id, sora as surahNumber, sora_name_ar as surahNameArabic,
                aya_no as ayahNumber, aya_text as ayahText,
                tafseer_saadi as tafseerSaadi, tafseer_moysar as tafseerMoysar,
@@ -185,46 +216,53 @@ interface QuranEnhancedDao {
                earab_quran as grammaticalAnalysis, reasons_of_verses as revelationReasons
         FROM quran
         WHERE sora = :surahNumber AND aya_no = :ayahNumber
-    """)
+    """,
+    )
     suspend fun getTafseerForAyah(surahNumber: Int, ayahNumber: Int): QuranAyahTafseer?
 
     /**
      * Get Tafseer Saadi for a Surah
      * Returns only Tafseer Saadi (most popular contemporary Tafseer)
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                tafseer_saadi as tafseer
         FROM quran
         WHERE sora = :surahNumber
         ORDER BY aya_no ASC
-    """)
+    """,
+    )
     suspend fun getTafseerSaadiBySurah(surahNumber: Int): List<AyahTafseerItem>
 
     /**
      * Get Tafseer Moysar for a Surah
      * Returns only Tafseer Moysar (simplified Tafseer)
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                tafseer_moysar as tafseer
         FROM quran
         WHERE sora = :surahNumber
         ORDER BY aya_no ASC
-    """)
+    """,
+    )
     suspend fun getTafseerMoysarBySurah(surahNumber: Int): List<AyahTafseerItem>
 
     /**
      * Get Tafseer Baghawi for a Surah
      * Returns only Tafseer Baghawi (classical Tafseer)
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                tafseer_bughiu as tafseer
         FROM quran
         WHERE sora = :surahNumber
         ORDER BY aya_no ASC
-    """)
+    """,
+    )
     suspend fun getTafseerBaghawiBySurah(surahNumber: Int): List<AyahTafseerItem>
 
     // ============= Grammar and Analysis Queries =============
@@ -232,34 +270,40 @@ interface QuranEnhancedDao {
     /**
      * Get grammatical analysis (I'rab) for an Ayah
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                earab_quran as analysis
         FROM quran
         WHERE sora = :surahNumber AND aya_no = :ayahNumber
-    """)
+    """,
+    )
     suspend fun getGrammaticalAnalysis(surahNumber: Int, ayahNumber: Int): AyahAnalysisItem?
 
     /**
      * Get word meanings for an Ayah
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                maany_aya as meanings
         FROM quran
         WHERE sora = :surahNumber AND aya_no = :ayahNumber
-    """)
+    """,
+    )
     suspend fun getAyahMeanings(surahNumber: Int, ayahNumber: Int): AyahMeaningsItem?
 
     /**
      * Get revelation reasons (Asbab al-Nuzul) for an Ayah
      */
-    @Query("""
+    @Query(
+        """
         SELECT aya_no as ayahNumber, aya_text as ayahText,
                reasons_of_verses as reasons
         FROM quran
         WHERE sora = :surahNumber AND aya_no = :ayahNumber
-    """)
+    """,
+    )
     suspend fun getRevelationReasons(surahNumber: Int, ayahNumber: Int): AyahReasonsItem?
 
     // ============= Search Queries =============
@@ -267,48 +311,56 @@ interface QuranEnhancedDao {
     /**
      * Search Ayahs by Arabic text (with tashkeel)
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM quran
         WHERE aya_text LIKE '%' || :query || '%'
         ORDER BY sora ASC, aya_no ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAyahsArabic(query: String, limit: Int = 100): List<QuranEnhancedEntity>
 
     /**
      * Search Ayahs by simplified Arabic text (without tashkeel)
      * Better for search as users often type without diacritics
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM quran
         WHERE aya_text_emlaey LIKE '%' || :query || '%'
         ORDER BY sora ASC, aya_no ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAyahsEmlaey(query: String, limit: Int = 100): List<QuranEnhancedEntity>
 
     /**
      * Search in Tafseer Saadi
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM quran
         WHERE tafseer_saadi LIKE '%' || :query || '%'
         ORDER BY sora ASC, aya_no ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchTafseerSaadi(query: String, limit: Int = 50): List<QuranEnhancedEntity>
 
     /**
      * Search in all Tafseer books
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM quran
         WHERE tafseer_saadi LIKE '%' || :query || '%'
            OR tafseer_moysar LIKE '%' || :query || '%'
            OR tafseer_bughiu LIKE '%' || :query || '%'
         ORDER BY sora ASC, aya_no ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchAllTafseer(query: String, limit: Int = 50): List<QuranEnhancedEntity>
 
     // ============= Text Variant Queries =============
@@ -317,14 +369,16 @@ interface QuranEnhancedDao {
      * Get different text variants for an Ayah
      * Returns all three Arabic text versions
      */
-    @Query("""
+    @Query(
+        """
         SELECT sora as surahNumber, aya_no as ayahNumber,
                aya_text as textWithTashkeel,
                aya_text_emlaey as textEmlaey,
                aya_text_tashkil as textTashkil
         FROM quran
         WHERE sora = :surahNumber AND aya_no = :ayahNumber
-    """)
+    """,
+    )
     suspend fun getTextVariants(surahNumber: Int, ayahNumber: Int): AyahTextVariants?
 }
 
@@ -337,7 +391,7 @@ data class SurahInfo(
     val surahNumber: Int,
     val surahNameEnglish: String,
     val surahNameArabic: String,
-    val ayahCount: Int
+    val ayahCount: Int,
 )
 
 /**
@@ -345,7 +399,7 @@ data class SurahInfo(
  */
 data class JuzInfo(
     val juzNumber: Int,
-    val ayahCount: Int
+    val ayahCount: Int,
 )
 
 /**
@@ -355,7 +409,7 @@ data class JuzInfo(
 data class AyahTafseerItem(
     val ayahNumber: Int,
     val ayahText: String,
-    val tafseer: String
+    val tafseer: String,
 )
 
 /**
@@ -364,7 +418,7 @@ data class AyahTafseerItem(
 data class AyahAnalysisItem(
     val ayahNumber: Int,
     val ayahText: String,
-    val analysis: String
+    val analysis: String,
 )
 
 /**
@@ -373,7 +427,7 @@ data class AyahAnalysisItem(
 data class AyahMeaningsItem(
     val ayahNumber: Int,
     val ayahText: String,
-    val meanings: String
+    val meanings: String,
 )
 
 /**
@@ -382,7 +436,7 @@ data class AyahMeaningsItem(
 data class AyahReasonsItem(
     val ayahNumber: Int,
     val ayahText: String,
-    val reasons: String
+    val reasons: String,
 )
 
 /**
@@ -393,5 +447,5 @@ data class AyahTextVariants(
     val ayahNumber: Int,
     val textWithTashkeel: String,
     val textEmlaey: String,
-    val textTashkil: String
+    val textTashkil: String,
 )

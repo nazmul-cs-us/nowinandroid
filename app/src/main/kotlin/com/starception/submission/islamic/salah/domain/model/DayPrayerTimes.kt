@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.islamic.salah.domain.model
 
 import com.starception.submission.prayer.model.Location
@@ -6,10 +22,10 @@ import java.time.LocalTime
 
 /**
  * Daily Islamic Prayer Times Model
- * 
+ *
  * Contains all prayer times for a specific day with intelligent status tracking.
  * This model provides the complete daily prayer schedule with real-time status updates.
- * 
+ *
  * @param date The specific date and time these prayers are calculated for
  * @param fajr Dawn prayer time
  * @param sunrise Sunrise time (for calculation reference)
@@ -27,9 +43,9 @@ data class DayPrayerTimes(
     val asr: LocalTime,
     val maghrib: LocalTime,
     val isha: LocalTime,
-    val location: Location
+    val location: Location,
 ) {
-    
+
     /**
      * Get all prayer times including sunrise with status calculation
      */
@@ -39,38 +55,38 @@ data class DayPrayerTimes(
             PrayerTime(
                 name = PrayerNames.FAJR,
                 arabicName = PrayerNames.FAJR_ARABIC,
-                time = fajr
+                time = fajr,
             ),
             PrayerTime(
                 name = PrayerNames.SUNRISE,
                 arabicName = PrayerNames.SUNRISE_ARABIC,
-                time = sunrise
+                time = sunrise,
             ),
             PrayerTime(
                 name = PrayerNames.DHUHR,
                 arabicName = PrayerNames.DHUHR_ARABIC,
-                time = dhuhr
+                time = dhuhr,
             ),
             PrayerTime(
                 name = PrayerNames.ASR,
                 arabicName = PrayerNames.ASR_ARABIC,
-                time = asr
+                time = asr,
             ),
             PrayerTime(
                 name = PrayerNames.MAGHRIB,
                 arabicName = PrayerNames.MAGHRIB_ARABIC,
-                time = maghrib
+                time = maghrib,
             ),
             PrayerTime(
                 name = PrayerNames.ISHA,
                 arabicName = PrayerNames.ISHA_ARABIC,
-                time = isha
-            )
+                time = isha,
+            ),
         )
-        
+
         return applyStatusToList(prayers, now)
     }
-    
+
     /**
      * Get only the five obligatory prayers (excludes sunrise)
      */
@@ -80,68 +96,68 @@ data class DayPrayerTimes(
             PrayerTime(
                 name = PrayerNames.FAJR,
                 arabicName = PrayerNames.FAJR_ARABIC,
-                time = fajr
+                time = fajr,
             ),
             PrayerTime(
                 name = PrayerNames.DHUHR,
                 arabicName = PrayerNames.DHUHR_ARABIC,
-                time = dhuhr
+                time = dhuhr,
             ),
             PrayerTime(
                 name = PrayerNames.ASR,
                 arabicName = PrayerNames.ASR_ARABIC,
-                time = asr
+                time = asr,
             ),
             PrayerTime(
                 name = PrayerNames.MAGHRIB,
                 arabicName = PrayerNames.MAGHRIB_ARABIC,
-                time = maghrib
+                time = maghrib,
             ),
             PrayerTime(
                 name = PrayerNames.ISHA,
                 arabicName = PrayerNames.ISHA_ARABIC,
-                time = isha
-            )
+                time = isha,
+            ),
         )
-        
+
         return applyStatusToList(prayers, now)
     }
-    
+
     /**
      * Get the next upcoming prayer
      */
     fun getNextPrayer(): PrayerTime? {
         return getActualPrayers().find { it.isNext }
     }
-    
+
     /**
      * Get the currently active prayer
      */
     fun getCurrentPrayer(): PrayerTime? {
         return getActualPrayers().find { it.isCurrently }
     }
-    
+
     /**
      * Calculate time remaining until next prayer
      */
     fun getTimeUntilNextPrayer(): String {
         val nextPrayer = getNextPrayer() ?: return "Unknown"
         val now = LocalTime.now()
-        
+
         val hoursUntil = if (nextPrayer.time.isAfter(now)) {
             nextPrayer.time.hour - now.hour
         } else {
             // Next day
             24 - now.hour + nextPrayer.time.hour
         }
-        
+
         val minutesUntil = if (nextPrayer.time.isAfter(now)) {
             nextPrayer.time.minute - now.minute
         } else {
             // Next day calculation
             nextPrayer.time.minute - now.minute
         }
-        
+
         return when {
             hoursUntil > 1 -> "${hoursUntil}h ${minutesUntil}m"
             hoursUntil == 1 -> "1h ${minutesUntil}m"
@@ -149,13 +165,13 @@ data class DayPrayerTimes(
             else -> "Now"
         }
     }
-    
+
     /**
      * Apply status calculation to a list of prayers
      */
     private fun applyStatusToList(prayers: List<PrayerTime>, now: LocalTime): List<PrayerTime> {
         val nextPrayerIndex = prayers.indexOfFirst { it.time.isAfter(now) }
-        
+
         return prayers.mapIndexed { index, prayer ->
             val isCurrently = when {
                 // For prayers before Isha, check if we're between this prayer and the next
@@ -164,7 +180,7 @@ data class DayPrayerTimes(
                 index == prayers.size - 1 && now.isAfter(prayer.time) && now.isBefore(prayer.time.plusHours(2)) -> true
                 else -> false
             }
-            
+
             val isNext = when {
                 // If there's a next prayer today, mark it
                 index == nextPrayerIndex -> true
@@ -172,10 +188,10 @@ data class DayPrayerTimes(
                 nextPrayerIndex == -1 && index == 0 -> true
                 else -> false
             }
-            
+
             prayer.copy(
                 isNext = isNext,
-                isCurrently = isCurrently
+                isCurrently = isCurrently,
             )
         }
     }

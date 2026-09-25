@@ -1,11 +1,25 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.download
 
 import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +41,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.starception.submission.core.designsystem.animation.NiaTransitions
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -131,118 +145,120 @@ fun MissingContentCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                when (state) {
-                is DownloadCardState.Idle -> {
-                    val sizeText = if (categorySize > 0) {
-                        " (${formatSize(categorySize)})"
-                    } else ""
+                    when (state) {
+                        is DownloadCardState.Idle -> {
+                            val sizeText = if (categorySize > 0) {
+                                " (${formatSize(categorySize)})"
+                            } else {
+                                ""
+                            }
 
-                    if (downloadManager.isOnCellularData()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SignalCellularAlt,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                            Text(
-                                text = "You're on mobile data — this download will use your data plan.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-
-                    NiaOutlinedButton(
-                        onClick = {
-                            downloadState = DownloadCardState.Downloading(0f)
-                            scope.launch {
-                                try {
-                                    val manifest = withContext(Dispatchers.IO) {
-                                        downloadManager.loadManifest()
-                                    }
-                                    if (manifest == null) {
-                                        downloadState = DownloadCardState.Failed("No manifest available")
-                                        return@launch
-                                    }
-                                    val completed = withContext(Dispatchers.IO) {
-                                        downloadManager.downloadCategory(category, manifest) { progress, _, _ ->
-                                            downloadState = DownloadCardState.Downloading(progress)
-                                        }
-                                    }
-                                    if (!completed) {
-                                        downloadState = DownloadCardState.Failed(
-                                            "Some files could not be downloaded. Please try again.",
-                                        )
-                                        return@launch
-                                    }
-                                    downloadState = DownloadCardState.Completed
-                                    onDownloadComplete()
-                                } catch (e: Exception) {
-                                    Log.e("MissingContentCard", "Download failed", e)
-                                    downloadState = DownloadCardState.Failed(
-                                        e.message ?: "Download failed"
+                            if (downloadManager.isOnCellularData()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SignalCellularAlt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                    Text(
+                                        text = "You're on mobile data — this download will use your data plan.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        textAlign = TextAlign.Center,
                                     )
                                 }
                             }
-                        },
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudDownload,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Download$sizeText")
+
+                            NiaOutlinedButton(
+                                onClick = {
+                                    downloadState = DownloadCardState.Downloading(0f)
+                                    scope.launch {
+                                        try {
+                                            val manifest = withContext(Dispatchers.IO) {
+                                                downloadManager.loadManifest()
+                                            }
+                                            if (manifest == null) {
+                                                downloadState = DownloadCardState.Failed("No manifest available")
+                                                return@launch
+                                            }
+                                            val completed = withContext(Dispatchers.IO) {
+                                                downloadManager.downloadCategory(category, manifest) { progress, _, _ ->
+                                                    downloadState = DownloadCardState.Downloading(progress)
+                                                }
+                                            }
+                                            if (!completed) {
+                                                downloadState = DownloadCardState.Failed(
+                                                    "Some files could not be downloaded. Please try again.",
+                                                )
+                                                return@launch
+                                            }
+                                            downloadState = DownloadCardState.Completed
+                                            onDownloadComplete()
+                                        } catch (e: Exception) {
+                                            Log.e("MissingContentCard", "Download failed", e)
+                                            downloadState = DownloadCardState.Failed(
+                                                e.message ?: "Download failed",
+                                            )
+                                        }
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Download$sizeText")
+                            }
+                        }
+
+                        is DownloadCardState.Downloading -> {
+                            LinearProgressIndicator(
+                                progress = { state.progress },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                text = "Downloading... ${(state.progress * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        is DownloadCardState.Completed -> {
+                            // Brief completion state - onDownloadComplete already called
+                            Text(
+                                text = "Download complete",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+
+                        is DownloadCardState.Failed -> {
+                            Text(
+                                text = state.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            NiaOutlinedButton(
+                                onClick = { downloadState = DownloadCardState.Idle },
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Retry")
+                            }
+                        }
                     }
-                }
-
-                is DownloadCardState.Downloading -> {
-                    LinearProgressIndicator(
-                        progress = { state.progress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text = "Downloading... ${(state.progress * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                is DownloadCardState.Completed -> {
-                    // Brief completion state - onDownloadComplete already called
-                    Text(
-                        text = "Download complete",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-
-                is DownloadCardState.Failed -> {
-                    Text(
-                        text = state.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    NiaOutlinedButton(
-                        onClick = { downloadState = DownloadCardState.Idle },
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Retry")
-                    }
-                }
-                }
                 }
             }
         }

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -36,50 +52,50 @@ import androidx.glance.semantics.semantics
  */
 @Composable
 fun ListItem(
-  headlineContent: @Composable (() -> Unit),
-  modifier: GlanceModifier = GlanceModifier,
-  contentSpacing: Dp = 16.dp,
-  supportingContent: @Composable (() -> Unit)? = null,
-  leadingContent: @Composable (() -> Unit)? = null,
-  trailingContent: @Composable (() -> Unit)? = null,
-  onClick: Action? = null,
-  itemContentDescription: String? = null,
+    headlineContent: @Composable (() -> Unit),
+    modifier: GlanceModifier = GlanceModifier,
+    contentSpacing: Dp = 16.dp,
+    supportingContent: @Composable (() -> Unit)? = null,
+    leadingContent: @Composable (() -> Unit)? = null,
+    trailingContent: @Composable (() -> Unit)? = null,
+    onClick: Action? = null,
+    itemContentDescription: String? = null,
 ) {
-  val listItemModifier = if (itemContentDescription != null) {
-    modifier.semantics { contentDescription = itemContentDescription }
-  } else {
-    modifier
-  }
+    val listItemModifier = if (itemContentDescription != null) {
+        modifier.semantics { contentDescription = itemContentDescription }
+    } else {
+        modifier
+    }
 
-  Row(
-    modifier = listItemModifier.maybeClickable(onClick),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    // Leading
-    leadingContent?.let {
-      it()
-      Spacer(modifier = GlanceModifier.width(contentSpacing))
-    }
-    // Center
-    Column(
-      modifier = GlanceModifier.defaultWeight(),
-      verticalAlignment = Alignment.CenterVertically
+    Row(
+        modifier = listItemModifier.maybeClickable(onClick),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-      headlineContent()
-      supportingContent?.let { it() }
+        // Leading
+        leadingContent?.let {
+            it()
+            Spacer(modifier = GlanceModifier.width(contentSpacing))
+        }
+        // Center
+        Column(
+            modifier = GlanceModifier.defaultWeight(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            headlineContent()
+            supportingContent?.let { it() }
+        }
+        // Trailing
+        trailingContent?.let {
+            Spacer(modifier = GlanceModifier.width(contentSpacing))
+            it()
+        }
     }
-    // Trailing
-    trailingContent?.let {
-      Spacer(modifier = GlanceModifier.width(contentSpacing))
-      it()
-    }
-  }
 }
 
 private fun GlanceModifier.maybeClickable(action: Action?): GlanceModifier {
-  return if (action != null) {
-    this.clickable(action)
-  } else {
-    this
-  }
+    return if (action != null) {
+        this.clickable(action)
+    } else {
+        this
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ internal enum class WidgetFoliagePlacement {
 internal object WidgetFoliageArtwork {
 
     private const val FRAME_COUNT = 12
+
     // Rasterise at half the logical drawing size. The curves stay clean when the launcher
     // scales them, while eight ARGB frames remain comfortably below RemoteViews' bitmap
     // memory ceiling even when two decorated cards are present.

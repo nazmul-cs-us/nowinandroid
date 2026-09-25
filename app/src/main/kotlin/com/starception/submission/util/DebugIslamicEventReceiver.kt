@@ -1,18 +1,19 @@
 /*
- * Debug-only BroadcastReceiver to force-show an Islamic-event banner in
- * PullToSyncContainer. Lets us verify the banner visually without waiting for
- * a real Hijri event day.
+ * Copyright 2026 The Android Open Source Project
  *
- * Usage (one of the supported keys: arafah | ashura | laylat_qadr | eid_fitr
- * | eid_adha | tashreeq | hijri_new_year):
- *   adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_ISLAMIC_EVENT \
- *     --es key arafah \
- *     -n com.starception.submission.demo.debug/com.starception.submission.util.DebugIslamicEventReceiver
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Clear the override (back to real-date behaviour):
- *   adb shell am broadcast -a com.starception.submission.DEBUG_SIMULATE_ISLAMIC_EVENT --ez clear true \
- *     -n com.starception.submission.demo.debug/com.starception.submission.util.DebugIslamicEventReceiver
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.starception.submission.util
 
 import android.content.BroadcastReceiver

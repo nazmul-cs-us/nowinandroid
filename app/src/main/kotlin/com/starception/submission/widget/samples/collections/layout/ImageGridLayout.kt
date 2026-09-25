@@ -1,6 +1,23 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
@@ -13,13 +30,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import android.content.Context
-import android.content.Intent
 import androidx.glance.action.Action
-import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
-import com.starception.submission.MainActivity
-import com.starception.submission.widget.WidgetNavigationBus
-import com.starception.submission.widget.WidgetNavigationTarget
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
@@ -34,7 +45,11 @@ import androidx.glance.layout.wrapContentHeight
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.starception.submission.MainActivity
 import com.starception.submission.R
+import com.starception.submission.widget.LocalWidgetHostBackground
+import com.starception.submission.widget.WidgetNavigationBus
+import com.starception.submission.widget.WidgetNavigationTarget
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.contentPadding
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.gridCells
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutDimensions.imageCornerRadius
@@ -45,6 +60,7 @@ import com.starception.submission.widget.samples.collections.layout.ImageGridLay
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutSize.Medium
 import com.starception.submission.widget.samples.collections.layout.ImageGridLayoutSize.Small
 import com.starception.submission.widget.samples.utils.ActionUtils
+import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
 
 /**
  * A layout focused on presenting a grid of images (with optional title and supporting text). The
@@ -80,140 +96,142 @@ import com.starception.submission.widget.samples.utils.ActionUtils
  */
 @Composable
 fun ImageGridLayout(
-  title: String,
-  @DrawableRes titleIconRes: Int,
-  @DrawableRes titleBarActionIconRes: Int,
-  titleBarActionIconContentDescription: String,
-  titleBarAction: () -> Unit,
-  items: List<ImageGridItemData>,
+    title: String,
+    @DrawableRes titleIconRes: Int,
+    @DrawableRes titleBarActionIconRes: Int,
+    titleBarActionIconContentDescription: String,
+    titleBarAction: () -> Unit,
+    items: List<ImageGridItemData>,
 ) {
-
-  @Composable
-  fun TitleBar() {
-    TitleBar(
-      startIcon = ImageProvider(titleIconRes),
-      title = title.takeIf { LocalSize.current.width >= titleTextBreakpoint } ?: "",
-      iconColor = GlanceTheme.colors.primary,
-      textColor = GlanceTheme.colors.onSurface,
-      actions = {
-        CircleIconButton(
-          imageProvider = ImageProvider(titleBarActionIconRes),
-          contentDescription = titleBarActionIconContentDescription,
-          contentColor = GlanceTheme.colors.secondary,
-          backgroundColor = null, // transparent
-          onClick = titleBarAction
+    @Composable
+    fun TitleBar() {
+        TitleBar(
+            startIcon = ImageProvider(titleIconRes),
+            title = title.takeIf { LocalSize.current.width >= titleTextBreakpoint } ?: "",
+            iconColor = GlanceTheme.colors.primary,
+            textColor = GlanceTheme.colors.onSurface,
+            actions = {
+                CircleIconButton(
+                    imageProvider = ImageProvider(titleBarActionIconRes),
+                    contentDescription = titleBarActionIconContentDescription,
+                    contentColor = GlanceTheme.colors.secondary,
+                    backgroundColor = null, // transparent
+                    onClick = titleBarAction,
+                )
+            },
         )
-      }
-    )
-  }
-
-  Scaffold(
-    titleBar = { TitleBar() },
-    backgroundColor = LocalWidgetHostBackground.current,
-    horizontalPadding = contentPadding,
-    modifier = GlanceModifier
-      .padding(bottom = contentPadding)
-  ) {
-    if (items.isEmpty()) {
-      EmptyListContent()
-    } else {
-      Grid(items)
     }
-  }
+
+    Scaffold(
+        titleBar = { TitleBar() },
+        backgroundColor = LocalWidgetHostBackground.current,
+        horizontalPadding = contentPadding,
+        modifier = GlanceModifier
+            .padding(bottom = contentPadding),
+    ) {
+        if (items.isEmpty()) {
+            EmptyListContent()
+        } else {
+            Grid(items)
+        }
+    }
 }
 
 @Composable
 private fun Grid(items: List<ImageGridItemData>) {
-  RoundedScrollingLazyVerticalGrid(
-    modifier = GlanceModifier.fillMaxSize(),
-    gridCells = gridCells,
-    items = items,
-    itemContentProvider = { item ->
-      GridItem(
-        item = item,
-        modifier = GlanceModifier.fillMaxSize()
-      )
-    })
+    RoundedScrollingLazyVerticalGrid(
+        modifier = GlanceModifier.fillMaxSize(),
+        gridCells = gridCells,
+        items = items,
+        itemContentProvider = { item ->
+            GridItem(
+                item = item,
+                modifier = GlanceModifier.fillMaxSize(),
+            )
+        },
+    )
 }
 
 @Composable
 private fun GridItem(
-  item: ImageGridItemData,
-  modifier: GlanceModifier,
+    item: ImageGridItemData,
+    modifier: GlanceModifier,
 ) {
-  @Composable
-  fun Image() {
-    val imageProvider = if (item.image != null) {
-      ImageProvider(item.image)
+    @Composable
+    fun Image() {
+        val imageProvider = if (item.image != null) {
+            ImageProvider(item.image)
+        } else {
+            ImageProvider(R.drawable.sample_placeholder_image)
+        }
+
+        Image(
+            provider = imageProvider,
+            contentDescription = item.imageContentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = GlanceModifier
+                .cornerRadius(imageCornerRadius)
+                .fillMaxWidth()
+                .wrapContentHeight(),
+        )
+    }
+
+    @Composable
+    fun Title(text: String) {
+        Text(
+            text = text,
+            maxLines = 1,
+            style = ImageGridLayoutTextStyles.titleText,
+            modifier = GlanceModifier.padding(start = textStartMargin),
+        )
+    }
+
+    @Composable
+    fun SupportingText(text: String) {
+        Text(
+            text = text,
+            maxLines = 1,
+            style = ImageGridLayoutTextStyles.supportingText,
+            modifier = GlanceModifier.padding(start = textStartMargin),
+        )
+    }
+
+    if (item.title != null) {
+        VerticalListItem(
+            modifier = modifier
+                .cornerRadius(itemCornerRadius)
+                // Opens the surah the tile names. Falls back to the sample's demo action only
+                // when the tile could not be resolved to one, which should not happen for the
+                // Quran grid but keeps the layout usable for any other data source.
+                .clickable(
+                    item.surahNumber
+                        ?.let { surahOpenAction(LocalContext.current, it) }
+                        ?: ActionUtils.actionStartDemoActivity("Item click ${item.title}"),
+                ),
+            topContent = { Image() },
+            titleContent = { Title(text = item.title) },
+            supportingContent = takeComposableIf(item.supportingText != null) {
+                SupportingText(text = checkNotNull(item.supportingText))
+            },
+        )
     } else {
-      ImageProvider(R.drawable.sample_placeholder_image)
+        Box(modifier) {
+            Image()
+        }
     }
-
-    Image(
-      provider = imageProvider,
-      contentDescription = item.imageContentDescription,
-      contentScale = ContentScale.Fit,
-      modifier = GlanceModifier
-        .cornerRadius(imageCornerRadius)
-        .fillMaxWidth()
-        .wrapContentHeight()
-    )
-  }
-
-  @Composable
-  fun Title(text: String) {
-    Text(
-      text = text,
-      maxLines = 1,
-      style = ImageGridLayoutTextStyles.titleText,
-      modifier = GlanceModifier.padding(start = textStartMargin)
-    )
-  }
-
-  @Composable
-  fun SupportingText(text: String) {
-    Text(
-      text = text,
-      maxLines = 1,
-      style = ImageGridLayoutTextStyles.supportingText,
-      modifier = GlanceModifier.padding(start = textStartMargin)
-    )
-  }
-
-  if (item.title != null) {
-    VerticalListItem(
-      modifier = modifier
-        .cornerRadius(itemCornerRadius)
-        // Opens the surah the tile names. Falls back to the sample's demo action only
-        // when the tile could not be resolved to one, which should not happen for the
-        // Quran grid but keeps the layout usable for any other data source.
-        .clickable(
-          item.surahNumber
-            ?.let { surahOpenAction(LocalContext.current, it) }
-            ?: ActionUtils.actionStartDemoActivity("Item click ${item.title}"),
-        ),
-      topContent = { Image() },
-      titleContent = { Title(text = item.title) },
-      supportingContent = takeComposableIf(item.supportingText != null) {
-        SupportingText(text = checkNotNull(item.supportingText))
-      }
-    )
-  } else {
-    Box(modifier) {
-      Image()
-    }
-  }
 }
 
 /** Returns the provided [block] composable if [predicate] is true, else returns null */
 @Composable
 private inline fun takeComposableIf(
-  predicate: Boolean,
-  crossinline block: @Composable () -> Unit,
+    predicate: Boolean,
+    crossinline block: @Composable () -> Unit,
 ): (@Composable () -> Unit)? {
-  return if (predicate) {
-    { block() }
-  } else null
+    return if (predicate) {
+        { block() }
+    } else {
+        null
+    }
 }
 
 /**
@@ -224,23 +242,23 @@ private inline fun takeComposableIf(
  * acts on once it exists.
  */
 private fun surahOpenAction(context: Context, surahNumber: Int): Action {
-  val intent = WidgetNavigationBus.put(
-    Intent(context, MainActivity::class.java).apply {
-      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-    },
-    WidgetNavigationTarget.Surah(surahNumber),
-  )
-  return actionStartIntent(intent)
+    val intent = WidgetNavigationBus.put(
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        WidgetNavigationTarget.Surah(surahNumber),
+    )
+    return actionStartIntent(intent)
 }
 
 data class ImageGridItemData(
-  val key: String,
-  val image: Bitmap?,
-  val imageContentDescription: String?,
-  val title: String? = null,
-  val supportingText: String? = null,
-  /** Surah this tile stands for, so tapping it can open that surah. Null if unknown. */
-  val surahNumber: Int? = null,
+    val key: String,
+    val image: Bitmap?,
+    val imageContentDescription: String?,
+    val title: String? = null,
+    val supportingText: String? = null,
+    /** Surah this tile stands for, so tapping it can open that surah. Null if unknown. */
+    val surahNumber: Int? = null,
 )
 
 /**
@@ -250,87 +268,89 @@ data class ImageGridItemData(
  * In this layout, only width breakpoints are used to scale the layout.
  */
 private enum class ImageGridLayoutSize(val maxWidth: Dp) {
-  // Smaller fonts, single column
-  Small(maxWidth = 320.dp),
+    // Smaller fonts, single column
+    Small(maxWidth = 320.dp),
 
-  // Larger fonts, 2 column
-  Medium(maxWidth = 519.dp),
+    // Larger fonts, 2 column
+    Medium(maxWidth = 519.dp),
 
-  // 3 column
-  Large(maxWidth = Dp.Infinity);
+    // 3 column
+    Large(maxWidth = Dp.Infinity),
+    ;
 
-  companion object {
-    /**
-     * Returns the corresponding [ImageGridLayoutSize] to be considered for the current widget
-     * size.
-     */
-    @Composable
-    fun fromLocalSize(): ImageGridLayoutSize {
-      val size = LocalSize.current
+    companion object {
+        /**
+         * Returns the corresponding [ImageGridLayoutSize] to be considered for the current widget
+         * size.
+         */
+        @Composable
+        fun fromLocalSize(): ImageGridLayoutSize {
+            val size = LocalSize.current
 
-      ImageGridLayoutSize.values().forEach {
-        if (size.width < it.maxWidth) {
-          return it
+            ImageGridLayoutSize.values().forEach {
+                if (size.width < it.maxWidth) {
+                    return it
+                }
+            }
+            throw IllegalStateException("No mapped size ")
         }
-      }
-      throw IllegalStateException("No mapped size ")
     }
-  }
 }
 
 private object ImageGridLayoutTextStyles {
-  /**
-   * Style for the text displayed as title within each item.
-   */
-  val titleText: TextStyle
-    @Composable get() = TextStyle(
-      fontWeight = FontWeight.Medium,
-      fontSize = if (ImageGridLayoutSize.fromLocalSize() == Small) {
-        14.sp // M3 Title Small
-      } else {
-        16.sp // M3 Title Medium
-      },
-      color = GlanceTheme.colors.onSurface
-    )
+    /**
+     * Style for the text displayed as title within each item.
+     */
+    val titleText: TextStyle
+        @Composable get() = TextStyle(
+            fontWeight = FontWeight.Medium,
+            fontSize = if (ImageGridLayoutSize.fromLocalSize() == Small) {
+                14.sp // M3 Title Small
+            } else {
+                16.sp // M3 Title Medium
+            },
+            color = GlanceTheme.colors.onSurface,
+        )
 
-  /**
-   * Style for the text displayed as supporting text within each item.
-   */
-  val supportingText: TextStyle
-    @Composable get() =
-      TextStyle(
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, // M3 Label Medium
-        color = GlanceTheme.colors.secondary
-      )
+    /**
+     * Style for the text displayed as supporting text within each item.
+     */
+    val supportingText: TextStyle
+        @Composable get() =
+            TextStyle(
+                fontWeight = FontWeight.Normal,
+                fontSize = 12.sp, // M3 Label Medium
+                color = GlanceTheme.colors.secondary,
+            )
 }
 
 private object ImageGridLayoutDimensions {
-  val contentPadding = 12.dp
+    val contentPadding = 12.dp
 
-  val titleTextBreakpoint = 200.dp
-  /**
-   * Amount of space before the text in each item
-   */
-  val textStartMargin = 4.dp
+    val titleTextBreakpoint = 200.dp
 
-  /** Corner radius for image in each item. */
-  val imageCornerRadius = 16.dp
+    /**
+     * Amount of space before the text in each item
+     */
+    val textStartMargin = 4.dp
 
-  /** Corner radius applied to each item **/
-  val itemCornerRadius = 16.dp
+    /** Corner radius for image in each item. */
+    val imageCornerRadius = 16.dp
 
-  /**
-   * Number of columns the grid layout should use to display items in available space.
-   */
-  val gridCells: Int
-    @Composable get() {
-      return when (ImageGridLayoutSize.fromLocalSize()) {
-        Medium -> 2
-        Large -> 3
-        else -> 1
-      }
-    }
+    /** Corner radius applied to each item **/
+    val itemCornerRadius = 16.dp
+
+    /**
+     * Number of columns the grid layout should use to display items in available space.
+     */
+    val gridCells: Int
+        @Composable get() {
+            return when (ImageGridLayoutSize.fromLocalSize()) {
+                Medium -> 2
+                Large -> 3
+                else -> 1
+            }
+        }
 }
 
 /**

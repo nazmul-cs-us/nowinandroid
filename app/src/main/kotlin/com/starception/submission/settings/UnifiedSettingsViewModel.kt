@@ -1,46 +1,59 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings
 
-import android.app.Application
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.data.repository.UserDataRepository
 import com.starception.submission.core.duadatabase.DuaDatabase
-import com.starception.submission.core.quranicduas.QuranicDuaDatabase
-import com.starception.submission.core.sync.DatabaseSyncHelper
 import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
-import com.starception.submission.core.contentdatabase.NewsDatabase
+import com.starception.submission.core.quranicduas.QuranicDuaDatabase
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
-import com.starception.submission.core.contentdatabase.TopicsDatabase as ContentTopicsDatabase
-import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.download.AssetDownloadManager
+import com.starception.submission.download.AssetDownloadViewModel
+import com.starception.submission.download.CategoryDownloadState
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
-import com.starception.submission.util.ActivityTracker
 import com.starception.submission.prayer.service.PrayerNotificationServiceManager
 import com.starception.submission.settings.components.DatabaseDisplayInfo
 import com.starception.submission.settings.components.DeveloperSettingsState
 import com.starception.submission.settings.components.RefreshResult
-import com.starception.submission.settings.components.VoiceRecognitionEngine
-import com.starception.submission.settings.components.VoiceSettingsState
-import com.starception.submission.settings.components.VoiceTestState
+import com.starception.submission.settings.components.TTS_VOICE_SAMPLE_TEXT
 import com.starception.submission.settings.components.TtsSettingsState
 import com.starception.submission.settings.components.TtsTestState
 import com.starception.submission.settings.components.TtsVoice
-import com.starception.submission.settings.components.TTS_VOICE_SAMPLE_TEXT
+import com.starception.submission.settings.components.VoiceRecognitionEngine
+import com.starception.submission.settings.components.VoiceSettingsState
+import com.starception.submission.settings.components.VoiceTestState
+import com.starception.submission.util.ActivityTracker
+import com.starception.submission.voice.SherpaOnnxKwsService
+import com.starception.submission.voice.SherpaOnnxTtsService
+import com.starception.submission.voice.WhisperVoiceService
 import com.starception.submission.widget.PrayerWidgetUpdater
 import com.starception.submission.widget.WidgetAppearancePreferences
 import com.starception.submission.widget.WidgetAppearanceSettings
-import com.starception.submission.download.AssetDownloadManager
-import com.starception.submission.download.AssetDownloadViewModel
-import com.starception.submission.download.CategoryDownloadState
-import com.starception.submission.voice.SherpaOnnxKwsService
-import com.starception.submission.voice.WhisperVoiceService
-import com.starception.submission.voice.SherpaOnnxTtsService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,12 +61,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import com.starception.submission.core.contentdatabase.TopicsDatabase as ContentTopicsDatabase
 
 /**
  * Unified Settings ViewModel
@@ -69,7 +82,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     private val sherpaOnnxKwsService: SherpaOnnxKwsService,
     private val ttsService: SherpaOnnxTtsService,
     private val downloadManager: AssetDownloadManager,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     companion object {
@@ -95,7 +108,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ThemeSettingsState()
+            initialValue = ThemeSettingsState(),
         )
 
     // One global appearance policy is consumed by every Glance widget.
@@ -200,7 +213,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                     autoDetectedCountryCode = autoDetectedSettings?.autoDetectedCountryCode,
                     isMethodAutoDetected = autoDetectedSettings?.isMethodAutoDetected ?: false,
                     isMadhhabAutoDetected = autoDetectedSettings?.isMadhhabAutoDetected ?: false,
-                    areCustomAnglesAutoDetected = autoDetectedSettings?.areCustomAnglesAutoDetected ?: false
+                    areCustomAnglesAutoDetected = autoDetectedSettings?.areCustomAnglesAutoDetected ?: false,
                 )
 
                 _prayerSettings.value = settings
@@ -340,7 +353,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                     cooldownMinutes = prefs.getInt(TravelDuaSettings.KEY_COOLDOWN_MINUTES, TravelDuaSettings.DEFAULT_COOLDOWN_MINUTES),
                     playbackDelaySeconds = prefs.getInt(TravelDuaSettings.KEY_PLAYBACK_DELAY_SECONDS, TravelDuaSettings.DEFAULT_PLAYBACK_DELAY_SECONDS),
                     gapToleranceMinutes = prefs.getInt(TravelDuaSettings.KEY_GAP_TOLERANCE_MINUTES, TravelDuaSettings.DEFAULT_GAP_TOLERANCE_MINUTES),
-                    drivingSpeedThresholdKmh = prefs.getInt(TravelDuaSettings.KEY_DRIVING_SPEED_THRESHOLD_KMH, TravelDuaSettings.DEFAULT_DRIVING_SPEED_THRESHOLD_KMH)
+                    drivingSpeedThresholdKmh = prefs.getInt(TravelDuaSettings.KEY_DRIVING_SPEED_THRESHOLD_KMH, TravelDuaSettings.DEFAULT_DRIVING_SPEED_THRESHOLD_KMH),
                 )
                 _travelDuaSettings.value = settings
                 Log.i(TAG, "Travel dua settings loaded: enabled=${settings.enabled}, cooldown=${settings.cooldownMinutes}min, delay=${settings.playbackDelaySeconds}s, gap=${settings.gapToleranceMinutes}min, speedThreshold=${settings.drivingSpeedThresholdKmh}km/h")
@@ -397,29 +410,29 @@ class UnifiedSettingsViewModel @Inject constructor(
                             itemCount = newsInfo.itemCount,
                             itemLabel = "news items",
                             lastModified = newsInfo.lastModified,
-                            sizeBytes = newsInfo.sizeBytes
+                            sizeBytes = newsInfo.sizeBytes,
                         ),
                         topicsInfo = DatabaseDisplayInfo(
                             name = topicsInfo.name,
                             itemCount = topicsInfo.itemCount,
                             itemLabel = "topics",
                             lastModified = topicsInfo.lastModified,
-                            sizeBytes = topicsInfo.sizeBytes
+                            sizeBytes = topicsInfo.sizeBytes,
                         ),
                         duasInfo = DatabaseDisplayInfo(
                             name = duasInfo.name,
                             itemCount = duasInfo.duaCount,
                             itemLabel = "duas",
                             lastModified = duasInfo.lastModified,
-                            sizeBytes = duasInfo.sizeBytes
+                            sizeBytes = duasInfo.sizeBytes,
                         ),
                         quranicDuasInfo = DatabaseDisplayInfo(
                             name = quranicDuasInfo.name,
                             itemCount = quranicDuasInfo.itemCount,
                             itemLabel = "duas",
                             lastModified = quranicDuasInfo.lastModified,
-                            sizeBytes = quranicDuasInfo.sizeBytes
-                        )
+                            sizeBytes = quranicDuasInfo.sizeBytes,
+                        ),
                     )
                 }
                 Log.d(TAG, "Database info loaded successfully")
@@ -439,7 +452,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 _developerSettings.value = _developerSettings.value.copy(
                     isRefreshing = true,
                     refreshingDatabase = "news",
-                    lastRefreshResult = null
+                    lastRefreshResult = null,
                 )
 
                 val result = withContext(Dispatchers.IO) {
@@ -456,8 +469,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                             "Regenerated: ${result.surahCount} Surahs, ${result.quranicDuaCount} Quranic Duas, ${result.fortressDuaCount} Fortress Duas (${result.durationMs}ms)"
                         } else {
                             "Failed: ${result.error}"
-                        }
-                    )
+                        },
+                    ),
                 )
 
                 // Reload database info
@@ -466,7 +479,6 @@ class UnifiedSettingsViewModel @Inject constructor(
                 // Clear result after delay
                 delay(5000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing news database", e)
                 _developerSettings.value = _developerSettings.value.copy(
@@ -475,8 +487,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "News",
                         success = false,
-                        message = "Error: ${e.message}"
-                    )
+                        message = "Error: ${e.message}",
+                    ),
                 )
             }
         }
@@ -491,7 +503,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 _developerSettings.value = _developerSettings.value.copy(
                     isRefreshing = true,
                     refreshingDatabase = "topics",
-                    lastRefreshResult = null
+                    lastRefreshResult = null,
                 )
 
                 val success = withContext(Dispatchers.IO) {
@@ -507,8 +519,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Topics",
                         success = success,
-                        message = if (success) "Topics database refreshed successfully" else "Failed to refresh Topics database"
-                    )
+                        message = if (success) "Topics database refreshed successfully" else "Failed to refresh Topics database",
+                    ),
                 )
 
                 // Reload database info
@@ -517,7 +529,6 @@ class UnifiedSettingsViewModel @Inject constructor(
                 // Clear result after delay
                 delay(3000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing topics database", e)
                 _developerSettings.value = _developerSettings.value.copy(
@@ -526,8 +537,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Topics",
                         success = false,
-                        message = "Error: ${e.message}"
-                    )
+                        message = "Error: ${e.message}",
+                    ),
                 )
             }
         }
@@ -542,7 +553,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 _developerSettings.value = _developerSettings.value.copy(
                     isRefreshing = true,
                     refreshingDatabase = "duas",
-                    lastRefreshResult = null
+                    lastRefreshResult = null,
                 )
 
                 val success = withContext(Dispatchers.IO) {
@@ -555,8 +566,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Duas",
                         success = success,
-                        message = if (success) "Duas database refreshed successfully" else "Failed to refresh Duas database"
-                    )
+                        message = if (success) "Duas database refreshed successfully" else "Failed to refresh Duas database",
+                    ),
                 )
 
                 // Reload database info
@@ -565,7 +576,6 @@ class UnifiedSettingsViewModel @Inject constructor(
                 // Clear result after delay
                 delay(3000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing duas database", e)
                 _developerSettings.value = _developerSettings.value.copy(
@@ -574,8 +584,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Duas",
                         success = false,
-                        message = "Error: ${e.message}"
-                    )
+                        message = "Error: ${e.message}",
+                    ),
                 )
             }
         }
@@ -590,7 +600,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                 _developerSettings.value = _developerSettings.value.copy(
                     isRefreshing = true,
                     refreshingDatabase = "quranic_duas",
-                    lastRefreshResult = null
+                    lastRefreshResult = null,
                 )
 
                 val success = withContext(Dispatchers.IO) {
@@ -603,8 +613,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Quranic Duas",
                         success = success,
-                        message = if (success) "Quranic Duas database refreshed successfully" else "Failed to refresh Quranic Duas database"
-                    )
+                        message = if (success) "Quranic Duas database refreshed successfully" else "Failed to refresh Quranic Duas database",
+                    ),
                 )
 
                 // Reload database info
@@ -613,7 +623,6 @@ class UnifiedSettingsViewModel @Inject constructor(
                 // Clear result after delay
                 delay(3000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing Quranic Duas database", e)
                 _developerSettings.value = _developerSettings.value.copy(
@@ -622,8 +631,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "Quranic Duas",
                         success = false,
-                        message = "Error: ${e.message}"
-                    )
+                        message = "Error: ${e.message}",
+                    ),
                 )
             }
         }
@@ -638,14 +647,14 @@ class UnifiedSettingsViewModel @Inject constructor(
                 _developerSettings.value = _developerSettings.value.copy(
                     isRefreshing = true,
                     refreshingDatabase = "all",
-                    lastRefreshResult = null
+                    lastRefreshResult = null,
                 )
 
                 data class RefreshResults(
                     val topicsSuccess: Boolean,
                     val duasSuccess: Boolean,
                     val quranicDuasSuccess: Boolean,
-                    val newsRegenResult: com.starception.submission.core.contentdatabase.RegenerationResult
+                    val newsRegenResult: com.starception.submission.core.contentdatabase.RegenerationResult,
                 )
 
                 val results = withContext(Dispatchers.IO) {
@@ -671,8 +680,8 @@ class UnifiedSettingsViewModel @Inject constructor(
 
                 val message = if (allSuccess) {
                     "All refreshed: ${results.newsRegenResult.surahCount} Surahs, " +
-                    "${results.newsRegenResult.quranicDuaCount} Quranic Duas, " +
-                    "${results.newsRegenResult.fortressDuaCount} Fortress Duas"
+                        "${results.newsRegenResult.quranicDuaCount} Quranic Duas, " +
+                        "${results.newsRegenResult.fortressDuaCount} Fortress Duas"
                 } else {
                     buildString {
                         append("Topics: ${if (results.topicsSuccess) "OK" else "FAILED"}")
@@ -688,8 +697,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "All",
                         success = allSuccess,
-                        message = message
-                    )
+                        message = message,
+                    ),
                 )
 
                 // Reload database info
@@ -698,7 +707,6 @@ class UnifiedSettingsViewModel @Inject constructor(
                 // Clear result after delay
                 delay(5000)
                 _developerSettings.value = _developerSettings.value.copy(lastRefreshResult = null)
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error refreshing all databases", e)
                 _developerSettings.value = _developerSettings.value.copy(
@@ -707,8 +715,8 @@ class UnifiedSettingsViewModel @Inject constructor(
                     lastRefreshResult = RefreshResult(
                         databaseName = "All",
                         success = false,
-                        message = "Error: ${e.message}"
-                    )
+                        message = "Error: ${e.message}",
+                    ),
                 )
             }
         }
@@ -868,7 +876,7 @@ class UnifiedSettingsViewModel @Inject constructor(
             _voiceSettings.value = _voiceSettings.value.copy(
                 testState = VoiceTestState.LISTENING,
                 testResult = null,
-                testError = null
+                testError = null,
             )
 
             when (_voiceSettings.value.selectedEngine) {
@@ -885,35 +893,35 @@ class UnifiedSettingsViewModel @Inject constructor(
                                             Log.i(TAG, "🎤 Voice test result: YES")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = "Yes"
+                                                testResult = "Yes",
                                             )
                                         }
                                         is SherpaOnnxKwsService.VoiceResult.No -> {
                                             Log.i(TAG, "🎤 Voice test result: NO")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = "No"
+                                                testResult = "No",
                                             )
                                         }
                                         is SherpaOnnxKwsService.VoiceResult.Unrecognized -> {
                                             Log.i(TAG, "🎤 Voice test result: ${result.text}")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = result.text
+                                                testResult = result.text,
                                             )
                                         }
                                         is SherpaOnnxKwsService.VoiceResult.Timeout -> {
                                             Log.w(TAG, "🎤 Voice test timeout")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.ERROR,
-                                                testError = "No speech detected"
+                                                testError = "No speech detected",
                                             )
                                         }
                                         is SherpaOnnxKwsService.VoiceResult.Error -> {
                                             Log.e(TAG, "🎤 Voice test error: ${result.message}")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.ERROR,
-                                                testError = result.message
+                                                testError = result.message,
                                             )
                                         }
                                     }
@@ -921,7 +929,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                                     delay(3000)
                                     if (sessionId == voiceTestSessionId) {
                                         _voiceSettings.value = _voiceSettings.value.copy(
-                                            testState = VoiceTestState.IDLE
+                                            testState = VoiceTestState.IDLE,
                                         )
                                     }
                                 }
@@ -939,7 +947,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                                         _voiceSettings.value.testState == VoiceTestState.LISTENING
                                     ) {
                                         _voiceSettings.value = _voiceSettings.value.copy(
-                                            testState = VoiceTestState.PROCESSING
+                                            testState = VoiceTestState.PROCESSING,
                                         )
                                     }
                                 }
@@ -948,7 +956,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                             override fun onStatusUpdate(message: String) {
                                 Log.i(TAG, "🎤 Voice test status: $message")
                             }
-                        }
+                        },
                     )
                 }
 
@@ -965,35 +973,35 @@ class UnifiedSettingsViewModel @Inject constructor(
                                             Log.i(TAG, "🎤 Voice test result: YES")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = "Yes"
+                                                testResult = "Yes",
                                             )
                                         }
                                         is WhisperVoiceService.VoiceResult.No -> {
                                             Log.i(TAG, "🎤 Voice test result: NO")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = "No"
+                                                testResult = "No",
                                             )
                                         }
                                         is WhisperVoiceService.VoiceResult.Unrecognized -> {
                                             Log.i(TAG, "🎤 Voice test result: ${result.text}")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.SUCCESS,
-                                                testResult = result.text
+                                                testResult = result.text,
                                             )
                                         }
                                         is WhisperVoiceService.VoiceResult.Timeout -> {
                                             Log.w(TAG, "🎤 Voice test timeout")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.ERROR,
-                                                testError = "No speech detected"
+                                                testError = "No speech detected",
                                             )
                                         }
                                         is WhisperVoiceService.VoiceResult.Error -> {
                                             Log.e(TAG, "🎤 Voice test error: ${result.message}")
                                             _voiceSettings.value = _voiceSettings.value.copy(
                                                 testState = VoiceTestState.ERROR,
-                                                testError = result.message
+                                                testError = result.message,
                                             )
                                         }
                                     }
@@ -1001,7 +1009,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                                     delay(3000)
                                     if (sessionId == voiceTestSessionId) {
                                         _voiceSettings.value = _voiceSettings.value.copy(
-                                            testState = VoiceTestState.IDLE
+                                            testState = VoiceTestState.IDLE,
                                         )
                                     }
                                 }
@@ -1019,7 +1027,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                                         _voiceSettings.value.testState == VoiceTestState.LISTENING
                                     ) {
                                         _voiceSettings.value = _voiceSettings.value.copy(
-                                            testState = VoiceTestState.PROCESSING
+                                            testState = VoiceTestState.PROCESSING,
                                         )
                                     }
                                 }
@@ -1032,7 +1040,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                             override fun onAmplitudeUpdate(amplitude: Float) {
                                 _voiceSettings.value = _voiceSettings.value.copy(amplitude = amplitude)
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -1051,7 +1059,7 @@ class UnifiedSettingsViewModel @Inject constructor(
             testState = VoiceTestState.IDLE,
             testResult = null,
             testError = null,
-            amplitude = 0f
+            amplitude = 0f,
         )
     }
 
@@ -1068,7 +1076,7 @@ class UnifiedSettingsViewModel @Inject constructor(
             // Update state to initializing
             _ttsSettings.value = currentState.copy(
                 testState = TtsTestState.INITIALIZING,
-                testError = null
+                testError = null,
             )
 
             try {
@@ -1081,7 +1089,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                     Log.e(TAG, "Failed to initialize TTS")
                     _ttsSettings.value = _ttsSettings.value.copy(
                         testState = TtsTestState.ERROR,
-                        testError = "Failed to initialize TTS engine"
+                        testError = "Failed to initialize TTS engine",
                     )
                     return@launch
                 }
@@ -1100,27 +1108,26 @@ class UnifiedSettingsViewModel @Inject constructor(
                 if (success) {
                     Log.i(TAG, "TTS test completed successfully")
                     _ttsSettings.value = _ttsSettings.value.copy(
-                        testState = TtsTestState.SUCCESS
+                        testState = TtsTestState.SUCCESS,
                     )
                 } else {
                     Log.e(TAG, "TTS test failed")
                     _ttsSettings.value = _ttsSettings.value.copy(
                         testState = TtsTestState.ERROR,
-                        testError = "Failed to generate speech"
+                        testError = "Failed to generate speech",
                     )
                 }
 
                 // Reset to idle after a delay
                 delay(2000)
                 _ttsSettings.value = _ttsSettings.value.copy(
-                    testState = TtsTestState.IDLE
+                    testState = TtsTestState.IDLE,
                 )
-
             } catch (e: Exception) {
                 Log.e(TAG, "TTS test error", e)
                 _ttsSettings.value = _ttsSettings.value.copy(
                     testState = TtsTestState.ERROR,
-                    testError = e.message ?: "Unknown error"
+                    testError = e.message ?: "Unknown error",
                 )
             }
         }
@@ -1134,7 +1141,7 @@ class UnifiedSettingsViewModel @Inject constructor(
         ttsService.stopSpeaking()
         _ttsSettings.value = _ttsSettings.value.copy(
             testState = TtsTestState.IDLE,
-            testError = null
+            testError = null,
         )
     }
 
@@ -1148,7 +1155,7 @@ class UnifiedSettingsViewModel @Inject constructor(
             val downloadCategory = if (needsDownload) ttsVoiceDownloadCategory(voice) else null
             _ttsSettings.value = _ttsSettings.value.copy(
                 selectedVoice = voice,
-                selectedSpeakerId = 0,  // Reset speaker ID when changing voice
+                selectedSpeakerId = 0, // Reset speaker ID when changing voice
                 needsDownload = needsDownload,
                 downloadCategory = downloadCategory,
             )
@@ -1175,7 +1182,7 @@ class UnifiedSettingsViewModel @Inject constructor(
     fun updateTtsSpeakerId(speakerId: Int) {
         Log.i(TAG, "🔊 Updating TTS speaker ID to: $speakerId")
         _ttsSettings.value = _ttsSettings.value.copy(
-            selectedSpeakerId = speakerId
+            selectedSpeakerId = speakerId,
         )
 
         // Save preference
@@ -1229,7 +1236,7 @@ class UnifiedSettingsViewModel @Inject constructor(
                         )
                     }.sortedWith(
                         compareByDescending<CategoryDownloadState> { it.required }
-                            .thenBy { it.displayName }
+                            .thenBy { it.displayName },
                     )
 
                 val totalDownloadedSize = downloadManager.getTotalDownloadedSize()

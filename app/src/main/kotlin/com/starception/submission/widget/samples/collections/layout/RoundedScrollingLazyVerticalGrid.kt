@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -30,22 +46,22 @@ import kotlin.math.ceil
  */
 @Composable
 fun RoundedScrollingLazyVerticalGrid(
-  gridCells: GridCells,
-  modifier: GlanceModifier = GlanceModifier,
-  horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-  content: LazyVerticalGridScope.() -> Unit,
+    gridCells: GridCells,
+    modifier: GlanceModifier = GlanceModifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    content: LazyVerticalGridScope.() -> Unit,
 ) {
-  Box(
-    modifier = GlanceModifier
-      .cornerRadius(16.dp) // to present a rounded scrolling experience
-      .then(modifier)
-  ) {
-    LazyVerticalGrid(
-      gridCells = gridCells,
-      horizontalAlignment = horizontalAlignment,
-      content = content
-    )
-  }
+    Box(
+        modifier = GlanceModifier
+            .cornerRadius(16.dp) // to present a rounded scrolling experience
+            .then(modifier),
+    ) {
+        LazyVerticalGrid(
+            gridCells = gridCells,
+            horizontalAlignment = horizontalAlignment,
+            content = content,
+        )
+    }
 }
 
 /**
@@ -62,66 +78,65 @@ fun RoundedScrollingLazyVerticalGrid(
  */
 @Composable
 fun <T> RoundedScrollingLazyVerticalGrid(
-  gridCells: Int,
-  items: List<T>,
-  itemContentProvider: @Composable (item: T) -> Unit,
-  modifier: GlanceModifier = GlanceModifier,
-  horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-  cellSpacing: Dp = 12.dp,
+    gridCells: Int,
+    items: List<T>,
+    itemContentProvider: @Composable (item: T) -> Unit,
+    modifier: GlanceModifier = GlanceModifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    cellSpacing: Dp = 12.dp,
 ) {
-  val numRows = ceil(items.size.toDouble() / gridCells).toInt()
+    val numRows = ceil(items.size.toDouble() / gridCells).toInt()
 
-  // Cell spacing is achieved by allocating equal amount of padding to each cell. Cells on edge
-  // apply it completely to inner sides, while cells not on edge apply it evenly on sides.
-  val perCellHorizontalPadding = (cellSpacing * (gridCells - 1)) / gridCells
-  val perCellVerticalPadding = (cellSpacing * (numRows - 1)) / numRows
+    // Cell spacing is achieved by allocating equal amount of padding to each cell. Cells on edge
+    // apply it completely to inner sides, while cells not on edge apply it evenly on sides.
+    val perCellHorizontalPadding = (cellSpacing * (gridCells - 1)) / gridCells
+    val perCellVerticalPadding = (cellSpacing * (numRows - 1)) / numRows
 
-  RoundedScrollingLazyVerticalGrid(
-    gridCells = GridCells.Fixed(gridCells),
-    horizontalAlignment = horizontalAlignment,
-    modifier = modifier
-  ) {
+    RoundedScrollingLazyVerticalGrid(
+        gridCells = GridCells.Fixed(gridCells),
+        horizontalAlignment = horizontalAlignment,
+        modifier = modifier,
+    ) {
+        itemsIndexed(items) { index, item ->
+            val row = index / gridCells
+            val column = index % gridCells
 
-    itemsIndexed(items) { index, item ->
-      val row = index / gridCells
-      val column = index % gridCells
+            val cellTopPadding = when (row) {
+                0 -> 0.dp
+                numRows - 1 -> perCellVerticalPadding
+                else -> perCellVerticalPadding / 2
+            }
 
-      val cellTopPadding = when (row) {
-        0 -> 0.dp
-        numRows - 1 -> perCellVerticalPadding
-        else -> perCellVerticalPadding / 2
-      }
+            val cellBottomPadding = when (row) {
+                0 -> perCellVerticalPadding
+                numRows - 1 -> 0.dp
+                else -> perCellVerticalPadding / 2
+            }
 
-      val cellBottomPadding = when (row) {
-        0 -> perCellVerticalPadding
-        numRows - 1 -> 0.dp
-        else -> perCellVerticalPadding / 2
-      }
+            val cellStartPadding = when (column) {
+                0 -> 0.dp
+                gridCells - 1 -> perCellHorizontalPadding
+                else -> perCellHorizontalPadding / 2
+            }
 
-      val cellStartPadding = when (column) {
-        0 -> 0.dp
-        gridCells - 1 -> perCellHorizontalPadding
-        else -> perCellHorizontalPadding / 2
-      }
+            val cellEndPadding = when (column) {
+                0 -> perCellHorizontalPadding
+                gridCells - 1 -> 0.dp
+                else -> perCellHorizontalPadding / 2
+            }
 
-      val cellEndPadding = when (column) {
-        0 -> perCellHorizontalPadding
-        gridCells - 1 -> 0.dp
-        else -> perCellHorizontalPadding / 2
-      }
-
-      Box(
-        modifier = modifier
-          .fillMaxSize()
-          .padding(
-            start = cellStartPadding,
-            end = cellEndPadding,
-            top = cellTopPadding,
-            bottom = cellBottomPadding
-          )
-      ) {
-        itemContentProvider(item)
-      }
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = cellStartPadding,
+                        end = cellEndPadding,
+                        top = cellTopPadding,
+                        bottom = cellBottomPadding,
+                    ),
+            ) {
+                itemContentProvider(item)
+            }
+        }
     }
-  }
 }

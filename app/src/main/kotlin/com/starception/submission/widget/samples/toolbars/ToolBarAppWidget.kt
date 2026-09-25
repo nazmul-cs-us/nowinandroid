@@ -16,9 +16,6 @@
 
 package com.starception.submission.widget.samples.toolbars
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
-
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
@@ -27,10 +24,12 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
-import com.starception.submission.core.ui.R as CoreUiR
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarButton
 import com.starception.submission.widget.samples.toolbars.layout.ToolBarLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
+import com.starception.submission.core.ui.R as CoreUiR
 
 /**
  * A widget to demonstrate the [ToolBarLayout].
@@ -58,30 +57,30 @@ class ToolBarAppWidget : GlanceAppWidget() {
             headerButton = ToolBarButton(
                 iconRes = R.drawable.sample_mark_prayed_icon,
                 contentDescription = "Mark prayed",
-                onClick = actionStartDemoActivity("add button")
+                onClick = actionStartDemoActivity("add button"),
             ),
             buttons = listOf(
                 ToolBarButton(
                     iconRes = R.drawable.sample_qibla_icon,
                     contentDescription = "Qibla",
-                    onClick = actionStartDemoActivity("mic button")
+                    onClick = actionStartDemoActivity("mic button"),
                 ),
                 ToolBarButton(
                     iconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
                     contentDescription = "Quran",
-                    onClick = actionStartDemoActivity("share button")
+                    onClick = actionStartDemoActivity("share button"),
                 ),
                 ToolBarButton(
                     iconRes = R.drawable.sample_dua_icon,
                     contentDescription = "Duas",
-                    onClick = actionStartDemoActivity("video button")
+                    onClick = actionStartDemoActivity("video button"),
                 ),
                 ToolBarButton(
                     iconRes = R.drawable.sample_tasbih_icon,
                     contentDescription = "Tasbih",
-                    onClick = actionStartDemoActivity("camera button")
-                )
-            )
+                    onClick = actionStartDemoActivity("camera button"),
+                ),
+            ),
         )
     }
 }

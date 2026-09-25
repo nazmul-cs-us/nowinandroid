@@ -1,60 +1,73 @@
-package com.starception.submission.services
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+package com.starception.submission.services
 
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.annotation.RequiresApi
-import com.starception.submission.R
+import androidx.core.content.res.ResourcesCompat
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityRecognitionClient
-import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.ActivityTransitionRequest
-import com.google.android.gms.location.ActivityTransitionResult
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.IntentFilter
-import android.media.AudioAttributes
-import android.media.AudioManager
-import android.media.ToneGenerator
-import com.starception.submission.prayer.model.DayPrayerTimes
-import java.time.LocalDateTime
-import com.starception.submission.prayer.model.PrayerTime
-import com.starception.submission.prayer.service.PrayerTimeCalculatorService
-import com.starception.submission.prayer.repository.PrayerSettingsRepository
-import com.starception.submission.util.PrayerNotificationManager
+import com.google.android.gms.location.DetectedActivity
+import com.starception.submission.R
+import com.starception.submission.feature.prayertimes.getPrayerDisplayName
+import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationBitmap
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherNotificationTrackerIcon
-import com.starception.submission.util.GoogleSampleNotificationManager
-import com.starception.submission.util.AnrPreventionConfig
+import com.starception.submission.prayer.model.DayPrayerTimes
+import com.starception.submission.prayer.model.PrayerTime
+import com.starception.submission.prayer.repository.PrayerSettingsRepository
+import com.starception.submission.prayer.service.PrayerTimeCalculatorService
+import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.util.ActivityTracker
+import com.starception.submission.util.AnrPreventionConfig
+import com.starception.submission.util.GoogleSampleNotificationManager
+import com.starception.submission.util.PrayerNotificationManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.time.LocalDate
-import java.time.LocalTime
 import java.time.Duration
-import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
-import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import javax.inject.Inject
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.drawable.Drawable
-import androidx.core.content.res.ResourcesCompat
-import com.starception.submission.prayer.util.FileLogger
 
 /**
  * Prayer Notification Service with ANR Protection
@@ -62,7 +75,7 @@ import com.starception.submission.prayer.util.FileLogger
  */
 @AndroidEntryPoint
 class PrayerNotificationService : Service() {
-    
+
     @Inject
     lateinit var prayerTimeCalculatorService: PrayerTimeCalculatorService
 
@@ -71,15 +84,15 @@ class PrayerNotificationService : Service() {
 
     @Inject
     lateinit var locationService: com.starception.submission.prayer.service.EnhancedLocationService
-    
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isServiceRunning = false
     private var isInitializing = false
     private var previousPrayerPhase: String? = null // Track previous phase for smart notifications
-    
+
     // Live Update notification manager (separate from foreground service)
     private lateinit var notificationManager: NotificationManager
-    
+
     // Activity Recognition
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var activityTransitionPendingIntent: PendingIntent? = null
@@ -93,49 +106,49 @@ class PrayerNotificationService : Service() {
     // Android 9+ throttles sensors for background apps, but foreground service handlers work
     private var sensorHandlerThread: android.os.HandlerThread? = null
     private var sensorHandler: android.os.Handler? = null
-    
+
     companion object {
         private const val TAG = "PrayerNotificationService"
-        
+
         // NOTIFICATION CONFIGURATION - Edit these to change notification behavior
         private const val NOTIFICATION_CHANNEL_ID = "prayer_live_update_channel"
-        private const val NOTIFICATION_ID = 1001  // Single notification ID for both foreground service and live update
+        private const val NOTIFICATION_ID = 1001 // Single notification ID for both foreground service and live update
         private const val LIVE_UPDATE_NOTIFICATION_ID = 1001 // Same ID as foreground - replaces it with live update
-        
+
         const val ACTION_ACTIVITY_TRANSITION =
             "com.starception.submission.action.ACTIVITY_TRANSITION"
         const val EXTRA_DETECTED_ACTIVITY = "detected_activity"
         const val EXTRA_TRANSITION_TYPE = "transition_type"
         const val EXTRA_IN_VEHICLE_TRANSITION_TYPE = "in_vehicle_transition_type"
-        
+
         // Check if service is running in another process (NON-BLOCKING with timeout)
         fun isServiceRunningInAnotherProcess(context: android.content.Context): Boolean {
             return try {
                 // Quick timeout to prevent ANR - getRunningServices can be very slow
                 val startTime = System.currentTimeMillis()
                 val manager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                
+
                 // Use smaller limit to prevent blocking - we only need to check if ANY instance exists
                 val runningServices = manager.getRunningServices(50) // Much smaller limit
                 val endTime = System.currentTimeMillis()
-                
+
                 val ourServiceCount = runningServices.count {
                     it.service.className == PrayerNotificationService::class.java.name
                 }
-                
+
                 Log.d(TAG, "Found $ourServiceCount instances of PrayerNotificationService running (took ${endTime - startTime}ms)")
-                
+
                 if (endTime - startTime > 1000) {
                     Log.w(TAG, "⚠️ getRunningServices took ${endTime - startTime}ms - this could cause ANR!")
                 }
-                
+
                 return ourServiceCount > 0
             } catch (e: Exception) {
                 Log.w(TAG, "Error checking service status: ${e.message}")
                 false // Assume not running to allow restart
             }
         }
-        
+
         // Get current instance count for debugging (NON-BLOCKING)
         fun getServiceInstanceCount(context: android.content.Context): Int {
             return try {
@@ -149,12 +162,12 @@ class PrayerNotificationService : Service() {
             }
         }
     }
-    
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Prayer notification service created")
         FileLogger.i(TAG, "Service onCreate - Prayer notification service created")
-        
+
         // Create notification channel and basic setup - keeping ANR protection
         try {
             createNotificationChannel()
@@ -187,7 +200,7 @@ class PrayerNotificationService : Service() {
                     Log.e(TAG, "Failed to initialize activity recognition: ${e.message}")
                 }
             }
-            
+
             // Initialize ActivityTracker with sensor-based detection
             // CRITICAL: Create HandlerThread for sensor callbacks FIRST
             // This ensures sensors deliver updates even when app is in background (Android 9+)
@@ -228,13 +241,13 @@ class PrayerNotificationService : Service() {
                 Log.e(TAG, "Error initializing ActivityTracker", e)
                 ActivityTracker.updateActivity("Detection Error")
             }
-            
+
             Log.d(TAG, "✓ Service onCreate completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error in onCreate: ${e.message}")
         }
     }
-    
+
     /**
      * Starts/updates the foreground notification with types valid for the current
      * state. On Android 14+, a visible app start can use while-in-use location and
@@ -326,27 +339,25 @@ class PrayerNotificationService : Service() {
             // the UI is absent. Apply that event only after startForeground(), keeping
             // Android's foreground-service startup contract intact.
             handleActivityTransitionIntent(intent)
-            
+
             // Background initialization with ANR protection - dependencies should be available now
             serviceScope.launch(Dispatchers.IO) {
                 try {
                     Log.d(TAG, "Background initialization starting...")
                     delay(100) // Small delay to ensure service startup completes
-                    
+
                     // Start prayer updates with extended timeout protection
                     // Start prayer updates without timeout restriction
                     startRealPrayerTimeUpdates()
                     Log.d(TAG, "✓ Prayer updates started successfully")
-                    
                 } catch (e: Exception) {
                     Log.e(TAG, "Background initialization failed: ${e.message}")
                     // Service continues running with basic notification
                 }
             }
-            
+
             Log.d(TAG, "✅ Service onStartCommand completed - startId: $startId")
             return START_STICKY
-            
         } catch (e: Exception) {
             Log.e(TAG, "Error in onStartCommand: ${e.message}")
             // Emergency fallback
@@ -387,13 +398,13 @@ class PrayerNotificationService : Service() {
                 .onFailure { Log.e(TAG, "Failed to refresh live update after activity transition", it) }
         }
     }
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 "Prayer Live Updates",
-                NotificationManager.IMPORTANCE_HIGH // High importance for lock screen visibility
+                NotificationManager.IMPORTANCE_HIGH, // High importance for lock screen visibility
             ).apply {
                 description = "Prayer time notifications and live updates - shows on lock screen"
                 enableVibration(true) // Enable vibration for prayer notifications
@@ -402,13 +413,13 @@ class PrayerNotificationService : Service() {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC // Explicitly enable lock screen visibility
                 setBypassDnd(false) // Respect Do Not Disturb for silent updates
             }
-            
+
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
             Log.d(TAG, "Prayer Live Updates notification channel created with lock screen visibility")
         }
     }
-    
+
     private fun createAbsoluteMinimumNotification(): Notification {
         return try {
             NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -432,7 +443,7 @@ class PrayerNotificationService : Service() {
                 .build()
         }
     }
-    
+
     private fun createMinimalNotification(): Notification {
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle("Prayer Tracker")
@@ -443,7 +454,7 @@ class PrayerNotificationService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority to avoid blocking
             .build()
     }
-    
+
     private fun createEmergencyNotification(): Notification {
         // Emergency simple foreground service notification - ONLY for keeping service alive
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -457,7 +468,7 @@ class PrayerNotificationService : Service() {
             .setSilent(true)
             .build()
     }
-    
+
     private fun createInitialNotification(): Notification {
         // Simple foreground service notification - ONLY for keeping service alive
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -472,7 +483,7 @@ class PrayerNotificationService : Service() {
             .setSilent(true)
             .build()
     }
-    
+
     /**
      * Create Live Update notification directly (separate from foreground service)
      * This ensures PROMOTED_ONGOING flag without FOREGROUND_SERVICE flag
@@ -482,7 +493,7 @@ class PrayerNotificationService : Service() {
         title: String,
         content: String,
         detailedMessage: String = "",
-        progress: Int = 0
+        progress: Int = 0,
     ): Notification {
         Log.d(TAG, "🎯 Creating direct Live Update notification: $title")
 
@@ -506,13 +517,13 @@ class PrayerNotificationService : Service() {
         // Add prayer phase color based on progress
         if (progress > 0) {
             val phaseColor = when {
-                progress <= 20 -> Color.parseColor("#4169E1")    // Blue for Go to Mosque
-                progress <= 60 -> Color.parseColor("#10B981")    // Green for Best Time
-                else -> Color.parseColor("#FBBF24")              // Yellow for Make Time
+                progress <= 20 -> Color.parseColor("#4169E1") // Blue for Go to Mosque
+                progress <= 60 -> Color.parseColor("#10B981") // Green for Best Time
+                else -> Color.parseColor("#FBBF24") // Yellow for Make Time
             }
             builder.setColor(phaseColor)
             builder.setColorized(true)
-            
+
             // Add Live Update ProgressStyle
             try {
                 val progressStyle = createLiveUpdateProgressStyle(progress, detailedMessage)
@@ -523,14 +534,14 @@ class PrayerNotificationService : Service() {
                 builder.setProgress(100, progress, false)
             }
         }
-        
+
         // Add detailed message if provided
         if (detailedMessage.isNotBlank()) {
             if (progress == 0) {
                 builder.setStyle(NotificationCompat.BigTextStyle().bigText(detailedMessage))
             }
         }
-        
+
         // Add activity icon as large icon (shows in top right corner)
         val activityIcon = prayerWeatherNotificationBitmap(
             context = this,
@@ -594,7 +605,7 @@ class PrayerNotificationService : Service() {
         val bitmap = Bitmap.createBitmap(
             drawable.intrinsicWidth.coerceAtLeast(1),
             drawable.intrinsicHeight.coerceAtLeast(1),
-            Bitmap.Config.ARGB_8888
+            Bitmap.Config.ARGB_8888,
         )
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -616,15 +627,15 @@ class PrayerNotificationService : Service() {
                 listOf(
                     NotificationCompat.ProgressStyle.Segment(20).setColor(Color.parseColor("#4169E1")), // Blue
                     NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#10B981")), // Green
-                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FBBF24"))  // Yellow
-                )
+                    NotificationCompat.ProgressStyle.Segment(40).setColor(Color.parseColor("#FBBF24")), // Yellow
+                ),
             )
             .setProgress(progress)
             .setProgressTrackerIcon(
-                prayerWeatherNotificationTrackerIcon(this, weatherSummary)
+                prayerWeatherNotificationTrackerIcon(this, weatherSummary),
             )
     }
-    
+
     /**
      * Post Live Update notification directly (bypassing PrayerNotificationManager)
      */
@@ -632,7 +643,7 @@ class PrayerNotificationService : Service() {
         title: String,
         content: String,
         detailedMessage: String = "",
-        progress: Int = 0
+        progress: Int = 0,
     ) {
         if (Build.VERSION.SDK_INT >= 35) {
             try {
@@ -646,17 +657,17 @@ class PrayerNotificationService : Service() {
             Log.w(TAG, "Live Updates not supported on API level ${Build.VERSION.SDK_INT}")
         }
     }
-    
+
     /**
      * MAIN FEATURE: Initialize background prayer notification updates
-     * 
+     *
      * This is the core function that starts the prayer tracking system.
-     * 
+     *
      * KEY FEATURES:
      * - Checks for Android 16+ Live Update support
      * - Starts the main prayer time update loop
      * - Handles service initialization errors gracefully
-     * 
+     *
      * EDIT THIS SECTION TO:
      * - Change Live Update detection logic
      * - Modify initialization behavior
@@ -666,42 +677,41 @@ class PrayerNotificationService : Service() {
         withContext(Dispatchers.IO) { // Ensure background thread
             try {
                 Log.d(TAG, "Starting real prayer time updates on background thread")
-                
+
                 // Add delay to prevent ANR during app startup
                 delay(3000) // Wait 3 seconds for app to be fully stable
-                
+
                 // Check service is still supposed to be running
                 if (!isServiceRunning) {
                     Log.d(TAG, "Service stopped during initialization, aborting updates")
                     return@withContext
                 }
-                
+
                 // Initialize separate Live Update notification (not tied to foreground service)
                 withTimeoutOrNull(10000L) { // Increased from 5s to 10s
                     // Check if device supports Live Updates
                     if (PrayerNotificationManager.supportsLiveUpdates()) {
                         Log.d(TAG, "🚀 Device supports Live Updates - using separate notification")
                         Log.d(TAG, "Has promotable characteristics: ${PrayerNotificationManager.hasPromotableCharacteristics()}")
-                        
+
                         // Don't post initial notification - Google system will handle it
                         Log.d(TAG, "🎯 Initial notification will be posted by Google Live Update system")
                     } else {
                         Log.w(TAG, "Device does not support Live Updates, using standard notifications")
                     }
                 } ?: Log.w(TAG, "Live Update notification initialization timed out, continuing")
-                
+
                 // Start observing settings changes for automatic recalculation
                 observeSettingsChanges()
-                
+
                 // Start simplified prayer time updates (no timeout - runs continuously)
                 startPrayerTimeUpdateLoop() // Remove timeout wrapper to allow continuous updates
-                
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting prayer time updates - service continues", e)
             }
         }
     }
-    
+
     /**
      * Observe settings changes and trigger prayer time recalculation
      */
@@ -719,7 +729,7 @@ class PrayerNotificationService : Service() {
                         Log.i(TAG, "   - Custom Fajr Angle: ${newSettings.customFajrAngle}")
                         Log.i(TAG, "   - Custom Isha Angle: ${newSettings.customIshaAngle}")
                         Log.i(TAG, "   - Time: ${java.time.LocalDateTime.now()}")
-                        
+
                         // Trigger immediate prayer time update with new settings
                         withContext(Dispatchers.IO) {
                             try {
@@ -739,48 +749,48 @@ class PrayerNotificationService : Service() {
             }
         }
     }
-    
+
     /**
      * CORE UPDATE LOOP: The heart of the prayer notification system
-     * 
+     *
      * This function runs continuously to update prayer notifications.
-     * 
+     *
      * SAFETY FEATURES:
      * - Auto-stops after 24 hours to prevent battery drain
      * - Limits to 60 updates maximum
      * - Smart timing: 1-minute updates for notifications, 6-minute for always-on display
-     * 
+     *
      * EDIT THESE VALUES TO:
      * - Change service runtime limit (maxServiceTime)
-     * - Adjust maximum update count (maxUpdates) 
+     * - Adjust maximum update count (maxUpdates)
      * - Modify update intervals in AnrPreventionConfig
      */
     private suspend fun startPrayerTimeUpdateLoop() {
         val startTime = System.currentTimeMillis()
         Log.d(TAG, "=== STARTING PRAYER NOTIFICATION UPDATE LOOP ===")
         Log.d(TAG, "Loop start time: ${java.time.LocalDateTime.now()}")
-        
+
         // CONFIGURABLE LIMITS - Edit these values to change service behavior
         val maxServiceTime = 24 * 60 * 60 * 1000L // 24 hours max - prevents battery drain
         val maxUpdates = 1440 // Max 1440 updates (24 hours * 60 minutes) - allows continuous updates
         var updateCount = 0
-        
-        Log.d(TAG, "Service limits configured: maxTime=${maxServiceTime/1000}s, maxUpdates=$maxUpdates")
-        
+
+        Log.d(TAG, "Service limits configured: maxTime=${maxServiceTime / 1000}s, maxUpdates=$maxUpdates")
+
         try {
             while (isServiceRunning && updateCount < maxUpdates) {
                 val iterationStartTime = System.currentTimeMillis()
                 Log.d(TAG, "--- Update Loop Iteration #${updateCount + 1} ---")
-                
+
                 try {
                     // Check if service has been running too long
                     val currentRuntime = System.currentTimeMillis() - startTime
                     if (currentRuntime > maxServiceTime) {
                         Log.w(TAG, "Service exceeded max time limit (${maxServiceTime / 1000}s), stopping automatically")
-                        Log.w(TAG, "Current runtime: ${currentRuntime/1000}s")
+                        Log.w(TAG, "Current runtime: ${currentRuntime / 1000}s")
                         break
                     }
-                    
+
                     Log.d(TAG, "Calling updatePrayerNotificationWithRealData()...")
                     updatePrayerNotificationWithRealData()
                     updateCount++
@@ -793,25 +803,25 @@ class PrayerNotificationService : Service() {
                         com.starception.submission.prayer.silent.PrayerSilentModeController(applicationContext)
                             .recoverIfNeeded()
                     }.onFailure { Log.e(TAG, "Silent-mode recovery check failed", it) }
-                    
+
                     val iterationDuration = System.currentTimeMillis() - iterationStartTime
                     Log.d(TAG, "✓ Prayer update #$updateCount/$maxUpdates completed in ${iterationDuration}ms")
-                    
+
                     if (AnrPreventionConfig.LOG_SERVICE_LIFECYCLE) {
-                        Log.d(TAG, "Service runtime: ${(System.currentTimeMillis() - startTime)/1000}s")
+                        Log.d(TAG, "Service runtime: ${(System.currentTimeMillis() - startTime) / 1000}s")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating prayer notification", e)
                     // Don't create fallback notifications - user wants only single AOD notification
                     Log.d(TAG, "⚠️ Error occurred but not creating fallback notification to avoid duplicates")
                 }
-                
+
                 // SMART UPDATE STRATEGY - Edit this logic to change update timing
-                // 
+                //
                 // CURRENT BEHAVIOR:
                 // - Every 1 minute: Update notification content (battery efficient)
                 // - Every 6 minutes: Update always-on display (prevents color flashing)
-                // 
+                //
                 // EDIT THIS TO:
                 // - Change update frequencies by modifying the modulo operation (updateCount % 6)
                 // - Adjust intervals in AnrPreventionConfig class
@@ -824,26 +834,25 @@ class PrayerNotificationService : Service() {
                 }
                 delay(updateInterval)
             }
-            
+
             // Auto-restart service after max updates or time limit
             val runtimeSeconds = (System.currentTimeMillis() - startTime) / 1000
             Log.d(TAG, "Service restarting automatically - updates: $updateCount, runtime: ${runtimeSeconds}s")
-            
+
             // Restart the service instead of stopping it
             isServiceRunning = false
             delay(2000) // Wait 2 seconds before restart
             isServiceRunning = true
-            
+
             // Restart the update loop
             Log.d(TAG, "🔄 Restarting prayer notification update loop...")
             startPrayerTimeUpdateLoop()
-            
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error in prayer update loop", e)
         }
         Log.d(TAG, "Prayer time updates stopped")
     }
-    
+
     /**
      * NOTIFICATION UPDATE ENGINE: Updates the notification with timeout protection
      */
@@ -851,7 +860,7 @@ class PrayerNotificationService : Service() {
         val updateStartTime = System.currentTimeMillis()
         Log.d(TAG, "=== UPDATING PRAYER NOTIFICATION (ANR PROTECTED) ===")
         Log.d(TAG, "Update time: ${java.time.LocalTime.now()}")
-        
+
         try {
             // Wrap entire update in timeout to prevent ANR
             withTimeoutOrNull(5000L) { // 5 second max for entire update
@@ -860,24 +869,24 @@ class PrayerNotificationService : Service() {
                     Log.d(TAG, "Initializing PrayerNotificationManager...")
                     PrayerNotificationManager.initialize(applicationContext)
                 }
-                
+
                 // Get prayer data with timeout
                 Log.d(TAG, "Getting prayer data...")
                 val prayerDataStartTime = System.currentTimeMillis()
                 val prayerData = getCurrentPrayerData() // Already has internal timeouts
                 val prayerDataDuration = System.currentTimeMillis() - prayerDataStartTime
                 Log.d(TAG, "✓ Prayer data retrieved in ${prayerDataDuration}ms")
-                
+
                 if (prayerData != null) {
                     val (title, content, detailedMessage, prayerPhase, realProgress, prayerInfo) = prayerData
                     val (prayerName, prayerTime) = prayerInfo
-                    
+
                     // Use the REAL progress percentage from prayer calculation, not the fake hour-based one
                     val progress = realProgress
                     val currentPhase = getCurrentPrayerPhase(progress)
-                    
-                    Log.d(TAG, "🎯 Using REAL prayer progress: ${progress}% (phase: $prayerPhase)")
-                    
+
+                    Log.d(TAG, "🎯 Using REAL prayer progress: $progress% (phase: $prayerPhase)")
+
                     // ONLY use Google's proven Live Update system for Android 16+
                     if (Build.VERSION.SDK_INT >= 35) {
                         try {
@@ -907,7 +916,7 @@ class PrayerNotificationService : Service() {
                             // Use startForeground() to update notification while maintaining foreground service priority
                             // This keeps OOM adj at ~200 instead of 915, preventing system from killing the service
                             startForegroundWithSafeTypes(liveUpdateNotification)
-                            Log.d(TAG, "🧪 Updated foreground notification via startForeground() with phase: $prayerPhase, real progress: ${progress}%")
+                            Log.d(TAG, "🧪 Updated foreground notification via startForeground() with phase: $prayerPhase, real progress: $progress%")
 
                             // Log notification update to file - now using startForeground() to maintain priority
                             FileLogger.logPrayerEvent(
@@ -920,8 +929,8 @@ class PrayerNotificationService : Service() {
                                     "title" to title,
                                     "content" to content,
                                     "prayerTime" to prayerTime,
-                                    "method" to "startForeground"
-                                )
+                                    "method" to "startForeground",
+                                ),
                             )
                         } catch (e: Exception) {
                             Log.e(TAG, "Google Live Update failed: ${e.message}")
@@ -932,30 +941,28 @@ class PrayerNotificationService : Service() {
                         // For older Android versions, don't create any notification
                         // The user specifically wants Android 16 Live Update functionality
                     }
-                    
+
                     previousPrayerPhase = currentPhase
-                    
+
                     val totalDuration = System.currentTimeMillis() - updateStartTime
                     Log.d(TAG, "✓ Notification updated successfully in ${totalDuration}ms")
                 } else {
                     // Don't create quick fallback - user wants only single AOD notification
                     Log.d(TAG, "📱 Skipping quick fallback to avoid duplicate notifications")
                 }
-                
             } ?: run {
                 // Timeout occurred - use emergency Live Update fallback (separate from foreground service)
                 Log.w(TAG, "⚠️ Update timed out after 5s - using emergency Live Update fallback")
                 // Don't create emergency fallback - user wants only single AOD notification
                 Log.d(TAG, "🚨 Update timed out but not creating emergency notification to avoid duplicates")
             }
-            
         } catch (e: Exception) {
             Log.e(TAG, "Error in update: ${e.message}")
             // Don't create final fallback - user wants only single AOD notification
             Log.d(TAG, "💾 Service error but not creating final fallback to avoid duplicates")
         }
     }
-    
+
     /**
      * Get current prayer data for notification with ANR prevention
      */
@@ -963,7 +970,7 @@ class PrayerNotificationService : Service() {
         return withContext(Dispatchers.IO) { // Ensure background thread
             try {
                 Log.d(TAG, "=== GETTING PRAYER DATA (BACKGROUND THREAD) ===")
-                
+
                 // Quick settings check with very short timeout (using injected dependency)
                 val settings = withTimeoutOrNull(1000L) { // 1 second max
                     prayerSettingsRepository.getSettings()
@@ -972,7 +979,7 @@ class PrayerNotificationService : Service() {
                     Log.w(TAG, "Settings unavailable, using fallback")
                     return@withContext Sextuple("Prayer Time Tracker", "Loading...", "Initializing prayer data", "MAKE_TIME", 25, Pair("Current Prayer", LocalTime.now().toString()))
                 }
-                
+
                 // ROBUST LOGGING: Check what settings we're actually using for calculation
                 Log.i(TAG, "📋 SETTINGS BEING USED FOR PRAYER CALCULATION:")
                 Log.i(TAG, "   - Method: ${settings.calculationMethod.displayName}")
@@ -1005,7 +1012,7 @@ class PrayerNotificationService : Service() {
                             // Get proper location details with city name from geocoding
                             val detailedLocation = locationService.getLocationDetails(fetchedLocation)
                             val locationModel = detailedLocation.copy(
-                                timeZoneOffset = offsetHours
+                                timeZoneOffset = offsetHours,
                             )
 
                             // Save to settings for future use
@@ -1038,18 +1045,18 @@ class PrayerNotificationService : Service() {
                     prayerTimeCalculatorService.calculatePrayerTimes(today, location, settings)
                 }
                 val calculationTime = System.currentTimeMillis() - calculationStartTime
-                
+
                 if (prayerTimes == null) {
                     Log.w(TAG, "Prayer calculation timed out after ${calculationTime}ms")
                     return@withContext Sextuple("Prayer Time Tracker", "Calculating...", "Prayer times being calculated", "MAKE_TIME", 40, Pair("Current Prayer", LocalTime.now().toString()))
                 }
-                
+
                 Log.d(TAG, "✓ Prayer times calculated in ${calculationTime}ms")
-                
+
                 // Get offsets from settings to apply to base times
                 val offsets = settings.timeOffsets
                 Log.d(TAG, "⏰ Applying user offsets: Fajr=${offsets.fajr}, Dhuhr=${offsets.dhuhr}, Asr=${offsets.asr}, Maghrib=${offsets.maghrib}, Isha=${offsets.isha}")
-                
+
                 // Apply offsets to base prayer times (to match small tiles and smart prediction)
                 fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTime {
                     if (offsetMinutes == 0) return baseTime
@@ -1057,7 +1064,7 @@ class PrayerNotificationService : Service() {
                         .plusMinutes(offsetMinutes.toLong())
                     return adjustedDateTime.toLocalTime()
                 }
-                
+
                 fun adjustPrayerTime(prayer: PrayerTime): PrayerTime {
                     val offset = when (prayer.name.lowercase()) {
                         "fajr" -> offsets.fajr
@@ -1070,7 +1077,7 @@ class PrayerNotificationService : Service() {
                     val adjustedTime = applyOffsetToTime(prayer.time, offset)
                     return prayer.copy(time = adjustedTime)
                 }
-                
+
                 // CRITICAL FIX: Use same logic as Smart Prediction
                 // Apply offsets FIRST, then find current/next prayer from adjusted times
                 val adjustedFajr = applyOffsetToTime(prayerTimes.fajr, offsets.fajr)
@@ -1088,7 +1095,7 @@ class PrayerNotificationService : Service() {
                     PrayerTime("Dhuhr", adjustedDhuhr, isNext = false, isCurrently = false),
                     PrayerTime("Asr", adjustedAsr, isNext = false, isCurrently = false),
                     PrayerTime("Maghrib", adjustedMaghrib, isNext = false, isCurrently = false),
-                    PrayerTime("Isha", adjustedIsha, isNext = false, isCurrently = false)
+                    PrayerTime("Isha", adjustedIsha, isNext = false, isCurrently = false),
                 )
 
                 val now = LocalTime.now()
@@ -1145,8 +1152,8 @@ class PrayerNotificationService : Service() {
                         "asr" to adjustedAsr.toString(),
                         "maghrib" to adjustedMaghrib.toString(),
                         "isha" to adjustedIsha.toString(),
-                        "calculationMethod" to settings.calculationMethod.displayName
-                    )
+                        "calculationMethod" to settings.calculationMethod.displayName,
+                    ),
                 )
 
                 // Handle fallback case (should rarely happen with new logic)
@@ -1160,10 +1167,10 @@ class PrayerNotificationService : Service() {
                 }
 
                 // Now calculate prayer progress (works for both same-day and cross-day scenarios)
-                
+
                 // Calculate prayer time progress
                 val prayerProgress = calculatePrayerProgress(currentPrayer, nextPrayer)
-                
+
                 // Format notification content based on prayer progress.
                 // On Fridays the midday (Dhuhr) prayer is Jumu'ah — show that name to the user.
                 val currentDisplayName = getPrayerDisplayName(currentPrayer.name, LocalDate.now())
@@ -1197,31 +1204,28 @@ class PrayerNotificationService : Service() {
                         "${it.notificationLine}\n${it.advice}"
                     },
                 )
-                
+
                 // Include prayer phase for accurate notification display
                 val phaseString = when (prayerProgress.phase) {
                     PrayerPhase.GO_TO_MOSQUE -> "GO_TO_MOSQUE"
                     PrayerPhase.BEST_TIME -> "BEST_TIME"
                     PrayerPhase.MAKE_TIME -> "MAKE_TIME"
                 }
-                
+
                 // Return tuple with phase and real progress information for GoogleSampleNotificationManager
                 Sextuple(title, content, detailedMessage, phaseString, prayerProgress.progressPercentage.toInt(), Pair(currentPrayer?.name ?: "Current Prayer", currentPrayer?.time?.toString() ?: LocalTime.now().toString()))
-                
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting prayer data: ${e.message}")
                 Sextuple("Prayer Time Tracker", "Service active", "Prayer time updates running", "MAKE_TIME", 50, Pair("Current Prayer", LocalTime.now().toString()))
             }
         }
     }
-    
 
-    
     /**
      * PRAYER PROGRESS CALCULATOR: Determines how far through a prayer time we are
-     * 
+     *
      * This calculates the progress percentage and determines which phase we're in.
-     * 
+     *
      * PHASES EXPLAINED:
      * - GO_TO_MOSQUE (configurable per-prayer): Time to prepare and go to mosque
      * - BEST_TIME (after go-to-mosque to halfway): Optimal time for prayer
@@ -1249,8 +1253,8 @@ class PrayerNotificationService : Service() {
         // 2. Current time is BEFORE the prayer start time (meaning we crossed midnight)
         // 3. Next prayer is Fajr (or we're waiting for tomorrow's Fajr)
         val isCrossMidnightScenario = currentPrayer.name.equals("Isha", ignoreCase = true) &&
-                                       now.isBefore(prayerStart) &&
-                                       (nextPrayer == null || nextPrayer.name.equals("Fajr", ignoreCase = true))
+            now.isBefore(prayerStart) &&
+            (nextPrayer == null || nextPrayer.name.equals("Fajr", ignoreCase = true))
 
         if (isCrossMidnightScenario) {
             Log.d(TAG, "🌙 CROSS-MIDNIGHT SCENARIO DETECTED!")
@@ -1317,7 +1321,7 @@ class PrayerNotificationService : Service() {
                 remainingMinutes = remainingMinutes.coerceAtLeast(0),
                 totalDuration = totalDuration,
                 progressPercentage = progressPercentage,
-                phase = progressPhase
+                phase = progressPhase,
             )
         }
 
@@ -1325,57 +1329,55 @@ class PrayerNotificationService : Service() {
         val prayerEndThreshold = prayerStart.plusHours(2)
         Log.d(TAG, "Prayer time threshold (end): $prayerEndThreshold")
         Log.d(TAG, "Has prayer passed 2-hour threshold? ${now.isAfter(prayerEndThreshold)}")
-        
+
         if (now.isAfter(prayerEndThreshold)) {
             Log.d(TAG, "Prayer time has passed 2-hour threshold, calculating progress towards next prayer")
             // Prayer time has passed, calculate progress towards next prayer
             if (nextPrayer != null) {
-                
                 // CROSS-DAY CALCULATION FIX: Handle Isha → Fajr overnight period
                 val timeUntilNext: Duration
                 val totalTime: Duration
                 val elapsedTime: Duration
-                
+
                 if (nextPrayer.time.isBefore(now)) {
                     // Next prayer is tomorrow (cross-day case: Isha → Fajr)
                     Log.d(TAG, "🌙 CROSS-DAY DETECTED: Current prayer is today's ${currentPrayer.name}, next prayer is tomorrow's ${nextPrayer.name}")
-                    
+
                     // Time until tomorrow's Fajr = time until midnight + time from midnight to Fajr
                     timeUntilNext = Duration.between(now, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
-                    
+
                     // Total time from today's Isha to tomorrow's Fajr = time until midnight + time from midnight to Fajr
                     totalTime = Duration.between(prayerStart, LocalTime.MAX) + Duration.between(LocalTime.MIN, nextPrayer.time)
-                    
+
                     // Elapsed time since today's Isha
                     elapsedTime = Duration.between(prayerStart, now)
-                    
+
                     Log.d(TAG, "⏰ Cross-day calculation:")
                     Log.d(TAG, "   Time until tomorrow's ${nextPrayer.name}: ${timeUntilNext.toMinutes()} minutes")
-                    Log.d(TAG, "   Total Isha→Fajr duration: ${totalTime.toMinutes()} minutes") 
+                    Log.d(TAG, "   Total Isha→Fajr duration: ${totalTime.toMinutes()} minutes")
                     Log.d(TAG, "   Elapsed since today's ${currentPrayer.name}: ${elapsedTime.toMinutes()} minutes")
-                    
                 } else {
                     // Next prayer is today (normal case)
                     timeUntilNext = Duration.between(now, nextPrayer.time)
                     totalTime = Duration.between(prayerStart, nextPrayer.time)
                     elapsedTime = Duration.between(prayerStart, now)
-                    
+
                     Log.d(TAG, "📅 Same-day calculation:")
                     Log.d(TAG, "   Time until next prayer: ${timeUntilNext.toMinutes()} minutes")
                     Log.d(TAG, "   Total time between prayers: ${totalTime.toMinutes()} minutes")
                     Log.d(TAG, "   Elapsed time since current prayer: ${elapsedTime.toMinutes()} minutes")
                 }
-                
+
                 if (totalTime.toMinutes() > 0) {
                     val progressPercentage = (elapsedTime.toMinutes().toFloat() / totalTime.toMinutes().toFloat() * 100f).coerceIn(0f, 100f)
-                    Log.d(TAG, "🎯 Calculated progress: ${progressPercentage}% (MAKE_TIME phase)")
-                    
+                    Log.d(TAG, "🎯 Calculated progress: $progressPercentage% (MAKE_TIME phase)")
+
                     val prayerProgress = PrayerProgress(
                         elapsedMinutes = elapsedTime.toMinutes(),
                         remainingMinutes = timeUntilNext.toMinutes(),
                         totalDuration = totalTime.toMinutes(),
                         progressPercentage = progressPercentage,
-                        phase = PrayerPhase.MAKE_TIME // Since prayer time has passed
+                        phase = PrayerPhase.MAKE_TIME, // Since prayer time has passed
                     )
                     Log.d(TAG, "✅ Returning cross-day prayer progress: $prayerProgress")
                     return prayerProgress
@@ -1383,10 +1385,10 @@ class PrayerNotificationService : Service() {
                     Log.w(TAG, "⚠️ Invalid total time calculation: ${totalTime.toMinutes()} minutes")
                 }
             }
-            
+
             // Fallback: prayer time has passed, no progress to show
             val elapsedMinutes = Duration.between(prayerStart, now).toMinutes()
-            
+
             // SAFETY CHECK: Ensure elapsed time is never negative
             val safeElapsedMinutes = if (elapsedMinutes < 0) {
                 Log.e(TAG, "🚨 NEGATIVE ELAPSED TIME IN FALLBACK!")
@@ -1398,16 +1400,16 @@ class PrayerNotificationService : Service() {
             } else {
                 elapsedMinutes
             }
-            
+
             return PrayerProgress(
                 elapsedMinutes = safeElapsedMinutes,
                 remainingMinutes = 0,
                 totalDuration = 0,
                 progressPercentage = 0f,
-                phase = PrayerPhase.MAKE_TIME
+                phase = PrayerPhase.MAKE_TIME,
             )
         }
-        
+
         // Prayer time is still active, calculate normal progress
         val prayerEnd = nextPrayer?.time ?: prayerStart.plusHours(1) // Default 1 hour if no next prayer
 
@@ -1438,11 +1440,11 @@ class PrayerNotificationService : Service() {
 
             // Total time = time until midnight + time from midnight to next prayer
             totalDuration = Duration.between(prayerStart, LocalTime.MAX).toMinutes() +
-                           Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
+                Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
 
             // Remaining time = time until midnight + time from midnight to next prayer
             remainingMinutes = Duration.between(now, LocalTime.MAX).toMinutes() +
-                              Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
+                Duration.between(LocalTime.MIN, prayerEnd).toMinutes() + 1
 
             Log.d(TAG, "   Total duration (cross-day): ${totalDuration}m")
             Log.d(TAG, "   Remaining (cross-day): ${remainingMinutes}m")
@@ -1451,12 +1453,12 @@ class PrayerNotificationService : Service() {
             totalDuration = Duration.between(prayerStart, prayerEnd).toMinutes()
             remainingMinutes = Duration.between(now, prayerEnd).toMinutes()
         }
-        
+
         // PHASE DETERMINATION - Uses per-prayer go-to-mosque duration from settings
         val progressPhase = when {
-            elapsedMinutes < goToMosqueDuration -> PrayerPhase.GO_TO_MOSQUE    // First N minutes: Go to mosque
-            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME    // N min to halfway: Best time
-            else -> PrayerPhase.MAKE_TIME    // Halfway to end: Make time
+            elapsedMinutes < goToMosqueDuration -> PrayerPhase.GO_TO_MOSQUE // First N minutes: Go to mosque
+            elapsedMinutes < (totalDuration / 2) -> PrayerPhase.BEST_TIME // N min to halfway: Best time
+            else -> PrayerPhase.MAKE_TIME // Halfway to end: Make time
         }
 
         // 3-SEGMENT PROGRESS CALCULATION to match notification segments
@@ -1487,20 +1489,20 @@ class PrayerNotificationService : Service() {
                 (60f + segmentProgress * 40f).coerceIn(60f, 100f)
             }
         }
-        
+
         Log.d(TAG, "🎯 3-SEGMENT PROGRESS CALCULATION:")
         Log.d(TAG, "   Elapsed: ${elapsedMinutes}m, Total: ${totalDuration}m, Phase: $progressPhase")
         Log.d(TAG, "   Progress: ${progressPercentage.toInt()}% (${progressPhase.name})")
-        
+
         return PrayerProgress(
             elapsedMinutes = elapsedMinutes,
             remainingMinutes = remainingMinutes,
             totalDuration = totalDuration,
             progressPercentage = progressPercentage,
-            phase = progressPhase
+            phase = progressPhase,
         )
     }
-    
+
     /**
      * Build prayer progress content for notification
      */
@@ -1512,7 +1514,7 @@ class PrayerNotificationService : Service() {
         val displayName = getPrayerDisplayName(currentPrayer.name, LocalDate.now())
         return "$elapsedText since $displayName"
     }
-    
+
     /**
      * Build detailed prayer progress message
      */
@@ -1548,7 +1550,7 @@ class PrayerNotificationService : Service() {
             }
         }
     }
-    
+
     /**
      * Data classes for prayer progress tracking
      */
@@ -1557,16 +1559,16 @@ class PrayerNotificationService : Service() {
         val remainingMinutes: Long,
         val totalDuration: Long,
         val progressPercentage: Float,
-        val phase: PrayerPhase
+        val phase: PrayerPhase,
     )
-    
+
     /**
      * Data class to hold notification content with prayer phase information
      */
     private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
     private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
     private data class Sextuple<A, B, C, D, E, F>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E, val sixth: F)
-    
+
     /**
      * PRAYER PHASES: The three stages of prayer time
      *
@@ -1574,11 +1576,11 @@ class PrayerNotificationService : Service() {
      * Phase durations are configurable per-prayer in notification settings.
      */
     private enum class PrayerPhase {
-        GO_TO_MOSQUE,    // 0-N minutes (configurable): Go to mosque (Blue color in progress bar)
-        BEST_TIME,       // N minutes to halfway: Best time for prayer (Green color)
-        MAKE_TIME        // Halfway+: Make time for prayer (Yellow color)
+        GO_TO_MOSQUE, // 0-N minutes (configurable): Go to mosque (Blue color in progress bar)
+        BEST_TIME, // N minutes to halfway: Best time for prayer (Green color)
+        MAKE_TIME, // Halfway+: Make time for prayer (Yellow color)
     }
-    
+
     /**
      * Format time remaining until prayer
      */
@@ -1617,7 +1619,7 @@ class PrayerNotificationService : Service() {
         Log.d(TAG, "   📊 Formatted result: $result")
         return result
     }
-    
+
     /**
      * Format elapsed time in a cleaner format
      */
@@ -1625,7 +1627,7 @@ class PrayerNotificationService : Service() {
         return when {
             elapsedMinutes == 0L -> "Just started"
             elapsedMinutes == 1L -> "1 minute"
-            elapsedMinutes < 60 -> "${elapsedMinutes} minutes"
+            elapsedMinutes < 60 -> "$elapsedMinutes minutes"
             else -> {
                 val hours = elapsedMinutes / 60
                 val minutes = elapsedMinutes % 60
@@ -1647,7 +1649,7 @@ class PrayerNotificationService : Service() {
             else -> "MAKE_TIME_FOR_PRAYER"
         }
     }
-    
+
     /**
      * Extract real progress from prayer data - no longer needed since we get it directly
      */
@@ -1655,7 +1657,7 @@ class PrayerNotificationService : Service() {
         // Return the real progress percentage that was calculated by the prayer system
         return prayerData.fifth
     }
-    
+
     /**
      * Initialize Activity Recognition (ASYNC VERSION - prevents ANR)
      *
@@ -1760,7 +1762,7 @@ class PrayerNotificationService : Service() {
             Log.e(TAG, "❌ Error starting activity recognition: ${e.message}")
         }
     }
-    
+
     /**
      * Start activity recognition updates
      */
@@ -1769,33 +1771,33 @@ class PrayerNotificationService : Service() {
             // Define activity transitions we want to detect
             // Using only commonly supported activities to avoid compatibility issues
             val transitions = mutableListOf<ActivityTransition>()
-            
+
             // Only use the most commonly supported activity types across all devices
             val activities = listOf(
-                DetectedActivity.STILL,        // Stationary (widely supported)
-                DetectedActivity.WALKING,      // Walking (widely supported)
-                DetectedActivity.RUNNING,      // Running (widely supported)
-                DetectedActivity.IN_VEHICLE    // In vehicle (widely supported)
+                DetectedActivity.STILL, // Stationary (widely supported)
+                DetectedActivity.WALKING, // Walking (widely supported)
+                DetectedActivity.RUNNING, // Running (widely supported)
+                DetectedActivity.IN_VEHICLE, // In vehicle (widely supported)
                 // Removed: ON_BICYCLE, ON_FOOT, TILTING (not universally supported)
             )
-            
+
             activities.forEach { activity ->
                 transitions.add(
                     ActivityTransition.Builder()
                         .setActivityType(activity)
                         .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                        .build()
+                        .build(),
                 )
                 transitions.add(
                     ActivityTransition.Builder()
                         .setActivityType(activity)
                         .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
-                        .build()
+                        .build(),
                 )
             }
-            
+
             val request = ActivityTransitionRequest(transitions)
-            
+
             activityTransitionPendingIntent?.let { pendingIntent ->
                 activityRecognitionClient.requestActivityTransitionUpdates(request, pendingIntent)
                     .addOnSuccessListener {
@@ -1813,14 +1815,14 @@ class PrayerNotificationService : Service() {
             Log.e(TAG, "❌ Error starting activity recognition: ${e.message}", e)
         }
     }
-    
+
     /**
      * Get current activity for display
      */
     fun getCurrentActivity(): String {
         return currentActivity
     }
-    
+
     /**
      * Play beep sound when activity changes
      */
@@ -1828,7 +1830,7 @@ class PrayerNotificationService : Service() {
         try {
             // Play a short beep tone
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
-            
+
             // Also vibrate briefly if available
             val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             vibrator?.let {
@@ -1839,13 +1841,13 @@ class PrayerNotificationService : Service() {
                     it.vibrate(100)
                 }
             }
-            
+
             Log.d(TAG, "🔊 Activity change beep played")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to play activity change beep: ${e.message}")
         }
     }
-    
+
     /**
      * Show notification when activity changes
      */
@@ -1859,15 +1861,15 @@ class PrayerNotificationService : Service() {
                 .setAutoCancel(true)
                 .setSilent(true) // Silent since we play beep manually
                 .build()
-            
+
             notificationManager.notify(1003, notification) // Different ID from other notifications
-            
+
             Log.d(TAG, "📱 Activity change notification shown: $activity")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show activity change notification: ${e.message}")
         }
     }
-    
+
     /**
      * Convert activity type to readable string
      */
@@ -1884,7 +1886,7 @@ class PrayerNotificationService : Service() {
             else -> "OTHER"
         }
     }
-    
+
     /**
      * Convert transition type to readable string
      */
@@ -1895,7 +1897,7 @@ class PrayerNotificationService : Service() {
             else -> "UNKNOWN"
         }
     }
-    
+
     /**
      * Stop activity recognition updates
      */
@@ -1910,10 +1912,10 @@ class PrayerNotificationService : Service() {
                         Log.e(TAG, "Failed to remove activity transition updates: ${e.message}")
                     }
             }
-            
+
             toneGenerator?.release()
             toneGenerator = null
-            
+
             Log.d(TAG, "✓ Activity recognition stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping activity recognition: ${e.message}")
@@ -1986,23 +1988,23 @@ class PrayerNotificationService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "Prayer notification service destroy started")
-        
+
         try {
             // Reset flags FIRST to stop all loops immediately
             isServiceRunning = false
             isInitializing = false
             lastForegroundNotification = null
-            
+
             // Cancel all coroutines immediately
             serviceScope.cancel()
-            
+
             // Stop foreground service and remove notification
             try {
                 stopForeground(true)
             } catch (e: Exception) {
                 Log.w(TAG, "Error stopping foreground", e)
             }
-            
+
             // Clean up notifications
             try {
                 if (PrayerNotificationManager.isInitialized()) {
@@ -2011,7 +2013,7 @@ class PrayerNotificationService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "Error cleaning up notifications", e)
             }
-            
+
             // Stop activity recognition
             try {
                 stopActivityRecognition()
@@ -2032,8 +2034,8 @@ class PrayerNotificationService : Service() {
 
             // Stop ActivityTracker sensor detection and clear callback
             try {
-                ActivityTracker.setActivityChangeCallback(null)  // Clear callback first
-                ActivityTracker.setSensorHandler(null)  // Clear sensor handler
+                ActivityTracker.setActivityChangeCallback(null) // Clear callback first
+                ActivityTracker.setSensorHandler(null) // Clear sensor handler
                 // The service is START_STICKY and may be recreated immediately. Do not
                 // invalidate a wake-up alarm that was already scheduled for an active trip.
                 ActivityTracker.stopDetection(preserveDrivingSession = true)
@@ -2053,7 +2055,6 @@ class PrayerNotificationService : Service() {
             }
 
             Log.d(TAG, "Modern service cleanup completed successfully")
-            
         } catch (e: Exception) {
             Log.e(TAG, "Error during service cleanup", e)
         } finally {
@@ -2061,7 +2062,7 @@ class PrayerNotificationService : Service() {
             Log.d(TAG, "Prayer notification service destroyed")
         }
     }
-    
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
@@ -2102,7 +2103,7 @@ class PrayerNotificationService : Service() {
                 applicationContext,
                 1,
                 restartServiceIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
@@ -2112,16 +2113,16 @@ class PrayerNotificationService : Service() {
             // This is critical for prayer notifications to work reliably
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
-                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,  // WAKEUP to wake device
+                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP, // WAKEUP to wake device
                     triggerTime,
-                    restartServicePendingIntent
+                    restartServicePendingIntent,
                 )
                 Log.i(TAG, "✅ Service restart scheduled with setExactAndAllowWhileIdle (Doze-safe)")
             } else {
                 alarmManager.setExact(
                     android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     triggerTime,
-                    restartServicePendingIntent
+                    restartServicePendingIntent,
                 )
                 Log.i(TAG, "✅ Service restart scheduled with setExact")
             }

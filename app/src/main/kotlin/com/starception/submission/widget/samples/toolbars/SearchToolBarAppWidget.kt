@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.starception.submission.widget.samples.toolbars
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
+package com.starception.submission.widget.samples.toolbars
 
 import android.content.Context
 import androidx.compose.runtime.Composable
@@ -26,67 +24,69 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
-import com.starception.submission.core.ui.R as CoreUiR
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarButton
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayout
 import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
+import com.starception.submission.core.ui.R as CoreUiR
 
 /**
  * A widget to demonstrate the [SearchToolBarLayout].
  */
 class SearchToolBarAppWidget : GlanceAppWidget() {
-  // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
-  // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
-  // supported size to be held in the widget host's memory.
-  override val sizeMode: SizeMode = SizeMode.Exact
+    // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
+    // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
+    // supported size to be held in the widget host's memory.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val themeSource = loadWidgetThemeSource(context)
-    provideContent {
-      StarceptionWidgetTheme(themeSource) {
-        WidgetContent()
-      }
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val themeSource = loadWidgetThemeSource(context)
+        provideContent {
+            StarceptionWidgetTheme(themeSource) {
+                WidgetContent()
+            }
+        }
     }
-  }
 
-  @Composable
-  fun WidgetContent() {
-    SearchToolBarLayout(
-      searchButton = SearchToolBarButton(
-        iconRes = CoreUiR.drawable.flaticon_search_152536,
-        contentDescription = "Search notes",
-        text = "Search",
-        onClick = actionStartDemoActivity("search notes button")
-      ),
-      trailingButtons = listOf(
-        SearchToolBarButton(
-          iconRes = R.drawable.sample_mic_icon,
-          contentDescription = "audio",
-          onClick = actionStartDemoActivity("audio button")
-        ),
-        SearchToolBarButton(
-          iconRes = R.drawable.sample_videocam_icon,
-          contentDescription = "video note",
-          onClick = actionStartDemoActivity("video note button")
-        ),
-        SearchToolBarButton(
-          iconRes = R.drawable.sample_tasbih_icon,
-          contentDescription = "Tasbih",
-          onClick = actionStartDemoActivity("camera button")
-        ),
-        SearchToolBarButton(
-          iconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
-          contentDescription = "Quran",
-          onClick = actionStartDemoActivity("share button")
-        ),
-      )
-    )
-  }
+    @Composable
+    fun WidgetContent() {
+        SearchToolBarLayout(
+            searchButton = SearchToolBarButton(
+                iconRes = CoreUiR.drawable.flaticon_search_152536,
+                contentDescription = "Search notes",
+                text = "Search",
+                onClick = actionStartDemoActivity("search notes button"),
+            ),
+            trailingButtons = listOf(
+                SearchToolBarButton(
+                    iconRes = R.drawable.sample_mic_icon,
+                    contentDescription = "audio",
+                    onClick = actionStartDemoActivity("audio button"),
+                ),
+                SearchToolBarButton(
+                    iconRes = R.drawable.sample_videocam_icon,
+                    contentDescription = "video note",
+                    onClick = actionStartDemoActivity("video note button"),
+                ),
+                SearchToolBarButton(
+                    iconRes = R.drawable.sample_tasbih_icon,
+                    contentDescription = "Tasbih",
+                    onClick = actionStartDemoActivity("camera button"),
+                ),
+                SearchToolBarButton(
+                    iconRes = CoreUiR.drawable.flaticon_magic_book_9061096,
+                    contentDescription = "Quran",
+                    onClick = actionStartDemoActivity("share button"),
+                ),
+            ),
+        )
+    }
 }
 
 /**
  * Receiver registered in the manifest for the [SearchToolBarAppWidget].
  */
 class SearchToolBarAppWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget: GlanceAppWidget = SearchToolBarAppWidget()
+    override val glanceAppWidget: GlanceAppWidget = SearchToolBarAppWidget()
 }

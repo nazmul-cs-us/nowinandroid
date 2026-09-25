@@ -1,10 +1,25 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.weather
 
-import android.provider.Settings
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BlendMode
 import android.graphics.BlendModeColorFilter
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
@@ -13,6 +28,7 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.os.Build
+import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.annotation.RawRes
 import androidx.compose.material3.MaterialTheme
@@ -20,26 +36,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.IconCompat
+import com.airbnb.lottie.LottieCompositionFactory
+import com.airbnb.lottie.LottieDrawable
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.airbnb.lottie.LottieCompositionFactory
-import com.airbnb.lottie.LottieDrawable
 import com.starception.submission.R
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
-
+import androidx.compose.ui.graphics.Color as ComposeColor
 
 // Only the current-weather icon uses this, and that icon stays here: it draws
 // animated vector drawables through BlendMode, neither of which crosses.
@@ -286,20 +301,20 @@ private fun CurrentWeather.currentWeatherVisual(): CurrentWeatherVisual = when (
 private fun CurrentWeatherVisual.animationResource(style: MeteoconStyle): Int =
     when (style) {
         MeteoconStyle.Monochrome -> when (this) {
-        CurrentWeatherVisual.ClearDay -> R.raw.meteocon_mono_clear_day
-        CurrentWeatherVisual.ClearNight -> R.raw.meteocon_mono_clear_night
-        CurrentWeatherVisual.PartlyCloudyDay -> R.raw.meteocon_mono_partly_cloudy_day
-        CurrentWeatherVisual.PartlyCloudyNight -> R.raw.meteocon_mono_partly_cloudy_night
-        CurrentWeatherVisual.OvercastDay -> R.raw.meteocon_mono_overcast_day
-        CurrentWeatherVisual.OvercastNight -> R.raw.meteocon_mono_overcast_night
-        CurrentWeatherVisual.FogDay -> R.raw.meteocon_mono_fog_day
-        CurrentWeatherVisual.FogNight -> R.raw.meteocon_mono_fog_night
-        CurrentWeatherVisual.Drizzle -> R.raw.meteocon_mono_drizzle
-        CurrentWeatherVisual.Rain -> R.raw.meteocon_mono_rain
-        CurrentWeatherVisual.Snow -> R.raw.meteocon_mono_snow
-        CurrentWeatherVisual.ThunderstormsDay -> R.raw.meteocon_mono_thunderstorms_day
-        CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_mono_thunderstorms_night
-        CurrentWeatherVisual.Cloudy -> R.raw.meteocon_mono_cloudy
+            CurrentWeatherVisual.ClearDay -> R.raw.meteocon_mono_clear_day
+            CurrentWeatherVisual.ClearNight -> R.raw.meteocon_mono_clear_night
+            CurrentWeatherVisual.PartlyCloudyDay -> R.raw.meteocon_mono_partly_cloudy_day
+            CurrentWeatherVisual.PartlyCloudyNight -> R.raw.meteocon_mono_partly_cloudy_night
+            CurrentWeatherVisual.OvercastDay -> R.raw.meteocon_mono_overcast_day
+            CurrentWeatherVisual.OvercastNight -> R.raw.meteocon_mono_overcast_night
+            CurrentWeatherVisual.FogDay -> R.raw.meteocon_mono_fog_day
+            CurrentWeatherVisual.FogNight -> R.raw.meteocon_mono_fog_night
+            CurrentWeatherVisual.Drizzle -> R.raw.meteocon_mono_drizzle
+            CurrentWeatherVisual.Rain -> R.raw.meteocon_mono_rain
+            CurrentWeatherVisual.Snow -> R.raw.meteocon_mono_snow
+            CurrentWeatherVisual.ThunderstormsDay -> R.raw.meteocon_mono_thunderstorms_day
+            CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_mono_thunderstorms_night
+            CurrentWeatherVisual.Cloudy -> R.raw.meteocon_mono_cloudy
         }
         MeteoconStyle.Fill -> when (this) {
             CurrentWeatherVisual.ClearDay -> R.raw.meteocon_fill_clear_day
@@ -333,7 +348,7 @@ private fun CurrentWeatherVisual.animationResource(style: MeteoconStyle): Int =
             CurrentWeatherVisual.ThunderstormsNight -> R.raw.meteocon_thunderstorms_night
             CurrentWeatherVisual.Cloudy -> R.raw.meteocon_cloudy
         }
-}
+    }
 
 private val notificationIconCache = ConcurrentHashMap<String, Bitmap>()
 

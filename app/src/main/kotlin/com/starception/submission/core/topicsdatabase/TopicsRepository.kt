@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.topicsdatabase
 
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +27,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class TopicsRepository @Inject constructor(
-    private val topicsDao: TopicsDao
+    private val topicsDao: TopicsDao,
 ) {
 
     // ============= Read Operations =============
@@ -102,7 +118,7 @@ class TopicsRepository @Inject constructor(
         shortDescription: String = "",
         longDescription: String = "",
         imageUrl: String = "",
-        icon: String? = null
+        icon: String? = null,
     ): Topic {
         val nextId = topicsDao.getNextUserTopicId()
         val entity = TopicEntity(
@@ -116,7 +132,7 @@ class TopicsRepository @Inject constructor(
             isSystem = 0,
             isUserCreated = 1,
             createdAt = java.time.Instant.now().toString(),
-            updatedAt = null
+            updatedAt = null,
         )
         topicsDao.insertTopic(entity)
         return entity.toTopic()
@@ -135,7 +151,7 @@ class TopicsRepository @Inject constructor(
         val updatedEntity = topic.toEntity().copy(
             isUserCreated = 1,
             isSystem = 0,
-            updatedAt = java.time.Instant.now().toString()
+            updatedAt = java.time.Instant.now().toString(),
         )
         topicsDao.updateTopic(updatedEntity)
         return true

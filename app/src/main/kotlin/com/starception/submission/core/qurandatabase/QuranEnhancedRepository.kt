@@ -1,6 +1,21 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
-import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +34,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class QuranEnhancedRepository @Inject constructor(
-    private val quranEnhancedDao: QuranEnhancedDao
+    private val quranEnhancedDao: QuranEnhancedDao,
 ) {
 
     // ============= Basic Ayah Access =============
@@ -100,7 +115,7 @@ class QuranEnhancedRepository @Inject constructor(
     suspend fun getAyahsByLineRange(
         pageNumber: Int,
         startLine: Int,
-        endLine: Int
+        endLine: Int,
     ): List<QuranEnhancedAyah> {
         return quranEnhancedDao.getAyahsByLineRange(pageNumber, startLine, endLine)
             .map { it.toQuranEnhancedAyah() }
@@ -185,7 +200,7 @@ class QuranEnhancedRepository @Inject constructor(
      */
     suspend fun getGrammaticalAnalysis(
         surahNumber: Int,
-        ayahNumber: Int
+        ayahNumber: Int,
     ): AyahAnalysisItem? {
         return quranEnhancedDao.getGrammaticalAnalysis(surahNumber, ayahNumber)
     }
@@ -202,7 +217,7 @@ class QuranEnhancedRepository @Inject constructor(
      */
     suspend fun getRevelationReasons(
         surahNumber: Int,
-        ayahNumber: Int
+        ayahNumber: Int,
     ): AyahReasonsItem? {
         return quranEnhancedDao.getRevelationReasons(surahNumber, ayahNumber)
     }
@@ -259,7 +274,7 @@ class QuranEnhancedRepository @Inject constructor(
 @Singleton
 class UnifiedQuranRepository @Inject constructor(
     private val quranDao: QuranDao,
-    private val quranEnhancedDao: QuranEnhancedDao
+    private val quranEnhancedDao: QuranEnhancedDao,
 ) {
 
     // ============= Standard Database Access =============

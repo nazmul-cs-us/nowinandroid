@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
 import androidx.compose.foundation.Canvas
@@ -25,10 +41,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.theme.ubuntuInspiredFontFamily
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import kotlin.math.cos
@@ -60,7 +76,7 @@ data class WatchClockStyle(
     val hoursDialStyle: WatchDialStyle = WatchDialStyle(),
     val hourLabelStyle: TextStyle = TextStyle(),
     val overlayStrokeWidth: Dp = 1.5.dp,
-    val overlayStrokeColor: Color = Color.White
+    val overlayStrokeColor: Color = Color.White,
 )
 
 // Default style for the Control Center (white on glass) - Helix/Timex inspired professional styling
@@ -70,7 +86,7 @@ val ControlCenterClockStyle = WatchClockStyle(
             fontFamily = ubuntuInspiredFontFamily,
             color = Color.White,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Normal
+            fontWeight = FontWeight.Normal,
         ),
         stepsWidth = 1.dp,
         majorStepsWidth = 1.8.dp,
@@ -81,14 +97,14 @@ val ControlCenterClockStyle = WatchClockStyle(
         normalStepsLineHeight = 5.dp,
         fiveStepsLineHeight = 12.dp,
         showMinorTicks = true,
-        showAccentMarks = true
+        showAccentMarks = true,
     ),
     minutesDialStyle = WatchDialStyle(
         stepsTextStyle = TextStyle(
             fontFamily = ubuntuInspiredFontFamily,
             color = Color.White.copy(alpha = 0.9f),
             fontSize = 10.sp,
-            fontWeight = FontWeight.Normal
+            fontWeight = FontWeight.Normal,
         ),
         stepsWidth = 0.8.dp,
         majorStepsWidth = 1.5.dp,
@@ -99,14 +115,14 @@ val ControlCenterClockStyle = WatchClockStyle(
         normalStepsLineHeight = 4.dp,
         fiveStepsLineHeight = 10.dp,
         showMinorTicks = true,
-        showAccentMarks = true
+        showAccentMarks = true,
     ),
     hoursDialStyle = WatchDialStyle(
         stepsTextStyle = TextStyle(
             fontFamily = ubuntuInspiredFontFamily,
             color = Color.White,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Normal
+            fontWeight = FontWeight.Normal,
         ),
         stepsWidth = 1.dp,
         majorStepsWidth = 1.8.dp,
@@ -117,22 +133,22 @@ val ControlCenterClockStyle = WatchClockStyle(
         normalStepsLineHeight = 5.dp,
         fiveStepsLineHeight = 12.dp,
         showMinorTicks = true,
-        showAccentMarks = false
+        showAccentMarks = false,
     ),
     hourLabelStyle = TextStyle(
         fontFamily = ubuntuInspiredFontFamily,
         color = Color.White,
         fontSize = 28.sp,
-        fontWeight = FontWeight.Bold
+        fontWeight = FontWeight.Bold,
     ),
     overlayStrokeColor = Color.White.copy(alpha = 0.6f),
-    overlayStrokeWidth = 1.dp
+    overlayStrokeWidth = 1.dp,
 )
 
 @Composable
 fun WatchFaceTile(
     modifier: Modifier = Modifier,
-    clockStyle: WatchClockStyle = ControlCenterClockStyle
+    clockStyle: WatchClockStyle = ControlCenterClockStyle,
 ) {
     val textMeasurer = rememberTextMeasurer()
 
@@ -183,10 +199,10 @@ fun WatchFaceTile(
 
     Box(
         modifier = modifier,
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Canvas(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             val outerRadius = minOf(size.width, size.height) / 2f - 4.dp.toPx()
             val innerRadius = outerRadius - 28.dp.toPx()
@@ -197,7 +213,7 @@ fun WatchFaceTile(
                 rotation = secondRotation,
                 textMeasurer = textMeasurer,
                 dialStyle = clockStyle.secondsDialStyle,
-                showLabels = true
+                showLabels = true,
             )
 
             // Minutes Dial (inner)
@@ -206,14 +222,14 @@ fun WatchFaceTile(
                 rotation = minuteRotation,
                 textMeasurer = textMeasurer,
                 dialStyle = clockStyle.minutesDialStyle,
-                showLabels = false // Hide labels on inner ring for cleaner look
+                showLabels = false, // Hide labels on inner ring for cleaner look
             )
 
             // Draw hour:minute in center
             val timeString = String.format("%02d:%02d", hour, minute)
             val timeTextMeasureOutput = textMeasurer.measure(
                 text = buildAnnotatedString { append(timeString) },
-                style = clockStyle.hourLabelStyle
+                style = clockStyle.hourLabelStyle,
             )
             val timeTopLeft = Offset(
                 x = center.x - (timeTextMeasureOutput.size.width / 2),
@@ -223,7 +239,7 @@ fun WatchFaceTile(
                 textMeasurer = textMeasurer,
                 text = timeString,
                 topLeft = timeTopLeft,
-                style = clockStyle.hourLabelStyle
+                style = clockStyle.hourLabelStyle,
             )
 
             // Draw overlay path connecting the dials
@@ -248,7 +264,7 @@ fun WatchFaceTile(
                     x2 = overlayLineX - overlayRadius,
                     y2 = endOffset.y,
                     x3 = overlayLineX,
-                    y3 = endOffset.y
+                    y3 = endOffset.y,
                 )
                 lineTo(endOffset.x, endOffset.y)
             }
@@ -256,7 +272,7 @@ fun WatchFaceTile(
             drawPath(
                 path = overlayPath,
                 color = clockStyle.overlayStrokeColor,
-                style = Stroke(width = clockStyle.overlayStrokeWidth.toPx())
+                style = Stroke(width = clockStyle.overlayStrokeWidth.toPx()),
             )
         }
     }
@@ -270,7 +286,7 @@ private fun DrawScope.watchDial(
     rotation: Float,
     textMeasurer: TextMeasurer,
     dialStyle: WatchDialStyle,
-    showLabels: Boolean = true
+    showLabels: Boolean = true,
 ) {
     var stepsAngle = 0
 
@@ -283,11 +299,11 @@ private fun DrawScope.watchDial(
 
         val stepsStartOffset = Offset(
             x = center.x + (radius * cos((stepsAngle + rotation) * (Math.PI / 180f))).toFloat(),
-            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
         )
         val stepsEndOffset = Offset(
             x = center.x + (radius - stepsHeight) * cos((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
-            y = center.y - (radius - stepsHeight) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat()
+            y = center.y - (radius - stepsHeight) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
         )
 
         drawLine(
@@ -295,7 +311,7 @@ private fun DrawScope.watchDial(
             start = stepsStartOffset,
             end = stepsEndOffset,
             strokeWidth = dialStyle.stepsWidth.toPx(),
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
 
         // Draw labels at every 5 steps
@@ -303,24 +319,24 @@ private fun DrawScope.watchDial(
             val stepsLabel = String.format("%02d", steps)
             val stepsLabelTextLayout = textMeasurer.measure(
                 text = buildAnnotatedString { append(stepsLabel) },
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
 
             val stepsLabelOffset = Offset(
                 x = center.x + (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * cos((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
-                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat()
+                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
             )
 
             val stepsLabelTopLeft = Offset(
                 stepsLabelOffset.x - ((stepsLabelTextLayout.size.width) / 2f),
-                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f)
+                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f),
             )
 
             drawText(
                 textMeasurer = textMeasurer,
                 text = stepsLabel,
                 topLeft = stepsLabelTopLeft,
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
         }
         stepsAngle += 6

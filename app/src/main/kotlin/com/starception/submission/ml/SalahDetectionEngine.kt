@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.ml
 
 import android.content.Context
@@ -41,21 +57,20 @@ class SalahDetectionEngine(context: Context) : Closeable {
         // The sequence validator provides additional filtering, so thresholds here
         // should favor passing detections through rather than suppressing them.
         private val POSTURE_CONFIDENCE_THRESHOLDS = mapOf(
-            SalahPosture.QIYAM to 0.35f,          // Standing is distinctive (upright orientation)
-            SalahPosture.RUKU to 0.35f,            // Bowing is distinctive (forward lean)
-            SalahPosture.GOING_TO_SUJUD to 0.40f,  // Brief transition
-            SalahPosture.SUJUD to 0.35f,           // Prostration is very distinctive (inverted)
-            SalahPosture.JALSA to 0.40f,           // Sitting between sujuds
-            SalahPosture.TASHAHHUD to 0.40f,       // Final sitting (similar to JALSA)
-            SalahPosture.QIYAM_RISING to 0.40f,    // Brief transition
-            SalahPosture.RISING_TO_QIYAM to 0.40f  // Next-rak'ah transition
+            SalahPosture.QIYAM to 0.35f, // Standing is distinctive (upright orientation)
+            SalahPosture.RUKU to 0.35f, // Bowing is distinctive (forward lean)
+            SalahPosture.GOING_TO_SUJUD to 0.40f, // Brief transition
+            SalahPosture.SUJUD to 0.35f, // Prostration is very distinctive (inverted)
+            SalahPosture.JALSA to 0.40f, // Sitting between sujuds
+            SalahPosture.TASHAHHUD to 0.40f, // Final sitting (similar to JALSA)
+            SalahPosture.QIYAM_RISING to 0.40f, // Brief transition
+            SalahPosture.RISING_TO_QIYAM to 0.40f, // Next-rak'ah transition
         )
         private const val DEFAULT_CONFIDENCE = 0.40f
 
         // EMA smoothing factor: higher = more responsive, lower = smoother
         // Increased from 0.3 to 0.6 so new detections carry more weight than history
         private const val EMA_ALPHA = 0.6f
-
     }
 
     data class ClassificationResult(
@@ -63,7 +78,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
         val confidence: Float,
         val allProbabilities: FloatArray,
         // true when using < sequenceLength windows
-        val isPartialSequence: Boolean = false  
+        val isPartialSequence: Boolean = false,
     )
 
     private val interpreter: Interpreter
@@ -148,10 +163,13 @@ class SalahDetectionEngine(context: Context) : Closeable {
             )
         }
 
-        Log.d(TAG, "Initialized: seq=$sequenceLength, features=$featuresPerWindow, " +
+        Log.d(
+            TAG,
+            "Initialized: seq=$sequenceLength, features=$featuresPerWindow, " +
                 "model_version=$modelVersion, " +
                 "input=${interpreter.getInputTensor(0).shape().contentToString()}, " +
-                "output=${interpreter.getOutputTensor(0).shape().contentToString()}")
+                "output=${interpreter.getOutputTensor(0).shape().contentToString()}",
+        )
     }
 
     /**
@@ -182,7 +200,7 @@ class SalahDetectionEngine(context: Context) : Closeable {
     private fun classify(): ClassificationResult? {
         // Build input tensor [1, sequenceLength, featuresPerWindow]
         val inputBuffer = ByteBuffer.allocateDirect(
-            4 * sequenceLength * featuresPerWindow
+            4 * sequenceLength * featuresPerWindow,
         ).order(ByteOrder.nativeOrder())
 
         // Full sequence: the oldest entry is at bufferIndex.

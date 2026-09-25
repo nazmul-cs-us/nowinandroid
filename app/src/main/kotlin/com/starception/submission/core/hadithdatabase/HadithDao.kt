@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.hadithdatabase
 
 import androidx.room.Dao
@@ -38,34 +54,40 @@ interface HadithDao {
     /**
      * Search hadiths by text
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM hadiths
         WHERE text_plain LIKE '%' || :query || '%'
         ORDER BY id ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchHadiths(query: String, limit: Int = 50): List<HadithEntity>
 
     /**
      * Search hadiths by Arabic text
      */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM hadiths
         WHERE text_arabic LIKE '%' || :query || '%'
         ORDER BY id ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchHadithsArabic(query: String, limit: Int = 50): List<HadithEntity>
 
     /** Multi-token AND search used by the app-wide search surface. */
-    @Query("""
+    @Query(
+        """
         SELECT * FROM hadiths
         WHERE (:t0 = '' OR text_plain LIKE '%' || :t0 || '%' OR text_arabic LIKE '%' || :t0 || '%')
           AND (:t1 = '' OR text_plain LIKE '%' || :t1 || '%' OR text_arabic LIKE '%' || :t1 || '%')
           AND (:t2 = '' OR text_plain LIKE '%' || :t2 || '%' OR text_arabic LIKE '%' || :t2 || '%')
         ORDER BY id ASC
         LIMIT :limit
-    """)
+    """,
+    )
     suspend fun searchHadithsMultiToken(
         t0: String,
         t1: String = "",

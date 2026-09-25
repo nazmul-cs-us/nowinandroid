@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.widget.samples.collections.layout
 
 import androidx.compose.runtime.Composable
@@ -37,41 +53,41 @@ import androidx.glance.text.TextStyle
  */
 @Composable
 fun NoDataContent(
-  noDataIconRes: Int,
-  noDataText: String,
-  actionButtonText: String,
-  actionButtonIcon: Int,
-  actionButtonOnClick: Action,
+    noDataIconRes: Int,
+    noDataText: String,
+    actionButtonText: String,
+    actionButtonIcon: Int,
+    actionButtonOnClick: Action,
 ) {
-  @Composable
-  fun showIcon() = LocalSize.current.height >= 180.dp
+    @Composable
+    fun showIcon() = LocalSize.current.height >= 180.dp
 
-  Column(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalAlignment = Alignment.CenterHorizontally,
-    modifier = GlanceModifier.fillMaxSize()
-  ) {
-    if (showIcon()) {
-      Image(
-        provider = ImageProvider(noDataIconRes),
-        colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary),
-        contentDescription = null, // only decorative
-      )
-      Spacer(modifier = GlanceModifier.height(8.dp))
+    Column(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = GlanceModifier.fillMaxSize(),
+    ) {
+        if (showIcon()) {
+            Image(
+                provider = ImageProvider(noDataIconRes),
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary),
+                contentDescription = null, // only decorative
+            )
+            Spacer(modifier = GlanceModifier.height(8.dp))
+        }
+        Text(
+            text = noDataText,
+            style = TextStyle(
+                fontWeight = FontWeight.Medium,
+                color = GlanceTheme.colors.onSurface,
+                fontSize = 16.sp, // M3 - title/medium
+            ),
+        )
+        Spacer(modifier = GlanceModifier.height(8.dp))
+        FilledButton(
+            text = actionButtonText,
+            icon = ImageProvider(actionButtonIcon),
+            onClick = actionButtonOnClick,
+        )
     }
-    Text(
-      text = noDataText,
-      style = TextStyle(
-        fontWeight = FontWeight.Medium,
-        color = GlanceTheme.colors.onSurface,
-        fontSize = 16.sp // M3 - title/medium
-      )
-    )
-    Spacer(modifier = GlanceModifier.height(8.dp))
-    FilledButton(
-      text = actionButtonText,
-      icon = ImageProvider(actionButtonIcon),
-      onClick = actionButtonOnClick
-    )
-  }
 }

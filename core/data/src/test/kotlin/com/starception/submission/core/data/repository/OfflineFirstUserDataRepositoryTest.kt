@@ -64,7 +64,7 @@ class OfflineFirstUserDataRepositoryTest {
                     followedTopics = emptySet(),
                     themeBrand = ThemeBrand.DEFAULT,
                     darkThemeConfig = DarkThemeConfig.FOLLOW_SYSTEM,
-                    useDynamicColor = false,
+                    useDynamicColor = true,
                     shouldHideOnboarding = false,
                 ),
                 subject.userData.first(),

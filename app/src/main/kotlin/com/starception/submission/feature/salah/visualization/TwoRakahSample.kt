@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.visualization
 
 import com.starception.submission.core.duadatabase.Dua
@@ -43,13 +59,19 @@ private fun buildPrayerSample(rakahCount: Int): List<TwoRakahStep> = buildList {
         if (rakah == 1) {
             add(
                 TwoRakahStep(
-                    1, SalahPosture.QIYAM, "Opening takbir", 1_500,
+                    1,
+                    SalahPosture.QIYAM,
+                    "Opening takbir",
+                    1_500,
                     guidance = "Raise your hands and say Allahu Akbar to enter the prayer.",
                 ),
             )
             add(
                 TwoRakahStep(
-                    1, SalahPosture.QIYAM, "Opening supplication", 5_000,
+                    1,
+                    SalahPosture.QIYAM,
+                    "Opening supplication",
+                    5_000,
                     fortressChapterId = 16,
                 ),
             )
@@ -57,7 +79,10 @@ private fun buildPrayerSample(rakahCount: Int): List<TwoRakahStep> = buildList {
 
         add(
             TwoRakahStep(
-                rakah, SalahPosture.QIYAM, "Qur'an recitation", 5_000,
+                rakah,
+                SalahPosture.QIYAM,
+                "Qur'an recitation",
+                5_000,
                 guidance = if (rakah <= 2) {
                     "Recite Al-Fatihah, followed by another passage of the Qur'an."
                 } else {
@@ -68,26 +93,38 @@ private fun buildPrayerSample(rakahCount: Int): List<TwoRakahStep> = buildList {
         add(TwoRakahStep(rakah, SalahPosture.RUKU, "Bowing", 4_000, fortressChapterId = 17))
         add(
             TwoRakahStep(
-                rakah, SalahPosture.QIYAM_RISING, "Standing after ruku", 3_500,
+                rakah,
+                SalahPosture.QIYAM_RISING,
+                "Standing after ruku",
+                3_500,
                 fortressChapterId = 18,
             ),
         )
         add(
             TwoRakahStep(
-                rakah, SalahPosture.GOING_TO_SUJUD, "Lowering to first sujud", 1_200,
+                rakah,
+                SalahPosture.GOING_TO_SUJUD,
+                "Lowering to first sujud",
+                1_200,
                 guidance = "Say Allahu Akbar while lowering into prostration.",
             ),
         )
         add(TwoRakahStep(rakah, SalahPosture.SUJUD, "First sujud", 4_000, fortressChapterId = 19))
         add(
             TwoRakahStep(
-                rakah, SalahPosture.JALSA, "Sitting between sujud", 3_500,
+                rakah,
+                SalahPosture.JALSA,
+                "Sitting between sujud",
+                3_500,
                 fortressChapterId = 20,
             ),
         )
         add(
             TwoRakahStep(
-                rakah, SalahPosture.GOING_TO_SUJUD, "Lowering to second sujud", 1_200,
+                rakah,
+                SalahPosture.GOING_TO_SUJUD,
+                "Lowering to second sujud",
+                1_200,
                 guidance = "Say Allahu Akbar while lowering into the second prostration.",
             ),
         )
@@ -97,25 +134,37 @@ private fun buildPrayerSample(rakahCount: Int): List<TwoRakahStep> = buildList {
             add(TwoRakahStep(rakah, SalahPosture.TASHAHHUD, "Tashahhud", 5_000, fortressChapterId = 22))
             add(
                 TwoRakahStep(
-                    rakah, SalahPosture.TASHAHHUD, "Blessings upon the Prophet", 5_000,
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Blessings upon the Prophet",
+                    5_000,
                     fortressChapterId = 23,
                 ),
             )
             add(
                 TwoRakahStep(
-                    rakah, SalahPosture.TASHAHHUD, "Supplication before salam", 5_000,
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Supplication before salam",
+                    5_000,
                     fortressChapterId = 24,
                 ),
             )
             add(
                 TwoRakahStep(
-                    rakah, SalahPosture.TASHAHHUD, "End with salam", 2_500,
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "End with salam",
+                    2_500,
                     guidance = "Turn to the right and then the left to end the prayer with salam.",
                 ),
             )
             add(
                 TwoRakahStep(
-                    rakah, SalahPosture.TASHAHHUD, "Remembrance after salam", 5_000,
+                    rakah,
+                    SalahPosture.TASHAHHUD,
+                    "Remembrance after salam",
+                    5_000,
                     fortressChapterId = 25,
                 ),
             )
@@ -124,14 +173,20 @@ private fun buildPrayerSample(rakahCount: Int): List<TwoRakahStep> = buildList {
             if (rakah == 2 && rakahCount > 2) {
                 add(
                     TwoRakahStep(
-                        rakah, SalahPosture.TASHAHHUD, "First tashahhud", 5_000,
+                        rakah,
+                        SalahPosture.TASHAHHUD,
+                        "First tashahhud",
+                        5_000,
                         fortressChapterId = 22,
                     ),
                 )
             }
             add(
                 TwoRakahStep(
-                    rakah, SalahPosture.RISING_TO_QIYAM, "Rise for rak'ah ${rakah + 1}", 1_500,
+                    rakah,
+                    SalahPosture.RISING_TO_QIYAM,
+                    "Rise for rak'ah ${rakah + 1}",
+                    1_500,
                     guidance = "Say Allahu Akbar while rising for rak'ah ${rakah + 1}.",
                 ),
             )

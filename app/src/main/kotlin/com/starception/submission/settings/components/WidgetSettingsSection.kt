@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -406,8 +406,8 @@ private fun WidgetProviderPreview(
         value = spec
             ?.takeUnless { it.source == WidgetPreviewSource.PACKAGED_IMAGE }
             ?.let {
-            runCatching { it.previewRemoteViews(context, slot = 1) }.getOrNull()
-        }
+                runCatching { it.previewRemoteViews(context, slot = 1) }.getOrNull()
+            }
     }
     val painter = painterResource(provider.previewImage)
     val previewAspect = remember(provider, painter, spec) {
@@ -491,8 +491,9 @@ private fun WidgetAppearancePreview(
     val systemDark = when (context.getSystemService(UiModeManager::class.java)?.nightMode) {
         UiModeManager.MODE_NIGHT_YES -> true
         UiModeManager.MODE_NIGHT_NO -> false
-        else -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-            Configuration.UI_MODE_NIGHT_YES
+        else ->
+            context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
     }
     val dark = when (settings.colorMode) {
         WidgetColorMode.FOLLOW_SYSTEM -> systemDark

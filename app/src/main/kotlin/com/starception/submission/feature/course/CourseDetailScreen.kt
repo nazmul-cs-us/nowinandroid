@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,23 +19,16 @@ package com.starception.submission.feature.course
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,7 +41,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,57 +49,41 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.starception.submission.core.designsystem.component.NiaTopicTag
-import com.starception.submission.core.designsystem.component.NiaOutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -119,14 +95,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.component.NiaTopicTag
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
-import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.launch
 
 /**
  * Lesson data model with memorization and time tracking
@@ -140,9 +117,9 @@ data class Lesson(
     val isCompleted: Boolean = false,
     val isLocked: Boolean = false,
     // For memorization courses
-    val totalAyahs: Int = 3, 
+    val totalAyahs: Int = 3,
     // Surah number for Quran courses
-    val surahNumber: Int = 0, 
+    val surahNumber: Int = 0,
 )
 
 enum class LessonType {
@@ -171,11 +148,11 @@ data class MemorizationProgress(
     val memorizedAyahs: Set<Int> = emptySet(), // Set of ayah numbers that are memorized
     val totalAyahs: Int = 3,
     // Total time spent on this lesson
-    val timeSpentMinutes: Int = 0, 
+    val timeSpentMinutes: Int = 0,
     // Timestamp of last practice
-    val lastPracticed: Long = 0L, 
+    val lastPracticed: Long = 0L,
     // Number of times practiced
-    val practiceCount: Int = 0, 
+    val practiceCount: Int = 0,
 )
 
 /**
@@ -241,14 +218,14 @@ fun CourseDetailScreen(
     // Check if enrolled
     var isEnrolled by remember {
         mutableStateOf(
-            (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).contains(course.id)
+            (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).contains(course.id),
         )
     }
 
     // Track completed lessons - use same key as CourseProgressTracker for consistency
     var completedLessons by remember {
         mutableStateOf(
-            prefs.getStringSet("completed_lessons_${course.id}", emptySet()) ?: emptySet()
+            prefs.getStringSet("completed_lessons_${course.id}", emptySet()) ?: emptySet(),
         )
     }
 
@@ -370,7 +347,7 @@ fun CourseDetailScreen(
     val toolbarAlpha by animateFloatAsState(
         targetValue = collapseProgress,
         animationSpec = tween(300, easing = FastOutSlowInEasing),
-        label = "toolbarAlpha"
+        label = "toolbarAlpha",
     )
 
     // Stable item positions power the in-page navigator. These are derived from
@@ -484,7 +461,7 @@ fun CourseDetailScreen(
                         onAyahToggle = { lessonId, ayahNumber ->
                             val currentProgress = memorizationProgress[lessonId] ?: MemorizationProgress(
                                 lessonId = lessonId,
-                                totalAyahs = 3
+                                totalAyahs = 3,
                             )
                             val newAyahs = currentProgress.memorizedAyahs.toMutableSet()
                             if (ayahNumber in newAyahs) {
@@ -494,7 +471,7 @@ fun CourseDetailScreen(
                             }
                             val updatedProgress = currentProgress.copy(
                                 memorizedAyahs = newAyahs,
-                                lastPracticed = System.currentTimeMillis()
+                                lastPracticed = System.currentTimeMillis(),
                             )
                             memorizationProgress = memorizationProgress.toMutableMap().apply {
                                 put(lessonId, updatedProgress)
@@ -626,7 +603,7 @@ fun CourseDetailScreen(
                             val totalAyahs = lesson?.totalAyahs ?: 3
                             val currentProgress = memorizationProgress[lessonId] ?: MemorizationProgress(
                                 lessonId = lessonId,
-                                totalAyahs = totalAyahs
+                                totalAyahs = totalAyahs,
                             )
                             val newAyahs = currentProgress.memorizedAyahs.toMutableSet()
                             if (ayahNumber in newAyahs) {
@@ -636,7 +613,7 @@ fun CourseDetailScreen(
                             }
                             val updatedProgress = currentProgress.copy(
                                 memorizedAyahs = newAyahs,
-                                lastPracticed = System.currentTimeMillis()
+                                lastPracticed = System.currentTimeMillis(),
                             )
                             memorizationProgress = memorizationProgress.toMutableMap().apply {
                                 put(lessonId, updatedProgress)
@@ -689,31 +666,31 @@ fun CourseDetailScreen(
             }
         }
 
-            // Bottom Action Bar
-            EnhancedBottomBar(
-                course = course,
-                isEnrolled = isEnrolled,
-                progressPercent = progressPercent,
-                onEnroll = {
-                    val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
-                    enrolledSet.add(course.id)
-                    prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
-                    isEnrolled = true
-                    onEnroll()
-                },
-                onContinue = {
-                    // Find next incomplete lesson and navigate
-                    for (module in modules) {
-                        for ((index, lesson) in module.lessons.withIndex()) {
-                            if (lesson.id !in completedLessons) {
-                                onLessonClick(lesson, index)
-                                return@EnhancedBottomBar
-                            }
+        // Bottom Action Bar
+        EnhancedBottomBar(
+            course = course,
+            isEnrolled = isEnrolled,
+            progressPercent = progressPercent,
+            onEnroll = {
+                val enrolledSet = (prefs.getStringSet("enrolled_courses", emptySet()) ?: emptySet()).toMutableSet()
+                enrolledSet.add(course.id)
+                prefs.edit().putStringSet("enrolled_courses", enrolledSet).apply()
+                isEnrolled = true
+                onEnroll()
+            },
+            onContinue = {
+                // Find next incomplete lesson and navigate
+                for (module in modules) {
+                    for ((index, lesson) in module.lessons.withIndex()) {
+                        if (lesson.id !in completedLessons) {
+                            onLessonClick(lesson, index)
+                            return@EnhancedBottomBar
                         }
                     }
-                },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
 
         // Transparent collapsing toolbar - overlays content like SurahDetailScreen
         CourseDetailTopBar(
@@ -771,7 +748,7 @@ fun CourseDetailScreen(
                         scaleY = scale
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     }
-                    .width(compactWidth)
+                    .width(compactWidth),
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(titleSpacing),
@@ -975,15 +952,15 @@ private fun CourseHeroSection(
     val (containerColor, accentColor) = when (course.category) {
         CourseCategory.MEMORIZATION -> Pair(
             MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.primary
+            MaterialTheme.colorScheme.primary,
         )
         CourseCategory.HADITH -> Pair(
             MaterialTheme.colorScheme.secondaryContainer,
-            MaterialTheme.colorScheme.secondary
+            MaterialTheme.colorScheme.secondary,
         )
         CourseCategory.QURAN -> Pair(
             MaterialTheme.colorScheme.tertiaryContainer,
-            MaterialTheme.colorScheme.tertiary
+            MaterialTheme.colorScheme.tertiary,
         )
     }
 
@@ -1004,7 +981,7 @@ private fun CourseHeroSection(
                 .background(
                     color = accentColor.copy(alpha = 0.1f),
                     shape = CircleShape,
-                )
+                ),
         )
 
         // Content
@@ -1015,7 +992,7 @@ private fun CourseHeroSection(
                     start = 20.dp,
                     end = 20.dp,
                     top = statusBarHeight + 56.dp,
-                    bottom = 24.dp
+                    bottom = 24.dp,
                 ),
         ) {
             // Main content row: Info + Dynamic Highlight
@@ -1207,7 +1184,7 @@ private fun CourseHeroSection(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .height(32.dp)
-                                    .background(accentColor.copy(alpha = 0.3f))
+                                    .background(accentColor.copy(alpha = 0.3f)),
                             )
                             Spacer(modifier = Modifier.width(16.dp))
 
@@ -1521,7 +1498,7 @@ private fun CertificateProgressCard(
                 modifier = Modifier.size(56.dp),
             ) {
                 androidx.compose.foundation.Canvas(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     // Background circle
                     drawArc(
@@ -1892,7 +1869,7 @@ private fun InstructorSection(
                             .fillMaxSize()
                             .background(
                                 brush = Brush.linearGradient(
-                                    colors = listOf(accentColor, accentColor.copy(alpha = 0.7f))
+                                    colors = listOf(accentColor, accentColor.copy(alpha = 0.7f)),
                                 ),
                                 shape = RoundedCornerShape(20.dp),
                             ),
@@ -2081,7 +2058,7 @@ private fun EnhancedModuleCard(
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
         animationSpec = tween(300, easing = FastOutSlowInEasing),
-        label = "rotation"
+        label = "rotation",
     )
 
     val completedInModule = module.lessons.count { it.id in completedLessons }
@@ -2095,7 +2072,7 @@ private fun EnhancedModuleCard(
             isExpanded -> accentColor.copy(alpha = 0.22f)
             else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         },
-        label = "borderColor"
+        label = "borderColor",
     )
     val cardColor by animateColorAsState(
         targetValue = when {
@@ -2103,7 +2080,7 @@ private fun EnhancedModuleCard(
             isExpanded -> MaterialTheme.colorScheme.surfaceContainerLow
             else -> MaterialTheme.colorScheme.surfaceContainerLowest
         },
-        label = "cardColor"
+        label = "cardColor",
     )
 
     Surface(
@@ -2111,7 +2088,7 @@ private fun EnhancedModuleCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .animateContentSize(
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
+                animationSpec = tween(300, easing = FastOutSlowInEasing),
             ),
         shape = RoundedCornerShape(28.dp),
         color = cardColor,
@@ -2164,10 +2141,14 @@ private fun EnhancedModuleCard(
                         modifier = Modifier.size(30.dp),
                         shape = CircleShape,
                         color = if (isModuleComplete) accentColor else MaterialTheme.colorScheme.surface,
-                        border = if (isModuleComplete) null else androidx.compose.foundation.BorderStroke(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        ),
+                        border = if (isModuleComplete) {
+                            null
+                        } else {
+                            androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            )
+                        },
                     ) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -2293,10 +2274,13 @@ private fun EnhancedLessonItem(
     var showAyahSelector by remember { mutableStateOf(false) }
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (lesson.isCompleted) accentColor.copy(alpha = 0.05f)
-        else Color.Transparent,
+        targetValue = if (lesson.isCompleted) {
+            accentColor.copy(alpha = 0.05f)
+        } else {
+            Color.Transparent
+        },
         animationSpec = tween(300, easing = FastOutSlowInEasing),
-        label = "bgColor"
+        label = "bgColor",
     )
 
     Column {
@@ -2360,7 +2344,7 @@ private fun EnhancedLessonItem(
                         text = lesson.subtitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = if (lesson.isLocked) 0.4f else 0.8f
+                            alpha = if (lesson.isLocked) 0.4f else 0.8f,
                         ),
                     )
                     Text(
@@ -2372,7 +2356,7 @@ private fun EnhancedLessonItem(
                         text = lesson.duration,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = if (lesson.isLocked) 0.4f else 0.8f
+                            alpha = if (lesson.isLocked) 0.4f else 0.8f,
                         ),
                     )
                 }
@@ -2484,8 +2468,11 @@ private fun ReviewsSection(
                             FlaticonIcon(
                                 glyph = FlaticonIcons.STAR,
                                 contentDescription = null,
-                                tint = if (index < averageRating.toInt()) Color(0xFFFFB800)
-                                else Color(0xFFFFB800).copy(alpha = 0.3f),
+                                tint = if (index < averageRating.toInt()) {
+                                    Color(0xFFFFB800)
+                                } else {
+                                    Color(0xFFFFB800).copy(alpha = 0.3f)
+                                },
                                 modifier = Modifier.size(16.dp),
                                 fontSize = 16.sp,
                             )
@@ -2594,8 +2581,11 @@ private fun ReviewCard(review: Review) {
                             FlaticonIcon(
                                 glyph = FlaticonIcons.STAR,
                                 contentDescription = null,
-                                tint = if (index < review.rating.toInt()) Color(0xFFFFB800)
-                                else Color(0xFFFFB800).copy(alpha = 0.3f),
+                                tint = if (index < review.rating.toInt()) {
+                                    Color(0xFFFFB800)
+                                } else {
+                                    Color(0xFFFFB800).copy(alpha = 0.3f)
+                                },
                                 modifier = Modifier.size(12.dp),
                                 fontSize = 12.sp,
                             )
@@ -2907,7 +2897,7 @@ private fun generateMemorize3AyahsModules(): List<CourseModule> {
                     totalAyahs = 3,
                     surahNumber = surahNumber,
                 )
-            }
+            },
         )
     }
 }
@@ -2934,7 +2924,7 @@ private fun generateDailyBukhariModules(): List<CourseModule> {
                     duration = "3 min",
                     type = LessonType.READING,
                 )
-            }
+            },
         )
     }
 }
@@ -2949,7 +2939,7 @@ private fun generateJuzAmmaModules(): List<CourseModule> {
         "Al-Bayyinah" to 8, "Az-Zalzalah" to 8, "Al-Adiyat" to 11, "Al-Qari'ah" to 11, "At-Takathur" to 8,
         "Al-Asr" to 3, "Al-Humazah" to 9, "Al-Fil" to 5, "Quraysh" to 4, "Al-Ma'un" to 7,
         "Al-Kawthar" to 3, "Al-Kafirun" to 6, "An-Nasr" to 3, "Al-Masad" to 5, "Al-Ikhlas" to 4,
-        "Al-Falaq" to 5, "An-Nas" to 6
+        "Al-Falaq" to 5, "An-Nas" to 6,
     )
 
     return listOf(
@@ -2967,7 +2957,7 @@ private fun generateJuzAmmaModules(): List<CourseModule> {
                     totalAyahs = ayahCount,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_medium",
@@ -2983,7 +2973,7 @@ private fun generateJuzAmmaModules(): List<CourseModule> {
                     totalAyahs = ayahCount,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_short",
@@ -2999,7 +2989,7 @@ private fun generateJuzAmmaModules(): List<CourseModule> {
                     totalAyahs = ayahCount,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
     )
 }
@@ -3024,7 +3014,7 @@ private fun generateQuranReadingModules(): List<CourseModule> {
                     duration = "5 min",
                     type = LessonType.READING,
                 )
-            }
+            },
         )
     }
 }
@@ -3046,7 +3036,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
         10, 10, 15, 10, 10, 5, 10, 10, 15, 10,
         5, 10, 5, 5, 5, 5, 5, 5, 5, 5,
         5, 5, 3, 5, 5, 3, 5, 3, 5, 3,
-        5, 3, 3, 3
+        5, 3, 3, 3,
     )
 
     // Group surahs into 6 modules
@@ -3064,7 +3054,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_2",
@@ -3079,7 +3069,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_3",
@@ -3094,7 +3084,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_4",
@@ -3109,7 +3099,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_5",
@@ -3124,7 +3114,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
         CourseModule(
             id = "module_6",
@@ -3139,7 +3129,7 @@ private fun generateQuranListeningModules(): List<CourseModule> {
                     type = LessonType.LISTENING,
                     surahNumber = surahNum,
                 )
-            }
+            },
         ),
     )
 }
@@ -3238,7 +3228,7 @@ private fun MemorizationProgressSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(40.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
                 )
 
                 // Surahs Complete
@@ -3263,7 +3253,7 @@ private fun MemorizationProgressSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(40.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
                 )
 
                 // Time Spent
@@ -3289,7 +3279,9 @@ private fun MemorizationProgressSection(
             // Progress Bar
             val progress = if (totalAyahsToMemorize > 0) {
                 totalMemorizedAyahs.toFloat() / totalAyahsToMemorize
-            } else 0f
+            } else {
+                0f
+            }
 
             Column {
                 Row(
@@ -3426,7 +3418,7 @@ private fun TimeSpentCard(
 
 private fun loadMemorizationProgress(
     prefs: android.content.SharedPreferences,
-    courseId: String
+    courseId: String,
 ): Map<String, MemorizationProgress> {
     val result = mutableMapOf<String, MemorizationProgress>()
     val allKeys = prefs.all.keys.filter { it.startsWith("mem_${courseId}_") }
@@ -3458,7 +3450,7 @@ private fun loadMemorizationProgress(
 private fun saveMemorizationProgress(
     prefs: android.content.SharedPreferences,
     courseId: String,
-    progress: Map<String, MemorizationProgress>
+    progress: Map<String, MemorizationProgress>,
 ) {
     val editor = prefs.edit()
     for ((lessonId, memProgress) in progress) {
@@ -3472,7 +3464,7 @@ private fun saveMemorizationProgress(
 
 private fun loadTimeSpent(
     prefs: android.content.SharedPreferences,
-    courseId: String
+    courseId: String,
 ): Map<String, Int> {
     val result = mutableMapOf<String, Int>()
     val allKeys = prefs.all.keys.filter { it.startsWith("time_${courseId}_") }
@@ -3491,7 +3483,7 @@ private fun loadTimeSpent(
 private fun saveTimeSpent(
     prefs: android.content.SharedPreferences,
     courseId: String,
-    timeSpent: Map<String, Int>
+    timeSpent: Map<String, Int>,
 ) {
     val editor = prefs.edit()
     for ((lessonId, minutes) in timeSpent) {

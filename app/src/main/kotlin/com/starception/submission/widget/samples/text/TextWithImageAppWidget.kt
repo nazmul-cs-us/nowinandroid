@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.starception.submission.widget.samples.text
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
+package com.starception.submission.widget.samples.text
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -34,6 +32,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.text.data.FakeTextWithImageRepository
 import com.starception.submission.widget.samples.text.data.FakeTextWithImageRepository.Companion.getRepo
 import com.starception.submission.widget.samples.text.layout.TextWithImageData
@@ -43,64 +43,65 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class TextWithImageAppWidget : GlanceAppWidget() {
-  // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
-  // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
-  // supported size to be held in the widget host's memory.
-  override val sizeMode: SizeMode = SizeMode.Exact
+    // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
+    // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
+    // supported size to be held in the widget host's memory.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val repo = getRepo(id)
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val repo = getRepo(id)
 
-    val initialData = withContext(Dispatchers.Default) {
-      repo.load(context)
-    }
-    val themeSource = loadWidgetThemeSource(context)
-
-    provideContent {
-      val data by repo.data().collectAsState(initial = initialData)
-      val coroutineScope = rememberCoroutineScope()
-
-      StarceptionWidgetTheme(themeSource) {
-        key(LocalSize.current) {
-          WidgetContent(
-            data = data,
-            refreshDataAction = {
-              coroutineScope.launch {
-                withContext(Dispatchers.Default) {
-                  repo.refresh(context)
-                }
-              }
-            })
+        val initialData = withContext(Dispatchers.Default) {
+            repo.load(context)
         }
-      }
+        val themeSource = loadWidgetThemeSource(context)
+
+        provideContent {
+            val data by repo.data().collectAsState(initial = initialData)
+            val coroutineScope = rememberCoroutineScope()
+
+            StarceptionWidgetTheme(themeSource) {
+                key(LocalSize.current) {
+                    WidgetContent(
+                        data = data,
+                        refreshDataAction = {
+                            coroutineScope.launch {
+                                withContext(Dispatchers.Default) {
+                                    repo.refresh(context)
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        }
     }
-  }
 
-  @Composable
-  fun WidgetContent(data: TextWithImageData?, refreshDataAction: () -> Unit) {
-    val context = LocalContext.current
+    @Composable
+    fun WidgetContent(data: TextWithImageData?, refreshDataAction: () -> Unit) {
+        val context = LocalContext.current
 
-    TextWithImageLayout(
-      title = context.getString(R.string.sample_text_and_image_app_widget_name),
-      titleIconRes = R.drawable.sample_text_icon,
-      titleBarActionIconRes = R.drawable.sample_refresh_icon,
-      titleBarActionIconContentDescription = context.getString(
-        R.string.sample_refresh_icon_button_label
-      ),
-      titleBarAction = refreshDataAction,
-      data = data
-    )
-  }
+        TextWithImageLayout(
+            title = context.getString(R.string.sample_text_and_image_app_widget_name),
+            titleIconRes = R.drawable.sample_text_icon,
+            titleBarActionIconRes = R.drawable.sample_refresh_icon,
+            titleBarActionIconContentDescription = context.getString(
+                R.string.sample_refresh_icon_button_label,
+            ),
+            titleBarAction = refreshDataAction,
+            data = data,
+        )
+    }
 }
 
 class TextWithImageAppWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget: GlanceAppWidget = TextWithImageAppWidget()
+    override val glanceAppWidget: GlanceAppWidget = TextWithImageAppWidget()
 
-  @SuppressLint("RestrictedApi")
-  override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-    appWidgetIds.forEach {
-      FakeTextWithImageRepository.cleanUp(AppWidgetId(appWidgetId = it))
+    @SuppressLint("RestrictedApi")
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        appWidgetIds.forEach {
+            FakeTextWithImageRepository.cleanUp(AppWidgetId(appWidgetId = it))
+        }
+        super.onDeleted(context, appWidgetIds)
     }
-    super.onDeleted(context, appWidgetIds)
-  }
 }

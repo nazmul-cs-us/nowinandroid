@@ -1,28 +1,34 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.prayertimes.components
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseIn
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -32,11 +38,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -62,26 +67,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.paint
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.GraphicsLayerScope
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -91,7 +85,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.compose.ui.util.fastCoerceIn
-import androidx.compose.ui.util.fastRoundToInt
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -103,9 +96,6 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.highlight.HighlightStyle
-import com.kyant.capsule.ContinuousCapsule
-import com.kyant.capsule.ContinuousRoundedRectangle
-import com.starception.submission.R
 import com.starception.submission.core.designsystem.animation.NiaMotion
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -118,7 +108,6 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.sign
 import kotlin.math.sin
-import android.util.Log
 
 // Progress converter from catalog app
 private fun convertProgress(progress: Float): Float {
@@ -138,7 +127,7 @@ fun ControlCenterPrayerPopup(
     onDismiss: () -> Unit,
     onSaveAdjustment: (String, Int) -> Unit,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
     val hapticFeedback = LocalHapticFeedback.current
@@ -167,13 +156,13 @@ fun ControlCenterPrayerPopup(
         animationScope.launch {
             enterProgressAnimation.animateTo(
                 1f,
-                spring(dampingRatio = 0.7f, stiffness = 300f)
+                spring(dampingRatio = 0.7f, stiffness = 300f),
             )
         }
         animationScope.launch {
             safeEnterProgressAnimation.animateTo(
                 1f,
-                spring(dampingRatio = 0.8f, stiffness = 400f)
+                spring(dampingRatio = 0.8f, stiffness = 400f),
             )
         }
     }
@@ -188,8 +177,8 @@ fun ControlCenterPrayerPopup(
         Highlight(
             style = HighlightStyle.Default(
                 angle = uiSensor.gravityAngle,
-                falloff = 2f
-            )
+                falloff = 2f,
+            ),
         )
     }
     val glassLayer: GraphicsLayerScope.() -> Unit = {
@@ -207,7 +196,7 @@ fun ControlCenterPrayerPopup(
         lens(
             24f.dp.toPx() * p,
             48f.dp.toPx() * p,
-            depthEffect = true
+            depthEffect = true,
         )
     }
 
@@ -224,7 +213,6 @@ fun ControlCenterPrayerPopup(
     var lastHapticAdjustment by remember { mutableIntStateOf(currentOffset) }
     // Keeps buttons visible briefly after Reset to allow animation to complete
     var keepButtonsVisible by remember { mutableStateOf(false) }
-
 
     // Watch face rotation states - derived from adjusted prayer time
     val adjustedPrayerTime by remember(originalTime, timeAdjustment) {
@@ -254,9 +242,9 @@ fun ControlCenterPrayerPopup(
         targetValue = if (isDragging) 1.02f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessHigh
+            stiffness = Spring.StiffnessHigh,
         ),
-        label = "dialScale"
+        label = "dialScale",
     )
 
     // Main layout
@@ -296,19 +284,19 @@ fun ControlCenterPrayerPopup(
                                 } else {
                                     spring(1f, 300f, 0.01f)
                                 },
-                                velocity / maxDragHeight
+                                velocity / maxDragHeight,
                             )
                         }
                         launch {
                             safeEnterProgressAnimation.animateTo(
                                 targetProgress,
-                                spring(1f, 300f, 0.01f)
+                                spring(1f, 300f, 0.01f),
                             )
                         }
                     }
-                }
+                },
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Full screen watch face with prayer adjustment
         Column(
@@ -318,7 +306,7 @@ fun ControlCenterPrayerPopup(
                 .fillMaxSize()
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             // Full screen circular watch face dial with glass effect
             Box(
@@ -337,7 +325,7 @@ fun ControlCenterPrayerPopup(
                         highlight = glassHighlight,
                         shadow = null,
                         layerBlock = glassLayer,
-                        onDrawSurface = glassSurface
+                        onDrawSurface = glassSurface,
                     )
                     .pointerInput(Unit) {
                         detectDragGestures(
@@ -345,7 +333,7 @@ fun ControlCenterPrayerPopup(
                                 val center = Offset(size.width / 2f, size.height / 2f)
                                 val distanceFromCenter = kotlin.math.sqrt(
                                     (offset.x - center.x) * (offset.x - center.x) +
-                                    (offset.y - center.y) * (offset.y - center.y)
+                                        (offset.y - center.y) * (offset.y - center.y),
                                 )
                                 val outerRadius = kotlin.math.min(size.width, size.height) * 0.5f
                                 // Exclude center area where Reset/Save buttons are (50% of radius)
@@ -356,7 +344,7 @@ fun ControlCenterPrayerPopup(
                                     isDragging = true
                                     lastAngle = atan2(
                                         offset.y - center.y,
-                                        offset.x - center.x
+                                        offset.x - center.x,
                                     ) * 180f / PI.toFloat()
                                     accumulatedAngle = 0f
 
@@ -379,13 +367,13 @@ fun ControlCenterPrayerPopup(
                                 Log.d("ControlCenter", "🏁 DRAG END - Adjustment: ${timeAdjustment}m")
                                 isDragging = false
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            }
+                            },
                         ) { change, _ ->
                             if (isDragging) {
                                 val center = Offset(size.width / 2f, size.height / 2f)
                                 val fingerAngle = atan2(
                                     change.position.y - center.y,
-                                    change.position.x - center.x
+                                    change.position.x - center.x,
                                 ) * 180f / PI.toFloat()
 
                                 var angleDiff = fingerAngle - lastAngle
@@ -410,45 +398,45 @@ fun ControlCenterPrayerPopup(
                             }
                         }
                     },
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Watch face dial canvas - wrapped in layerBackdrop for date window magnification
                 Box(Modifier.fillMaxSize().layerBackdrop(dialBackdrop)) {
                     androidx.compose.foundation.Canvas(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     ) {
-                    val outerRadius = minOf(size.width, size.height) / 2f - 4.dp.toPx()
-                    val middleRadius = outerRadius - 38.dp.toPx()
-                    val innerRadius = middleRadius - 38.dp.toPx()
-                    val clockStyle = ControlCenterClockStyle
+                        val outerRadius = minOf(size.width, size.height) / 2f - 4.dp.toPx()
+                        val middleRadius = outerRadius - 38.dp.toPx()
+                        val innerRadius = middleRadius - 38.dp.toPx()
+                        val clockStyle = ControlCenterClockStyle
 
-                    // Seconds Dial (outer)
-                    drawWatchDial(
-                        radius = outerRadius,
-                        rotation = secondRotation,
-                        textMeasurer = textMeasurer,
-                        dialStyle = clockStyle.secondsDialStyle,
-                        showLabels = true
-                    )
+                        // Seconds Dial (outer)
+                        drawWatchDial(
+                            radius = outerRadius,
+                            rotation = secondRotation,
+                            textMeasurer = textMeasurer,
+                            dialStyle = clockStyle.secondsDialStyle,
+                            showLabels = true,
+                        )
 
-                    // Minutes Dial (middle) - with labels like reference
-                    drawWatchDial(
-                        radius = middleRadius,
-                        rotation = minuteRotation,
-                        textMeasurer = textMeasurer,
-                        dialStyle = clockStyle.minutesDialStyle,
-                        showLabels = true
-                    )
+                        // Minutes Dial (middle) - with labels like reference
+                        drawWatchDial(
+                            radius = middleRadius,
+                            rotation = minuteRotation,
+                            textMeasurer = textMeasurer,
+                            dialStyle = clockStyle.minutesDialStyle,
+                            showLabels = true,
+                        )
 
-                    // Hours Dial (inner) - 12 hour marks
-                    drawHourDial(
-                        radius = innerRadius,
-                        rotation = hourRotation,
-                        textMeasurer = textMeasurer,
-                        dialStyle = clockStyle.hoursDialStyle
-                    )
+                        // Hours Dial (inner) - 12 hour marks
+                        drawHourDial(
+                            radius = innerRadius,
+                            rotation = hourRotation,
+                            textMeasurer = textMeasurer,
+                            dialStyle = clockStyle.hoursDialStyle,
+                        )
 
-                    // Date window is now handled by liquid glass composable overlay only
+                        // Date window is now handled by liquid glass composable overlay only
                     }
                 }
 
@@ -464,7 +452,7 @@ fun ControlCenterPrayerPopup(
                                 rememberBackdrop(dialBackdrop) { drawBackdrop ->
                                     // Draw the dial content through the lens
                                     drawBackdrop()
-                                }
+                                },
                             ),
                             shape = { RoundedCornerShape(topStart = 25.dp, bottomStart = 25.dp, topEnd = 0.dp, bottomEnd = 0.dp) },
                             effects = {
@@ -473,7 +461,7 @@ fun ControlCenterPrayerPopup(
                                     14f.dp.toPx(),
                                     20f.dp.toPx(),
                                     chromaticAberration = true,
-                                    depthEffect = true
+                                    depthEffect = true,
                                 )
                             },
                             highlight = glassHighlight,
@@ -482,15 +470,15 @@ fun ControlCenterPrayerPopup(
                             onDrawSurface = {
                                 // Subtle tint for glass appearance
                                 drawRect(Color.White.copy(alpha = 0.03f))
-                            }
-                        )
+                            },
+                        ),
                 )
 
                 // Center content - prayer info and controls (reference style)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp),
                 ) {
                     // Prayer name - small label above time
                     Text(
@@ -498,10 +486,10 @@ fun ControlCenterPrayerPopup(
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.sp,
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.sp,
                         ),
                         color = Color.White.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -533,7 +521,7 @@ fun ControlCenterPrayerPopup(
                                     },
                                     onDragEnd = {
                                         scrollAccumulator = 0f
-                                    }
+                                    },
                                 ) { _, dragAmount ->
                                     // Accumulate scroll amount
                                     scrollAccumulator += dragAmount
@@ -560,49 +548,49 @@ fun ControlCenterPrayerPopup(
                                         scrollAccumulator -= minutesToAdjust * scrollThreshold
                                     }
                                 }
-                            }
+                            },
                     ) {
                         // Hour
                         Text(
                             text = hourDisplay,
                             style = MaterialTheme.typography.displayLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 56.sp
+                                fontSize = 56.sp,
                             ),
                             color = Color.White,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                         // Colon separator
                         Text(
                             text = ":",
                             style = MaterialTheme.typography.displayLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 48.sp
+                                fontSize = 48.sp,
                             ),
                             color = Color.White.copy(alpha = 0.8f),
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 2.dp)
+                            modifier = Modifier.padding(horizontal = 2.dp),
                         )
                         // Minute
                         Text(
                             text = minuteDisplay,
                             style = MaterialTheme.typography.displayLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 56.sp
+                                fontSize = 56.sp,
                             ),
                             color = Color.White,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                         // AM/PM indicator
                         Text(
                             text = amPm,
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 16.sp
+                                fontSize = 16.sp,
                             ),
                             color = Color.White.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
                         )
                     }
 
@@ -636,10 +624,10 @@ fun ControlCenterPrayerPopup(
                         text = adjustmentText,
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
                         ),
                         color = Color(0xFF26C6DA),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
 
                     val hasAdjusted = timeAdjustment != baseAdjustment
@@ -647,25 +635,24 @@ fun ControlCenterPrayerPopup(
                     // keepButtonsVisible keeps them visible briefly after Reset
                     val showButtons = (hasAdjusted && !isDragging) || keepButtonsVisible
 
-
                     // Fixed height container to prevent layout jumps
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Column(
                         modifier = Modifier.height(60.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showButtons,
                             enter = slideInVertically(
                                 initialOffsetY = { it },
-                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
                             ) + fadeIn(animationSpec = spring(stiffness = 300f)),
                             exit = slideOutVertically(
                                 targetOffsetY = { it },
-                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
-                            ) + fadeOut(animationSpec = spring(stiffness = 300f))
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+                            ) + fadeOut(animationSpec = spring(stiffness = 300f)),
                         ) {
                             // Liquid Glass Bottom Tabs UI - starts in middle, user swipes to select
                             var selectedTabIndex by remember { mutableIntStateOf(-1) }
@@ -698,7 +685,7 @@ fun ControlCenterPrayerPopup(
                                 backdrop = backdrop,
                                 tabsCount = 2,
                                 modifier = Modifier.fillMaxWidth(0.7f),
-                                initialPosition = 0.5f // Start pill in the middle (centered for narrower pill)
+                                initialPosition = 0.5f, // Start pill in the middle (centered for narrower pill)
                             ) {
                                 // Get the animateToTab function from CompositionLocal
                                 val animateToTab = LocalAnimateToTab.current
@@ -709,19 +696,19 @@ fun ControlCenterPrayerPopup(
                                         // Animate to Reset tab, action will be triggered via onTabSelected
                                         animateToTab?.invoke(0)
                                     },
-                                    horizontalAlignment = Alignment.Start
+                                    horizontalAlignment = Alignment.Start,
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Restore,
                                         contentDescription = "Reset",
                                         modifier = Modifier.size(24.dp).padding(start = 14.dp),
-                                        tint = Color.White.copy(alpha = 0.9f)
+                                        tint = Color.White.copy(alpha = 0.9f),
                                     )
                                     Text(
                                         text = "Reset",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White.copy(alpha = 0.8f),
-                                        modifier = Modifier.padding(start = 14.dp)
+                                        modifier = Modifier.padding(start = 14.dp),
                                     )
                                 }
 
@@ -731,19 +718,19 @@ fun ControlCenterPrayerPopup(
                                         // Animate to Save tab, action will be triggered via onTabSelected
                                         animateToTab?.invoke(1)
                                     },
-                                    horizontalAlignment = Alignment.End
+                                    horizontalAlignment = Alignment.End,
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Check,
                                         contentDescription = "Save",
                                         modifier = Modifier.size(24.dp).padding(end = 14.dp),
-                                        tint = Color(0xFF26C6DA)
+                                        tint = Color(0xFF26C6DA),
                                     )
                                     Text(
                                         text = "Save",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFF26C6DA),
-                                        modifier = Modifier.padding(end = 14.dp)
+                                        modifier = Modifier.padding(end = 14.dp),
                                     )
                                 }
                             }
@@ -754,19 +741,19 @@ fun ControlCenterPrayerPopup(
                             visible = !showButtons,
                             enter = slideInVertically(
                                 initialOffsetY = { -it },
-                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
                             ) + fadeIn(animationSpec = spring(stiffness = 300f)),
                             exit = slideOutVertically(
                                 targetOffsetY = { -it },
-                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
-                            ) + fadeOut(animationSpec = spring(stiffness = 300f))
+                                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+                            ) + fadeOut(animationSpec = spring(stiffness = 300f)),
                         ) {
                             Text(
                                 text = "Rotate dial to adjust time",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White.copy(alpha = 0.6f),
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.offset(y = (-16).dp)
+                                modifier = Modifier.offset(y = (-16).dp),
                             )
                         }
                     }
@@ -795,7 +782,7 @@ private fun DrawScope.drawWatchDial(
     rotation: Float,
     textMeasurer: androidx.compose.ui.text.TextMeasurer,
     dialStyle: WatchDialStyle,
-    showLabels: Boolean = true
+    showLabels: Boolean = true,
 ) {
     var stepsAngle = 0
 
@@ -830,11 +817,11 @@ private fun DrawScope.drawWatchDial(
         // All markers start from the same outer edge
         val stepsStartOffset = Offset(
             x = center.x + (radius * cos((stepsAngle + rotation) * (Math.PI / 180f))).toFloat(),
-            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+            y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
         )
         val stepsEndOffset = Offset(
             x = center.x + (radius - stepsHeight) * cos((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
-            y = center.y - (radius - stepsHeight) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat()
+            y = center.y - (radius - stepsHeight) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
         )
 
         drawLine(
@@ -842,7 +829,7 @@ private fun DrawScope.drawWatchDial(
             start = stepsStartOffset,
             end = stepsEndOffset,
             strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
 
         // Draw red accent marks at major positions (like Helix watch) - inside the dial
@@ -851,18 +838,18 @@ private fun DrawScope.drawWatchDial(
             // Red accent starts at same outer edge as main marker
             val accentStartOffset = Offset(
                 x = center.x + (radius * cos((stepsAngle + rotation) * (Math.PI / 180f))).toFloat(),
-                y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+                y = center.y - (radius * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
             )
             val accentEndOffset = Offset(
                 x = center.x + ((radius - accentHeight) * cos((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
-                y = center.y - ((radius - accentHeight) * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat()
+                y = center.y - ((radius - accentHeight) * sin((stepsAngle + rotation) * (Math.PI / 180))).toFloat(),
             )
             drawLine(
                 color = dialStyle.accentColor,
                 start = accentStartOffset,
                 end = accentEndOffset,
                 strokeWidth = 1.5.dp.toPx(),
-                cap = StrokeCap.Round
+                cap = StrokeCap.Round,
             )
         }
 
@@ -870,24 +857,24 @@ private fun DrawScope.drawWatchDial(
             val stepsLabel = String.format("%02d", steps)
             val stepsLabelTextLayout = textMeasurer.measure(
                 text = buildAnnotatedString { append(stepsLabel) },
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
 
             val stepsLabelOffset = Offset(
                 x = center.x + (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * cos((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
-                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat()
+                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((stepsAngle + rotation) * (Math.PI / 180)).toFloat(),
             )
 
             val stepsLabelTopLeft = Offset(
                 stepsLabelOffset.x - ((stepsLabelTextLayout.size.width) / 2f),
-                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f)
+                stepsLabelOffset.y - (stepsLabelTextLayout.size.height / 2f),
             )
 
             drawText(
                 textMeasurer = textMeasurer,
                 text = stepsLabel,
                 topLeft = stepsLabelTopLeft,
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
         }
         stepsAngle += 6
@@ -899,7 +886,7 @@ private fun DrawScope.drawHourDial(
     radius: Float,
     rotation: Float,
     textMeasurer: androidx.compose.ui.text.TextMeasurer,
-    dialStyle: WatchDialStyle
+    dialStyle: WatchDialStyle,
 ) {
     // 60 tick marks like seconds/minutes, with hour positions (every 5th) being major
     repeat(60) { tickIndex ->
@@ -931,11 +918,11 @@ private fun DrawScope.drawHourDial(
 
         val stepsStartOffset = Offset(
             x = center.x + (radius * cos((tickAngle + rotation) * (Math.PI / 180f))).toFloat(),
-            y = center.y - (radius * sin((tickAngle + rotation) * (Math.PI / 180))).toFloat()
+            y = center.y - (radius * sin((tickAngle + rotation) * (Math.PI / 180))).toFloat(),
         )
         val stepsEndOffset = Offset(
             x = center.x + (radius - stepsHeight) * cos((tickAngle + rotation) * (Math.PI / 180)).toFloat(),
-            y = center.y - (radius - stepsHeight) * sin((tickAngle + rotation) * (Math.PI / 180)).toFloat()
+            y = center.y - (radius - stepsHeight) * sin((tickAngle + rotation) * (Math.PI / 180)).toFloat(),
         )
 
         drawLine(
@@ -943,7 +930,7 @@ private fun DrawScope.drawHourDial(
             start = stepsStartOffset,
             end = stepsEndOffset,
             strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
+            cap = StrokeCap.Round,
         )
 
         // Hour labels only at hour positions (every 5th tick = 30 degrees)
@@ -952,26 +939,25 @@ private fun DrawScope.drawHourDial(
             val hourLabel = if (hourIndex == 0) "12" else hourIndex.toString()
             val hourLabelTextLayout = textMeasurer.measure(
                 text = buildAnnotatedString { append(hourLabel) },
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
 
             val hourLabelOffset = Offset(
                 x = center.x + (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * cos((tickAngle + rotation) * (Math.PI / 180)).toFloat(),
-                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((tickAngle + rotation) * (Math.PI / 180)).toFloat()
+                y = center.y - (radius - stepsHeight - dialStyle.stepsLabelTopPadding.toPx()) * sin((tickAngle + rotation) * (Math.PI / 180)).toFloat(),
             )
 
             val hourLabelTopLeft = Offset(
                 hourLabelOffset.x - ((hourLabelTextLayout.size.width) / 2f),
-                hourLabelOffset.y - (hourLabelTextLayout.size.height / 2f)
+                hourLabelOffset.y - (hourLabelTextLayout.size.height / 2f),
             )
 
             drawText(
                 textMeasurer = textMeasurer,
                 text = hourLabel,
                 topLeft = hourLabelTopLeft,
-                style = dialStyle.stepsTextStyle
+                style = dialStyle.stepsTextStyle,
             )
         }
     }
 }
-

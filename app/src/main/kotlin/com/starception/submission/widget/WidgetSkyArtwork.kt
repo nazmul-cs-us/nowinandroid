@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,10 @@ package com.starception.submission.widget
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.DashPathEffect
-import android.graphics.PorterDuffColorFilter
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
@@ -30,7 +29,6 @@ import android.graphics.PointF
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -38,14 +36,11 @@ import androidx.core.content.res.ResourcesCompat
 import com.starception.submission.R
 import com.starception.submission.prayer.sky.julianDay
 import com.starception.submission.prayer.sky.sunAltitudeAt
-import com.starception.submission.core.designsystem.R as DesignR
 import kotlin.math.PI
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
+import com.starception.submission.core.designsystem.R as DesignR
 
 /**
  * Today's Prayers as a living sky.
@@ -226,6 +221,7 @@ internal object WidgetSkyArtwork {
         private val titleBlock = (if (compact) 26f else 30f) * tp
         private val labelBlock = (if (compact) 48f else 56f) * tp
         private val groundTop = h - labelBlock
+
         // The strip of ground between the skyline and the label row is a fixed share of the
         // card in the reference, which on a flipper page turned into a broad empty band.
         // Hold it near the size it has there — scaled with the type, like the row beneath
@@ -424,10 +420,16 @@ internal object WidgetSkyArtwork {
 
         private fun drawSky() {
             canvas.drawRect(
-                0f, 0f, w, groundTop,
+                0f,
+                0f,
+                w,
+                groundTop,
                 Paint().apply {
                     shader = LinearGradient(
-                        0f, 0f, 0f, groundTop,
+                        0f,
+                        0f,
+                        0f,
+                        groundTop,
                         intArrayOf(palette.top, palette.mid, palette.horizon, palette.horizon),
                         floatArrayOf(0f, 0.55f, 0.9f, 1f),
                         Shader.TileMode.CLAMP,
@@ -458,12 +460,25 @@ internal object WidgetSkyArtwork {
             for (i in boundaries.indices) {
                 val bottom = boundaries[i]
                 canvas.drawRect(
-                    0f, top, w, bottom,
-                    Paint().apply { color = inks[i]; alpha = 38 + i * 16 },
+                    0f,
+                    top,
+                    w,
+                    bottom,
+                    Paint().apply {
+                        color = inks[i]
+                        alpha = 38 + i * 16
+                    },
                 )
                 canvas.drawLine(
-                    0f, bottom, w, bottom,
-                    Paint().apply { color = 0xFFFFFFFF.toInt(); alpha = 20; strokeWidth = 1f * px },
+                    0f,
+                    bottom,
+                    w,
+                    bottom,
+                    Paint().apply {
+                        color = 0xFFFFFFFF.toInt()
+                        alpha = 20
+                        strokeWidth = 1f * px
+                    },
                 )
                 top = bottom
             }
@@ -508,7 +523,10 @@ internal object WidgetSkyArtwork {
             // into the indigo, so it lightens to slate and gets a backlit rim along its top,
             // as a skyline does against the afterglow.
             val ink = if (palette.dark) 0xFF1A2440.toInt() else 0xFF20443E.toInt()
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; alpha = if (palette.dark) 245 else 185 }
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ink
+                alpha = if (palette.dark) 245 else 185
+            }
             val hills = Path().apply {
                 moveTo(0f, horizonY + 6f * px)
                 cubicTo(w * 0.12f, horizonY - 5f * px, w * 0.22f, horizonY + 4f * px, w * 0.34f, horizonY - 1f * px)
@@ -519,7 +537,10 @@ internal object WidgetSkyArtwork {
                 close()
             }
             val art = skylineArt(context, w.toInt())
-                ?: run { canvas.drawPath(hills, paint); return }
+                ?: run {
+                    canvas.drawPath(hills, paint)
+                    return
+                }
             // The panorama is drawn 3:1 precisely so it spans the card edge to edge and
             // still clears the sun's apex — the old single-building art was 1.48:1, which
             // the short wide sky band held to about two fifths of the width however it was
@@ -541,7 +562,9 @@ internal object WidgetSkyArtwork {
             // not quite photographic, so the artwork keeps its greens and creams and only
             // the sky behind it changes.
             canvas.drawBitmap(
-                art, null, dst,
+                art,
+                null,
+                dst,
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
             )
         }
@@ -623,9 +646,14 @@ internal object WidgetSkyArtwork {
             val isDay = sky.now in sky.sunrise..sky.maghrib
             if (!isDay) return
             val reach = w * 0.45f
-            canvas.drawCircle(x, y, reach, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(x, y, reach, intArrayOf(0x8CFFE1A6.toInt(), 0x33FFC77A, 0x00FFC77A), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
-            })
+            canvas.drawCircle(
+                x,
+                y,
+                reach,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(x, y, reach, intArrayOf(0x8CFFE1A6.toInt(), 0x33FFC77A, 0x00FFC77A), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+                },
+            )
         }
 
         /**
@@ -651,12 +679,22 @@ internal object WidgetSkyArtwork {
             val (x, y) = sunPositionNow() ?: moonAtNight() ?: return
             val r = (if (compact) 7f else 9f) * px
             if (sky.now in sky.sunrise..sky.maghrib) {
-                canvas.drawCircle(x, y, r * 2.4f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(x, y, r * 2.4f, 0xAAFFF1C2.toInt(), 0x00FFF1C2, Shader.TileMode.CLAMP)
-                })
-                canvas.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(x - r * 0.3f, y - r * 0.3f, r * 1.3f, intArrayOf(0xFFFFFBEA.toInt(), 0xFFFFE28A.toInt(), 0xFFF7B24A.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
-                })
+                canvas.drawCircle(
+                    x,
+                    y,
+                    r * 2.4f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = RadialGradient(x, y, r * 2.4f, 0xAAFFF1C2.toInt(), 0x00FFF1C2, Shader.TileMode.CLAMP)
+                    },
+                )
+                canvas.drawCircle(
+                    x,
+                    y,
+                    r,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = RadialGradient(x - r * 0.3f, y - r * 0.3f, r * 1.3f, intArrayOf(0xFFFFFBEA.toInt(), 0xFFFFE28A.toInt(), 0xFFF7B24A.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+                    },
+                )
             } else {
                 drawMoon(x, y, r * 0.9f)
             }
@@ -668,9 +706,14 @@ internal object WidgetSkyArtwork {
          * left for the waning half, as seen from the northern hemisphere.
          */
         private fun drawMoon(x: Float, y: Float, r: Float) {
-            canvas.drawCircle(x, y, r * 3f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(x, y, r * 3f, 0x55E8ECFF, 0x00E8ECFF, Shader.TileMode.CLAMP)
-            })
+            canvas.drawCircle(
+                x,
+                y,
+                r * 3f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(x, y, r * 3f, 0x55E8ECFF, 0x00E8ECFF, Shader.TileMode.CLAMP)
+                },
+            )
             val phase = ((sky.hijriDay - 1) / 29.53).toFloat().coerceIn(0f, 1f)
             val waxing = phase <= 0.5f
             val lit = (if (waxing) phase * 2f else (1f - phase) * 2f).coerceIn(0f, 1f)
@@ -681,9 +724,14 @@ internal object WidgetSkyArtwork {
             canvas.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF6F0D8.toInt() })
             if (lit < 0.97f) {
                 val offset = 2f * r * lit * (if (waxing) -1f else 1f)
-                canvas.drawCircle(x + offset, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-                })
+                canvas.drawCircle(
+                    x + offset,
+                    y,
+                    r,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+                    },
+                )
             }
             canvas.restoreToCount(layer)
         }
@@ -693,16 +741,35 @@ internal object WidgetSkyArtwork {
             input.prayers.forEachIndexed { column, prayer ->
                 val node = nodeForColumn(nodes, column)
                 val core = if (palette.dark) 0xFFFFFFFF.toInt() else 0xFFFFF4D0.toInt()
-                val glow = if (prayer.isNext) 0xFFFFD86A.toInt() else if (palette.dark) 0xFFCFD6F2.toInt() else 0xFFFFE9A8.toInt()
+                val glow = if (prayer.isNext) {
+                    0xFFFFD86A.toInt()
+                } else if (palette.dark) {
+                    0xFFCFD6F2.toInt()
+                } else {
+                    0xFFFFE9A8.toInt()
+                }
                 val r = (if (prayer.isNext) 4.6f else 3.2f) * px
-                canvas.drawCircle(node.x, node.y, r * 3.2f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(node.x, node.y, r * 3.2f, (glow and 0x00FFFFFF) or 0x99000000.toInt(), glow and 0x00FFFFFF, Shader.TileMode.CLAMP)
-                })
+                canvas.drawCircle(
+                    node.x,
+                    node.y,
+                    r * 3.2f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = RadialGradient(node.x, node.y, r * 3.2f, (glow and 0x00FFFFFF) or 0x99000000.toInt(), glow and 0x00FFFFFF, Shader.TileMode.CLAMP)
+                    },
+                )
                 canvas.drawCircle(node.x, node.y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = core })
                 // A hairline down to the label so the eye connects point and name.
-                canvas.drawLine(node.x, node.y + r + 3f * px, node.x, groundTop - 2f * px, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    strokeWidth = 1f * px; color = core; alpha = if (prayer.isNext) 110 else 55
-                })
+                canvas.drawLine(
+                    node.x,
+                    node.y + r + 3f * px,
+                    node.x,
+                    groundTop - 2f * px,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        strokeWidth = 1f * px
+                        color = core
+                        alpha = if (prayer.isNext) 110 else 55
+                    },
+                )
             }
         }
 
@@ -710,15 +777,32 @@ internal object WidgetSkyArtwork {
             nodes[(if (column == 0) 0 else column + 1).coerceIn(0, nodes.size - 1)]
 
         private fun drawGround() {
-            canvas.drawRect(0f, groundTop, w, h, Paint().apply {
-                shader = LinearGradient(0f, groundTop, 0f, h, 0xFF0E2926.toInt(), 0xFF081A18.toInt(), Shader.TileMode.CLAMP)
-            })
-            canvas.drawLine(0f, groundTop, w, groundTop, Paint().apply { color = 0x33FFFFFF; strokeWidth = 1f * px })
+            canvas.drawRect(
+                0f,
+                groundTop,
+                w,
+                h,
+                Paint().apply {
+                    shader = LinearGradient(0f, groundTop, 0f, h, 0xFF0E2926.toInt(), 0xFF081A18.toInt(), Shader.TileMode.CLAMP)
+                },
+            )
+            canvas.drawLine(
+                0f,
+                groundTop,
+                w,
+                groundTop,
+                Paint().apply {
+                    color = 0x33FFFFFF
+                    strokeWidth = 1f * px
+                },
+            )
         }
 
         private fun drawTitle() {
             val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = bold; textSize = (if (compact) 13f else 15f) * tp; color = palette.ink
+                typeface = bold
+                textSize = (if (compact) 13f else 15f) * tp
+                color = palette.ink
             }
             val barX = 12f * px
             val titleTop = 9f * tp
@@ -726,7 +810,11 @@ internal object WidgetSkyArtwork {
             canvas.drawText("Today's Prayers", barX + 9f * tp, titleTop + title.textSize * 0.98f, title)
             // Day and night lengths, quietly at the right.
             val caption = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = medium; textSize = (if (compact) 8f else 9f) * tp; color = palette.ink; alpha = 200; textAlign = Paint.Align.RIGHT
+                typeface = medium
+                textSize = (if (compact) 8f else 9f) * tp
+                color = palette.ink
+                alpha = 200
+                textAlign = Paint.Align.RIGHT
             }
             canvas.drawText("${input.daylightLabel}   ·   ${input.nightLabel}", w - 12f * px, 9f * tp + title.textSize * 0.9f, caption)
         }
@@ -736,8 +824,16 @@ internal object WidgetSkyArtwork {
             val muted = 0xFFB9C7C0.toInt()
             val nameSize = (if (compact) 10.5f else 11.5f) * tp
             val timeSize = (if (compact) 9.5f else 10.5f) * tp
-            val name = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold; textSize = nameSize; textAlign = Paint.Align.CENTER }
-            val time = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium; textSize = timeSize; textAlign = Paint.Align.CENTER }
+            val name = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = bold
+                textSize = nameSize
+                textAlign = Paint.Align.CENTER
+            }
+            val time = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = medium
+                textSize = timeSize
+                textAlign = Paint.Align.CENTER
+            }
             val nameY = groundTop + nameSize + 5f * tp
             val timeY = nameY + timeSize + 2f * tp
             val statusCy = timeY + 13f * tp
@@ -758,19 +854,43 @@ internal object WidgetSkyArtwork {
                 label != null -> pill(cx, cy, label, gold = false)
                 prayer.isPast -> {
                     canvas.drawCircle(cx, cy, 7.5f * tp, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x2EFFFFFF })
-                    canvas.drawCircle(cx, cy, 7.5f * tp, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE; strokeWidth = 1f * px; color = 0x40FFFFFF
-                    })
+                    canvas.drawCircle(
+                        cx,
+                        cy,
+                        7.5f * tp,
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            style = Paint.Style.STROKE
+                            strokeWidth = 1f * px
+                            color = 0x40FFFFFF
+                        },
+                    )
                     val check = Path().apply {
-                        moveTo(cx - 3.2f * tp, cy); lineTo(cx - 0.9f * tp, cy + 2.3f * tp); lineTo(cx + 3.4f * tp, cy - 2.5f * tp)
+                        moveTo(cx - 3.2f * tp, cy)
+                        lineTo(cx - 0.9f * tp, cy + 2.3f * tp)
+                        lineTo(cx + 3.4f * tp, cy - 2.5f * tp)
                     }
-                    canvas.drawPath(check, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE; strokeWidth = 1.6f * px; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; color = 0xFFF4F1E6.toInt()
-                    })
+                    canvas.drawPath(
+                        check,
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            style = Paint.Style.STROKE
+                            strokeWidth = 1.6f * px
+                            strokeCap = Paint.Cap.ROUND
+                            strokeJoin = Paint.Join.ROUND
+                            color = 0xFFF4F1E6.toInt()
+                        },
+                    )
                 }
-                else -> canvas.drawCircle(cx, cy, 6f * tp, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE; strokeWidth = 1.8f * px; color = 0xFFFFD86A.toInt(); alpha = 210
-                })
+                else -> canvas.drawCircle(
+                    cx,
+                    cy,
+                    6f * tp,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = 1.8f * px
+                        color = 0xFFFFD86A.toInt()
+                        alpha = 210
+                    },
+                )
             }
         }
 
@@ -793,17 +913,30 @@ internal object WidgetSkyArtwork {
             if (gold) {
                 canvas.drawRoundRect(
                     RectF(rect.left - 3f * pp, rect.top - 3f * pp, rect.right + 3f * pp, rect.bottom + 3f * pp),
-                    ph, ph,
+                    ph,
+                    ph,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33FFD86A },
                 )
-                canvas.drawRoundRect(rect, ph / 2, ph / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = LinearGradient(0f, rect.top, 0f, rect.bottom, 0xFFFFE28A.toInt(), 0xFFF5C244.toInt(), Shader.TileMode.CLAMP)
-                })
+                canvas.drawRoundRect(
+                    rect,
+                    ph / 2,
+                    ph / 2,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = LinearGradient(0f, rect.top, 0f, rect.bottom, 0xFFFFE28A.toInt(), 0xFFF5C244.toInt(), Shader.TileMode.CLAMP)
+                    },
+                )
             } else {
                 canvas.drawRoundRect(rect, ph / 2, ph / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x24FFFFFF })
-                canvas.drawRoundRect(rect, ph / 2, ph / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE; strokeWidth = 1f * px; color = 0x3DFFFFFF
-                })
+                canvas.drawRoundRect(
+                    rect,
+                    ph / 2,
+                    ph / 2,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = 1f * px
+                        color = 0x3DFFFFFF
+                    },
+                )
             }
             canvas.drawText(text, cx, cy + paint.textSize * 0.35f, paint)
         }

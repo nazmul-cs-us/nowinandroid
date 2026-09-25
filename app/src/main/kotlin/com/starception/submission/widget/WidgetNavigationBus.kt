@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,21 +114,24 @@ object WidgetNavigationBus {
 
     /** Puts [target] on an intent in the form [consume] expects. */
     fun put(intent: Intent, target: WidgetNavigationTarget): Intent = when (target) {
-        is WidgetNavigationTarget.Hadith -> intent
-            .putExtra(EXTRA_KIND, KIND_HADITH)
-            .putExtra(EXTRA_HADITH_DB, target.databaseFile)
-            .putExtra(EXTRA_HADITH_NUMBER, target.hadithNumber)
-            .putExtra(EXTRA_COLLECTION, target.collectionName)
+        is WidgetNavigationTarget.Hadith ->
+            intent
+                .putExtra(EXTRA_KIND, KIND_HADITH)
+                .putExtra(EXTRA_HADITH_DB, target.databaseFile)
+                .putExtra(EXTRA_HADITH_NUMBER, target.hadithNumber)
+                .putExtra(EXTRA_COLLECTION, target.collectionName)
 
-        is WidgetNavigationTarget.Surah -> intent
-            .putExtra(EXTRA_KIND, KIND_SURAH)
-            .putExtra(EXTRA_SURAH_NUMBER, target.surahNumber)
+        is WidgetNavigationTarget.Surah ->
+            intent
+                .putExtra(EXTRA_KIND, KIND_SURAH)
+                .putExtra(EXTRA_SURAH_NUMBER, target.surahNumber)
 
-        is WidgetNavigationTarget.Dua -> intent
-            .putExtra(EXTRA_KIND, KIND_DUA)
-            .putExtra(EXTRA_DUA_TITLE, target.title)
-            .putExtra(EXTRA_DUA_CONTENT, target.content)
-            .putExtra(EXTRA_DUA_NUMBER, target.duaNumber)
+        is WidgetNavigationTarget.Dua ->
+            intent
+                .putExtra(EXTRA_KIND, KIND_DUA)
+                .putExtra(EXTRA_DUA_TITLE, target.title)
+                .putExtra(EXTRA_DUA_CONTENT, target.content)
+                .putExtra(EXTRA_DUA_NUMBER, target.duaNumber)
     }
 
     const val EXTRA_KIND = "widget_target_kind"

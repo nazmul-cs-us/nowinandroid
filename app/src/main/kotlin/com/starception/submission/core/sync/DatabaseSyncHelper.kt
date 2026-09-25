@@ -1,11 +1,27 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.sync
 
 import android.content.Context
 import android.util.Log
-import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.contentdatabase.NewsResourceEntity
 import com.starception.submission.core.contentdatabase.NewsTopicCrossRef
+import com.starception.submission.core.duadatabase.DuaDatabase
 import com.starception.submission.core.quranicduas.QuranicDuaDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,11 +40,12 @@ object DatabaseSyncHelper {
 
     // Starting ID for Fortress of the Muslim duas in news (to avoid conflicts)
     private const val FORTRESS_DUA_START_ID = 1000
+
     // Starting ID for Quranic Duas in news
     private const val QURANIC_DUA_START_ID = 100
 
     // Topic IDs for associating duas
-    private const val TOPIC_QURANIC_DUAS = 11  // "Quranic Duas" topic
+    private const val TOPIC_QURANIC_DUAS = 11 // "Quranic Duas" topic
 
     /**
      * Sync all duas from duas databases to news database
@@ -75,12 +92,12 @@ object DatabaseSyncHelper {
                         url = "",
                         headerImageUrl = "https://via.placeholder.com/600x300/4CAF50/FFFFFF?text=Quranic+Dua+${dua.duaNumber}",
                         publishDate = now,
-                        type = "Dua \uD83E\uDD32",  // Dua 🤲
+                        type = "Dua \uD83E\uDD32", // Dua 🤲
                         isSystem = 1,
                         isUserCreated = 0,
                         source = "quranic_duas_db",
                         createdAt = now,
-                        updatedAt = now
+                        updatedAt = now,
                     )
 
                     newsDao.insertNewsResource(newsEntity)
@@ -132,12 +149,12 @@ object DatabaseSyncHelper {
                             url = "",
                             headerImageUrl = "https://via.placeholder.com/600x300/9C27B0/FFFFFF?text=${chapter.title.take(20).replace(" ", "+")}",
                             publishDate = now,
-                            type = "Dua \uD83E\uDD32",  // Dua 🤲
+                            type = "Dua \uD83E\uDD32", // Dua 🤲
                             isSystem = 1,
                             isUserCreated = 0,
                             source = "fortress_db",
                             createdAt = now,
-                            updatedAt = now
+                            updatedAt = now,
                         )
 
                         newsDao.insertNewsResource(newsEntity)
@@ -157,16 +174,15 @@ object DatabaseSyncHelper {
                     success = true,
                     quranicDuasSynced = quranicSynced,
                     fortressDuasSynced = fortressSynced,
-                    message = "Synced $quranicSynced Quranic + $fortressSynced Fortress duas"
+                    message = "Synced $quranicSynced Quranic + $fortressSynced Fortress duas",
                 )
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error syncing duas to news", e)
                 SyncResult(
                     success = false,
                     quranicDuasSynced = 0,
                     fortressDuasSynced = 0,
-                    message = "Sync failed: ${e.message}"
+                    message = "Sync failed: ${e.message}",
                 )
             }
         }
@@ -178,19 +194,19 @@ object DatabaseSyncHelper {
     private fun getTopicIdForChapter(chapterTitle: String): Int? {
         val title = chapterTitle.lowercase()
         return when {
-            title.contains("morning") || title.contains("evening") || title.contains("waking") || title.contains("sleeping") -> 21  // Morning & Evening
-            title.contains("prayer") || title.contains("salah") || title.contains("mosque") || title.contains("athan") -> 22  // Prayer
-            title.contains("home") || title.contains("entering") || title.contains("leaving") || title.contains("toilet") -> 23  // Home & Daily
-            title.contains("food") || title.contains("eating") || title.contains("drink") || title.contains("fasting") -> 24  // Food & Drink
-            title.contains("travel") || title.contains("journey") -> 25  // Travel
-            title.contains("protect") || title.contains("refuge") || title.contains("evil") || title.contains("fear") -> 26  // Protection
-            title.contains("distress") || title.contains("anxiety") || title.contains("worry") || title.contains("debt") -> 27  // Distress & Anxiety
-            title.contains("sick") || title.contains("health") || title.contains("pain") || title.contains("visit") -> 28  // Health & Sickness
-            title.contains("guest") || title.contains("greeting") || title.contains("gift") || title.contains("thank") -> 29  // Social & Etiquette
-            title.contains("death") || title.contains("funeral") || title.contains("grave") || title.contains("deceased") -> 30  // Death & Funeral
-            title.contains("rain") || title.contains("wind") || title.contains("thunder") || title.contains("moon") -> 31  // Weather & Nature
-            title.contains("hajj") || title.contains("umrah") || title.contains("tawaf") || title.contains("safa") -> 32  // Hajj & Umrah
-            title.contains("forgive") || title.contains("repent") || title.contains("istighfar") -> 33  // Forgiveness & Repentance
+            title.contains("morning") || title.contains("evening") || title.contains("waking") || title.contains("sleeping") -> 21 // Morning & Evening
+            title.contains("prayer") || title.contains("salah") || title.contains("mosque") || title.contains("athan") -> 22 // Prayer
+            title.contains("home") || title.contains("entering") || title.contains("leaving") || title.contains("toilet") -> 23 // Home & Daily
+            title.contains("food") || title.contains("eating") || title.contains("drink") || title.contains("fasting") -> 24 // Food & Drink
+            title.contains("travel") || title.contains("journey") -> 25 // Travel
+            title.contains("protect") || title.contains("refuge") || title.contains("evil") || title.contains("fear") -> 26 // Protection
+            title.contains("distress") || title.contains("anxiety") || title.contains("worry") || title.contains("debt") -> 27 // Distress & Anxiety
+            title.contains("sick") || title.contains("health") || title.contains("pain") || title.contains("visit") -> 28 // Health & Sickness
+            title.contains("guest") || title.contains("greeting") || title.contains("gift") || title.contains("thank") -> 29 // Social & Etiquette
+            title.contains("death") || title.contains("funeral") || title.contains("grave") || title.contains("deceased") -> 30 // Death & Funeral
+            title.contains("rain") || title.contains("wind") || title.contains("thunder") || title.contains("moon") -> 31 // Weather & Nature
+            title.contains("hajj") || title.contains("umrah") || title.contains("tawaf") || title.contains("safa") -> 32 // Hajj & Umrah
+            title.contains("forgive") || title.contains("repent") || title.contains("istighfar") -> 33 // Forgiveness & Repentance
             else -> null
         }
     }
@@ -203,5 +219,5 @@ data class SyncResult(
     val success: Boolean,
     val quranicDuasSynced: Int,
     val fortressDuasSynced: Int,
-    val message: String
+    val message: String,
 )

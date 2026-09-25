@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.ui.search
 
 import android.content.Context
@@ -14,8 +30,6 @@ import com.starception.submission.feature.search.SuggestedVerse
 import com.starception.submission.feature.search.SuggestedVerses
 import com.starception.submission.ui.AppTaskProgressBus
 import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Holds in-memory ranked indices for the small, name-keyed search sources
@@ -64,10 +80,15 @@ class InMemorySearchService @Inject constructor(
     }
 
     private val readyMutex = Mutex()
+
     @Volatile private var surahIndex: FieldWeightedIndex<SurahEntity>? = null
+
     @Volatile private var quranicDuaIndex: FieldWeightedIndex<QuranicDuaEntity>? = null
+
     @Volatile private var verseIndex: FieldWeightedIndex<SuggestedVerse>? = null
+
     @Volatile private var chapterIndex: FieldWeightedIndex<ChapterWithCount>? = null
+
     @Volatile private var fortressDuaIndex: FieldWeightedIndex<Dua>? = null
 
     private val _status = MutableStateFlow(SearchIndexStatus())
@@ -313,8 +334,8 @@ class InMemorySearchService @Inject constructor(
             "search('$query') readyWait=${(tReadyDone - tReady) / 1_000_000}ms " +
                 "queries=${(tDone - tQ) / 1_000_000}ms total=${(tDone - tReady) / 1_000_000}ms " +
                 "[s=${result.surahs.size} qd=${result.quranicDuas.size} " +
-                    "v=${result.verses.size} c=${result.chapters.size} " +
-                    "fd=${result.fortressDuas.size}]",
+                "v=${result.verses.size} c=${result.chapters.size} " +
+                "fd=${result.fortressDuas.size}]",
         )
         return result
     }

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.automotive
 
 import android.util.Log
@@ -12,7 +28,6 @@ import androidx.car.app.model.Template
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -29,7 +44,7 @@ import kotlinx.coroutines.launch
  */
 class QiblaCompassScreen(
     carContext: CarContext,
-    private val dataProvider: AutomotivePrayerDataProvider
+    private val dataProvider: AutomotivePrayerDataProvider,
 ) : Screen(carContext) {
 
     companion object {
@@ -57,7 +72,7 @@ class QiblaCompassScreen(
                     Row.Builder()
                         .setTitle("🧭 Calculating Qibla Direction...")
                         .addText("Determining direction to Holy Kaaba in Makkah")
-                        .build()
+                        .build(),
                 )
             }
 
@@ -66,12 +81,12 @@ class QiblaCompassScreen(
                     Row.Builder()
                         .setTitle("⚠️ Unable to Calculate Qibla")
                         .addText(errorMessage ?: "Unknown error")
-                        .build()
+                        .build(),
                 )
                 itemListBuilder.addItem(
                     Row.Builder()
                         .setTitle("Tap Refresh to try again")
-                        .build()
+                        .build(),
                 )
             }
 
@@ -90,16 +105,16 @@ class QiblaCompassScreen(
                         Action.Builder()
                             .setTitle("🔄 Refresh")
                             .setOnClickListener { loadQiblaDirection() }
-                            .build()
+                            .build(),
                     )
-                    .build()
+                    .build(),
             )
             .build()
     }
 
     private fun buildQiblaInfoList(
         builder: ItemList.Builder,
-        qibla: AutomotivePrayerDataProvider.QiblaInfo
+        qibla: AutomotivePrayerDataProvider.QiblaInfo,
     ) {
         // Check if we have valid location
         if (qibla.latitude == 0.0 && qibla.longitude == 0.0) {
@@ -107,7 +122,7 @@ class QiblaCompassScreen(
                 Row.Builder()
                     .setTitle("📍 Location Required")
                     .addText("Please ensure location is enabled in the main app")
-                    .build()
+                    .build(),
             )
             return
         }
@@ -117,7 +132,7 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("🕋 Qibla Direction")
                 .addText("${qibla.compassDirection} (${qibla.direction.toInt()}°)")
-                .build()
+                .build(),
         )
 
         // Distance to Makkah
@@ -125,7 +140,7 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("📏 Distance to Makkah")
                 .addText("${String.format("%.0f", qibla.distance)} km")
-                .build()
+                .build(),
         )
 
         // Directional guidance
@@ -134,7 +149,7 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("🧭 Turn Direction")
                 .addText(guidance)
-                .build()
+                .build(),
         )
 
         // Prayer reminder
@@ -142,14 +157,14 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("🤲 For Prayer")
                 .addText("Face this direction during Salah")
-                .build()
+                .build(),
         )
 
         // Separator
         builder.addItem(
             Row.Builder()
                 .setTitle("─────────────────────")
-                .build()
+                .build(),
         )
 
         // Location info
@@ -157,7 +172,7 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("📍 Your Location")
                 .addText(qibla.locationName)
-                .build()
+                .build(),
         )
 
         // Coordinates (for reference)
@@ -165,7 +180,7 @@ class QiblaCompassScreen(
             Row.Builder()
                 .setTitle("🌐 Coordinates")
                 .addText("${String.format("%.4f", qibla.latitude)}°, ${String.format("%.4f", qibla.longitude)}°")
-                .build()
+                .build(),
         )
     }
 
@@ -209,5 +224,4 @@ class QiblaCompassScreen(
             else -> "Turn to face North"
         }
     }
-
 }

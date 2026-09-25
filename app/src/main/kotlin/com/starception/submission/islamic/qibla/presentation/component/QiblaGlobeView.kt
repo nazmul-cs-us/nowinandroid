@@ -1,70 +1,68 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.islamic.qibla.presentation.component
 
-import android.content.Context as AndroidContext
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.hardware.GeomagneticField
 import androidx.compose.animation.*
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBackIos
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.Path as ComposePath
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.Dp
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
-import android.view.MotionEvent
-import com.starception.submission.R
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import com.starception.submission.feature.prayertimes.utils.calculateQiblaDirection
 import earth.worldwind.WorldWindow
 import earth.worldwind.geom.AltitudeMode
@@ -78,9 +76,7 @@ import earth.worldwind.layer.atmosphere.AtmosphereLayer
 import earth.worldwind.render.image.ImageSource
 import earth.worldwind.shape.Placemark
 import earth.worldwind.shape.Polygon
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import android.content.Context as AndroidContext
 
 /**
  * Qibla Globe View - 3D globe showing direction from user location to Makkah
@@ -101,9 +97,9 @@ fun QiblaGlobeView(
     userLongitude: Double,
     modifier: Modifier = Modifier,
     // Set to false to hide overlay buttons and info cards
-    showControls: Boolean = true,  
+    showControls: Boolean = true,
     // When this becomes true, plays a one-time day/night sweep
-    isActiveTile: Boolean = true,  
+    isActiveTile: Boolean = true,
     surfaceCornerRadius: Dp = 16.dp,
 ) {
     val context = LocalContext.current
@@ -122,665 +118,677 @@ fun QiblaGlobeView(
         val tileWidthPx = with(density) { maxWidth.toPx() }
         val tileHeightPx = with(density) { maxHeight.toPx() }
 
-        android.util.Log.d("QiblaGlobeView", "📐 Tile dimensions: width=${tileWidthPx}px (${maxWidth}), height=${tileHeightPx}px (${maxHeight})")
+        android.util.Log.d("QiblaGlobeView", "📐 Tile dimensions: width=${tileWidthPx}px ($maxWidth), height=${tileHeightPx}px ($maxHeight)")
 
-    // Compass sensor state for dynamic rotation
-    var deviceHeading by remember { mutableFloatStateOf(0f) }
-    var lastUpdatedHeading by remember { mutableFloatStateOf(0f) }  // Track last heading used for update
+        // Compass sensor state for dynamic rotation
+        var deviceHeading by remember { mutableFloatStateOf(0f) }
+        var lastUpdatedHeading by remember { mutableFloatStateOf(0f) } // Track last heading used for update
 
-    val animatedHeading by animateFloatAsState(
-        targetValue = deviceHeading,
-        animationSpec = spring(
-            dampingRatio = 0.75f,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "smoothBeamHeading"
-    )
-    var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
-    var qiblaLayerRef by remember { mutableStateOf<RenderableLayer?>(null) }
-    val lifecycleObservers = remember(lifecycleOwner) {
-        mutableMapOf<WorldWindow, LifecycleEventObserver>()
-    }
-    var isUserInteracting by remember { mutableStateOf(false) }
-    var lastInteractionTime by remember { mutableStateOf(0L) }
-    var wasAlignedWithQibla by remember { mutableStateOf(false) }
-    var userMarkerPlacemark by remember { mutableStateOf<Placemark?>(null) }
-    var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
-    var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
-    var magneticFieldStrength by remember { mutableFloatStateOf(50f) } // For strength-based accuracy like Smart Prediction
-    var hasPlayedDayNightSweep by remember { mutableStateOf(false) }
-
-    // Debounce direction changes to prevent flickering when angle is near 180°
-    var stableDirection by remember { mutableStateOf<Boolean?>(null) } // true = turn right, false = turn left
-    var lastDirectionChangeTime by remember { mutableLongStateOf(0L) }
-
-    // Throttling for sensor updates to prevent jitter (same as Smart Prediction - 50ms)
-    var lastSensorUpdateTime by remember { mutableLongStateOf(0L) }
-    val SENSOR_UPDATE_INTERVAL_MS = 50L
-
-    // Low-pass filter for smoothing sensor data (reduces jitter from noisy accelerometer/magnetometer)
-    var filteredHeading by remember { mutableFloatStateOf(0f) }
-    val SMOOTHING_FACTOR = 0.03f  // Very low = very smooth (raw data jumps 50-100° even when still!)
-
-    // Calculate magnetic declination for location
-    val magneticDeclination = remember(userLatitude, userLongitude) {
-        val geoField = GeomagneticField(
-            userLatitude.toFloat(),
-            userLongitude.toFloat(),
-            0f, // altitude (can use 0 if not critical)
-            System.currentTimeMillis()
+        val animatedHeading by animateFloatAsState(
+            targetValue = deviceHeading,
+            animationSpec = spring(
+                dampingRatio = 0.75f,
+                stiffness = Spring.StiffnessMedium,
+            ),
+            label = "smoothBeamHeading",
         )
-        geoField.declination
-    }
-
-    // Calculate Qibla direction from user location
-    val qiblaDirection = remember(userLatitude, userLongitude) {
-        calculateQiblaDirection(userLatitude, userLongitude).toFloat()
-    }
-
-    // Check if user is facing Qibla (within ±5 degrees)
-    val angularDiff = kotlin.math.abs(deviceHeading - qiblaDirection)
-    val normalizedDiff = if (angularDiff > 180f) 360f - angularDiff else angularDiff
-    val isAlignedWithQibla = normalizedDiff <= 5f
-
-    // Debug logging to compare with QiblaCompass
-    android.util.Log.d("QiblaGlobeAlignment", "deviceHeading=$deviceHeading, qiblaDirection=$qiblaDirection, normalizedDiff=$normalizedDiff, isAligned=$isAlignedWithQibla, declination=$magneticDeclination")
-
-    // Haptic feedback when becoming aligned - only in foreground to avoid background vibration
-    LaunchedEffect(isAlignedWithQibla, isInForeground) {
-        if (isAlignedWithQibla && !wasAlignedWithQibla && isInForeground) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            wasAlignedWithQibla = true
-        } else if (!isAlignedWithQibla) {
-            wasAlignedWithQibla = false
+        var worldWindowRef by remember { mutableStateOf<WorldWindow?>(null) }
+        var qiblaLayerRef by remember { mutableStateOf<RenderableLayer?>(null) }
+        val lifecycleObservers = remember(lifecycleOwner) {
+            mutableMapOf<WorldWindow, LifecycleEventObserver>()
         }
-    }
+        var isUserInteracting by remember { mutableStateOf(false) }
+        var lastInteractionTime by remember { mutableStateOf(0L) }
+        var wasAlignedWithQibla by remember { mutableStateOf(false) }
+        var userMarkerPlacemark by remember { mutableStateOf<Placemark?>(null) }
+        var isInForeground by remember { mutableStateOf(true) } // Track if app is in foreground for haptic control
+        var sensorAccuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH) }
+        var magneticFieldStrength by remember { mutableFloatStateOf(50f) } // For strength-based accuracy like Smart Prediction
+        var hasPlayedDayNightSweep by remember { mutableStateOf(false) }
 
-    // Sensor manager for compass - only active when user is NOT touching.
-    // Also keyed on isActiveTile: while the card is stacked behind others the
-    // globe is hidden, so compass work would be wasted — sensors unregister
-    // and re-register when the card lands on front again.
-    DisposableEffect(context, isActiveTile, magneticDeclination) {
-        if (!isActiveTile) {
-            return@DisposableEffect onDispose { }
+        // Debounce direction changes to prevent flickering when angle is near 180°
+        var stableDirection by remember { mutableStateOf<Boolean?>(null) } // true = turn right, false = turn left
+        var lastDirectionChangeTime by remember { mutableLongStateOf(0L) }
+
+        // Throttling for sensor updates to prevent jitter (same as Smart Prediction - 50ms)
+        var lastSensorUpdateTime by remember { mutableLongStateOf(0L) }
+        val SENSOR_UPDATE_INTERVAL_MS = 50L
+
+        // Low-pass filter for smoothing sensor data (reduces jitter from noisy accelerometer/magnetometer)
+        var filteredHeading by remember { mutableFloatStateOf(0f) }
+        val SMOOTHING_FACTOR = 0.03f // Very low = very smooth (raw data jumps 50-100° even when still!)
+
+        // Calculate magnetic declination for location
+        val magneticDeclination = remember(userLatitude, userLongitude) {
+            val geoField = GeomagneticField(
+                userLatitude.toFloat(),
+                userLongitude.toFloat(),
+                0f, // altitude (can use 0 if not critical)
+                System.currentTimeMillis(),
+            )
+            geoField.declination
         }
-        val sensorManager = context.getSystemService(AndroidContext.SENSOR_SERVICE) as SensorManager
-        // Use TYPE_ORIENTATION for stable heading (same as Smart Prediction tile)
-        // TYPE_ORIENTATION is deprecated but provides pre-filtered, stable values
-        val orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
-        val magneticSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
-        // Orientation sensor listener - for stable compass heading (like Smart Prediction)
-        val orientationListener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                // Throttle sensor updates (same as Smart Prediction - 50ms)
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - lastSensorUpdateTime < SENSOR_UPDATE_INTERVAL_MS) {
-                    return
-                }
-                lastSensorUpdateTime = currentTime
+        // Calculate Qibla direction from user location
+        val qiblaDirection = remember(userLatitude, userLongitude) {
+            calculateQiblaDirection(userLatitude, userLongitude).toFloat()
+        }
 
-                // Get pre-filtered heading from TYPE_ORIENTATION (much more stable than manual calculation)
-                val rawHeading = event.values[0] + magneticDeclination
+        // Check if user is facing Qibla (within ±5 degrees)
+        val angularDiff = kotlin.math.abs(deviceHeading - qiblaDirection)
+        val normalizedDiff = if (angularDiff > 180f) 360f - angularDiff else angularDiff
+        val isAlignedWithQibla = normalizedDiff <= 5f
 
-                // Only update heading if change is significant (3° threshold like Smart Prediction)
-                val headingDiff = kotlin.math.abs(rawHeading - lastUpdatedHeading)
-                val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
+        // Debug logging to compare with QiblaCompass
+        android.util.Log.d("QiblaGlobeAlignment", "deviceHeading=$deviceHeading, qiblaDirection=$qiblaDirection, normalizedDiff=$normalizedDiff, isAligned=$isAlignedWithQibla, declination=$magneticDeclination")
 
-                if (normalizedHeadingDiff > 3f) {
-                    deviceHeading = rawHeading
-                    lastUpdatedHeading = rawHeading
-                    // The marker bitmap (heading + accuracy color + breathing pulse) is
-                    // regenerated continuously by the pulse loop below, which reads the
-                    // latest deviceHeading — so we only record the new heading here.
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-                // Not used - accuracy from magnetic field listener
+        // Haptic feedback when becoming aligned - only in foreground to avoid background vibration
+        LaunchedEffect(isAlignedWithQibla, isInForeground) {
+            if (isAlignedWithQibla && !wasAlignedWithQibla && isInForeground) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                wasAlignedWithQibla = true
+            } else if (!isAlignedWithQibla) {
+                wasAlignedWithQibla = false
             }
         }
 
-        // Magnetic field listener - for accuracy detection only (same as Smart Prediction)
-        val magneticFieldListener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                // Calculate magnetic field strength for accuracy detection
-                val x = event.values[0]
-                val y = event.values[1]
-                val z = event.values[2]
-                val strength = kotlin.math.sqrt(x * x + y * y + z * z)
-                magneticFieldStrength = strength
+        // Sensor manager for compass - only active when user is NOT touching.
+        // Also keyed on isActiveTile: while the card is stacked behind others the
+        // globe is hidden, so compass work would be wasted — sensors unregister
+        // and re-register when the card lands on front again.
+        DisposableEffect(context, isActiveTile, magneticDeclination) {
+            if (!isActiveTile) {
+                return@DisposableEffect onDispose { }
+            }
+            val sensorManager = context.getSystemService(AndroidContext.SENSOR_SERVICE) as SensorManager
+            // Use TYPE_ORIENTATION for stable heading (same as Smart Prediction tile)
+            // TYPE_ORIENTATION is deprecated but provides pre-filtered, stable values
+            val orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+            val magneticSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
-                // Determine accuracy based on magnetic field strength
-                sensorAccuracy = when {
-                    strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                    strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
-                    strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
-                    else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+            // Orientation sensor listener - for stable compass heading (like Smart Prediction)
+            val orientationListener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent) {
+                    // Throttle sensor updates (same as Smart Prediction - 50ms)
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastSensorUpdateTime < SENSOR_UPDATE_INTERVAL_MS) {
+                        return
+                    }
+                    lastSensorUpdateTime = currentTime
+
+                    // Get pre-filtered heading from TYPE_ORIENTATION (much more stable than manual calculation)
+                    val rawHeading = event.values[0] + magneticDeclination
+
+                    // Only update heading if change is significant (3° threshold like Smart Prediction)
+                    val headingDiff = kotlin.math.abs(rawHeading - lastUpdatedHeading)
+                    val normalizedHeadingDiff = if (headingDiff > 180f) 360f - headingDiff else headingDiff
+
+                    if (normalizedHeadingDiff > 3f) {
+                        deviceHeading = rawHeading
+                        lastUpdatedHeading = rawHeading
+                        // The marker bitmap (heading + accuracy color + breathing pulse) is
+                        // regenerated continuously by the pulse loop below, which reads the
+                        // latest deviceHeading — so we only record the new heading here.
+                    }
+                }
+
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                    // Not used - accuracy from magnetic field listener
                 }
             }
 
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
+            // Magnetic field listener - for accuracy detection only (same as Smart Prediction)
+            val magneticFieldListener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent) {
+                    // Calculate magnetic field strength for accuracy detection
+                    val x = event.values[0]
+                    val y = event.values[1]
+                    val z = event.values[2]
+                    val strength = kotlin.math.sqrt(x * x + y * y + z * z)
+                    magneticFieldStrength = strength
 
-        // Register sensors - SAME as Smart Prediction tile
-        orientationSensor?.let {
-            sensorManager.registerListener(orientationListener, it, SensorManager.SENSOR_DELAY_GAME)
-        }
-        magneticSensor?.let {
-            sensorManager.registerListener(magneticFieldListener, it, SensorManager.SENSOR_DELAY_GAME)
-        }
-
-        onDispose {
-            sensorManager.unregisterListener(orientationListener)
-            sensorManager.unregisterListener(magneticFieldListener)
-        }
-    }
-
-    // Breathing pulse for the user dot (Google Maps style), matching the Smart
-    // Prediction globe. Regenerates the marker bitmap at ~20fps with a varying dot
-    // radius while the tile is in the foreground; the cone and white ring stay
-    // constant and the fill stays the accuracy-driven color — only the dot scales.
-    LaunchedEffect(
-        isInForeground,
-        isActiveTile,
-        qiblaDirection,
-        userLatitude,
-        userLongitude,
-    ) {
-        if (!isInForeground || !isActiveTile) return@LaunchedEffect
-        val cycleMs = 2200f
-        while (true) {
-            val phase = (System.currentTimeMillis() % cycleMs.toLong()) / cycleMs
-            val dotScale = DOT_PULSE_MIN +
-                (1f - DOT_PULSE_MIN) *
-                (0.5f - 0.5f * kotlin.math.cos(2.0 * Math.PI * phase).toFloat())
-            userMarkerPlacemark?.let { placemark ->
-                val relativeHeading = deviceHeading - qiblaDirection
-                val aligned = kotlin.math.abs(relativeHeading) <= 5f ||
-                    kotlin.math.abs(relativeHeading) >= 355f
-                val color = when {
-                    aligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
-                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
-                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
-                    sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
-                    else -> 0xFFFF4444.toInt()
+                    // Determine accuracy based on magnetic field strength
+                    sensorAccuracy = when {
+                        strength < 15f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        strength > 100f -> SensorManager.SENSOR_STATUS_ACCURACY_LOW
+                        strength < 25f -> SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+                        else -> SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+                    }
                 }
-                val bmp = createUserMarkerWithHeadingShadow(relativeHeading, color, dotScale)
-                placemark.attributes.imageSource = ImageSource.fromBitmap(bmp)
+
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            }
+
+            // Register sensors - SAME as Smart Prediction tile
+            orientationSensor?.let {
+                sensorManager.registerListener(orientationListener, it, SensorManager.SENSOR_DELAY_GAME)
+            }
+            magneticSensor?.let {
+                sensorManager.registerListener(magneticFieldListener, it, SensorManager.SENSOR_DELAY_GAME)
+            }
+
+            onDispose {
+                sensorManager.unregisterListener(orientationListener)
+                sensorManager.unregisterListener(magneticFieldListener)
+            }
+        }
+
+        // Breathing pulse for the user dot (Google Maps style), matching the Smart
+        // Prediction globe. Regenerates the marker bitmap at ~20fps with a varying dot
+        // radius while the tile is in the foreground; the cone and white ring stay
+        // constant and the fill stays the accuracy-driven color — only the dot scales.
+        LaunchedEffect(
+            isInForeground,
+            isActiveTile,
+            qiblaDirection,
+            userLatitude,
+            userLongitude,
+        ) {
+            if (!isInForeground || !isActiveTile) return@LaunchedEffect
+            val cycleMs = 2200f
+            while (true) {
+                val phase = (System.currentTimeMillis() % cycleMs.toLong()) / cycleMs
+                val dotScale = DOT_PULSE_MIN +
+                    (1f - DOT_PULSE_MIN) *
+                    (0.5f - 0.5f * kotlin.math.cos(2.0 * Math.PI * phase).toFloat())
+                userMarkerPlacemark?.let { placemark ->
+                    val relativeHeading = deviceHeading - qiblaDirection
+                    val aligned = kotlin.math.abs(relativeHeading) <= 5f ||
+                        kotlin.math.abs(relativeHeading) >= 355f
+                    val color = when {
+                        aligned && sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF00C853.toInt()
+                        sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> 0xFF10B981.toInt()
+                        sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> 0xFFFFA500.toInt()
+                        sensorAccuracy == SensorManager.SENSOR_STATUS_ACCURACY_LOW -> 0xFFFF6B6B.toInt()
+                        else -> 0xFFFF4444.toInt()
+                    }
+                    val bmp = createUserMarkerWithHeadingShadow(relativeHeading, color, dotScale)
+                    placemark.attributes.imageSource = ImageSource.fromBitmap(bmp)
+                    worldWindowRef?.requestRedraw()
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+
+        // When the user lands on the Kaaba tile, play a one-time ~4s day/night sweep — the
+        // terminator rolls a full 24h loop and lands back on the real current time — then keep
+        // the terminator tracking real time each minute. Re-runs whenever the tile re-activates.
+        LaunchedEffect(isActiveTile, isInForeground) {
+            if (!isActiveTile || !isInForeground) return@LaunchedEffect
+
+            fun atmosphere(): AtmosphereLayer? =
+                worldWindowRef?.engine?.layers?.firstOrNull { it is AtmosphereLayer } as? AtmosphereLayer
+            // Wait for the globe + its AtmosphereLayer to be created.
+            while (atmosphere() == null) kotlinx.coroutines.delay(50)
+
+            fun setTime(instant: kotlin.time.Instant) {
+                atmosphere()?.time = instant
                 worldWindowRef?.requestRedraw()
             }
-            kotlinx.coroutines.delay(50)
-        }
-    }
 
-    // When the user lands on the Kaaba tile, play a one-time ~4s day/night sweep — the
-    // terminator rolls a full 24h loop and lands back on the real current time — then keep
-    // the terminator tracking real time each minute. Re-runs whenever the tile re-activates.
-    LaunchedEffect(isActiveTile, isInForeground) {
-        if (!isActiveTile || !isInForeground) return@LaunchedEffect
-
-        fun atmosphere(): AtmosphereLayer? =
-            worldWindowRef?.engine?.layers?.firstOrNull { it is AtmosphereLayer } as? AtmosphereLayer
-        // Wait for the globe + its AtmosphereLayer to be created.
-        while (atmosphere() == null) kotlinx.coroutines.delay(50)
-
-        fun setTime(instant: kotlin.time.Instant) {
-            atmosphere()?.time = instant
-            worldWindowRef?.requestRedraw()
-        }
-
-        if (!hasPlayedDayNightSweep) {
-            // Play this once for the retained surface, not after every carousel swipe.
-            val baseMs = System.currentTimeMillis()
-            val dayMs = 24L * 60 * 60 * 1000
-            val durationMs = 4000L
-            val startMs = System.currentTimeMillis()
-            while (true) {
-                val t = ((System.currentTimeMillis() - startMs).toFloat() / durationMs)
-                    .coerceIn(0f, 1f)
-                val eased = 0.5f - 0.5f * kotlin.math.cos((t * Math.PI).toFloat())
-                setTime(kotlin.time.Instant.fromEpochMilliseconds(baseMs + (eased * dayMs).toLong()))
-                if (t >= 1f) break
-                kotlinx.coroutines.delay(16)
-            }
-            hasPlayedDayNightSweep = true
-        }
-
-        // Settle on real time, then keep it current while the tile stays active + foreground.
-        while (true) {
-            setTime(nowInstant())
-            kotlinx.coroutines.delay(60_000L)
-        }
-    }
-
-    // ONE live globe across deck shuffles: while the card is stacked behind
-    // others, the GL surface is HIDDEN (un-punching its hole so it can't bleed
-    // through the transformed deck cards) and the render thread paused; when
-    // the card lands on the front the surface is shown and nudged to redraw.
-    // The EGL context is preserved across the pause, so coming back is a fast
-    // redraw with warm textures — not the black-flashing cold recreate the
-    // old live/static composition swap caused.
-    // Keep the SurfaceView laid out at one stable position. Alpha does not destroy its
-    // Surface, so the last GL buffer is immediately available when the carousel returns.
-    // Translating a SurfaceView off-screen caused stale SurfaceControl copies to bleed
-    // into adjacent carousel items on some devices.
-    LaunchedEffect(isActiveTile, worldWindowRef) {
-        val ww = worldWindowRef ?: return@LaunchedEffect
-        ww.translationX = 0f
-        if (isActiveTile) {
-            ww.alpha = 1f
-            ww.requestRedraw()
-        } else {
-            ww.alpha = 0f
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()  // Fill both width and height from parent constraints
-            // Removed clip - can interfere with touch handling on AndroidView
-            // Space-black, not theme surface: this backs the GL hole, so it must
-            // match the globe scene — a light theme color here flashes white
-            // while a fresh surface waits for its first frame.
-            .background(
-                color = Color(0xFF070B10),
-                shape = RoundedCornerShape(16.dp)
-            )
-    ) {
-        // Create backdrop for liquid glass effect
-        val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        val backdrop = rememberLayerBackdrop {
-            drawRect(surfaceColor)
-            drawContent()
-        }
-
-        // WorldWind globe view with lifecycle management
-        // WorldWind builds marker positions, the Qibla path and camera framing in
-        // its factory. Key the retained Android view by coordinates so a location
-        // refresh replaces that complete coordinate-derived scene instead of only
-        // recomposing the Compose overlays around a stale globe.
-        key(userLatitude, userLongitude) {
-            AndroidView(
-                factory = { ctx ->
-                    val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
-                        context = ctx,
-                        userLat = userLatitude,
-                        userLon = userLongitude,
-                        makkahLat = makkahLatitude,
-                        makkahLon = makkahLongitude,
-                        viewWidth = tileWidthPx.toInt(),
-                        viewHeight = tileHeightPx.toInt(),
-                        onTouchStart = {
-                            isUserInteracting = true
-                            lastInteractionTime = System.currentTimeMillis()
-                        },
-                        onTouchEnd = {
-                            isUserInteracting = false
-                            lastInteractionTime = System.currentTimeMillis()
-                        }
-                    )
-
-                    // Store references for sensor updates
-                    worldWindowRef = worldWindow
-                    qiblaLayerRef = qiblaLayer
-                    userMarkerPlacemark = headingCone
-
-                    // Disable touch interactions on globe to allow HorizontalPager swiping
-                    // The globe is display-only, compass rotation is automatic
-                    worldWindow.isFocusable = false
-                    worldWindow.isFocusableInTouchMode = false
-                    worldWindow.isClickable = false
-                    worldWindow.setOnTouchListener { _, _ -> false }
-                    worldWindow.alpha = if (isActiveTile) 1f else 0f
-                    worldWindow.clipToOutline = true
-                    worldWindow.outlineProvider = object : android.view.ViewOutlineProvider() {
-                        override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
-                            outline.setRoundRect(0, 0, view.width, view.height, surfaceCornerRadiusPx)
-                        }
-                    }
-                    worldWindow.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-                        view.clipBounds = android.graphics.Rect(0, 0, view.width, view.height)
-                        view.invalidateOutline()
-                    }
-
-                    // Survive app pause/resume without re-uploading textures.
-                    worldWindow.preserveEGLContextOnPause = true
-
-                    // DEBUG: trace the GL surface lifecycle to find black-frame gaps.
-                    android.util.Log.d("GlobeSurface", "🏗️ WorldWindow CREATED @${android.os.SystemClock.uptimeMillis()}")
-                    worldWindow.holder.addCallback(object : android.view.SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: android.view.SurfaceHolder) {
-                            android.util.Log.d("GlobeSurface", "🟢 surfaceCreated @${android.os.SystemClock.uptimeMillis()}")
-                        }
-                        override fun surfaceChanged(holder: android.view.SurfaceHolder, format: Int, width: Int, height: Int) {
-                            android.util.Log.d("GlobeSurface", "🔄 surfaceChanged ${width}x$height @${android.os.SystemClock.uptimeMillis()}")
-                        }
-                        override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
-                            android.util.Log.d("GlobeSurface", "🔴 surfaceDestroyed @${android.os.SystemClock.uptimeMillis()}")
-                        }
-                    })
-                    // Add lifecycle observer to properly manage GLSurfaceView
-                    val observer = LifecycleEventObserver { _, event ->
-                        when (event) {
-                            Lifecycle.Event.ON_RESUME -> {
-                                isInForeground = true
-                                worldWindow.onResume()
-                            }
-                            Lifecycle.Event.ON_PAUSE -> {
-                                isInForeground = false
-                                worldWindow.onPause()
-                            }
-                            else -> {}
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    lifecycleObservers[worldWindow] = observer
-
-                    worldWindow
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { worldWindow ->
-                    worldWindow.alpha = if (isActiveTile) 1f else 0f
-                    worldWindow.clipBounds = android.graphics.Rect(
-                        0,
-                        0,
-                        worldWindow.width,
-                        worldWindow.height,
-                    )
-                    worldWindow.invalidateOutline()
-                },
-                onRelease = { worldWindow ->
-                    android.util.Log.d("GlobeSurface", "🗑️ WorldWindow RELEASED @${android.os.SystemClock.uptimeMillis()}")
-                    lifecycleObservers.remove(worldWindow)?.let { observer ->
-                        lifecycleOwner.lifecycle.removeObserver(observer)
-                    }
-                    worldWindow.onPause()
-                    if (worldWindowRef === worldWindow) {
-                        worldWindowRef = null
-                        qiblaLayerRef = null
-                        userMarkerPlacemark = null
-                    }
+            if (!hasPlayedDayNightSweep) {
+                // Play this once for the retained surface, not after every carousel swipe.
+                val baseMs = System.currentTimeMillis()
+                val dayMs = 24L * 60 * 60 * 1000
+                val durationMs = 4000L
+                val startMs = System.currentTimeMillis()
+                while (true) {
+                    val t = ((System.currentTimeMillis() - startMs).toFloat() / durationMs)
+                        .coerceIn(0f, 1f)
+                    val eased = 0.5f - 0.5f * kotlin.math.cos((t * Math.PI).toFloat())
+                    setTime(kotlin.time.Instant.fromEpochMilliseconds(baseMs + (eased * dayMs).toLong()))
+                    if (t >= 1f) break
+                    kotlinx.coroutines.delay(16)
                 }
-            )
+                hasPlayedDayNightSweep = true
+            }
+
+            // Settle on real time, then keep it current while the tile stays active + foreground.
+            while (true) {
+                setTime(nowInstant())
+                kotlinx.coroutines.delay(60_000L)
+            }
         }
 
-        // Only show overlay controls when showControls is true
-        if (showControls) {
-            // Combined header: alignment status + directional guidance
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { RoundedCornerShape(12.dp) },
-                        effects = {
-                            vibrancy()
-                            lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
+        // ONE live globe across deck shuffles: while the card is stacked behind
+        // others, the GL surface is HIDDEN (un-punching its hole so it can't bleed
+        // through the transformed deck cards) and the render thread paused; when
+        // the card lands on the front the surface is shown and nudged to redraw.
+        // The EGL context is preserved across the pause, so coming back is a fast
+        // redraw with warm textures — not the black-flashing cold recreate the
+        // old live/static composition swap caused.
+        // Keep the SurfaceView laid out at one stable position. Alpha does not destroy its
+        // Surface, so the last GL buffer is immediately available when the carousel returns.
+        // Translating a SurfaceView off-screen caused stale SurfaceControl copies to bleed
+        // into adjacent carousel items on some devices.
+        LaunchedEffect(isActiveTile, worldWindowRef) {
+            val ww = worldWindowRef ?: return@LaunchedEffect
+            ww.translationX = 0f
+            if (isActiveTile) {
+                ww.alpha = 1f
+                ww.requestRedraw()
+            } else {
+                ww.alpha = 0f
+            }
+        }
+
+        Box(
+            modifier = modifier
+                .fillMaxSize() // Fill both width and height from parent constraints
+                // Removed clip - can interfere with touch handling on AndroidView
+                // Space-black, not theme surface: this backs the GL hole, so it must
+                // match the globe scene — a light theme color here flashes white
+                // while a fresh surface waits for its first frame.
+                .background(
+                    color = Color(0xFF070B10),
+                    shape = RoundedCornerShape(16.dp),
+                ),
+        ) {
+            // Create backdrop for liquid glass effect
+            val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            val backdrop = rememberLayerBackdrop {
+                drawRect(surfaceColor)
+                drawContent()
+            }
+
+            // WorldWind globe view with lifecycle management
+            // WorldWind builds marker positions, the Qibla path and camera framing in
+            // its factory. Key the retained Android view by coordinates so a location
+            // refresh replaces that complete coordinate-derived scene instead of only
+            // recomposing the Compose overlays around a stale globe.
+            key(userLatitude, userLongitude) {
+                AndroidView(
+                    factory = { ctx ->
+                        val (worldWindow, qiblaLayer, headingCone) = createWorldWindow(
+                            context = ctx,
+                            userLat = userLatitude,
+                            userLon = userLongitude,
+                            makkahLat = makkahLatitude,
+                            makkahLon = makkahLongitude,
+                            viewWidth = tileWidthPx.toInt(),
+                            viewHeight = tileHeightPx.toInt(),
+                            onTouchStart = {
+                                isUserInteracting = true
+                                lastInteractionTime = System.currentTimeMillis()
+                            },
+                            onTouchEnd = {
+                                isUserInteracting = false
+                                lastInteractionTime = System.currentTimeMillis()
+                            },
+                        )
+
+                        // Store references for sensor updates
+                        worldWindowRef = worldWindow
+                        qiblaLayerRef = qiblaLayer
+                        userMarkerPlacemark = headingCone
+
+                        // Disable touch interactions on globe to allow HorizontalPager swiping
+                        // The globe is display-only, compass rotation is automatic
+                        worldWindow.isFocusable = false
+                        worldWindow.isFocusableInTouchMode = false
+                        worldWindow.isClickable = false
+                        worldWindow.setOnTouchListener { _, _ -> false }
+                        worldWindow.alpha = if (isActiveTile) 1f else 0f
+                        worldWindow.clipToOutline = true
+                        worldWindow.outlineProvider = object : android.view.ViewOutlineProvider() {
+                            override fun getOutline(view: android.view.View, outline: android.graphics.Outline) {
+                                outline.setRoundRect(0, 0, view.width, view.height, surfaceCornerRadiusPx)
+                            }
                         }
-                    )
-            ) {
-                if (isAlignedWithQibla) {
-                    // Aligned state - compact text
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "✓ QIBLA",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                        worldWindow.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                            view.clipBounds = android.graphics.Rect(0, 0, view.width, view.height)
+                            view.invalidateOutline()
+                        }
+
+                        // Survive app pause/resume without re-uploading textures.
+                        worldWindow.preserveEGLContextOnPause = true
+
+                        // DEBUG: trace the GL surface lifecycle to find black-frame gaps.
+                        android.util.Log.d("GlobeSurface", "🏗️ WorldWindow CREATED @${android.os.SystemClock.uptimeMillis()}")
+                        worldWindow.holder.addCallback(object : android.view.SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                                android.util.Log.d("GlobeSurface", "🟢 surfaceCreated @${android.os.SystemClock.uptimeMillis()}")
+                            }
+                            override fun surfaceChanged(holder: android.view.SurfaceHolder, format: Int, width: Int, height: Int) {
+                                android.util.Log.d("GlobeSurface", "🔄 surfaceChanged ${width}x$height @${android.os.SystemClock.uptimeMillis()}")
+                            }
+                            override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                                android.util.Log.d("GlobeSurface", "🔴 surfaceDestroyed @${android.os.SystemClock.uptimeMillis()}")
+                            }
+                        })
+                        // Add lifecycle observer to properly manage GLSurfaceView
+                        val observer = LifecycleEventObserver { _, event ->
+                            when (event) {
+                                Lifecycle.Event.ON_RESUME -> {
+                                    isInForeground = true
+                                    worldWindow.onResume()
+                                }
+                                Lifecycle.Event.ON_PAUSE -> {
+                                    isInForeground = false
+                                    worldWindow.onPause()
+                                }
+                                else -> {}
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        lifecycleObservers[worldWindow] = observer
+
+                        worldWindow
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { worldWindow ->
+                        worldWindow.alpha = if (isActiveTile) 1f else 0f
+                        worldWindow.clipBounds = android.graphics.Rect(
+                            0,
+                            0,
+                            worldWindow.width,
+                            worldWindow.height,
                         )
-                        Text(
-                            text = "Aligned",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 9.sp
-                        )
-                    }
-                } else {
-                    // Not aligned - show compact directional guidance
-                    // Use animatedHeading for smooth, stable angle display (like Smart Prediction)
-                    var diff = qiblaDirection - animatedHeading
+                        worldWindow.invalidateOutline()
+                    },
+                    onRelease = { worldWindow ->
+                        android.util.Log.d("GlobeSurface", "🗑️ WorldWindow RELEASED @${android.os.SystemClock.uptimeMillis()}")
+                        lifecycleObservers.remove(worldWindow)?.let { observer ->
+                            lifecycleOwner.lifecycle.removeObserver(observer)
+                        }
+                        worldWindow.onPause()
+                        if (worldWindowRef === worldWindow) {
+                            worldWindowRef = null
+                            qiblaLayerRef = null
+                            userMarkerPlacemark = null
+                        }
+                    },
+                )
+            }
 
-                    // Normalize to [-180, 180] for shortest path
-                    if (diff > 180f) diff -= 360f
-                    if (diff < -180f) diff += 360f
+            // Only show overlay controls when showControls is true
+            if (showControls) {
+                // Combined header: alignment status + directional guidance
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { RoundedCornerShape(12.dp) },
+                            effects = {
+                                vibrancy()
+                                lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
+                            },
+                        ),
+                ) {
+                    if (isAlignedWithQibla) {
+                        // Aligned state - compact text
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = "✓ QIBLA",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White,
+                            )
+                            Text(
+                                text = "Aligned",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 9.sp,
+                            )
+                        }
+                    } else {
+                        // Not aligned - show compact directional guidance
+                        // Use animatedHeading for smooth, stable angle display (like Smart Prediction)
+                        var diff = qiblaDirection - animatedHeading
 
-                    val rawTurnRight = diff > 0
-                    val angleDiff = kotlin.math.abs(diff)
+                        // Normalize to [-180, 180] for shortest path
+                        if (diff > 180f) diff -= 360f
+                        if (diff < -180f) diff += 360f
 
-                    // Debounce direction changes to prevent flickering near 180°
-                    val currentTime = System.currentTimeMillis()
-                    val turnRight = if (stableDirection == null) {
-                        // First time - set immediately
-                        stableDirection = rawTurnRight
-                        lastDirectionChangeTime = currentTime
-                        rawTurnRight
-                    } else if (stableDirection != rawTurnRight) {
-                        // Direction wants to change - only allow if:
-                        // 1. It's been at least 800ms since last change, OR
-                        // 2. The angle is very clear (far from 180°)
-                        val timeSinceLastChange = currentTime - lastDirectionChangeTime
-                        val isVeryClearDirection = angleDiff < 30f || angleDiff > 330f
+                        val rawTurnRight = diff > 0
+                        val angleDiff = kotlin.math.abs(diff)
 
-                        if (timeSinceLastChange > 800 || isVeryClearDirection) {
+                        // Debounce direction changes to prevent flickering near 180°
+                        val currentTime = System.currentTimeMillis()
+                        val turnRight = if (stableDirection == null) {
+                            // First time - set immediately
                             stableDirection = rawTurnRight
                             lastDirectionChangeTime = currentTime
                             rawTurnRight
+                        } else if (stableDirection != rawTurnRight) {
+                            // Direction wants to change - only allow if:
+                            // 1. It's been at least 800ms since last change, OR
+                            // 2. The angle is very clear (far from 180°)
+                            val timeSinceLastChange = currentTime - lastDirectionChangeTime
+                            val isVeryClearDirection = angleDiff < 30f || angleDiff > 330f
+
+                            if (timeSinceLastChange > 800 || isVeryClearDirection) {
+                                stableDirection = rawTurnRight
+                                lastDirectionChangeTime = currentTime
+                                rawTurnRight
+                            } else {
+                                // Keep old direction (debounce)
+                                stableDirection!!
+                            }
                         } else {
-                            // Keep old direction (debounce)
-                            stableDirection!!
-                        }
-                    } else {
-                        rawTurnRight
-                    }
-
-                    val turnLeft = !turnRight
-
-                    // Round angle to nearest 5 degrees for stable display
-                    val displayAngle = ((angleDiff / 5f).toInt() * 5)
-
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        // Left arrow with horizontal slide animation
-                        AnimatedContent(
-                            targetState = turnLeft,
-                            transitionSpec = {
-                                // Slide horizontally - natural direction for arrows
-                                (slideInHorizontally { width -> -width } + fadeIn(
-                                    animationSpec = tween(200)
-                                )) togetherWith (slideOutHorizontally { width -> width } + fadeOut(
-                                    animationSpec = tween(200)
-                                ))
-                            },
-                            label = "leftArrow"
-                        ) { isLeft ->
-                            Icon(
-                                imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                                contentDescription = if (isLeft) "Turn left" else "Turn right",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            rawTurnRight
                         }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        val turnLeft = !turnRight
+
+                        // Round angle to nearest 5 degrees for stable display
+                        val displayAngle = ((angleDiff / 5f).toInt() * 5)
+
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
                         ) {
-                            // Direction text with horizontal slide (matches arrow direction)
+                            // Left arrow with horizontal slide animation
                             AnimatedContent(
                                 targetState = turnLeft,
                                 transitionSpec = {
-                                    // Slide in direction of turn
-                                    val slideDirection = if (targetState) -1 else 1
-                                    (slideInHorizontally { width -> slideDirection * width } + fadeIn(
-                                        animationSpec = tween(250)
-                                    )) togetherWith (slideOutHorizontally { width -> -slideDirection * width } + fadeOut(
-                                        animationSpec = tween(250)
-                                    ))
+                                    // Slide horizontally - natural direction for arrows
+                                    (
+                                        slideInHorizontally { width -> -width } + fadeIn(
+                                            animationSpec = tween(200),
+                                        )
+                                        ) togetherWith (
+                                        slideOutHorizontally { width -> width } + fadeOut(
+                                            animationSpec = tween(200),
+                                        )
+                                        )
                                 },
-                                label = "directionText"
+                                label = "leftArrow",
                             ) { isLeft ->
-                                Text(
-                                    text = if (isLeft) "LEFT" else "RIGHT",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 7.sp
+                                Icon(
+                                    imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                                    contentDescription = if (isLeft) "Turn left" else "Turn right",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp),
                                 )
                             }
 
-                            // Airport-style scrolling angle display (compact)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                // Animate each digit separately for airport board effect
-                                val angleStr = displayAngle.toString().padStart(3, ' ')
-                                angleStr.forEach { char ->
-                                    if (char == ' ') {
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                    } else {
-                                        AnimatedContent(
-                                            targetState = char,
-                                            transitionSpec = {
-                                                // Scroll up when increasing, down when decreasing
-                                                val direction = if (targetState > initialState) -1 else 1
-                                                slideInVertically(
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    )
-                                                ) { height -> direction * height } + fadeIn() togetherWith
-                                                slideOutVertically(
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    )
-                                                ) { height -> -direction * height } + fadeOut()
-                                            },
-                                            label = "digitScroll"
-                                        ) { digit ->
-                                            Text(
-                                                text = digit.toString(),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                fontSize = 13.sp
+                                // Direction text with horizontal slide (matches arrow direction)
+                                AnimatedContent(
+                                    targetState = turnLeft,
+                                    transitionSpec = {
+                                        // Slide in direction of turn
+                                        val slideDirection = if (targetState) -1 else 1
+                                        (
+                                            slideInHorizontally { width -> slideDirection * width } + fadeIn(
+                                                animationSpec = tween(250),
                                             )
+                                            ) togetherWith (
+                                            slideOutHorizontally { width -> -slideDirection * width } + fadeOut(
+                                                animationSpec = tween(250),
+                                            )
+                                            )
+                                    },
+                                    label = "directionText",
+                                ) { isLeft ->
+                                    Text(
+                                        text = if (isLeft) "LEFT" else "RIGHT",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 7.sp,
+                                    )
+                                }
+
+                                // Airport-style scrolling angle display (compact)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    // Animate each digit separately for airport board effect
+                                    val angleStr = displayAngle.toString().padStart(3, ' ')
+                                    angleStr.forEach { char ->
+                                        if (char == ' ') {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                        } else {
+                                            AnimatedContent(
+                                                targetState = char,
+                                                transitionSpec = {
+                                                    // Scroll up when increasing, down when decreasing
+                                                    val direction = if (targetState > initialState) -1 else 1
+                                                    slideInVertically(
+                                                        animationSpec = spring(
+                                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                            stiffness = Spring.StiffnessMedium,
+                                                        ),
+                                                    ) { height -> direction * height } + fadeIn() togetherWith
+                                                        slideOutVertically(
+                                                            animationSpec = spring(
+                                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                                stiffness = Spring.StiffnessMedium,
+                                                            ),
+                                                        ) { height -> -direction * height } + fadeOut()
+                                                },
+                                                label = "digitScroll",
+                                            ) { digit ->
+                                                Text(
+                                                    text = digit.toString(),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                )
+                                            }
                                         }
                                     }
+                                    Text(
+                                        text = "°",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                    )
                                 }
-                                Text(
-                                    text = "°",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 13.sp
+                            }
+
+                            // Second arrow with matching animation
+                            AnimatedContent(
+                                targetState = turnLeft,
+                                transitionSpec = {
+                                    // Slide horizontally - opposite direction from first arrow
+                                    (
+                                        slideInHorizontally { width -> width } + fadeIn(
+                                            animationSpec = tween(200),
+                                        )
+                                        ) togetherWith (
+                                        slideOutHorizontally { width -> -width } + fadeOut(
+                                            animationSpec = tween(200),
+                                        )
+                                        )
+                                },
+                                label = "rightArrow",
+                            ) { isLeft ->
+                                Icon(
+                                    imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                                    contentDescription = if (isLeft) "Turn left" else "Turn right",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp),
                                 )
                             }
-                        }
-
-                        // Second arrow with matching animation
-                        AnimatedContent(
-                            targetState = turnLeft,
-                            transitionSpec = {
-                                // Slide horizontally - opposite direction from first arrow
-                                (slideInHorizontally { width -> width } + fadeIn(
-                                    animationSpec = tween(200)
-                                )) togetherWith (slideOutHorizontally { width -> -width } + fadeOut(
-                                    animationSpec = tween(200)
-                                ))
-                            },
-                            label = "rightArrow"
-                        ) { isLeft ->
-                            Icon(
-                                imageVector = if (isLeft) Icons.AutoMirrored.Outlined.ArrowBackIos else Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                                contentDescription = if (isLeft) "Turn left" else "Turn right",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
                         }
                     }
                 }
-            }
 
-            // Distance info overlay
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { RoundedCornerShape(12.dp) },
-                        effects = {
-                            vibrancy()
-                            lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
-                        }
-                    )
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
+                // Distance info overlay
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { RoundedCornerShape(12.dp) },
+                            effects = {
+                                vibrancy()
+                                lens(with(density) { 16.dp.toPx() }, with(density) { 32.dp.toPx() })
+                            },
+                        ),
                 ) {
-                    Text(
-                        text = "🕋 Kaaba",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Makkah, Saudi Arabia",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 11.sp
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                    ) {
+                        Text(
+                            text = "🕋 Kaaba",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Makkah, Saudi Arabia",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+
+                // Locate Me button - resets view to show user and Kaaba (with liquid glass effect)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .size(44.dp)
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { CircleShape },
+                            effects = {
+                                vibrancy()
+                                lens(with(density) { 8.dp.toPx() }, with(density) { 16.dp.toPx() })
+                            },
+                        )
+                        .clickable {
+                            // Reset camera to show both user and Kaaba
+                            worldWindowRef?.let { ww ->
+                                resetCameraToShowBoth(
+                                    ww,
+                                    userLatitude,
+                                    userLongitude,
+                                    makkahLatitude,
+                                    makkahLongitude,
+                                )
+                            }
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "Show my location and Kaaba",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
-
-            // Locate Me button - resets view to show user and Kaaba (with liquid glass effect)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .size(44.dp)
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { CircleShape },
-                        effects = {
-                            vibrancy()
-                            lens(with(density) { 8.dp.toPx() }, with(density) { 16.dp.toPx() })
-                        }
-                    )
-                    .clickable {
-                        // Reset camera to show both user and Kaaba
-                        worldWindowRef?.let { ww ->
-                            resetCameraToShowBoth(
-                                ww,
-                                userLatitude,
-                                userLongitude,
-                                makkahLatitude,
-                                makkahLongitude
-                            )
-                        }
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MyLocation,
-                    contentDescription = "Show my location and Kaaba",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
         }
-    }
-    }  // End BoxWithConstraints
+    } // End BoxWithConstraints
 }
 
 /**
@@ -795,16 +803,16 @@ private fun createWorldWindow(
     viewWidth: Int,
     viewHeight: Int,
     onTouchStart: () -> Unit,
-    onTouchEnd: () -> Unit
+    onTouchEnd: () -> Unit,
 ): Triple<WorldWindow, RenderableLayer, Placemark> {
     val worldWindow = WorldWindow(context)
 
     // Explicitly set layout parameters to ensure proper viewport sizing
     worldWindow.layoutParams = android.view.ViewGroup.LayoutParams(
         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
     )
-    android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x${viewHeight}")
+    android.util.Log.d("QiblaGlobeView", "🌍 WorldWindow created with explicit size: ${viewWidth}x$viewHeight")
 
     // Uses the WorldWindow's default controller; touch is disabled via setOnTouchListener
     // so HorizontalPager swiping works. Layers/camera live on worldWindow.engine in WWK.
@@ -827,19 +835,20 @@ private fun createWorldWindow(
     worldWindow.engine.layers.addLayer(qiblaLayer)
 
     // Create Position objects with elevation for better visibility
-    val userPos = Position.fromDegrees(userLat, userLon, 200000.0)  // 200km elevation
-    val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 200000.0)  // 200km elevation
+    val userPos = Position.fromDegrees(userLat, userLon, 200000.0) // 200km elevation
+    val kaabaPos = Position.fromDegrees(makkahLat, makkahLon, 200000.0) // 200km elevation
 
     // Calculate Qibla direction from user to Kaaba
     val qiblaAzimuth = userPos.greatCircleAzimuth(kaabaPos)
 
     // Create Google Maps style user marker with heading shadow
-    val userMarkerBitmap = createUserMarkerWithHeadingShadow(0f)  // Initial heading 0
+    val userMarkerBitmap = createUserMarkerWithHeadingShadow(0f) // Initial heading 0
     val kaabaBitmap = emojiToBitmap("🕋", sizeDp = 48)
 
     // 1. Add User Location Placemark with heading shadow marker
     val userPlacemark = Placemark.createWithImage(
-        userPos, ImageSource.fromBitmap(userMarkerBitmap),
+        userPos,
+        ImageSource.fromBitmap(userMarkerBitmap),
     ).apply {
         attributes.imageScale = 1.0
         altitudeMode = AltitudeMode.ABSOLUTE
@@ -849,13 +858,14 @@ private fun createWorldWindow(
     // 2. User location marker with heading shadow is handled by the placemark itself
     // No separate heading indicator - we'll rotate the user marker bitmap instead
     // Not used - heading shown via rotated marker
-    val headingCone: Polygon? = null  
+    val headingCone: Polygon? = null
 
     // 3. Add Kaaba Placemark with emoji icon
     val kaabaPlacemark = Placemark.createWithImage(
-        kaabaPos, ImageSource.fromBitmap(kaabaBitmap),
+        kaabaPos,
+        ImageSource.fromBitmap(kaabaBitmap),
     ).apply {
-        attributes.imageScale = 0.4  // Original size
+        attributes.imageScale = 0.4 // Original size
         altitudeMode = AltitudeMode.ABSOLUTE
     }
     qiblaLayer.addRenderable(kaabaPlacemark)
@@ -877,7 +887,7 @@ private fun createWorldWindow(
     // "up" points at the Kaaba: it ends up at the top of the globe and the user at the bottom.
     val heading = Position.fromDegrees(midLat, midLon, 0.0).greatCircleAzimuth(kaabaPos)
 
-    android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters/1000).toInt()}km, midpoint=($midLat, $midLon)")
+    android.util.Log.d("QiblaGlobeView", "📷 Camera setup: distance=${(distanceMeters / 1000).toInt()}km, midpoint=($midLat, $midLon)")
 
     // Pull back far enough for the complete sphere to fit the narrowest viewport
     // dimension. The old fixed 2.05R minimum worked for the wide home tile but
@@ -898,16 +908,18 @@ private fun createWorldWindow(
 
     val lookAt = LookAt().apply {
         set(
-            midLat.degrees, midLon.degrees, 0.0,  // Center on midpoint between user and Kaaba
+            midLat.degrees,
+            midLon.degrees,
+            0.0, // Center on midpoint between user and Kaaba
             AltitudeMode.ABSOLUTE,
-            finalRange,           // Closer range - globe fills tile
-            heading,              // Orient view along Qibla direction (Angle)
-            tilt.degrees,         // 3D perspective
-            0.0.degrees,          // No roll
+            finalRange, // Closer range - globe fills tile
+            heading, // Orient view along Qibla direction (Angle)
+            tilt.degrees, // 3D perspective
+            0.0.degrees, // No roll
         )
     }
 
-    android.util.Log.d("QiblaGlobeView", "🎯 Camera: midpoint=($midLat, $midLon), range=${(finalRange/1000).toInt()}km, heading=$heading")
+    android.util.Log.d("QiblaGlobeView", "🎯 Camera: midpoint=($midLat, $midLon), range=${(finalRange / 1000).toInt()}km, heading=$heading")
 
     worldWindow.engine.cameraFromLookAt(lookAt)
 
@@ -923,7 +935,7 @@ private fun resetCameraToShowBoth(
     userLat: Double,
     userLon: Double,
     makkahLat: Double,
-    makkahLon: Double
+    makkahLon: Double,
 ) {
     val globe = worldWindow.engine.globe
     val userPos = Position.fromDegrees(userLat, userLon, 0.0)
@@ -954,12 +966,14 @@ private fun resetCameraToShowBoth(
 
     val lookAt = LookAt().apply {
         set(
-            midLat.degrees, midLon.degrees, 0.0,
+            midLat.degrees,
+            midLon.degrees,
+            0.0,
             AltitudeMode.ABSOLUTE,
             finalRange,
             heading,
             (if (worldWindow.height > worldWindow.width) 0.0 else 12.0).degrees,
-            0.0.degrees,   // roll
+            0.0.degrees, // roll
         )
     }
 
@@ -1000,7 +1014,7 @@ private fun updateGlobeViewForOptimalMarkerVisibility(
     userLat: Double,
     userLon: Double,
     makkahLat: Double,
-    makkahLon: Double
+    makkahLon: Double,
 ) {
     // Get current camera as a LookAt
     val lookAt = worldWindow.engine.cameraAsLookAt(LookAt())
@@ -1027,8 +1041,10 @@ private fun nowInstant(): kotlin.time.Instant =
 // including far-apart points and across the antimeridian — unlike a lat/lon average,
 // so the camera centers on the true mid-arc and both markers stay framed worldwide.
 private fun greatCircleMidpoint(lat1: Double, lon1: Double, lat2: Double, lon2: Double): DoubleArray {
-    val p1 = Math.toRadians(lat1); val l1 = Math.toRadians(lon1)
-    val p2 = Math.toRadians(lat2); val dl = Math.toRadians(lon2 - lon1)
+    val p1 = Math.toRadians(lat1)
+    val l1 = Math.toRadians(lon1)
+    val p2 = Math.toRadians(lat2)
+    val dl = Math.toRadians(lon2 - lon1)
     val bx = Math.cos(p2) * Math.cos(dl)
     val by = Math.cos(p2) * Math.sin(dl)
     val midLat = Math.atan2(
@@ -1087,20 +1103,24 @@ private fun createUserMarkerWithHeadingShadow(
     val coneStart = heading - 90f - coneSweep / 2f
 
     val coneOval = android.graphics.RectF(
-        centerX - coneRadius, centerY - coneRadius,
-        centerX + coneRadius, centerY + coneRadius
+        centerX - coneRadius,
+        centerY - coneRadius,
+        centerX + coneRadius,
+        centerY + coneRadius,
     )
 
     val coneShader = android.graphics.RadialGradient(
-        centerX, centerY, coneRadius,
+        centerX,
+        centerY,
+        coneRadius,
         intArrayOf(
-            android.graphics.Color.argb(0xFF, ccR, ccG, ccB),  // 100% at dot
-            android.graphics.Color.argb(0xCC, ccR, ccG, ccB),  // ~80% near dot
-            android.graphics.Color.argb(0x66, ccR, ccG, ccB),  // ~40% mid
-            android.graphics.Color.argb(0x00, ccR, ccG, ccB)   // transparent at edge
+            android.graphics.Color.argb(0xFF, ccR, ccG, ccB), // 100% at dot
+            android.graphics.Color.argb(0xCC, ccR, ccG, ccB), // ~80% near dot
+            android.graphics.Color.argb(0x66, ccR, ccG, ccB), // ~40% mid
+            android.graphics.Color.argb(0x00, ccR, ccG, ccB), // transparent at edge
         ),
         floatArrayOf(0f, 0.2f, 0.55f, 1f),
-        android.graphics.Shader.TileMode.CLAMP
+        android.graphics.Shader.TileMode.CLAMP,
     )
 
     paint.style = android.graphics.Paint.Style.FILL
@@ -1158,7 +1178,7 @@ private fun updateHeadingIndicator(polygon: Polygon, userLat: Double, userLon: D
     // polygon.getOuterBoundary().clear()  // Method doesn't exist in API
     // polygon.getOuterBoundary().add(userPos)
     // ... etc
-    */
+     */
 }
 
 /**
@@ -1171,8 +1191,8 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
     val dLon = Math.toRadians(lon2 - lon1)
 
     val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-            kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-            kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+        kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+        kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
 
     val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
 
@@ -1194,7 +1214,7 @@ private fun drawableToBitmap(context: AndroidContext, drawableId: Int): Bitmap {
     val bitmap = Bitmap.createBitmap(
         drawable.intrinsicWidth,
         drawable.intrinsicHeight,
-        Bitmap.Config.ARGB_8888
+        Bitmap.Config.ARGB_8888,
     )
 
     val canvas = Canvas(bitmap)

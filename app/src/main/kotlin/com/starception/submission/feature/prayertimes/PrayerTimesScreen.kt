@@ -1,268 +1,185 @@
-/**
- * Prayer Times Screen - Main UI for Islamic Prayer Times Application
- * 
- * This file contains the complete prayer times interface implementation with:
- * - Real-time prayer time calculations
- * - Location-based services
- * - Qibla direction compass
- * - Interactive prayer tiles
- * - Permission management
- * - Material 3 design system
- * 
- * ## Architecture:
- * - **MVVM Pattern**: Uses ViewModels for state management
- * - **Compose UI**: Modern declarative UI with Material 3
- * - **Dependency Injection**: Hilt for dependency management
- * - **Permissions**: Location permissions with graceful degradation
- * - **Services**: Background location and prayer calculation services
- * 
- * ## Key Components:
- * - `PrayerTimesScreen`: Main screen composable with permission handling
- * - `SwipeableBigTiles`: Interactive prayer time cards with smooth animations
- * - `CompassProgressIndicator`: Enhanced Qibla direction compass
- * - Location services integration for accurate prayer time calculation
- * 
- * @author Prayer Times Development Team
- * @version 2.0 - Enhanced with Material 3 and improved UX
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package com.starception.submission.feature.prayertimes
 
-import kotlinx.datetime.LocalDate as KotlinLocalDate
+package com.starception.submission.feature.prayertimes
 
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
+import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.drawBehind
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import kotlin.math.sin
-import kotlin.math.PI
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.HistoryEdu
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.VolunteerActivism
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudQueue
-import androidx.compose.material.icons.filled.FlashOn
-import androidx.compose.material.icons.filled.Grain
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.painterResource
-import com.starception.submission.R
-import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.imageResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.style.LineHeightStyle
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.animation.core.*
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.IntSize
-import android.util.Log
-import androidx.compose.ui.zIndex
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import com.starception.submission.feature.prayertimes.components.ElasticTopShape
-import com.starception.submission.feature.prayertimes.wobble.AlertPhase
-import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
-import com.starception.submission.feature.prayertimes.wobble.calculatePrayerAlertState
-import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
-import com.starception.submission.feature.prayertimes.utils.convertToArabicNumerals
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-
-
-
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus.Denied
 import com.google.accompanist.permissions.rememberPermissionState
-import com.starception.submission.feature.prayertimes.utils.getCurrentDate
-import com.starception.submission.feature.prayertimes.utils.formatTime
-import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.starception.submission.feature.quran.QuranPlayerViewModel
-import com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint
-import com.starception.submission.feature.prayertimes.animations.RefreshIndicator
-import com.starception.submission.feature.prayertimes.animations.FlowingArrowsAnimation
-import com.starception.submission.feature.prayertimes.SwipeableBigTiles
-import com.starception.submission.feature.prayertimes.SmartContentUtils
-import com.starception.submission.feature.prayertimes.PrayerTimeHelpers
-import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
-import dagger.hilt.android.EntryPointAccessors
-import com.starception.submission.prayer.service.CountryCodeMapper
-import com.starception.submission.islamic.qibla.presentation.component.QiblaGlobeView
-import kotlinx.coroutines.Dispatchers
-import com.starception.submission.core.designsystem.theme.QuranFonts
-import kotlinx.coroutines.launch
-import android.content.SharedPreferences
-import androidx.core.content.ContextCompat
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.Duration
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
-import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.starception.submission.R
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDefaults
 import com.starception.submission.core.designsystem.component.NiaBottomSheetDragHandle
 import com.starception.submission.core.designsystem.component.NiaBottomSheetFrame
 import com.starception.submission.core.designsystem.component.NiaBottomSheetTheme
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
+import com.starception.submission.core.designsystem.theme.LocalDarkTheme
+import com.starception.submission.core.designsystem.theme.QuranFonts
+import com.starception.submission.core.designsystem.theme.mainPageBackgroundBrush
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
+import com.starception.submission.feature.prayertimes.components.CompassPopupScreen
+import com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint
+import com.starception.submission.feature.prayertimes.data.PrayerTimesCalculator
+import com.starception.submission.feature.prayertimes.utils.getCurrentDate
+import com.starception.submission.feature.prayertimes.weather.AnimatedCurrentWeatherIcon
+import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.CurrentWeather
 import com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository
 import com.starception.submission.feature.prayertimes.weather.MeteoconStyle
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherIntelligence
+import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholds
-import com.starception.submission.feature.prayertimes.weather.AnimatedPrayerWeatherIcon
-import com.starception.submission.feature.prayertimes.weather.AnimatedCurrentWeatherIcon
 import com.starception.submission.feature.prayertimes.weather.PrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.WeatherThresholdLevel
-import com.starception.submission.feature.prayertimes.weather.temperatureThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
 import com.starception.submission.feature.prayertimes.weather.humidityThresholdLevel
-import com.starception.submission.feature.prayertimes.weather.rainThresholdLevel
-import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherThresholdLevel
 import com.starception.submission.feature.prayertimes.weather.prayerWeatherWarningDelayMillis
-import com.starception.submission.feature.prayertimes.weather.PrayerWeatherIntelligence
+import com.starception.submission.feature.prayertimes.weather.primaryPrayerWeatherVisual
+import com.starception.submission.feature.prayertimes.weather.rainThresholdLevel
+import com.starception.submission.feature.prayertimes.weather.temperatureThresholdLevel
 import com.starception.submission.feature.prayertimes.weather.weatherThresholdPreviewLevel
-import com.starception.submission.feature.prayertimes.weather.PrayerWeatherThresholdStore
-import com.starception.submission.feature.prayertimes.weather.getUpcomingPrayerForecastTarget
-import androidx.compose.ui.graphics.lerp
+import com.starception.submission.feature.prayertimes.wobble.PrayerAlertState
+import com.starception.submission.feature.prayertimes.wobble.PullToSyncContainer
+import com.starception.submission.feature.quran.QuranPlayerViewModel
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 private val PrayerReferenceInk = Color(0xFF0A0808)
 private val PrayerReferenceCard = Color(0xFFFFFDF7)
@@ -422,32 +339,32 @@ private fun rememberCurrentWeatherLoadState(
 
 /**
  * PRAYER TIMES SCREEN: Main UI for displaying Islamic prayer times with Material 3 design
- * 
+ *
  * This is the primary user interface for the prayer times feature, providing:
- * 
+ *
  * VISUAL DESIGN:
  * - Material 3 expressive design with asymmetrical shapes
  * - Real-time prayer status updates (Current/Next/Upcoming)
  * - Layered background with gradient effects
  * - Responsive layout for different screen sizes
- * 
+ *
  * FUNCTIONALITY:
  * - Live prayer time calculations with 3-second location timeout
  * - Smart permission handling (location and notifications)
  * - Real-time clock updates every minute
  * - Automatic refresh when permissions change
  * - Fallback to cached data or Dubai default
- * 
+ *
  * STATE MANAGEMENT:
  * - Uses Compose state for reactive UI updates
  * - Background calculation to prevent UI blocking
  * - Error handling with graceful fallbacks
- * 
+ *
  * PERMISSIONS:
  * - Requests location permission for accurate prayer times
  * - Requests notification permission for prayer alerts (Android 13+)
  * - Continues working without permissions using defaults
- * 
+ *
  * EDIT THIS TO:
  * - Change UI design and colors
  * - Modify permission request strategy
@@ -456,38 +373,38 @@ private fun rememberCurrentWeatherLoadState(
  */
 /**
  * Main prayer times screen with comprehensive Islamic prayer time display
- * 
+ *
  * This composable creates a full-screen prayer times interface with pull-to-refresh,
  * real-time updates, location services, and permission management.
- * 
+ *
  * @param modifier Optional Modifier for customization
- * 
+ *
  * SCREEN COMPONENTS:
  * - Header: Shows current location and date
  * - Prayer Cards: Individual prayer times with status indicators
  * - Real-time Clock: Updates every minute to show current prayer status
  * - Pull-to-Refresh: Manual location/calculation refresh
  * - Permission Handlers: Location and notification permission requests
- * 
+ *
  * STATE MANAGEMENT:
  * - prayerTimes: Calculated Islamic prayer times for current location/date
  * - isLoading: Controls loading indicator visibility
  * - location: Human-readable location string for display
  * - currentTime: Live clock updated every minute
  * - Pull-to-refresh states: isRefreshing, pullOffset, isDragging
- * 
+ *
  * CALCULATION FLOW:
  * 1. Request location permission if needed
  * 2. Get GPS coordinates or use cached location
  * 3. Calculate prayer times using astronomical algorithms
  * 4. Display results with real-time status updates
  * 5. Handle errors gracefully with fallback to defaults
- * 
+ *
  * REFRESH BEHAVIOR:
  * - Automatic: Runs calculation on screen load and permission changes
  * - Manual: Pull-to-refresh gesture clears cache and recalculates
  * - Timeout: 3-second limit prevents infinite loading states
- * 
+ *
  * DEBUG MONITORING:
  * - Watch LaunchedEffect blocks for initialization and refresh logic
  * - Monitor permission state changes and their effects
@@ -572,7 +489,7 @@ fun PrayerTimesScreen(
             }
         }
     }
-    
+
     // COMPREHENSIVE UI LOGGING SYSTEM
     LaunchedEffect(Unit) {
         android.util.Log.i("PrayerTimesScreen", "")
@@ -583,7 +500,7 @@ fun PrayerTimesScreen(
         android.util.Log.i("PrayerTimesScreen", "📱 Context: ${screenContext.javaClass.simpleName}")
         android.util.Log.i("PrayerTimesScreen", "")
     }
-    
+
     // SHARED STATE - Only one tile can be in edit mode at a time
     var currentEditingTile by remember { mutableStateOf<String?>(null) }
 
@@ -633,10 +550,10 @@ fun PrayerTimesScreen(
         android.util.Log.i("PrayerTimesScreen", "  📝 Currently editing: ${currentEditingTile ?: "None"}")
         android.util.Log.i("PrayerTimesScreen", "  🔒 Other tiles locked: ${currentEditingTile != null}")
     }
-    
+
     // TODO: Load actual prayer settings - for now use defaults to test functionality
     val prayerSettings = null
-    
+
     // UI STATE MANAGEMENT - These control what the user sees
     // Try to load cached data immediately, with Dubai fallback for instant startup
     // Priority: 1. In-memory cache, 2. SharedPreferences cache, 3. Dubai fallback
@@ -644,7 +561,7 @@ fun PrayerTimesScreen(
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 screenContext.applicationContext,
-                PrayerTimeCalculatorEntryPoint::class.java
+                PrayerTimeCalculatorEntryPoint::class.java,
             )
 
             // PRIORITY 1: Check in-memory cache (fastest)
@@ -675,7 +592,7 @@ fun PrayerTimesScreen(
                 longitude = 55.2708,
                 timeZoneOffset = 4.0,
                 city = "Dubai",
-                country = "UAE"
+                country = "UAE",
             )
             val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
                 date = LocalDateTime.now(),
@@ -685,7 +602,7 @@ fun PrayerTimesScreen(
                 asr = LocalTime.of(15, 45),
                 maghrib = LocalTime.of(18, 30),
                 isha = LocalTime.of(19, 45),
-                location = dubaiLocation
+                location = dubaiLocation,
             )
             Triple(defaultTimes, "Dubai (Default)", false)
         } catch (e: Exception) {
@@ -696,7 +613,7 @@ fun PrayerTimesScreen(
                 longitude = 55.2708,
                 timeZoneOffset = 4.0,
                 city = "Dubai",
-                country = "UAE"
+                country = "UAE",
             )
             val defaultTimes = com.starception.submission.prayer.model.DayPrayerTimes(
                 date = LocalDateTime.now(),
@@ -706,16 +623,16 @@ fun PrayerTimesScreen(
                 asr = LocalTime.of(15, 45),
                 maghrib = LocalTime.of(18, 30),
                 isha = LocalTime.of(19, 45),
-                location = dubaiLocation
+                location = dubaiLocation,
             )
             Triple(defaultTimes, "Dubai (Default)", false)
         }
     }
-    
-    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(initialPrayerTimes) }  // Calculated prayer times
-    var isLoading by remember { mutableStateOf(initialLoading) }     // Start with no loading if we have cached data
-    var location by remember { mutableStateOf(initialLocation) }  // Location display text
-    
+
+    var prayerTimes by remember { mutableStateOf<com.starception.submission.prayer.model.DayPrayerTimes?>(initialPrayerTimes) } // Calculated prayer times
+    var isLoading by remember { mutableStateOf(initialLoading) } // Start with no loading if we have cached data
+    var location by remember { mutableStateOf(initialLocation) } // Location display text
+
     // COMPREHENSIVE DATA STATE LOGGING
     LaunchedEffect(prayerTimes) {
         android.util.Log.i("PrayerTimesScreen", "🕌 PRAYER TIMES DATA STATE CHANGED")
@@ -733,15 +650,15 @@ fun PrayerTimesScreen(
             android.util.Log.w("PrayerTimesScreen", "  ❌ No prayer times available")
         }
     }
-    
+
     LaunchedEffect(isLoading) {
         android.util.Log.i("PrayerTimesScreen", "⏳ LOADING STATE CHANGED: ${if (isLoading) "LOADING" else "IDLE"}")
     }
-    
+
     LaunchedEffect(location) {
         android.util.Log.i("PrayerTimesScreen", "📍 LOCATION DISPLAY CHANGED: $location")
     }
-    
+
     // REAL-TIME CLOCK STATE - Updates every minute for live prayer status
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
 
@@ -757,13 +674,16 @@ fun PrayerTimesScreen(
         prayerTimes?.let { times ->
             val nextPrayer = times.getNextPrayer()
             android.util.Log.d("PrayerTimesScreen", "  🔔 Next prayer: ${nextPrayer?.name ?: "None today"}")
-            android.util.Log.d("PrayerTimesScreen", "  ⏱️ Time until next: ${nextPrayer?.let { 
-                val duration = Duration.between(currentTime, it.time)
-                "${duration.toHours()}h ${duration.toMinutes() % 60}m"
-            } ?: "N/A"}")
+            android.util.Log.d(
+                "PrayerTimesScreen",
+                "  ⏱️ Time until next: ${nextPrayer?.let {
+                    val duration = Duration.between(currentTime, it.time)
+                    "${duration.toHours()}h ${duration.toMinutes() % 60}m"
+                } ?: "N/A"}",
+            )
         }
     }
-    
+
     // PULL-TO-REFRESH STATE - Simple implementation
     // Single source of truth: read straight from the hoisted VM flag.
     // All writes go through onSetSyncing so the app-level container on other
@@ -771,21 +691,21 @@ fun PrayerTimesScreen(
     // remember(key) that snapped the reset signal mid-flight.)
     val isRefreshing = isSyncingExternal
     var isDragging by remember { mutableStateOf(false) }
-    
+
     // Track refresh state changes
     LaunchedEffect(isRefreshing) {
         android.util.Log.i("PrayerTimesScreen", "🔄 REFRESH STATE CHANGED: ${if (isRefreshing) "REFRESHING" else "IDLE"}")
     }
-    
+
     // LOCATION SERVICE PROMPT STATE
     var showLocationServiceDialog by remember { mutableStateOf(false) }
     var locationServiceCheckPending by remember { mutableStateOf(false) }
-    
+
     // COMPASS POPUP STATE - Shows large compass with calibration guidance
     var showCompassPopup by remember { mutableStateOf(false) }
-    
+
     // INTERACTIVE PRAYER DIAL POPUP STATE
-    var popupDialState by remember { mutableStateOf<String?>(null) }  // null means closed, non-null means open with that prayer name
+    var popupDialState by remember { mutableStateOf<String?>(null) } // null means closed, non-null means open with that prayer name
 
     // Clean up popup state when navigating away to prevent lingering shadow effects
     DisposableEffect(Unit) {
@@ -803,7 +723,7 @@ fun PrayerTimesScreen(
     val repository = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
             screenContext.applicationContext,
-            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
         )
         val repo = entryPoint.prayerSettingsRepository()
         val instanceId = System.identityHashCode(repo).toString(16)
@@ -815,7 +735,7 @@ fun PrayerTimesScreen(
     val suggestionRepository = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
             screenContext.applicationContext,
-            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+            com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
         )
         entryPoint.prayerTimeSuggestionRepository()
     }
@@ -913,7 +833,7 @@ fun PrayerTimesScreen(
                 Text(
                     "Now in Android can automatically turn on Do Not Disturb at prayer time " +
                         "so you're not interrupted, then restore it afterward. This needs " +
-                        "Do Not Disturb access — you can grant it on the next screen."
+                        "Do Not Disturb access — you can grant it on the next screen.",
                 )
             },
             confirmButton = {
@@ -971,7 +891,7 @@ fun PrayerTimesScreen(
         try {
             val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
                 screenContext.applicationContext,
-                com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+                com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java,
             ).prayerNotificationServiceManager()
             serviceManager.updatePrayerNotifications()
             android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: $prayerName ${if (enabled) "enabled" else "disabled"}")
@@ -992,8 +912,8 @@ fun PrayerTimesScreen(
                             settings = com.starception.submission.prayer.model.PrayerSettings(
                                 calculationMethod = calculationSettings.calculationMethod,
                                 asrMadhhab = calculationSettings.asrMadhhab,
-                                timeOffsets = storedOffsets
-                            )
+                                timeOffsets = storedOffsets,
+                            ),
                         )
                     } catch (e: Exception) {
                         android.util.Log.e("PrayerTimesScreen", "❌ Failed to fetch AI suggestions: ${e.message}")
@@ -1031,13 +951,11 @@ fun PrayerTimesScreen(
     val locationService = remember {
         val entryPoint = EntryPointAccessors.fromApplication(
             screenContext.applicationContext,
-            PrayerTimeCalculatorEntryPoint::class.java
+            PrayerTimeCalculatorEntryPoint::class.java,
         )
         entryPoint.enhancedLocationService()
     }
-    
 
-    
     // REFRESH LOGIC - Handle pull-to-refresh action with location service checking
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
@@ -1048,32 +966,32 @@ fun PrayerTimesScreen(
                 // LOCATION SERVICE CHECK: Verify location services before proceeding
                 android.util.Log.d("PullToRefresh", "=== STARTING PULL-TO-REFRESH DEBUG ===")
                 android.util.Log.d("PullToRefresh", "User initiated prayer times refresh with location service validation")
-                
+
                 // Get location service to check if services are enabled
                 val entryPoint = EntryPointAccessors.fromApplication(
                     screenContext.applicationContext,
-                    PrayerTimeCalculatorEntryPoint::class.java
+                    PrayerTimeCalculatorEntryPoint::class.java,
                 )
                 val locationService = entryPoint.enhancedLocationService()
-                
+
                 val hasPermission = locationService.hasLocationPermission()
                 val servicesEnabled = locationService.isLocationEnabled()
-                
+
                 android.util.Log.d("PullToRefresh", "Location permission granted: $hasPermission")
                 android.util.Log.d("PullToRefresh", "Location services enabled: $servicesEnabled")
-                
+
                 // CHECK: If location services are not fully available, prompt user
                 if (!hasPermission) {
                     android.util.Log.w("PullToRefresh", "⚠️  LOCATION PERMISSION NOT GRANTED!")
                     android.util.Log.w("PullToRefresh", "User has not granted location permission")
                     android.util.Log.w("PullToRefresh", "Will proceed with cached/default location but showing advisory")
-                    
+
                     // Continue with cached/default but don't show dialog for permission (handled by permission UI)
                 } else if (!servicesEnabled) {
                     android.util.Log.w("PullToRefresh", "⚠️  LOCATION SERVICES DISABLED!")
                     android.util.Log.w("PullToRefresh", "User has granted permission but turned off location services")
                     android.util.Log.w("PullToRefresh", "Showing dialog to prompt user to enable location services")
-                    
+
                     // Stop refresh and show dialog
                     onSetSyncing(false)
                     isLoading = false
@@ -1082,14 +1000,14 @@ fun PrayerTimesScreen(
                 } else {
                     android.util.Log.d("PullToRefresh", "✅ Location permission and services are both available")
                 }
-                
+
                 // Step 1: Clear in-memory cache to force GPS location fetch and prayer calculation
                 android.util.Log.d("PullToRefresh", "STEP 1: Clearing LocationCache to force fresh GPS and calculations...")
                 try {
                     // Access the LocationCache service through Hilt dependency injection
                     val entryPoint = EntryPointAccessors.fromApplication(
                         screenContext.applicationContext,
-                        PrayerTimeCalculatorEntryPoint::class.java
+                        PrayerTimeCalculatorEntryPoint::class.java,
                     )
                     val cache = entryPoint.locationCache()
                     cache.clearCache()
@@ -1098,7 +1016,7 @@ fun PrayerTimesScreen(
                     android.util.Log.e("PullToRefresh", "❌ CRITICAL: Failed to clear cache: ${e.message}", e)
                     // Continue anyway - calculation may still work with cached data
                 }
-                
+
                 // Don't set isLoading = true here — PullToSyncContainer already shows
                 // "Syncing your data" with a spinner. Setting isLoading replaces the
                 // prayer tiles with a loading spinner, causing a visual blink.
@@ -1122,8 +1040,8 @@ fun PrayerTimesScreen(
                             android.util.Log.d("PullToRefresh", "LOCATION COMPARISON: Old=\"$location\" → New=\"${result.second}\"")
                             android.util.Log.d("PullToRefresh", "LOCATION CHANGED: ${location != result.second}")
 
-                            prayerTimes = result.first   // Calculated prayer times (or null if failed)
-                            location = result.second     // Location name for display
+                            prayerTimes = result.first // Calculated prayer times (or null if failed)
+                            location = result.second // Location name for display
 
                             android.util.Log.d("PullToRefresh", "STATE UPDATED: location variable now = \"$location\"")
                         }
@@ -1178,18 +1096,18 @@ fun PrayerTimesScreen(
     // PERMISSION MANAGEMENT - Handle user permissions gracefully
     // Notification permission for prayer alerts (Android 13+)
     val notificationPermissionState = rememberPermissionState(
-        permission = Manifest.permission.POST_NOTIFICATIONS
+        permission = Manifest.permission.POST_NOTIFICATIONS,
     )
-    
+
     // Location permission for accurate prayer times (or fallback to default)
     val locationPermissionState = rememberPermissionState(
-        permission = Manifest.permission.ACCESS_FINE_LOCATION
+        permission = Manifest.permission.ACCESS_FINE_LOCATION,
     )
-    
+
     // Activity recognition permission for activity detection
     val activityRecognitionPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         rememberPermissionState(
-            permission = Manifest.permission.ACTIVITY_RECOGNITION
+            permission = Manifest.permission.ACTIVITY_RECOGNITION,
         )
     } else {
         null // Not needed on older Android versions
@@ -1205,23 +1123,23 @@ fun PrayerTimesScreen(
     val audioPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         // Android 13+ uses READ_MEDIA_AUDIO
         rememberPermissionState(
-            permission = Manifest.permission.READ_MEDIA_AUDIO
+            permission = Manifest.permission.READ_MEDIA_AUDIO,
         )
     } else {
         // Android 12 and below use READ_EXTERNAL_STORAGE
         rememberPermissionState(
-            permission = Manifest.permission.READ_EXTERNAL_STORAGE
+            permission = Manifest.permission.READ_EXTERNAL_STORAGE,
         )
     }
-    
+
     // Monitor permission changes and re-initialize ActivityTracker
     val activityContext = LocalContext.current
     LaunchedEffect(locationPermissionState.status, activityRecognitionPermissionState?.status) {
         // Check if both location and activity recognition permissions are now granted
         val locationGranted = locationPermissionState.status is com.google.accompanist.permissions.PermissionStatus.Granted
-        val activityGranted = activityRecognitionPermissionState?.status is com.google.accompanist.permissions.PermissionStatus.Granted 
-            || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
-        
+        val activityGranted = activityRecognitionPermissionState?.status is com.google.accompanist.permissions.PermissionStatus.Granted ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+
         if (locationGranted && activityGranted) {
             // Re-initialize ActivityTracker in case permissions were just granted
             try {
@@ -1231,7 +1149,7 @@ fun PrayerTimesScreen(
             }
         }
     }
-    
+
     // COMPREHENSIVE PERMISSION STATE LOGGING
     LaunchedEffect(notificationPermissionState.status) {
         android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATION PERMISSION STATE CHANGED")
@@ -1248,7 +1166,7 @@ fun PrayerTimesScreen(
             }
         }
     }
-    
+
     LaunchedEffect(locationPermissionState.status) {
         android.util.Log.i("PrayerTimesScreen", "📍 LOCATION PERMISSION STATE CHANGED")
         when (locationPermissionState.status) {
@@ -1264,7 +1182,7 @@ fun PrayerTimesScreen(
             }
         }
     }
-    
+
     // Request missing first-launch permissions sequentially. Completion is persisted whether the
     // user grants or denies each request, so reopening the app never becomes a permission nag loop.
     val permissionOnboardingPreferences = remember(activityContext) {
@@ -1333,10 +1251,10 @@ fun PrayerTimesScreen(
                     com.google.accompanist.permissions.PermissionStatus.Granted
                 val notificationGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                     notificationPermissionState.status is
-                    com.google.accompanist.permissions.PermissionStatus.Granted
+                        com.google.accompanist.permissions.PermissionStatus.Granted
                 val activityGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
                     activityRecognitionPermissionState?.status is
-                    com.google.accompanist.permissions.PermissionStatus.Granted
+                        com.google.accompanist.permissions.PermissionStatus.Granted
 
                 if (locationGranted && notificationGranted && activityGranted) {
                     advancePermissionOnboarding(PermissionOnboardingStep.Complete)
@@ -1391,7 +1309,7 @@ fun PrayerTimesScreen(
     if (permissionPrimerVisible) {
         val rationales = buildList {
             if (locationPermissionState.status !is
-                com.google.accompanist.permissions.PermissionStatus.Granted
+                    com.google.accompanist.permissions.PermissionStatus.Granted
             ) {
                 add(
                     PermissionRationale(
@@ -1404,7 +1322,7 @@ fun PrayerTimesScreen(
             if (
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 notificationPermissionState.status !is
-                com.google.accompanist.permissions.PermissionStatus.Granted
+                    com.google.accompanist.permissions.PermissionStatus.Granted
             ) {
                 add(
                     PermissionRationale(
@@ -1417,7 +1335,7 @@ fun PrayerTimesScreen(
             if (
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                 activityRecognitionPermissionState?.status !is
-                com.google.accompanist.permissions.PermissionStatus.Granted
+                    com.google.accompanist.permissions.PermissionStatus.Granted
             ) {
                 add(
                     PermissionRationale(
@@ -1495,12 +1413,12 @@ fun PrayerTimesScreen(
     // LIVE CLOCK UPDATES - Updates current time every minute for real-time prayer status
     LaunchedEffect(Unit) {
         while (true) {
-            currentTime = LocalTime.now()      // Update current time
-            kotlinx.coroutines.delay(60000)   // Wait 1 minute (60,000 milliseconds)
+            currentTime = LocalTime.now() // Update current time
+            kotlinx.coroutines.delay(60000) // Wait 1 minute (60,000 milliseconds)
             // This enables real-time updates like "Next prayer in 15 minutes"
         }
     }
-    
+
     // INTERACTIVE PRAYER CARD HELPER - Creates prayer card with long-press dial functionality
     @Composable
     fun InteractivePrayerCard(
@@ -1516,25 +1434,64 @@ fun PrayerTimesScreen(
         onApplySuggestion: ((String, Int) -> Unit)? = null,
         // iOS-style swipe-to-reveal state
         isRevealed: Boolean = false,
-        onRevealChange: (Boolean) -> Unit = {}
+        onRevealChange: (Boolean) -> Unit = {},
     ) {
         // Check if this specific card is in edit mode
         val isInEditMode = currentEditingTile == prayerName
         val isAnotherTileInEditMode = currentEditingTile != null && currentEditingTile != prayerName
         val compactTile = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-        
+
+        // Per-prayer adhan state for the dial's speaker + volume bar,
+        // persisted through the singleton prayer settings repository.
+        var adhanEnabled by remember(prayerName) { mutableStateOf(true) }
+        var adhanVolume by remember(prayerName) { mutableStateOf(100) }
+        LaunchedEffect(prayerName) {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                screenContext.applicationContext,
+                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+            )
+            val repository = entryPoint.prayerSettingsRepository()
+            val preferences = repository.getNotificationPreferences()
+            adhanEnabled = preferences.isAdhanEnabledForPrayer(prayerName)
+            adhanVolume = preferences.getAdhanVolumeForPrayer(prayerName)
+        }
+        val onAdhanEnabledChange: (Boolean) -> Unit = { enabled ->
+            adhanEnabled = enabled
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching {
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        screenContext.applicationContext,
+                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+                    )
+                    entryPoint.prayerSettingsRepository().setAdhanEnabledForPrayer(prayerName, enabled)
+                }
+            }
+        }
+        val onAdhanVolumeChange: (Int) -> Unit = { volume ->
+            adhanVolume = volume
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching {
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        screenContext.applicationContext,
+                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+                    )
+                    entryPoint.prayerSettingsRepository().setAdhanVolumeForPrayer(prayerName, volume)
+                }
+            }
+        }
+
         // Material 3 expressive animation states with spring physics
         val expressiveAnimationSpec = spring<Float>(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium,
-            visibilityThreshold = 0.01f
+            visibilityThreshold = 0.01f,
         )
-        
+
         val sizeAnimationSpec = spring<IntSize>(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = Spring.StiffnessMediumLow,
         )
-        
+
         // Material 3 expressive scale animation: shrink other tiles when one is in edit mode
         val scale by animateFloatAsState(
             targetValue = when {
@@ -1543,12 +1500,12 @@ fun PrayerTimesScreen(
                 else -> 1f // Normal size when no tile is in edit mode
             },
             animationSpec = expressiveAnimationSpec,
-            label = "expressiveTileScale"
+            label = "expressiveTileScale",
         )
-        
+
         // Debug logging
         android.util.Log.d("PrayerCard", "🔄 Rendering InteractivePrayerCard for $prayerName, isInEditMode=$isInEditMode, scale=$scale")
-        
+
         if (isInEditMode) {
             // Show ONLY the circular dial - complete transformation, no extra UI
             // CRITICAL FIX: Initialize from currentOffset and track independently
@@ -1575,9 +1532,9 @@ fun PrayerTimesScreen(
                     .aspectRatio(1f) // Force square container for perfect circle
                     .graphicsLayer(
                         scaleX = scale,
-                        scaleY = scale
+                        scaleY = scale,
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 // Using Card with border instead of shadow - shadows cause navigation artifacts
                 Card(
@@ -1587,7 +1544,7 @@ fun PrayerTimesScreen(
                             "Current" -> MaterialTheme.colorScheme.tertiaryContainer
                             "Next" -> MaterialTheme.colorScheme.primaryContainer
                             else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
+                        },
                     ),
                     border = BorderStroke(
                         2.dp,
@@ -1595,94 +1552,94 @@ fun PrayerTimesScreen(
                             "Current" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
                             "Next" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                             else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        }
+                        },
                     ),
-                    modifier = Modifier.fillMaxSize()
-            ) {
-                // ONLY show the circular dial - complete transformation with no overlapping content
-                com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
-                    prayerName = prayerName,
-                    originalTime = when (prayerName) {
-                        "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
-                        "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
-                        "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
-                        "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
-                        "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
-                        "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
-                        else -> LocalTime.of(12, 0)
-                    },
-                    timeAdjustment = timeAdjustment,
-                    onTimeAdjusted = { adjustment ->
-                        timeAdjustment = adjustment
-                    },
-                    onSaveAdjustment = { prayerName, finalAdjustment ->
-                        android.util.Log.d("PrayerTimesScreen", "🎯 INTERACTIVE DIAL SAVE:")
-                        android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
-                        android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
-                        android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    // ONLY show the circular dial - complete transformation with no overlapping content
+                    com.starception.submission.feature.prayertimes.components.InteractivePrayerDial(
+                        prayerName = prayerName,
+                        originalTime = when (prayerName) {
+                            "Fajr" -> prayerTimes?.fajr ?: LocalTime.of(5, 23)
+                            "Sunrise" -> prayerTimes?.sunrise ?: LocalTime.of(6, 42)
+                            "Dhuhr" -> prayerTimes?.dhuhr ?: LocalTime.of(12, 0)
+                            "Asr" -> prayerTimes?.asr ?: LocalTime.of(15, 46)
+                            "Maghrib" -> prayerTimes?.maghrib ?: LocalTime.of(18, 25)
+                            "Isha" -> prayerTimes?.isha ?: LocalTime.of(19, 55)
+                            else -> LocalTime.of(12, 0)
+                        },
+                        timeAdjustment = timeAdjustment,
+                        onTimeAdjusted = { adjustment ->
+                            timeAdjustment = adjustment
+                        },
+                        onSaveAdjustment = { prayerName, finalAdjustment ->
+                            android.util.Log.d("PrayerTimesScreen", "🎯 INTERACTIVE DIAL SAVE:")
+                            android.util.Log.d("PrayerTimesScreen", "   📝 Prayer: $prayerName")
+                            android.util.Log.d("PrayerTimesScreen", "   ⏱️ Final Adjustment: $finalAdjustment minutes")
+                            android.util.Log.d("PrayerTimesScreen", "   💾 Saving to prayer settings...")
 
-                        // Save the adjustment to Prayer settings using singleton repository
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                // CRITICAL FIX: Use singleton repository from EntryPoint, not new instance
-                                val entryPoint = EntryPointAccessors.fromApplication(
-                                    screenContext.applicationContext,
-                                    com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
-                                )
-                                val repository = entryPoint.prayerSettingsRepository()
-                                repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
-                                android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
-
-                                // CRITICAL: Wait for preferences to be fully written to disk
-                                // This ensures the recalculation will read the NEW offset values
-                                delay(100) // 100ms delay to ensure SharedPreferences commit completes
-                                android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
-
-                                // CRITICAL: Update scheduled notifications with new prayer time
+                            // Save the adjustment to Prayer settings using singleton repository
+                            CoroutineScope(Dispatchers.IO).launch {
                                 try {
-                                    val appContext = screenContext.applicationContext
-                                    val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
-                                        appContext,
-                                        com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
-                                    ).prayerNotificationServiceManager()
-                                    serviceManager.updatePrayerNotifications()
-                                    android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: Rescheduled with new $prayerName time")
+                                    // CRITICAL FIX: Use singleton repository from EntryPoint, not new instance
+                                    val entryPoint = EntryPointAccessors.fromApplication(
+                                        screenContext.applicationContext,
+                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+                                    )
+                                    val repository = entryPoint.prayerSettingsRepository()
+                                    repository.updateSinglePrayerOffset(prayerName, finalAdjustment)
+                                    android.util.Log.i("PrayerTimesScreen", "✅ SAVE SUCCESS: $prayerName offset saved as $finalAdjustment minutes")
+
+                                    // CRITICAL: Wait for preferences to be fully written to disk
+                                    // This ensures the recalculation will read the NEW offset values
+                                    delay(100) // 100ms delay to ensure SharedPreferences commit completes
+                                    android.util.Log.d("PrayerTimesScreen", "⏸️ Waited 100ms for preferences write to complete")
+
+                                    // CRITICAL: Update scheduled notifications with new prayer time
+                                    try {
+                                        val appContext = screenContext.applicationContext
+                                        val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
+                                            appContext,
+                                            com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java,
+                                        ).prayerNotificationServiceManager()
+                                        serviceManager.updatePrayerNotifications()
+                                        android.util.Log.i("PrayerTimesScreen", "🔔 NOTIFICATIONS UPDATED: Rescheduled with new $prayerName time")
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications", e)
+                                    }
+
+                                    // Update UI on main thread
+                                    withContext(Dispatchers.Main) {
+                                        // NO MANUAL UPDATE NEEDED - The repository flow automatically updates storedOffsets!
+                                        // When we call repository.updateCalculationSettings() above, it triggers the flow
+                                        // which causes calculationSettingsFlow.collectAsState() to recompose with new values
+                                        android.util.Log.d("PrayerTimesScreen", "✅ Offset saved - repository flow will automatically update UI")
+                                        android.util.Log.d("PrayerTimesScreen", "   💾 Saved $prayerName offset: $finalAdjustment minutes")
+                                        android.util.Log.d("PrayerTimesScreen", "   🔄 Flow-based recomposition will trigger automatically")
+
+                                        // Wait for swipe animation and tile scale animation to complete smoothly
+                                        delay(250) // Give time for animations to finish
+
+                                        // Exit edit mode after successful saving
+                                        onEditingTileChange(null)
+                                        android.util.Log.d("PrayerTimesScreen", "🚪 Exited edit mode - returning to tile view")
+                                    }
                                 } catch (e: Exception) {
-                                    android.util.Log.e("PrayerTimesScreen", "❌ Failed to update notifications", e)
-                                }
-
-                                // Update UI on main thread
-                                withContext(Dispatchers.Main) {
-                                    // NO MANUAL UPDATE NEEDED - The repository flow automatically updates storedOffsets!
-                                    // When we call repository.updateCalculationSettings() above, it triggers the flow
-                                    // which causes calculationSettingsFlow.collectAsState() to recompose with new values
-                                    android.util.Log.d("PrayerTimesScreen", "✅ Offset saved - repository flow will automatically update UI")
-                                    android.util.Log.d("PrayerTimesScreen", "   💾 Saved $prayerName offset: $finalAdjustment minutes")
-                                    android.util.Log.d("PrayerTimesScreen", "   🔄 Flow-based recomposition will trigger automatically")
-
-                                    // Wait for swipe animation and tile scale animation to complete smoothly
-                                    delay(250) // Give time for animations to finish
-
-                                    // Exit edit mode after successful saving
-                                    onEditingTileChange(null)
-                                    android.util.Log.d("PrayerTimesScreen", "🚪 Exited edit mode - returning to tile view")
-                                }
-                            } catch (e: Exception) {
-                                android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
-                                // Still exit edit mode even if save failed
-                                withContext(Dispatchers.Main) {
-                                    onEditingTileChange(null)
+                                    android.util.Log.e("PrayerTimesScreen", "❌ SAVE FAILED: Error saving $prayerName offset", e)
+                                    // Still exit edit mode even if save failed
+                                    withContext(Dispatchers.Main) {
+                                        onEditingTileChange(null)
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onResetAdjustment = {
-                        android.util.Log.d("PrayerTimesScreen", "🔄 INTERACTIVE DIAL RESET for $prayerName")
-                        timeAdjustment = 0
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                        },
+                        onResetAdjustment = {
+                            android.util.Log.d("PrayerTimesScreen", "🔄 INTERACTIVE DIAL RESET for $prayerName")
+                            timeAdjustment = 0
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         } else {
             // Show regular small card with iOS-style swipe-to-reveal actions
@@ -1706,7 +1663,7 @@ fun PrayerTimesScreen(
                         try {
                             val entryPoint = EntryPointAccessors.fromApplication(
                                 screenContext.applicationContext,
-                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
                             )
                             val repository = entryPoint.prayerSettingsRepository()
                             repository.updateSinglePrayerOffset(prayerName, newOffset)
@@ -1722,7 +1679,7 @@ fun PrayerTimesScreen(
                         try {
                             val entryPoint = EntryPointAccessors.fromApplication(
                                 screenContext.applicationContext,
-                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
                             )
                             val repository = entryPoint.prayerSettingsRepository()
                             val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
@@ -1737,7 +1694,7 @@ fun PrayerTimesScreen(
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
-                    }
+                    },
             ) {
                 val prayerStatus = PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes)
                 val isDarkTheme = LocalDarkTheme.current
@@ -1815,7 +1772,7 @@ fun PrayerTimesScreen(
                                         try {
                                             val entryPoint = EntryPointAccessors.fromApplication(
                                                 screenContext.applicationContext,
-                                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
                                             )
                                             val repository = entryPoint.prayerSettingsRepository()
                                             val defaultOffset = repository.getDefaultPrayerOffset(prayerName)
@@ -1830,9 +1787,9 @@ fun PrayerTimesScreen(
                                             android.util.Log.e("PrayerCard", "❌ Failed to reset offset", e)
                                         }
                                     }
-                                }
+                                },
                             )
-                        }
+                        },
                 ) {
                     Column(
                         modifier = Modifier
@@ -1865,7 +1822,7 @@ fun PrayerTimesScreen(
                             Row(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(
                                     text = getPrayerDisplayName(prayerName),
@@ -1886,7 +1843,7 @@ fun PrayerTimesScreen(
                                     fontWeight = FontWeight.SemiBold,
                                     overflow = TextOverflow.Ellipsis,
                                     maxLines = 1,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
                                 )
 
                                 // Notification bell toggle icon (only for main 5 prayers)
@@ -1901,15 +1858,15 @@ fun PrayerTimesScreen(
                                             onNotificationToggle(!notificationEnabled)
                                             android.util.Log.d("PrayerCard", "🔔 Notification toggled for $prayerName: ${!notificationEnabled}")
                                         },
-                                        modifier = Modifier.size(if (compactTile) 26.dp else 30.dp)
+                                        modifier = Modifier.size(if (compactTile) 26.dp else 30.dp),
                                     ) {
                                         val weatherAlert = prayerTileWeatherAlerts[prayerName]
                                             .takeIf {
                                                 prayerName == prayerTileWeatherAlertTarget &&
-                                                shouldReplacePrayerBellWithWeather(
-                                                    prayerStatus = prayerStatus,
-                                                    prayerTimeEditMode = prayerTimeEditMode,
-                                                )
+                                                    shouldReplacePrayerBellWithWeather(
+                                                        prayerStatus = prayerStatus,
+                                                        prayerTimeEditMode = prayerTimeEditMode,
+                                                    )
                                             }
                                         var showPrayerWeather by remember(
                                             prayerName,
@@ -1938,14 +1895,18 @@ fun PrayerTimesScreen(
                                                 showPrayerWeather
                                             },
                                             transitionSpec = {
-                                                (fadeIn(tween(220)) + scaleIn(
-                                                    initialScale = 0.72f,
-                                                    animationSpec = tween(260, easing = FastOutSlowInEasing),
-                                                )) togetherWith
-                                                    (fadeOut(tween(150)) + scaleOut(
-                                                        targetScale = 0.78f,
-                                                        animationSpec = tween(190),
-                                                    ))
+                                                (
+                                                    fadeIn(tween(220)) + scaleIn(
+                                                        initialScale = 0.72f,
+                                                        animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                                    )
+                                                    ) togetherWith
+                                                    (
+                                                        fadeOut(tween(150)) + scaleOut(
+                                                            targetScale = 0.78f,
+                                                            animationSpec = tween(190),
+                                                        )
+                                                        )
                                             },
                                             label = "${prayerName}BellWeatherMorph",
                                         ) { alert ->
@@ -2025,7 +1986,7 @@ fun PrayerTimesScreen(
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
                         ) {
                             // Calculate adjusted time
                             val originalTime = when (prayerName) {
@@ -2041,66 +2002,150 @@ fun PrayerTimesScreen(
                             val (timeOnly, amPm) = originalTime?.let { time ->
                                 val adjustedDateTime = java.time.LocalDateTime.of(java.time.LocalDate.now(), time).plusMinutes(currentOffset.toLong())
                                 val adjusted = adjustedDateTime.toLocalTime()
-                                val hour12 = if (adjusted.hour == 0) 12
-                                            else if (adjusted.hour > 12) adjusted.hour - 12
-                                            else adjusted.hour
+                                val hour12 = if (adjusted.hour == 0) {
+                                    12
+                                } else if (adjusted.hour > 12) {
+                                    adjusted.hour - 12
+                                } else {
+                                    adjusted.hour
+                                }
                                 val period = if (adjusted.hour < 12) "AM" else "PM"
                                 Pair(String.format("%d:%02d", hour12, adjusted.minute), period)
                             } ?: Pair("", "")
 
-                            // Time display - NO direct gestures, use swipe-to-reveal instead
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Bottom,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val baseColor = accentColor
-
-                                // Left side: Time + AM/PM grouped together
+                            // In Tune-schedule mode the adjusted time is
+                            // replaced by this prayer's adhan control: the
+                            // speaker icon alone when off, and a
+                            // system-volume-style bar when turned on.
+                            if (prayerTimeEditMode && prayerName != "Sunrise") {
                                 Row(
-                                    horizontalArrangement = Arrangement.Start,
-                                    verticalAlignment = Alignment.Bottom
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
-                                    // Time (hour:minute). headlineMedium's default ~36sp
-                                    // line box PLUS the extra font padding overflows the
-                                    // shorter expanded tile and clips the time. Drop the
-                                    // font padding and use a snug (but glyph-safe) line box
-                                    // so it stays fully visible without taller tiles.
-                                    Text(
-                                        text = timeOnly,
-                                        style = MaterialTheme.typography.headlineMedium.copy(
-                                            fontSize = if (compactTile) 19.sp else 24.sp,
-                                            lineHeight = if (compactTile) 22.sp else 30.sp,
-                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                        ),
-                                        color = baseColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (adhanEnabled) {
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                            )
+                                            .clickable {
+                                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onAdhanEnabledChange(!adhanEnabled)
+                                            },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        FlaticonIcon(
+                                            glyph = FlaticonIcons.VOLUME,
+                                            contentDescription = if (adhanEnabled) {
+                                                "Mute adhan for $prayerName"
+                                            } else {
+                                                "Enable adhan for $prayerName"
+                                            },
+                                            tint = if (adhanEnabled) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            fontSize = 16.sp,
+                                        )
+                                    }
+                                    androidx.compose.animation.AnimatedVisibility(
+                                        visible = adhanEnabled,
+                                        enter = fadeIn() + expandHorizontally(),
+                                        exit = fadeOut() + shrinkHorizontally(),
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            androidx.compose.material3.Slider(
+                                                value = adhanVolume.toFloat(),
+                                                onValueChange = { newValue ->
+                                                    onAdhanVolumeChange(newValue.toInt().coerceIn(0, 100))
+                                                },
+                                                valueRange = 0f..100f,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(24.dp),
+                                                colors = androidx.compose.material3.SliderDefaults.colors(
+                                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                                    inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                                    thumbColor = MaterialTheme.colorScheme.surface,
+                                                ),
+                                            )
+                                            Text(
+                                                text = "$adhanVolume%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Time display - NO direct gestures, use swipe-to-reveal instead
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Bottom,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    val baseColor = accentColor
 
-                                    Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
+                                    // Left side: Time + AM/PM grouped together
+                                    Row(
+                                        horizontalArrangement = Arrangement.Start,
+                                        verticalAlignment = Alignment.Bottom,
+                                    ) {
+                                        // Time (hour:minute). headlineMedium's default ~36sp
+                                        // line box PLUS the extra font padding overflows the
+                                        // shorter expanded tile and clips the time. Drop the
+                                        // font padding and use a snug (but glyph-safe) line box
+                                        // so it stays fully visible without taller tiles.
+                                        Text(
+                                            text = timeOnly,
+                                            style = MaterialTheme.typography.headlineMedium.copy(
+                                                fontSize = if (compactTile) 19.sp else 24.sp,
+                                                lineHeight = if (compactTile) 22.sp else 30.sp,
+                                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                            ),
+                                            color = baseColor,
+                                            fontWeight = FontWeight.Bold,
+                                        )
 
-                                    // AM/PM (smaller)
-                                    Text(
-                                        text = amPm,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontSize = if (compactTile) 11.sp else 14.sp,
-                                        ),
-                                        color = baseColor.copy(alpha = 0.85f),
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.padding(bottom = 2.dp)
+                                        Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
+
+                                        // AM/PM (smaller)
+                                        Text(
+                                            text = amPm,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontSize = if (compactTile) 11.sp else 14.sp,
+                                            ),
+                                            color = baseColor.copy(alpha = 0.85f),
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(bottom = 2.dp),
+                                        )
+                                    }
+
+                                    // Right side: Offset indicator with AI suggestion alternation
+                                    com.starception.submission.feature.prayertimes.components.AiSuggestionBadge(
+                                        currentOffset = currentOffset,
+                                        suggestion = suggestion,
+                                        baseColor = baseColor,
+                                        enabled = prayerTimeEditMode,
+                                        onApplySuggestion = if (onApplySuggestion != null) {
+                                            { suggestedOffset -> onApplySuggestion(prayerName, suggestedOffset) }
+                                        } else {
+                                            null
+                                        },
                                     )
                                 }
-
-                                // Right side: Offset indicator with AI suggestion alternation
-                                com.starception.submission.feature.prayertimes.components.AiSuggestionBadge(
-                                    currentOffset = currentOffset,
-                                    suggestion = suggestion,
-                                    baseColor = baseColor,
-                                    enabled = prayerTimeEditMode,
-                                    onApplySuggestion = if (onApplySuggestion != null) {
-                                        { suggestedOffset -> onApplySuggestion(prayerName, suggestedOffset) }
-                                    } else null
-                                )
                             }
                         }
                     }
@@ -2118,8 +2163,8 @@ fun PrayerTimesScreen(
                 // This uses our improved 3-second timeout system
                 val result = calculator.calculateDefaultPrayerTimes(forceGpsRefresh = forceGpsRefresh)
 
-                prayerTimes = result.first   // Calculated prayer times (or null if failed)
-                location = result.second     // Location name for display
+                prayerTimes = result.first // Calculated prayer times (or null if failed)
+                location = result.second // Location name for display
 
                 // CRITICAL: Always turn off loading after calculation completes
                 isLoading = false
@@ -2136,14 +2181,14 @@ fun PrayerTimesScreen(
             // Note: Prayer times remain null, which will show appropriate fallback UI
         }
     }
-    
+
     // INSTANT LOAD STRATEGY - Show cached data immediately, update in background
     LaunchedEffect(Unit) {
         // Measure automatic warning timing from app entry. The actual delay is
         // resolved after the forecast arrives because it depends on severity.
         val appOpenStartedAt = System.currentTimeMillis()
         android.util.Log.d("PrayerScreen", "=== INSTANT LOAD STRATEGY ===")
-        
+
         // STEP 1: Skip redundant cache loading - already done in remember{} block
         // The initial state was set from SharedPreferences cache which persists across app restarts
         // We only need to refresh with GPS if we don't already have valid data
@@ -2154,12 +2199,12 @@ fun PrayerTimesScreen(
             android.util.Log.d("PrayerScreen", "  Skipping redundant in-memory cache check")
         } else {
             android.util.Log.d("PrayerScreen", "No valid cached data - first time use or cache expired")
-            isLoading = true  // Only show loading for brand new users
+            isLoading = true // Only show loading for brand new users
         }
-        
+
         // STEP 2: Update with fresh GPS data in background (auto-refresh on app open)
         android.util.Log.d("PrayerScreen", "STEP 2: Starting background GPS update with fresh location...")
-        calculatePrayerTimes(true)  // forceGpsRefresh = true for auto-refresh on app open
+        calculatePrayerTimes(true) // forceGpsRefresh = true for auto-refresh on app open
         android.util.Log.d("PrayerScreen", "Background update completed with fresh GPS location")
 
         // Surface noteworthy conditions immediately on app entry. Previously this
@@ -2199,24 +2244,22 @@ fun PrayerTimesScreen(
                 }
             }
         }
-        
+
         // Note: calculatePrayerTimes() now handles turning off isLoading
     }
-    
+
     // PERMISSION CHANGE HANDLER - Update data when permissions change
     LaunchedEffect(locationPermissionState.status) {
         android.util.Log.d("PrayerScreen", "Permission status changed, running background update...")
         // Update in background with fresh GPS - calculatePrayerTimes() handles loading state
-        calculatePrayerTimes(true)  // forceGpsRefresh = true when permission changes
+        calculatePrayerTimes(true) // forceGpsRefresh = true when permission changes
     }
-    
-
 
     // Animate blur/dim for smooth Control Center transitions
     val controlCenterProgress by animateFloatAsState(
         targetValue = if (popupDialState != null) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
-        label = "controlCenterProgress"
+        label = "controlCenterProgress",
     )
 
     // Use PullToSyncContainer component wrapped in Box for Control Center overlay
@@ -2247,8 +2290,8 @@ fun PrayerTimesScreen(
                             }
                     } else {
                         Modifier
-                    }
-                )
+                    },
+                ),
         ) {
             // Single source of truth: Home renders the SAME VM-produced prayer-alert state
             // (prayerAlertOverride = mainViewModel.prayerAlertState) that every other page
@@ -2261,7 +2304,7 @@ fun PrayerTimesScreen(
             val islamicEventStateProvider = remember {
                 EntryPointAccessors.fromApplication(
                     screenContext.applicationContext,
-                    PrayerTimeCalculatorEntryPoint::class.java
+                    PrayerTimeCalculatorEntryPoint::class.java,
                 ).islamicEventStateProvider()
             }
             val islamicEventState by islamicEventStateProvider.state.collectAsStateWithLifecycle()
@@ -2308,1631 +2351,1646 @@ fun PrayerTimesScreen(
                 onIslamicEventClick = { event ->
                     com.starception.submission.ui.search.SearchPrefillBus.requestSearch(event.searchQuery)
                 },
-                modifier = Modifier.fillMaxSize()
-            ) { syncState ->
-            val outerConfiguration = LocalConfiguration.current
-            val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            var showAllPrayers by rememberSaveable { mutableStateOf(false) }
-            val portraitScrollState = rememberScrollState()
-            var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
-            // Insights keeps its full geometry in expanded mode. Follow the added
-            // prayer row with scroll instead of compressing the carousel; the full
-            // location card simultaneously contracts into a compact action.
-            // Row 3 adds 106dp while the location control gives back 52dp
-            // (92dp -> 40dp). Scroll only that 54dp net growth. The previous
-            // 122dp travel made the entering tiles move farther than their reveal,
-            // which looked like a bounce before the layout settled.
-            val expansionScrollDistancePx = with(LocalDensity.current) { 54.dp.toPx() }
-            // A disabled verticalScroll does not dispatch nested-scroll deltas, which
-            // prevents PullToSyncContainer from seeing downward drags while the prayer
-            // list is collapsed. This no-op scrollable keeps the page stationary while
-            // still forwarding those gestures to the pull-to-sync connection.
-            val pullGestureScrollState = rememberScrollableState { 0f }
-            LaunchedEffect(showAllPrayers, outerIsLandscape) {
-                if (!outerIsLandscape) {
-                    if (showAllPrayers) {
-                        // Bring the added row and its controls into view while the
-                        // full-size Insights carousel remains available above.
-                        keepExpansionScrollEnabled = true
-                        withFrameNanos { }
-                        portraitScrollState.animateScrollBy(
-                            value = expansionScrollDistancePx,
-                            animationSpec = tween(
-                                durationMillis = 840,
-                                easing = FastOutSlowInEasing,
-                            ),
-                        )
-                    } else if (keepExpansionScrollEnabled) {
-                        portraitScrollState.animateScrollTo(
-                            value = 0,
-                            animationSpec = tween(
-                                durationMillis = 680,
-                                easing = FastOutSlowInEasing,
-                            ),
-                        )
-                        keepExpansionScrollEnabled = false
-                    }
-                }
-            }
-            // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
-            val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-                .asPaddingValues().calculateTopPadding()
-            val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
-            com.starception.submission.ui.AppTopSearchBar(
-                title = stringResource(R.string.prayer_times_title),
-                onSettingsClick = onSettingsClick,
-                topInset = dynamicTopInset,
-                onVerseClick = onSurahClickWithAyah,
-                onSearchSubmit = onSearchSubmit,
-            ) {
-            // Apply syncState.pullModifier here so the inner ComposeView's scrollable
-            // feeds the outer PullToSyncContainer's NestedScrollConnection. Without
-            // this the View↔Compose boundary swallows the drag events.
-            Column(modifier = Modifier
-                .fillMaxSize()
-                .then(syncState.pullModifier)
-                .then(
-                    if (!outerIsLandscape && (showAllPrayers || keepExpansionScrollEnabled)) {
-                        Modifier.verticalScroll(
-                            state = portraitScrollState,
-                        )
-                    } else {
-                        Modifier.scrollable(
-                            state = pullGestureScrollState,
-                            orientation = Orientation.Vertical,
-                        )
-                    },
-                )) {
-            // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
-            // Home page content with wobble transformation applied to actual content
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-            ) {
-            
-            if (isLoading) {
-            // Loading state with Material 3 design
-            Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Loading prayer times...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        } else {
-            // Main content with simple wobble transformations
-            // Use syncState.wobbleIntensity from syncState
-
-            // Detect orientation for adaptive layout
-            val configuration = LocalConfiguration.current
-            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            val fontScale = LocalDensity.current.fontScale
-            // Reserve room for the search chrome, prayer rows, location card and
-            // floating navigation, then give the Insights carousel what remains.
-            // This keeps Location visible at rest instead of relying on a height
-            // tuned for one handset. Larger accessibility text gets extra room too.
-            val portraitInsightMaxHeight = when {
-                configuration.screenHeightDp < 820 -> 280.dp
-                configuration.screenHeightDp < 900 -> 304.dp
-                // The Pixel 9 Pro class has enough vertical room for the carousel
-                // to absorb the final dashboard slack. At 328dp the location tile
-                // still stopped about 30dp above the floating navigation; 348dp
-                // leaves the intended compact 10–12dp visual gap.
-                else -> 348.dp
-            }
-            // Measured against the real chrome rather than guessed: the prayer rows
-            // gave back 32dp (112 -> 96), the Show All control 8dp, the Prayer times
-            // header 8dp and the location card 6dp, on top of the slack that was
-            // already there while this sat pinned to its 208dp floor. Charge less
-            // than the chrome actually needs and the card slides under the floating
-            // navigation; charge more and dead space collects above it.
-            val portraitInsightRestingHeight = (
-                configuration.screenHeightDp.dp -
-                    576.dp -
-                    (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
-                ).coerceIn(208.dp, portraitInsightMaxHeight)
-            // Keep the location tile at the same screen position while the sync strip
-            // is held. The sheet moves down by heldContentInsetTop, while the search
-            // chrome simultaneously gives back only the portion of the status-bar
-            // inset represented by dynamicTopInset. Let the large Insights strip absorb
-            // the remaining displacement so prayer cards keep their complete design,
-            // including the localized Arabic prayer name.
-            val syncTopInsetReclaim = (statusBarInset - dynamicTopInset)
-                .coerceAtLeast(0.dp)
-                .coerceAtMost(syncState.heldContentInsetTop)
-            val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
-            // The expanded prayer list needs the full bottom clearance as manual
-            // scroll runway for its added row and the location card beneath it.
-            val effectiveSyncBottomClearanceReclaim =
-                if (showAllPrayers || keepExpansionScrollEnabled) {
-                    0.dp
-                } else {
-                    syncBottomClearanceReclaim
-                }
-            val syncContentCompression =
-                (syncState.heldContentInsetTop - syncTopInsetReclaim)
-                    .coerceAtLeast(0.dp)
-            // A persistent sync/prayer strip used to collapse Insights all the way to
-            // 170dp on every phone. On tall portrait displays (Pixel 9 Pro included)
-            // that made the dashboard finish roughly 40dp too early, leaving a large
-            // empty band between Location and the floating navigation. Preserve the
-            // normal 208dp compact strip on tall screens; genuinely short phones still
-            // have the smaller escape hatch needed to keep Location reachable.
-            val portraitInsightMinHeight =
-                if (configuration.screenHeightDp >= 900) 208.dp else 170.dp
-            val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
-                .coerceAtLeast(portraitInsightMinHeight)
-
-            if (isLandscape) {
-                // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // Landscape doesn't scroll, so the gesture-nav bar inset must be
-                        // reserved here or the location card / prayer grid sit under it.
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-                        .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Left column: Swipeable tiles + Location info
-                    Column(
-                        modifier = Modifier
-                            .weight(0.5f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Swipeable Big Tiles - take most of the height
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                        ) {
-                            SwipeableBigTiles(
-                                prayerTimes = prayerTimes,
-                                currentTime = currentTime,
-                                locationService = locationService,
-                                getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
-                                getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
-                                getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
-                                getPrayerTimeDisplay = { prayerName -> PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes) },
-                                getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
-                                getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
-                                getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
-                                getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
-                                getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
-                                getTimeSinceCurrentPrayer = { SmartContentUtils.formatTimeSinceCurrentPrayer(SmartContentUtils.getMinutesSinceCurrentPrayer(prayerTimes, currentTime) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) }) },
-                                getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
-                                getDailyStatsTitle = {
-                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
-                                    SmartContentUtils.getDailyStatsTitle(completed, total)
-                                },
-                                getDailyStatsMessage = {
-                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
-                                    SmartContentUtils.getDailyStatsMessage(completed, total)
-                                },
-                                getPrayed = { prayedCount },
-                                prayedPrayers = prayedPrayersToday,
-                                onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
-                                dailyReadingPlayback = DailyReadingPlaybackState(
-                                    surahIndex = dailyReadingPlayer.currentSurahIndex,
-                                    isPlaying = dailyReadingPlayer.isPlaying,
-                                    isLoading = dailyReadingPlayer.isLoading,
-                                    isDownloading = dailyReadingPlayer.isDownloading,
-                                    downloadProgress = dailyReadingPlayer.downloadProgress,
-                                    error = dailyReadingPlayer.downloadError,
+            ) { syncState ->
+                val outerConfiguration = LocalConfiguration.current
+                val outerIsLandscape = outerConfiguration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                var showAllPrayers by rememberSaveable { mutableStateOf(false) }
+                val portraitScrollState = rememberScrollState()
+                var keepExpansionScrollEnabled by remember { mutableStateOf(false) }
+                // Insights keeps its full geometry in expanded mode. Follow the added
+                // prayer row with scroll instead of compressing the carousel; the full
+                // location card simultaneously contracts into a compact action.
+                // Row 3 adds 106dp while the location control gives back 52dp
+                // (92dp -> 40dp). Scroll only that 54dp net growth. The previous
+                // 122dp travel made the entering tiles move farther than their reveal,
+                // which looked like a bounce before the layout settled.
+                val expansionScrollDistancePx = with(LocalDensity.current) { 54.dp.toPx() }
+                // A disabled verticalScroll does not dispatch nested-scroll deltas, which
+                // prevents PullToSyncContainer from seeing downward drags while the prayer
+                // list is collapsed. This no-op scrollable keeps the page stationary while
+                // still forwarding those gestures to the pull-to-sync connection.
+                val pullGestureScrollState = rememberScrollableState { 0f }
+                LaunchedEffect(showAllPrayers, outerIsLandscape) {
+                    if (!outerIsLandscape) {
+                        if (showAllPrayers) {
+                            // Bring the added row and its controls into view while the
+                            // full-size Insights carousel remains available above.
+                            keepExpansionScrollEnabled = true
+                            withFrameNanos { }
+                            portraitScrollState.animateScrollBy(
+                                value = expansionScrollDistancePx,
+                                animationSpec = tween(
+                                    durationMillis = 840,
+                                    easing = FastOutSlowInEasing,
                                 ),
-                                onDailyReadingPlayPause = { surahIndex ->
-                                    if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
-                                        (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
-                                    ) {
-                                        dailyReadingPlayer.togglePlayPause()
-                                    } else {
-                                        dailyReadingPlayer.playSurah(surahIndex)
-                                    }
-                                },
-                                onDailyReadingRetry = dailyReadingPlayer::retryDownload,
-                                getCurrentActivity = {
-                                    try {
-                                        com.starception.submission.util.ActivityTracker.getCurrentActivity()
-                                    } catch (e: Exception) {
-                                        "UNKNOWN"
-                                    }
-                                },
-                                onCompassClick = {
-                                    Log.d("PrayerTimes", "Compass clicked, showing popup")
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    showCompassPopup = true
-                                },
-                                timeOffsets = storedOffsets,
-                                isLandscape = true,
-                                onSurahClick = onSurahClick,
-                                onSurahClickWithAyah = onSurahClickWithAyah,
-                                onFortressDuaClick = onFortressDuaClick,
-                                onBukhariBookPlayClick = onBukhariBookPlayClick,
-                                onShamayelBookPlayClick = onShamayelBookPlayClick,
-                                fortressDuasByChapter = contextualDuasByChapter,
-                                goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
-                                isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
-                                weatherThresholds = prayerWeatherThresholds,
                             )
+                        } else if (keepExpansionScrollEnabled) {
+                            portraitScrollState.animateScrollTo(
+                                value = 0,
+                                animationSpec = tween(
+                                    durationMillis = 680,
+                                    easing = FastOutSlowInEasing,
+                                ),
+                            )
+                            keepExpansionScrollEnabled = false
                         }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        LandscapeLocationWeatherTile(
-                            locationString = location,
-                            locationData = prayerTimes?.location,
-                            thresholds = prayerWeatherThresholds,
-                            onLongPress = { showWeatherThresholds = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
                     }
-
-                    // Right column: compact header + all six prayer cards. The rows
-                    // share the measured height so the last pair cannot fall behind
-                    // the bottom edge or require a hidden initial scroll.
+                }
+                // Dynamic top inset: full at rest, collapses during pull (Fitbit-style)
+                val statusBarInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                    .asPaddingValues().calculateTopPadding()
+                val dynamicTopInset = statusBarInset * (1f - (syncState.wobbleIntensity * 2f).coerceAtMost(1f))
+                com.starception.submission.ui.AppTopSearchBar(
+                    title = stringResource(R.string.prayer_times_title),
+                    onSettingsClick = onSettingsClick,
+                    topInset = dynamicTopInset,
+                    onVerseClick = onSurahClickWithAyah,
+                    onSearchSubmit = onSearchSubmit,
+                ) {
+                    // Apply syncState.pullModifier here so the inner ComposeView's scrollable
+                    // feeds the outer PullToSyncContainer's NestedScrollConnection. Without
+                    // this the View↔Compose boundary swallows the drag events.
                     Column(
-                        modifier = Modifier
-                            .weight(0.5f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Get ordered prayers
-                        val orderedPrayers = remember(currentTime, prayerTimes) {
-                            val result = mutableListOf<String>()
-                            val allPrayersList = prayerTimes?.let { times ->
-                                listOf(
-                                    "Fajr" to times.fajr, "Sunrise" to times.sunrise,
-                                    "Dhuhr" to times.dhuhr, "Asr" to times.asr,
-                                    "Maghrib" to times.maghrib, "Isha" to times.isha
-                                )
-                            } ?: emptyList()
-                            if (allPrayersList.isNotEmpty()) {
-                                val currentPrayerIndex = allPrayersList.indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
-                                if (currentPrayerIndex != -1) {
-                                    for (i in 0 until 6) {
-                                        val index = (currentPrayerIndex + i) % allPrayersList.size
-                                        result.add(allPrayersList[index].first)
-                                    }
-                                } else {
-                                    result.addAll(allPrayersList.map { it.first })
-                                }
-                            }
-                            result
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Prayer times",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = "Today’s schedule",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            PrayerHeaderAction(
-                                active = prayerTimeEditMode,
-                                compact = true,
-                                onClick = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    if (prayerTimeEditMode) {
-                                        revealedPrayerCard = null
-                                        currentEditingTile = null
-                                    }
-                                    prayerTimeEditMode = !prayerTimeEditMode
-                                },
-                            )
-                        }
-
-                        // Prayer cards in a 2-column grid for landscape
-                        for (i in orderedPrayers.indices step 2) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // First card in row
-                                InteractivePrayerCard(
-                                    prayerName = orderedPrayers[i],
-                                    currentEditingTile = currentEditingTile,
-                                    onEditingTileChange = { currentEditingTile = it },
-                                    currentOffset = when (orderedPrayers[i]) {
-                                        "Fajr" -> storedOffsets.fajr
-                                        "Sunrise" -> storedOffsets.sunrise
-                                        "Dhuhr" -> storedOffsets.dhuhr
-                                        "Asr" -> storedOffsets.asr
-                                        "Maghrib" -> storedOffsets.maghrib
-                                        "Isha" -> storedOffsets.isha
-                                        else -> 0
-                                    },
-                                    notificationEnabled = when (orderedPrayers[i]) {
-                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                        "Asr" -> notificationPreferences.asrNotificationEnabled
-                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                        else -> true
-                                    },
-                                    onNotificationToggle = { enabled ->
-                                        togglePrayerNotificationAndUpdate(orderedPrayers[i], enabled)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    onShowPopup = { prayerName -> popupDialState = prayerName },
-                                    suggestion = getSuggestionFor(orderedPrayers[i]),
-                                    onApplySuggestion = applySuggestion,
-                                    isRevealed = revealedPrayerCard == orderedPrayers[i],
-                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i] else null }
-                                )
-
-                                // Second card in row (if exists)
-                                if (i + 1 < orderedPrayers.size) {
-                                    InteractivePrayerCard(
-                                        prayerName = orderedPrayers[i + 1],
-                                        currentEditingTile = currentEditingTile,
-                                        onEditingTileChange = { currentEditingTile = it },
-                                        currentOffset = when (orderedPrayers[i + 1]) {
-                                            "Fajr" -> storedOffsets.fajr
-                                            "Sunrise" -> storedOffsets.sunrise
-                                            "Dhuhr" -> storedOffsets.dhuhr
-                                            "Asr" -> storedOffsets.asr
-                                            "Maghrib" -> storedOffsets.maghrib
-                                            "Isha" -> storedOffsets.isha
-                                            else -> 0
-                                        },
-                                        notificationEnabled = when (orderedPrayers[i + 1]) {
-                                            "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                            "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                            "Asr" -> notificationPreferences.asrNotificationEnabled
-                                            "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                            "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                            else -> true
-                                        },
-                                        onNotificationToggle = { enabled ->
-                                            togglePrayerNotificationAndUpdate(orderedPrayers[i + 1], enabled)
-                                        },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight(),
-                                        onShowPopup = { prayerName -> popupDialState = prayerName },
-                                        suggestion = getSuggestionFor(orderedPrayers[i + 1]),
-                                        onApplySuggestion = applySuggestion,
-                                        isRevealed = revealedPrayerCard == orderedPrayers[i + 1],
-                                        onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i + 1] else null }
-                                    )
-                                } else {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-            // PORTRAIT LAYOUT: Original vertical layout
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp)
-                    .padding(
-                        top = 8.dp,
-                        bottom = 0.dp
-                    ),
-                verticalArrangement = Arrangement.Top
-            ) {
-                val dashboardTransition = updateTransition(
-                    targetState = showAllPrayers,
-                    label = "prayerDashboardExpansion",
-                )
-                // Keep the child measurement stable while row 3 is revealed. If the
-                // tiles resize during expandVertically, its moving target produces a
-                // visible settle at the end of the entrance.
-                val tileHeight = 106.dp
-                val buttonIconRotation by dashboardTransition.animateFloat(
-                    transitionSpec = {
-                        tween(durationMillis = 680, easing = FastOutSlowInEasing)
-                    },
-                    label = "prayerToggleRotation",
-                ) { expanded ->
-                    if (expanded) 180f else 0f
-                }
-                // Swipeable Big Tiles
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    SwipeableBigTiles(
-                    prayerTimes = prayerTimes,
-                    currentTime = currentTime,
-                    locationService = locationService,
-                    getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
-                    getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
-                    getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
-                    getPrayerTimeDisplay = { prayerName -> PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes) },
-                    getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
-                    getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
-                    getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
-                    getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
-                    getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
-                    getTimeSinceCurrentPrayer = { SmartContentUtils.formatTimeSinceCurrentPrayer(SmartContentUtils.getMinutesSinceCurrentPrayer(prayerTimes, currentTime) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) }) },
-                    getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
-                    getDailyStatsTitle = { 
-                        val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
-                        SmartContentUtils.getDailyStatsTitle(completed, total) 
-                    },
-                    getDailyStatsMessage = { 
-                        val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
-                        SmartContentUtils.getDailyStatsMessage(completed, total) 
-                    },
-                    getPrayed = { prayedCount },
-                    prayedPrayers = prayedPrayersToday,
-                    onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
-                    dailyReadingPlayback = DailyReadingPlaybackState(
-                        surahIndex = dailyReadingPlayer.currentSurahIndex,
-                        isPlaying = dailyReadingPlayer.isPlaying,
-                        isLoading = dailyReadingPlayer.isLoading,
-                        isDownloading = dailyReadingPlayer.isDownloading,
-                        downloadProgress = dailyReadingPlayer.downloadProgress,
-                        error = dailyReadingPlayer.downloadError,
-                    ),
-                    onDailyReadingPlayPause = { surahIndex ->
-                        if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
-                            (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
-                        ) {
-                            dailyReadingPlayer.togglePlayPause()
-                        } else {
-                            dailyReadingPlayer.playSurah(surahIndex)
-                        }
-                    },
-                    onDailyReadingRetry = dailyReadingPlayer::retryDownload,
-                    getCurrentActivity = { 
-                        // Get current activity from ActivityTracker
-                        try {
-                            com.starception.submission.util.ActivityTracker.getCurrentActivity()
-                        } catch (e: Exception) {
-                            "UNKNOWN"
-                        }
-                    },
-                    onCompassClick = {
-                        Log.d("PrayerTimes", "Compass clicked, showing popup")
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        showCompassPopup = true
-                    },
-                    timeOffsets = storedOffsets,
-                    portraitStripHeight = portraitInsightHeight,
-                    // Expanded prayer mode scrolls naturally; keep Insights at its
-                    // normal size instead of squeezing the carousel to fund row 3.
-                    compactForExpandedPrayers = false,
-                    onSurahClick = onSurahClick,
-                    onSurahClickWithAyah = onSurahClickWithAyah,
-                    onFortressDuaClick = onFortressDuaClick,
-                    onBukhariBookPlayClick = onBukhariBookPlayClick,
-                    onShamayelBookPlayClick = onShamayelBookPlayClick,
-                    fortressDuasByChapter = contextualDuasByChapter,
-                    goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
-                    isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
-                    weatherThresholds = prayerWeatherThresholds,
-                )
-                }
-
-                // Treat adjustment guidance as part of the prayer section
-                // header instead of a separate dashboard banner.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(1.dp),
-                    ) {
-                        Text(
-                            text = "Prayer times",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "Today’s schedule",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    PrayerHeaderAction(
-                        active = prayerTimeEditMode,
-                        onClick = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            if (prayerTimeEditMode) {
-                                revealedPrayerCard = null
-                                currentEditingTile = null
-                                prayerTimeEditMode = false
-                            } else {
-                                prayerTimeEditMode = true
-                            }
-                        },
-                    )
-                }
-
-                // Expandable prayer layout - smart default view with expand option
-                // The tile height participates in the shared dashboard
-                // transition above, keeping every moving element synchronized.
-                
-                // Get next 6 prayers in circular chronological order
-                // All 6 items (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) are included
-                // Shows next 4 when collapsed, next 6 when expanded
-                val orderedPrayers = remember(currentTime, prayerTimes) {
-                    val result = mutableListOf<String>()
-
-                    // Define all 6 prayers in chronological order
-                    val allPrayersList = prayerTimes?.let { times ->
-                        listOf(
-                            "Fajr" to times.fajr,
-                            "Sunrise" to times.sunrise,
-                            "Dhuhr" to times.dhuhr,
-                            "Asr" to times.asr,
-                            "Maghrib" to times.maghrib,
-                            "Isha" to times.isha
-                        )
-                    } ?: emptyList()
-
-                    if (allPrayersList.isNotEmpty()) {
-                        // Find the current prayer (last prayer that has passed)
-                        val currentPrayerIndex = allPrayersList
-                            .indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
-
-                        if (currentPrayerIndex != -1) {
-                            // Found current prayer - start from there and show next 6 prayers in circular order
-                            for (i in 0 until 6) {
-                                val index = (currentPrayerIndex + i) % allPrayersList.size
-                                result.add(allPrayersList[index].first)
-                            }
-                        } else {
-                            // No prayer has passed yet (very early morning before Fajr) - start from Fajr
-                            result.addAll(allPrayersList.map { it.first })
-                        }
-                    }
-
-                    result
-                }
-
-                // First row: First 2 prayers from ordered list (most relevant)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // First prayer tile
-                    if (orderedPrayers.isNotEmpty()) {
-                        InteractivePrayerCard(
-                            prayerName = orderedPrayers[0],
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (orderedPrayers[0]) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Sunrise" -> storedOffsets.sunrise
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            notificationEnabled = when (orderedPrayers[0]) {
-                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                "Asr" -> notificationPreferences.asrNotificationEnabled
-                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                else -> true
-                            },
-                            onNotificationToggle = { enabled ->
-                                togglePrayerNotificationAndUpdate(orderedPrayers[0], enabled)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight),
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            },
-                            suggestion = getSuggestionFor(orderedPrayers[0]),
-                            onApplySuggestion = applySuggestion,
-                            isRevealed = revealedPrayerCard == orderedPrayers[0],
-                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[0] else null }
-                        )
-                    }
-
-                    // Second prayer tile
-                    if (orderedPrayers.size > 1) {
-                        InteractivePrayerCard(
-                            prayerName = orderedPrayers[1],
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (orderedPrayers[1]) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Sunrise" -> storedOffsets.sunrise
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            notificationEnabled = when (orderedPrayers[1]) {
-                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                "Asr" -> notificationPreferences.asrNotificationEnabled
-                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                else -> true
-                            },
-                            onNotificationToggle = { enabled ->
-                                togglePrayerNotificationAndUpdate(orderedPrayers[1], enabled)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight),
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            },
-                            suggestion = getSuggestionFor(orderedPrayers[1]),
-                            onApplySuggestion = applySuggestion,
-                            isRevealed = revealedPrayerCard == orderedPrayers[1],
-                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[1] else null }
-                        )
-                    }
-                }
-
-                // Second row: Remaining 2 prayers from ordered list
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Third prayer tile
-                    if (orderedPrayers.size > 2) {
-                        InteractivePrayerCard(
-                            prayerName = orderedPrayers[2],
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (orderedPrayers[2]) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Sunrise" -> storedOffsets.sunrise
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            notificationEnabled = when (orderedPrayers[2]) {
-                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                "Asr" -> notificationPreferences.asrNotificationEnabled
-                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                else -> true
-                            },
-                            onNotificationToggle = { enabled ->
-                                togglePrayerNotificationAndUpdate(orderedPrayers[2], enabled)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight),
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            },
-                            suggestion = getSuggestionFor(orderedPrayers[2]),
-                            onApplySuggestion = applySuggestion,
-                            isRevealed = revealedPrayerCard == orderedPrayers[2],
-                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[2] else null }
-                        )
-                    }
-
-                    // Fourth prayer tile
-                    if (orderedPrayers.size > 3) {
-                        InteractivePrayerCard(
-                            prayerName = orderedPrayers[3],
-                            currentEditingTile = currentEditingTile,
-                            onEditingTileChange = { currentEditingTile = it },
-                            currentOffset = when (orderedPrayers[3]) {
-                                "Fajr" -> storedOffsets.fajr
-                                "Sunrise" -> storedOffsets.sunrise
-                                "Dhuhr" -> storedOffsets.dhuhr
-                                "Asr" -> storedOffsets.asr
-                                "Maghrib" -> storedOffsets.maghrib
-                                "Isha" -> storedOffsets.isha
-                                else -> 0
-                            },
-                            notificationEnabled = when (orderedPrayers[3]) {
-                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                "Asr" -> notificationPreferences.asrNotificationEnabled
-                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                else -> true
-                            },
-                            onNotificationToggle = { enabled ->
-                                togglePrayerNotificationAndUpdate(orderedPrayers[3], enabled)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(tileHeight),
-                            onShowPopup = { prayerName ->
-                                android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                popupDialState = prayerName
-                                android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                            },
-                            suggestion = getSuggestionFor(orderedPrayers[3]),
-                            onApplySuggestion = applySuggestion,
-                            isRevealed = revealedPrayerCard == orderedPrayers[3],
-                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[3] else null }
-                        )
-                    }
-                }
-
-                // Material 3 expressive expandable section with a deliberately
-                // unhurried curve; this avoids the abrupt accordion-like jump.
-                AnimatedVisibility(
-                    visible = showAllPrayers,
-                    enter = expandVertically(
-                        animationSpec = tween(
-                            durationMillis = 840,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        expandFrom = Alignment.Top,
-                    ) + fadeIn(
-                        animationSpec = tween(
-                            durationMillis = 500,
-                            delayMillis = 40,
-                        ),
-                    ),
-                    exit = shrinkVertically(
-                        animationSpec = tween(
-                            durationMillis = 680,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        shrinkTowards = Alignment.Top,
-                    ) + fadeOut(
-                        animationSpec = tween(durationMillis = 240),
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Fifth prayer with staggered entrance animation
-                        if (orderedPrayers.size > 4) {
-                            InteractivePrayerCard(
-                                prayerName = orderedPrayers[4],
-                                currentEditingTile = currentEditingTile,
-                                onEditingTileChange = { currentEditingTile = it },
-                                currentOffset = when (orderedPrayers[4]) {
-                                    "Fajr" -> storedOffsets.fajr
-                                    "Sunrise" -> storedOffsets.sunrise
-                                    "Dhuhr" -> storedOffsets.dhuhr
-                                    "Asr" -> storedOffsets.asr
-                                    "Maghrib" -> storedOffsets.maghrib
-                                    "Isha" -> storedOffsets.isha
-                                    else -> 0
-                                },
-                                notificationEnabled = when (orderedPrayers[4]) {
-                                    "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                    "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                    "Asr" -> notificationPreferences.asrNotificationEnabled
-                                    "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                    "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                    else -> true
-                                },
-                                onNotificationToggle = { enabled ->
-                                    togglePrayerNotificationAndUpdate(orderedPrayers[4], enabled)
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(tileHeight),
-                                onShowPopup = { prayerName ->
-                                    android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                    popupDialState = prayerName
-                                    android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                                },
-                                suggestion = getSuggestionFor(orderedPrayers[4]),
-                                onApplySuggestion = applySuggestion,
-                                isRevealed = revealedPrayerCard == orderedPrayers[4],
-                                onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[4] else null }
-                            )
-                        }
-
-                        // Sixth prayer with staggered entrance animation
-                        if (orderedPrayers.size > 5) {
-                            InteractivePrayerCard(
-                                prayerName = orderedPrayers[5],
-                                currentEditingTile = currentEditingTile,
-                                onEditingTileChange = { currentEditingTile = it },
-                                currentOffset = when (orderedPrayers[5]) {
-                                    "Fajr" -> storedOffsets.fajr
-                                    "Sunrise" -> storedOffsets.sunrise
-                                    "Dhuhr" -> storedOffsets.dhuhr
-                                    "Asr" -> storedOffsets.asr
-                                    "Maghrib" -> storedOffsets.maghrib
-                                    "Isha" -> storedOffsets.isha
-                                    else -> 0
-                                },
-                                notificationEnabled = when (orderedPrayers[5]) {
-                                    "Fajr" -> notificationPreferences.fajrNotificationEnabled
-                                    "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
-                                    "Asr" -> notificationPreferences.asrNotificationEnabled
-                                    "Maghrib" -> notificationPreferences.maghribNotificationEnabled
-                                    "Isha" -> notificationPreferences.ishaNotificationEnabled
-                                    else -> true
-                                },
-                                onNotificationToggle = { enabled ->
-                                    togglePrayerNotificationAndUpdate(orderedPrayers[5], enabled)
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(tileHeight),
-                                onShowPopup = { prayerName ->
-                                    android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
-                                    popupDialState = prayerName
-                                    android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
-                                },
-                                suggestion = getSuggestionFor(orderedPrayers[5]),
-                                onApplySuggestion = applySuggestion,
-                                isRevealed = revealedPrayerCard == orderedPrayers[5],
-                                onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[5] else null }
-                            )
-                        }
-                    }
-                }
-
-                // Keep the toggle and location in one layout so the card can travel,
-                // resize and round into the floating pin instead of cross-fading
-                // between two unrelated components.
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    // The location morph and row-3 expansion share the same state,
-                    // duration and easing so neither can lead or catch up to the other.
-                    val locationControlHeight by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationControlHeight",
-                    ) { expanded ->
-                        if (expanded) 40.dp else 92.dp
-                    }
-                    val locationCardWidth by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationCardWidth",
-                    ) { expanded ->
-                        if (expanded) 40.dp else maxWidth
-                    }
-                    val locationCardHeight by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationCardHeight",
-                    ) { expanded ->
-                        if (expanded) 40.dp else 52.dp
-                    }
-                    val locationCardOffsetY by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationCardOffsetY",
-                    ) { expanded ->
-                        // In the resting layout the Show All control starts at 2dp
-                        // and ends at 34dp. A 36dp card offset leaves a compact 2dp
-                        // gap, returning 4dp below the location card for navigation
-                        // clearance without changing the dashboard's total height.
-                        if (expanded) 0.dp else 36.dp
-                    }
-                    val locationCardEndInset by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationCardEndInset",
-                    ) { expanded ->
-                        if (expanded) 12.dp else 0.dp
-                    }
-                    val locationCardCornerRadius by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationCardCornerRadius",
-                    ) { expanded ->
-                        if (expanded) 20.dp else 16.dp
-                    }
-                    val locationMarkerInset by dashboardTransition.animateDp(
-                        transitionSpec = {
-                            tween(durationMillis = 840, easing = FastOutSlowInEasing)
-                        },
-                        label = "locationMarkerInset",
-                    ) { expanded ->
-                        // 9dp centers a 22dp marker in the 40dp floating surface.
-                        if (expanded) 9.dp else 14.dp
-                    }
-                    val locationCardShape = RoundedCornerShape(locationCardCornerRadius)
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(locationControlHeight),
-                    ) {
-                    TextButton(
-                        onClick = {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            // One state starts (or reverses) the prayer-row expansion,
-                            // dashboard scroll and location morph on the same frame.
-                            showAllPrayers = !showAllPrayers
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        // Default 40dp min-height around a 14dp label; the carousel
-                        // uses the difference.
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset(y = 2.dp)
-                            .height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .graphicsLayer {
-                                    rotationZ = buttonIconRotation
-                                },
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (showAllPrayers) "Show Less" else "Show All Prayers",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-
-                    // One surface owns both states. Anchoring it to the end makes the
-                    // full card contract naturally into the pin beside Show Less.
-                    val locationTileContent = MaterialTheme.colorScheme.onSurface
-                    val locationTileSupporting = MaterialTheme.colorScheme.onSurfaceVariant
-                    Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = -locationCardEndInset, y = locationCardOffsetY)
-                        .width(locationCardWidth)
-                        .height(locationCardHeight)
-                        .zIndex(1f)
-                        .clip(locationCardShape)
-                        .combinedClickable(
-                            onClick = {
-                                if (showAllPrayers) {
-                                    hapticFeedback.performHapticFeedback(
-                                        HapticFeedbackType.TextHandleMove,
-                                    )
-                                    showAllPrayers = false
-                                } else {
-                                    showWeatherThresholds = true
-                                }
-                            },
-                            onLongClick = {
-                                if (showAllPrayers) {
-                                    hapticFeedback.performHapticFeedback(
-                                        HapticFeedbackType.TextHandleMove,
-                                    )
-                                    showAllPrayers = false
-                                } else {
-                                    hapticFeedback.performHapticFeedback(
-                                        HapticFeedbackType.LongPress,
-                                    )
-                                    showWeatherThresholds = true
-                                }
-                            },
-                        ),
-                    shape = locationCardShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    // Follows the prayer tiles: outlined only in dark, where a card
-                    // needs an edge to separate from the background. In light it was
-                    // the one outlined card on the screen, and primary at 20% renders
-                    // a cool blue hairline against these warm surfaces.
-                    border = if (showAllPrayers) {
-                        BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                        )
-                    } else if (LocalDarkTheme.current) {
-                        BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                        )
-                    } else {
-                        null
-                    },
-                    shadowElevation = if (showAllPrayers) 3.dp else if (LocalDarkTheme.current) 0.dp else 1.dp,
-                    ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                    // This is the same marker in both states. The surface's animated
-                    // right-anchored width carries it from the card's leading edge to
-                    // the floating position, so there is no icon handoff or blank frame.
-                    Image(
-                        painter = painterResource(R.drawable.ic_flaticon_location_marker),
-                        contentDescription = if (showAllPrayers) {
-                            "Collapse prayers and show location details"
-                        } else {
-                            "Prayer location"
-                        },
-                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = locationMarkerInset)
-                            .size(22.dp)
-                            .zIndex(1f),
-                    )
-
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = !showAllPrayers,
-                        enter = fadeIn(
-                            animationSpec = tween(durationMillis = 220, delayMillis = 150),
-                        ),
-                        exit = fadeOut(
-                            animationSpec = tween(durationMillis = 180),
-                        ),
-                    ) {
-                    Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(start = 46.dp, end = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val locationData = prayerTimes?.location
-                        val city = locationData?.city?.trim().orEmpty()
-                        val area = locationData?.area?.trim().takeUnless { it.isNullOrEmpty() }
-                            ?: locationData?.subLocality?.trim().takeUnless { it.isNullOrEmpty() }
-                        val countryCode = locationData?.countryCode?.trim()?.uppercase()
-                            ?.takeIf { it.length in 2..3 }
-                        val locationTitle = city.ifBlank {
-                            getLocationWithCountryCode(location, locationData)
-                        }
-                        val locationDetail = area
-                            ?.takeUnless { it.equals(locationTitle, ignoreCase = true) }
-                            ?: locationData?.administrativeArea?.trim()
-                                ?.takeUnless {
-                                    it.isEmpty() || it.equals(locationTitle, ignoreCase = true)
-                                }
-                            ?: locationData?.country?.trim().orEmpty()
-
-                        // Check if location text contains Arabic (Unicode range 0600-06FF)
-                        val containsArabic = (locationTitle + locationDetail)
-                            .any { it in '\u0600'..'\u06FF' }
-
-                        // Get selected Arabic font if location contains Arabic
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        val arabicFontFamily = if (containsArabic) {
-                            val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
-                            val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
-                            when (selectedFont) {
-                                "pdms_saleem" -> QuranFonts.PDMSSaleem
-                                "noor_e_hidayat" -> QuranFonts.NoorEHidayat
-                                "thabit" -> QuranFonts.Thabit
-                                "uthmani_script" -> QuranFonts.UthmanicScript
-                                "indopak_script" -> QuranFonts.IndoPakScript
-                                else -> QuranFonts.PDMSSaleem
-                            }
-                        } else {
-                            null
-                        }
-
-                        val currentWeatherState by rememberCurrentWeatherLoadState(locationData)
-
-                        val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
-                            ?: countryCode.orEmpty()
-
-                        // Name and chevron claim the row's spare width as a group. The
-                        // continuously animated marker occupies the 32dp reserved by
-                        // the outer row's start padding.
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                        Column(
-                            modifier = Modifier.weight(1f, fill = false),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                text = locationTitle,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = arabicFontFamily
-                                        ?: MaterialTheme.typography.bodyLarge.fontFamily,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    lineHeight = 18.sp,
-                                ),
-                                color = locationTileContent,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-
-                            if (supportingLocation.isNotBlank()) {
-                                Text(
-                                    text = supportingLocation,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        lineHeight = 14.sp,
-                                        letterSpacing = 0.sp,
-                                    ),
-                                    color = locationTileSupporting,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-
-                        // Sits directly against the location text: the column above
-                        // uses fill = false, so it reports only the width it needs and
-                        // this lands right after it rather than at the row's far edge.
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Weather details",
-                            tint = locationTileSupporting.copy(alpha = 0.7f),
-                            modifier = Modifier
-                                .padding(start = 2.dp)
-                                .size(16.dp),
-                        )
-                        }
-
-                        when (val weatherState = currentWeatherState) {
-                            CurrentWeatherLoadState.Loading -> {
-                                PortraitWeatherLoadingPlaceholder()
-                            }
-                            is CurrentWeatherLoadState.Available -> {
-                            val weather = weatherState.weather
-                            val conditionLabel = weatherConditionLabel(weather)
-                            val temperatureLevel = temperatureThresholdLevel(
-                                value = weather.temperatureCelsius,
-                                threshold = prayerWeatherThresholds.temperatureCelsius,
-                            )
-                            val humidityLevel = humidityThresholdLevel(
-                                value = weather.relativeHumidity,
-                                threshold = prayerWeatherThresholds.humidity,
-                            )
-                            val rainLevel = rainThresholdLevel(
-                                value = weather.precipitationProbability,
-                                threshold = prayerWeatherThresholds.rainProbability,
-                            )
-                            val precipitationLabel = if (weather.precipitationProbability == 0) {
-                                "No rain"
-                            } else {
-                                "${weather.precipitationProbability}% rain"
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // Rule separating location identity from conditions, as
-                            // in the dashboard reference.
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .height(32.dp)
-                                    .background(
-                                        brush = Brush.verticalGradient(
-                                            0f to Color.Transparent,
-                                            0.2f to MaterialTheme.colorScheme.primary.copy(
-                                                alpha = 0.06f,
-                                            ),
-                                            0.5f to MaterialTheme.colorScheme.primary.copy(
-                                                alpha = 0.30f,
-                                            ),
-                                            0.8f to MaterialTheme.colorScheme.primary.copy(
-                                                alpha = 0.06f,
-                                            ),
-                                            1f to Color.Transparent,
-                                        ),
-                                        shape = RoundedCornerShape(50),
-                                    ),
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(
-                                    space = 5.dp,
-                                    alignment = Alignment.End,
-                                ),
-                            ) {
-                                // Monochrome takes the palette tint fully, so it reads
-                                // at this size against a pale card the way the location
-                                // pin beside it does. Fill and Flat are both light
-                                // artwork and washed out here, which is what the tinted
-                                // disc was previously compensating for.
-                                if (temperatureLevel == WeatherThresholdLevel.Normal) {
-                                    AnimatedCurrentWeatherIcon(
-                                        weather = weather,
-                                        styleOverride = MeteoconStyle.Monochrome,
-                                        modifier = Modifier.size(32.dp),
+                            .then(syncState.pullModifier)
+                            .then(
+                                if (!outerIsLandscape && (showAllPrayers || keepExpansionScrollEnabled)) {
+                                    Modifier.verticalScroll(
+                                        state = portraitScrollState,
                                     )
                                 } else {
-                                    AnimatedPrayerWeatherIcon(
-                                        visual = PrayerWeatherVisual.Heat,
-                                        level = temperatureLevel,
-                                        modifier = Modifier.size(32.dp),
+                                    Modifier.scrollable(
+                                        state = pullGestureScrollState,
+                                        orientation = Orientation.Vertical,
                                     )
-                                }
-                                Column(
-                                    // Keep the three lines on a shared leading edge
-                                    // so the icon and copy read as one compact unit.
-                                    // The parent row anchors that unit to the card's
-                                    // 14dp end inset.
-                                    horizontalAlignment = Alignment.Start,
-                                    verticalArrangement = Arrangement.Center,
+                                },
+                            ),
+                    ) {
+                        // Pull-to-refresh indicator is handled by PullToSyncContainer in the sage background
+                        // Home page content with wobble transformation applied to actual content
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize(),
+                        ) {
+                            if (isLoading) {
+                                // Loading state with Material 3 design
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    // Keep these stacked. Setting temperature and
-                                    // condition on one line widened this block to
-                                    // ~135dp, and because it is unweighted it claims
-                                    // that width first — which truncated the location
-                                    // name to "Al Safo...". Stacked, the widest line
-                                    // is ~68dp and the location keeps its room.
-                                    Text(
-                                        // The weather repository currently requests
-                                        // Celsius explicitly, so always expose the unit
-                                        // instead of leaving a bare degree ambiguous.
-                                        text = "${weather.temperatureCelsius.roundToInt()}°C",
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 15.sp,
-                                            lineHeight = 18.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
-                                            ),
-                                        ),
-                                        color = locationTileContent,
-                                        maxLines = 1,
-                                    )
-                                    Text(
-                                        text = conditionLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 10.5.sp,
-                                            lineHeight = 13.sp,
-                                            letterSpacing = 0.sp,
-                                            platformStyle = PlatformTextStyle(
-                                                includeFontPadding = false,
-                                            ),
-                                        ),
-                                        color = locationTileContent,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    val feelsLike = weather.apparentTemperatureCelsius
-                                    val defaultSupportingText = if (feelsLike != null) {
-                                        "Feels like ${feelsLike.roundToInt()}°C"
-                                    } else {
-                                        "${weather.relativeHumidity}% · $precipitationLabel"
-                                    }
-                                    val thresholdSupportingText = when {
-                                        rainLevel != WeatherThresholdLevel.Normal ->
-                                            "Rain ${weather.precipitationProbability}%"
-                                        humidityLevel != WeatherThresholdLevel.Normal ->
-                                            "Humidity ${weather.relativeHumidity}%"
-                                        else -> null
-                                    }
-                                    var showThresholdText by remember(thresholdSupportingText) {
-                                        mutableStateOf(false)
-                                    }
-                                    LaunchedEffect(thresholdSupportingText) {
-                                        showThresholdText = false
-                                        if (thresholdSupportingText != null) {
-                                            while (true) {
-                                                delay(4_500L)
-                                                showThresholdText = true
-                                                delay(3_500L)
-                                                showThresholdText = false
-                                            }
-                                        }
-                                    }
-                                    // Measure both possible labels up front. This gives the
-                                    // animated layer one stable slot instead of letting
-                                    // AnimatedContent resize the weather column on every swap.
-                                    Box(
-                                        modifier = Modifier.height(14.dp),
-                                        contentAlignment = Alignment.CenterStart,
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
-                                        listOfNotNull(
-                                            defaultSupportingText,
-                                            thresholdSupportingText,
-                                        ).forEach { measuredText ->
-                                            Text(
-                                                text = measuredText,
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontSize = 10.5.sp,
-                                                    lineHeight = 13.sp,
-                                                    letterSpacing = 0.sp,
-                                                    platformStyle = PlatformTextStyle(
-                                                        includeFontPadding = false,
-                                                    ),
-                                                ),
-                                                maxLines = 1,
+                                        CircularProgressIndicator(
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "Loading prayer times...",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Main content with simple wobble transformations
+                                // Use syncState.wobbleIntensity from syncState
+
+                                // Detect orientation for adaptive layout
+                                val configuration = LocalConfiguration.current
+                                val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                val fontScale = LocalDensity.current.fontScale
+                                // Reserve room for the search chrome, prayer rows, location card and
+                                // floating navigation, then give the Insights carousel what remains.
+                                // This keeps Location visible at rest instead of relying on a height
+                                // tuned for one handset. Larger accessibility text gets extra room too.
+                                val portraitInsightMaxHeight = when {
+                                    configuration.screenHeightDp < 820 -> 280.dp
+                                    configuration.screenHeightDp < 900 -> 304.dp
+                                    // The Pixel 9 Pro class has enough vertical room for the carousel
+                                    // to absorb the final dashboard slack. At 328dp the location tile
+                                    // still stopped about 30dp above the floating navigation; 348dp
+                                    // leaves the intended compact 10–12dp visual gap.
+                                    else -> 348.dp
+                                }
+                                // Measured against the real chrome rather than guessed: the prayer rows
+                                // gave back 32dp (112 -> 96), the Show All control 8dp, the Prayer times
+                                // header 8dp and the location card 6dp, on top of the slack that was
+                                // already there while this sat pinned to its 208dp floor. Charge less
+                                // than the chrome actually needs and the card slides under the floating
+                                // navigation; charge more and dead space collects above it.
+                                val portraitInsightRestingHeight = (
+                                    configuration.screenHeightDp.dp -
+                                        576.dp -
+                                        (80f * (fontScale - 1f).coerceAtLeast(0f)).dp
+                                    ).coerceIn(208.dp, portraitInsightMaxHeight)
+                                // Keep the location tile at the same screen position while the sync strip
+                                // is held. The sheet moves down by heldContentInsetTop, while the search
+                                // chrome simultaneously gives back only the portion of the status-bar
+                                // inset represented by dynamicTopInset. Let the large Insights strip absorb
+                                // the remaining displacement so prayer cards keep their complete design,
+                                // including the localized Arabic prayer name.
+                                val syncTopInsetReclaim = (statusBarInset - dynamicTopInset)
+                                    .coerceAtLeast(0.dp)
+                                    .coerceAtMost(syncState.heldContentInsetTop)
+                                val syncBottomClearanceReclaim = syncState.heldContentInsetTop.coerceAtMost(38.dp)
+                                // The expanded prayer list needs the full bottom clearance as manual
+                                // scroll runway for its added row and the location card beneath it.
+                                val effectiveSyncBottomClearanceReclaim =
+                                    if (showAllPrayers || keepExpansionScrollEnabled) {
+                                        0.dp
+                                    } else {
+                                        syncBottomClearanceReclaim
+                                    }
+                                val syncContentCompression =
+                                    (syncState.heldContentInsetTop - syncTopInsetReclaim)
+                                        .coerceAtLeast(0.dp)
+                                // A persistent sync/prayer strip used to collapse Insights all the way to
+                                // 170dp on every phone. On tall portrait displays (Pixel 9 Pro included)
+                                // that made the dashboard finish roughly 40dp too early, leaving a large
+                                // empty band between Location and the floating navigation. Preserve the
+                                // normal 208dp compact strip on tall screens; genuinely short phones still
+                                // have the smaller escape hatch needed to keep Location reachable.
+                                val portraitInsightMinHeight =
+                                    if (configuration.screenHeightDp >= 900) 208.dp else 170.dp
+                                val portraitInsightHeight = (portraitInsightRestingHeight - syncContentCompression)
+                                    .coerceAtLeast(portraitInsightMinHeight)
+
+                                if (isLandscape) {
+                                    // LANDSCAPE LAYOUT: Side-by-side with swipeable tiles on left, prayer cards on right
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            // Landscape doesn't scroll, so the gesture-nav bar inset must be
+                                            // reserved here or the location card / prayer grid sit under it.
+                                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                                            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        // Left column: Swipeable tiles + Location info
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(0.5f)
+                                                .fillMaxHeight(),
+                                            verticalArrangement = Arrangement.SpaceBetween,
+                                        ) {
+                                            // Swipeable Big Tiles - take most of the height
+                                            Box(
                                                 modifier = Modifier
-                                                    .alpha(0f)
-                                                    .clearAndSetSemantics { },
+                                                    .weight(1f)
+                                                    .fillMaxWidth(),
+                                            ) {
+                                                SwipeableBigTiles(
+                                                    prayerTimes = prayerTimes,
+                                                    currentTime = currentTime,
+                                                    locationService = locationService,
+                                                    getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
+                                                    getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
+                                                    getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
+                                                    getPrayerTimeDisplay = { prayerName -> PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes) },
+                                                    getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
+                                                    getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
+                                                    getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
+                                                    getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
+                                                    getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
+                                                    getTimeSinceCurrentPrayer = { SmartContentUtils.formatTimeSinceCurrentPrayer(SmartContentUtils.getMinutesSinceCurrentPrayer(prayerTimes, currentTime) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) }) },
+                                                    getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
+                                                    getDailyStatsTitle = {
+                                                        val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                                        SmartContentUtils.getDailyStatsTitle(completed, total)
+                                                    },
+                                                    getDailyStatsMessage = {
+                                                        val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                                        SmartContentUtils.getDailyStatsMessage(completed, total)
+                                                    },
+                                                    getPrayed = { prayedCount },
+                                                    prayedPrayers = prayedPrayersToday,
+                                                    onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
+                                                    dailyReadingPlayback = DailyReadingPlaybackState(
+                                                        surahIndex = dailyReadingPlayer.currentSurahIndex,
+                                                        isPlaying = dailyReadingPlayer.isPlaying,
+                                                        isLoading = dailyReadingPlayer.isLoading,
+                                                        isDownloading = dailyReadingPlayer.isDownloading,
+                                                        downloadProgress = dailyReadingPlayer.downloadProgress,
+                                                        error = dailyReadingPlayer.downloadError,
+                                                    ),
+                                                    onDailyReadingPlayPause = { surahIndex ->
+                                                        if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
+                                                            (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
+                                                        ) {
+                                                            dailyReadingPlayer.togglePlayPause()
+                                                        } else {
+                                                            dailyReadingPlayer.playSurah(surahIndex)
+                                                        }
+                                                    },
+                                                    onDailyReadingRetry = dailyReadingPlayer::retryDownload,
+                                                    getCurrentActivity = {
+                                                        try {
+                                                            com.starception.submission.util.ActivityTracker.getCurrentActivity()
+                                                        } catch (e: Exception) {
+                                                            "UNKNOWN"
+                                                        }
+                                                    },
+                                                    onCompassClick = {
+                                                        Log.d("PrayerTimes", "Compass clicked, showing popup")
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        showCompassPopup = true
+                                                    },
+                                                    timeOffsets = storedOffsets,
+                                                    isLandscape = true,
+                                                    onSurahClick = onSurahClick,
+                                                    onSurahClickWithAyah = onSurahClickWithAyah,
+                                                    onFortressDuaClick = onFortressDuaClick,
+                                                    onBukhariBookPlayClick = onBukhariBookPlayClick,
+                                                    onShamayelBookPlayClick = onShamayelBookPlayClick,
+                                                    fortressDuasByChapter = contextualDuasByChapter,
+                                                    goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
+                                                    isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
+                                                    weatherThresholds = prayerWeatherThresholds,
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            LandscapeLocationWeatherTile(
+                                                locationString = location,
+                                                locationData = prayerTimes?.location,
+                                                thresholds = prayerWeatherThresholds,
+                                                onLongPress = { showWeatherThresholds = true },
+                                                modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
 
-                                        AnimatedContent(
-                                            targetState = thresholdSupportingText
-                                                ?.takeIf { showThresholdText }
-                                                ?: defaultSupportingText,
-                                            contentAlignment = Alignment.CenterStart,
-                                            transitionSpec = {
-                                                // Match the prayer-tile bell/weather morph:
-                                                // fade through with a restrained scale, without
-                                                // vertical travel that looks like a height change.
-                                                (fadeIn(tween(220)) + scaleIn(
-                                                    initialScale = 0.72f,
-                                                    animationSpec = tween(
-                                                        260,
-                                                        easing = FastOutSlowInEasing,
-                                                    ),
-                                                )) togetherWith
-                                                    (fadeOut(tween(150)) + scaleOut(
-                                                        targetScale = 0.78f,
-                                                        animationSpec = tween(190),
-                                                    ))
-                                            },
-                                            modifier = Modifier.matchParentSize(),
-                                            label = "locationWeatherSupportingText",
-                                        ) { supportingText ->
-                                        Text(
-                                            text = supportingText,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 10.5.sp,
-                                                lineHeight = 13.sp,
-                                                letterSpacing = 0.sp,
-                                                platformStyle = PlatformTextStyle(
-                                                    includeFontPadding = false,
-                                                ),
-                                            ),
-                                            color = locationTileSupporting,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
+                                        // Right column: compact header + all six prayer cards. The rows
+                                        // share the measured height so the last pair cannot fall behind
+                                        // the bottom edge or require a hidden initial scroll.
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(0.5f)
+                                                .fillMaxHeight(),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            // Get ordered prayers
+                                            val orderedPrayers = remember(currentTime, prayerTimes) {
+                                                val result = mutableListOf<String>()
+                                                val allPrayersList = prayerTimes?.let { times ->
+                                                    listOf(
+                                                        "Fajr" to times.fajr,
+                                                        "Sunrise" to times.sunrise,
+                                                        "Dhuhr" to times.dhuhr,
+                                                        "Asr" to times.asr,
+                                                        "Maghrib" to times.maghrib,
+                                                        "Isha" to times.isha,
+                                                    )
+                                                } ?: emptyList()
+                                                if (allPrayersList.isNotEmpty()) {
+                                                    val currentPrayerIndex = allPrayersList.indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
+                                                    if (currentPrayerIndex != -1) {
+                                                        for (i in 0 until 6) {
+                                                            val index = (currentPrayerIndex + i) % allPrayersList.size
+                                                            result.add(allPrayersList[index].first)
+                                                        }
+                                                    } else {
+                                                        result.addAll(allPrayersList.map { it.first })
+                                                    }
+                                                }
+                                                result
+                                            }
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(40.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Column {
+                                                    Text(
+                                                        text = "Prayer times",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        color = MaterialTheme.colorScheme.onBackground,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                    )
+                                                    Text(
+                                                        text = "Today’s schedule",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                                PrayerHeaderAction(
+                                                    active = prayerTimeEditMode,
+                                                    compact = true,
+                                                    onClick = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        if (prayerTimeEditMode) {
+                                                            revealedPrayerCard = null
+                                                            currentEditingTile = null
+                                                        }
+                                                        prayerTimeEditMode = !prayerTimeEditMode
+                                                    },
+                                                )
+                                            }
+
+                                            // Prayer cards in a 2-column grid for landscape
+                                            for (i in orderedPrayers.indices step 2) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .weight(1f),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                ) {
+                                                    // First card in row
+                                                    InteractivePrayerCard(
+                                                        prayerName = orderedPrayers[i],
+                                                        currentEditingTile = currentEditingTile,
+                                                        onEditingTileChange = { currentEditingTile = it },
+                                                        currentOffset = when (orderedPrayers[i]) {
+                                                            "Fajr" -> storedOffsets.fajr
+                                                            "Sunrise" -> storedOffsets.sunrise
+                                                            "Dhuhr" -> storedOffsets.dhuhr
+                                                            "Asr" -> storedOffsets.asr
+                                                            "Maghrib" -> storedOffsets.maghrib
+                                                            "Isha" -> storedOffsets.isha
+                                                            else -> 0
+                                                        },
+                                                        notificationEnabled = when (orderedPrayers[i]) {
+                                                            "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                            "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                            "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                            "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                            "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                            else -> true
+                                                        },
+                                                        onNotificationToggle = { enabled ->
+                                                            togglePrayerNotificationAndUpdate(orderedPrayers[i], enabled)
+                                                        },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .fillMaxHeight(),
+                                                        onShowPopup = { prayerName -> popupDialState = prayerName },
+                                                        suggestion = getSuggestionFor(orderedPrayers[i]),
+                                                        onApplySuggestion = applySuggestion,
+                                                        isRevealed = revealedPrayerCard == orderedPrayers[i],
+                                                        onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i] else null },
+                                                    )
+
+                                                    // Second card in row (if exists)
+                                                    if (i + 1 < orderedPrayers.size) {
+                                                        InteractivePrayerCard(
+                                                            prayerName = orderedPrayers[i + 1],
+                                                            currentEditingTile = currentEditingTile,
+                                                            onEditingTileChange = { currentEditingTile = it },
+                                                            currentOffset = when (orderedPrayers[i + 1]) {
+                                                                "Fajr" -> storedOffsets.fajr
+                                                                "Sunrise" -> storedOffsets.sunrise
+                                                                "Dhuhr" -> storedOffsets.dhuhr
+                                                                "Asr" -> storedOffsets.asr
+                                                                "Maghrib" -> storedOffsets.maghrib
+                                                                "Isha" -> storedOffsets.isha
+                                                                else -> 0
+                                                            },
+                                                            notificationEnabled = when (orderedPrayers[i + 1]) {
+                                                                "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                                "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                                "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                                "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                                "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                                else -> true
+                                                            },
+                                                            onNotificationToggle = { enabled ->
+                                                                togglePrayerNotificationAndUpdate(orderedPrayers[i + 1], enabled)
+                                                            },
+                                                            modifier = Modifier
+                                                                .weight(1f)
+                                                                .fillMaxHeight(),
+                                                            onShowPopup = { prayerName -> popupDialState = prayerName },
+                                                            suggestion = getSuggestionFor(orderedPrayers[i + 1]),
+                                                            onApplySuggestion = applySuggestion,
+                                                            isRevealed = revealedPrayerCard == orderedPrayers[i + 1],
+                                                            onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[i + 1] else null },
+                                                        )
+                                                    } else {
+                                                        Spacer(modifier = Modifier.weight(1f))
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
-                                }
+                                } else {
+                                    // PORTRAIT LAYOUT: Original vertical layout
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 24.dp)
+                                            .padding(
+                                                top = 8.dp,
+                                                bottom = 0.dp,
+                                            ),
+                                        verticalArrangement = Arrangement.Top,
+                                    ) {
+                                        val dashboardTransition = updateTransition(
+                                            targetState = showAllPrayers,
+                                            label = "prayerDashboardExpansion",
+                                        )
+                                        // Keep the child measurement stable while row 3 is revealed. If the
+                                        // tiles resize during expandVertically, its moving target produces a
+                                        // visible settle at the end of the entrance.
+                                        val tileHeight = 106.dp
+                                        val buttonIconRotation by dashboardTransition.animateFloat(
+                                            transitionSpec = {
+                                                tween(durationMillis = 680, easing = FastOutSlowInEasing)
+                                            },
+                                            label = "prayerToggleRotation",
+                                        ) { expanded ->
+                                            if (expanded) 180f else 0f
+                                        }
+                                        // Swipeable Big Tiles
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                        ) {
+                                            SwipeableBigTiles(
+                                                prayerTimes = prayerTimes,
+                                                currentTime = currentTime,
+                                                locationService = locationService,
+                                                getNextPrayer = { PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes) },
+                                                getCurrentPrayer = { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) },
+                                                getPrayerStatus = { prayerName -> PrayerTimeHelpers.getPrayerStatus(prayerName, currentTime, prayerTimes) },
+                                                getPrayerTimeDisplay = { prayerName -> PrayerTimeHelpers.getPrayerTimeDisplay(prayerName, prayerTimes) },
+                                                getTimeUntilNextPrayer = { PrayerTimeHelpers.getTimeUntilNextPrayer(currentTime, prayerTimes) },
+                                                getCurrentDate = { PrayerTimeHelpers.getCurrentDate() },
+                                                getSmartTitle = { SmartContentUtils.getSmartTitle(currentTime) },
+                                                getSmartContent = { SmartContentUtils.getSmartContent(currentTime, prayerTimes) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) } },
+                                                getSmartFooter = { SmartContentUtils.getSmartFooter(PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes), PrayerTimeHelpers.getNextPrayer(currentTime, prayerTimes)) },
+                                                getTimeSinceCurrentPrayer = { SmartContentUtils.formatTimeSinceCurrentPrayer(SmartContentUtils.getMinutesSinceCurrentPrayer(prayerTimes, currentTime) { PrayerTimeHelpers.getCurrentPrayer(currentTime, prayerTimes) }) },
+                                                getPrayerProgress = { SmartContentUtils.getPrayerProgress(prayerTimes, currentTime) },
+                                                getDailyStatsTitle = {
+                                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                                    SmartContentUtils.getDailyStatsTitle(completed, total)
+                                                },
+                                                getDailyStatsMessage = {
+                                                    val (completed, total) = SmartContentUtils.getPrayerProgress(prayerTimes, currentTime)
+                                                    SmartContentUtils.getDailyStatsMessage(completed, total)
+                                                },
+                                                getPrayed = { prayedCount },
+                                                prayedPrayers = prayedPrayersToday,
+                                                onTogglePrayer = com.starception.submission.util.PrayerTracker::togglePrayerStatus,
+                                                dailyReadingPlayback = DailyReadingPlaybackState(
+                                                    surahIndex = dailyReadingPlayer.currentSurahIndex,
+                                                    isPlaying = dailyReadingPlayer.isPlaying,
+                                                    isLoading = dailyReadingPlayer.isLoading,
+                                                    isDownloading = dailyReadingPlayer.isDownloading,
+                                                    downloadProgress = dailyReadingPlayer.downloadProgress,
+                                                    error = dailyReadingPlayer.downloadError,
+                                                ),
+                                                onDailyReadingPlayPause = { surahIndex ->
+                                                    if (dailyReadingPlayer.currentSurahIndex == surahIndex &&
+                                                        (dailyReadingPlayer.isPlaying || dailyReadingPlayer.currentPosition > 0)
+                                                    ) {
+                                                        dailyReadingPlayer.togglePlayPause()
+                                                    } else {
+                                                        dailyReadingPlayer.playSurah(surahIndex)
+                                                    }
+                                                },
+                                                onDailyReadingRetry = dailyReadingPlayer::retryDownload,
+                                                getCurrentActivity = {
+                                                    // Get current activity from ActivityTracker
+                                                    try {
+                                                        com.starception.submission.util.ActivityTracker.getCurrentActivity()
+                                                    } catch (e: Exception) {
+                                                        "UNKNOWN"
+                                                    }
+                                                },
+                                                onCompassClick = {
+                                                    Log.d("PrayerTimes", "Compass clicked, showing popup")
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    showCompassPopup = true
+                                                },
+                                                timeOffsets = storedOffsets,
+                                                portraitStripHeight = portraitInsightHeight,
+                                                // Expanded prayer mode scrolls naturally; keep Insights at its
+                                                // normal size instead of squeezing the carousel to fund row 3.
+                                                compactForExpandedPrayers = false,
+                                                onSurahClick = onSurahClick,
+                                                onSurahClickWithAyah = onSurahClickWithAyah,
+                                                onFortressDuaClick = onFortressDuaClick,
+                                                onBukhariBookPlayClick = onBukhariBookPlayClick,
+                                                onShamayelBookPlayClick = onShamayelBookPlayClick,
+                                                fortressDuasByChapter = contextualDuasByChapter,
+                                                goToMosqueDurationMinutes = { name -> notificationPreferences.getGoToMosqueDurationForPrayer(name) },
+                                                isInteractionBlocked = showCompassPopup || popupDialState != null || showLocationServiceDialog,
+                                                weatherThresholds = prayerWeatherThresholds,
+                                            )
+                                        }
+
+                                        // Treat adjustment guidance as part of the prayer section
+                                        // header instead of a separate dashboard banner.
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp, bottom = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(
+                                                verticalArrangement = Arrangement.spacedBy(1.dp),
+                                            ) {
+                                                Text(
+                                                    text = "Prayer times",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.onBackground,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                                Text(
+                                                    text = "Today’s schedule",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+
+                                            PrayerHeaderAction(
+                                                active = prayerTimeEditMode,
+                                                onClick = {
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    if (prayerTimeEditMode) {
+                                                        revealedPrayerCard = null
+                                                        currentEditingTile = null
+                                                        prayerTimeEditMode = false
+                                                    } else {
+                                                        prayerTimeEditMode = true
+                                                    }
+                                                },
+                                            )
+                                        }
+
+                                        // Expandable prayer layout - smart default view with expand option
+                                        // The tile height participates in the shared dashboard
+                                        // transition above, keeping every moving element synchronized.
+
+                                        // Get next 6 prayers in circular chronological order
+                                        // All 6 items (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) are included
+                                        // Shows next 4 when collapsed, next 6 when expanded
+                                        val orderedPrayers = remember(currentTime, prayerTimes) {
+                                            val result = mutableListOf<String>()
+
+                                            // Define all 6 prayers in chronological order
+                                            val allPrayersList = prayerTimes?.let { times ->
+                                                listOf(
+                                                    "Fajr" to times.fajr,
+                                                    "Sunrise" to times.sunrise,
+                                                    "Dhuhr" to times.dhuhr,
+                                                    "Asr" to times.asr,
+                                                    "Maghrib" to times.maghrib,
+                                                    "Isha" to times.isha,
+                                                )
+                                            } ?: emptyList()
+
+                                            if (allPrayersList.isNotEmpty()) {
+                                                // Find the current prayer (last prayer that has passed)
+                                                val currentPrayerIndex = allPrayersList
+                                                    .indexOfLast { it.second.isBefore(currentTime) || it.second == currentTime }
+
+                                                if (currentPrayerIndex != -1) {
+                                                    // Found current prayer - start from there and show next 6 prayers in circular order
+                                                    for (i in 0 until 6) {
+                                                        val index = (currentPrayerIndex + i) % allPrayersList.size
+                                                        result.add(allPrayersList[index].first)
+                                                    }
+                                                } else {
+                                                    // No prayer has passed yet (very early morning before Fajr) - start from Fajr
+                                                    result.addAll(allPrayersList.map { it.first })
+                                                }
+                                            }
+
+                                            result
+                                        }
+
+                                        // First row: First 2 prayers from ordered list (most relevant)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            // First prayer tile
+                                            if (orderedPrayers.isNotEmpty()) {
+                                                InteractivePrayerCard(
+                                                    prayerName = orderedPrayers[0],
+                                                    currentEditingTile = currentEditingTile,
+                                                    onEditingTileChange = { currentEditingTile = it },
+                                                    currentOffset = when (orderedPrayers[0]) {
+                                                        "Fajr" -> storedOffsets.fajr
+                                                        "Sunrise" -> storedOffsets.sunrise
+                                                        "Dhuhr" -> storedOffsets.dhuhr
+                                                        "Asr" -> storedOffsets.asr
+                                                        "Maghrib" -> storedOffsets.maghrib
+                                                        "Isha" -> storedOffsets.isha
+                                                        else -> 0
+                                                    },
+                                                    notificationEnabled = when (orderedPrayers[0]) {
+                                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                        "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                        else -> true
+                                                    },
+                                                    onNotificationToggle = { enabled ->
+                                                        togglePrayerNotificationAndUpdate(orderedPrayers[0], enabled)
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(tileHeight),
+                                                    onShowPopup = { prayerName ->
+                                                        android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                        popupDialState = prayerName
+                                                        android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                    },
+                                                    suggestion = getSuggestionFor(orderedPrayers[0]),
+                                                    onApplySuggestion = applySuggestion,
+                                                    isRevealed = revealedPrayerCard == orderedPrayers[0],
+                                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[0] else null },
+                                                )
+                                            }
+
+                                            // Second prayer tile
+                                            if (orderedPrayers.size > 1) {
+                                                InteractivePrayerCard(
+                                                    prayerName = orderedPrayers[1],
+                                                    currentEditingTile = currentEditingTile,
+                                                    onEditingTileChange = { currentEditingTile = it },
+                                                    currentOffset = when (orderedPrayers[1]) {
+                                                        "Fajr" -> storedOffsets.fajr
+                                                        "Sunrise" -> storedOffsets.sunrise
+                                                        "Dhuhr" -> storedOffsets.dhuhr
+                                                        "Asr" -> storedOffsets.asr
+                                                        "Maghrib" -> storedOffsets.maghrib
+                                                        "Isha" -> storedOffsets.isha
+                                                        else -> 0
+                                                    },
+                                                    notificationEnabled = when (orderedPrayers[1]) {
+                                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                        "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                        else -> true
+                                                    },
+                                                    onNotificationToggle = { enabled ->
+                                                        togglePrayerNotificationAndUpdate(orderedPrayers[1], enabled)
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(tileHeight),
+                                                    onShowPopup = { prayerName ->
+                                                        android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                        popupDialState = prayerName
+                                                        android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                    },
+                                                    suggestion = getSuggestionFor(orderedPrayers[1]),
+                                                    onApplySuggestion = applySuggestion,
+                                                    isRevealed = revealedPrayerCard == orderedPrayers[1],
+                                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[1] else null },
+                                                )
+                                            }
+                                        }
+
+                                        // Second row: Remaining 2 prayers from ordered list
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            // Third prayer tile
+                                            if (orderedPrayers.size > 2) {
+                                                InteractivePrayerCard(
+                                                    prayerName = orderedPrayers[2],
+                                                    currentEditingTile = currentEditingTile,
+                                                    onEditingTileChange = { currentEditingTile = it },
+                                                    currentOffset = when (orderedPrayers[2]) {
+                                                        "Fajr" -> storedOffsets.fajr
+                                                        "Sunrise" -> storedOffsets.sunrise
+                                                        "Dhuhr" -> storedOffsets.dhuhr
+                                                        "Asr" -> storedOffsets.asr
+                                                        "Maghrib" -> storedOffsets.maghrib
+                                                        "Isha" -> storedOffsets.isha
+                                                        else -> 0
+                                                    },
+                                                    notificationEnabled = when (orderedPrayers[2]) {
+                                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                        "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                        else -> true
+                                                    },
+                                                    onNotificationToggle = { enabled ->
+                                                        togglePrayerNotificationAndUpdate(orderedPrayers[2], enabled)
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(tileHeight),
+                                                    onShowPopup = { prayerName ->
+                                                        android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                        popupDialState = prayerName
+                                                        android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                    },
+                                                    suggestion = getSuggestionFor(orderedPrayers[2]),
+                                                    onApplySuggestion = applySuggestion,
+                                                    isRevealed = revealedPrayerCard == orderedPrayers[2],
+                                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[2] else null },
+                                                )
+                                            }
+
+                                            // Fourth prayer tile
+                                            if (orderedPrayers.size > 3) {
+                                                InteractivePrayerCard(
+                                                    prayerName = orderedPrayers[3],
+                                                    currentEditingTile = currentEditingTile,
+                                                    onEditingTileChange = { currentEditingTile = it },
+                                                    currentOffset = when (orderedPrayers[3]) {
+                                                        "Fajr" -> storedOffsets.fajr
+                                                        "Sunrise" -> storedOffsets.sunrise
+                                                        "Dhuhr" -> storedOffsets.dhuhr
+                                                        "Asr" -> storedOffsets.asr
+                                                        "Maghrib" -> storedOffsets.maghrib
+                                                        "Isha" -> storedOffsets.isha
+                                                        else -> 0
+                                                    },
+                                                    notificationEnabled = when (orderedPrayers[3]) {
+                                                        "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                        "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                        "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                        "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                        "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                        else -> true
+                                                    },
+                                                    onNotificationToggle = { enabled ->
+                                                        togglePrayerNotificationAndUpdate(orderedPrayers[3], enabled)
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(tileHeight),
+                                                    onShowPopup = { prayerName ->
+                                                        android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                        popupDialState = prayerName
+                                                        android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                    },
+                                                    suggestion = getSuggestionFor(orderedPrayers[3]),
+                                                    onApplySuggestion = applySuggestion,
+                                                    isRevealed = revealedPrayerCard == orderedPrayers[3],
+                                                    onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[3] else null },
+                                                )
+                                            }
+                                        }
+
+                                        // Material 3 expressive expandable section with a deliberately
+                                        // unhurried curve; this avoids the abrupt accordion-like jump.
+                                        AnimatedVisibility(
+                                            visible = showAllPrayers,
+                                            enter = expandVertically(
+                                                animationSpec = tween(
+                                                    durationMillis = 840,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                                expandFrom = Alignment.Top,
+                                            ) + fadeIn(
+                                                animationSpec = tween(
+                                                    durationMillis = 500,
+                                                    delayMillis = 40,
+                                                ),
+                                            ),
+                                            exit = shrinkVertically(
+                                                animationSpec = tween(
+                                                    durationMillis = 680,
+                                                    easing = FastOutSlowInEasing,
+                                                ),
+                                                shrinkTowards = Alignment.Top,
+                                            ) + fadeOut(
+                                                animationSpec = tween(durationMillis = 240),
+                                            ),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            ) {
+                                                // Fifth prayer with staggered entrance animation
+                                                if (orderedPrayers.size > 4) {
+                                                    InteractivePrayerCard(
+                                                        prayerName = orderedPrayers[4],
+                                                        currentEditingTile = currentEditingTile,
+                                                        onEditingTileChange = { currentEditingTile = it },
+                                                        currentOffset = when (orderedPrayers[4]) {
+                                                            "Fajr" -> storedOffsets.fajr
+                                                            "Sunrise" -> storedOffsets.sunrise
+                                                            "Dhuhr" -> storedOffsets.dhuhr
+                                                            "Asr" -> storedOffsets.asr
+                                                            "Maghrib" -> storedOffsets.maghrib
+                                                            "Isha" -> storedOffsets.isha
+                                                            else -> 0
+                                                        },
+                                                        notificationEnabled = when (orderedPrayers[4]) {
+                                                            "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                            "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                            "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                            "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                            "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                            else -> true
+                                                        },
+                                                        onNotificationToggle = { enabled ->
+                                                            togglePrayerNotificationAndUpdate(orderedPrayers[4], enabled)
+                                                        },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(tileHeight),
+                                                        onShowPopup = { prayerName ->
+                                                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                            popupDialState = prayerName
+                                                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                        },
+                                                        suggestion = getSuggestionFor(orderedPrayers[4]),
+                                                        onApplySuggestion = applySuggestion,
+                                                        isRevealed = revealedPrayerCard == orderedPrayers[4],
+                                                        onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[4] else null },
+                                                    )
+                                                }
+
+                                                // Sixth prayer with staggered entrance animation
+                                                if (orderedPrayers.size > 5) {
+                                                    InteractivePrayerCard(
+                                                        prayerName = orderedPrayers[5],
+                                                        currentEditingTile = currentEditingTile,
+                                                        onEditingTileChange = { currentEditingTile = it },
+                                                        currentOffset = when (orderedPrayers[5]) {
+                                                            "Fajr" -> storedOffsets.fajr
+                                                            "Sunrise" -> storedOffsets.sunrise
+                                                            "Dhuhr" -> storedOffsets.dhuhr
+                                                            "Asr" -> storedOffsets.asr
+                                                            "Maghrib" -> storedOffsets.maghrib
+                                                            "Isha" -> storedOffsets.isha
+                                                            else -> 0
+                                                        },
+                                                        notificationEnabled = when (orderedPrayers[5]) {
+                                                            "Fajr" -> notificationPreferences.fajrNotificationEnabled
+                                                            "Dhuhr" -> notificationPreferences.dhuhrNotificationEnabled
+                                                            "Asr" -> notificationPreferences.asrNotificationEnabled
+                                                            "Maghrib" -> notificationPreferences.maghribNotificationEnabled
+                                                            "Isha" -> notificationPreferences.ishaNotificationEnabled
+                                                            else -> true
+                                                        },
+                                                        onNotificationToggle = { enabled ->
+                                                            togglePrayerNotificationAndUpdate(orderedPrayers[5], enabled)
+                                                        },
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(tileHeight),
+                                                        onShowPopup = { prayerName ->
+                                                            android.util.Log.d("PrayerCard", "🚀 onShowPopup called with $prayerName")
+                                                            popupDialState = prayerName
+                                                            android.util.Log.d("PrayerCard", "✅ Set popupDialState to $prayerName")
+                                                        },
+                                                        suggestion = getSuggestionFor(orderedPrayers[5]),
+                                                        onApplySuggestion = applySuggestion,
+                                                        isRevealed = revealedPrayerCard == orderedPrayers[5],
+                                                        onRevealChange = { revealed -> revealedPrayerCard = if (revealed) orderedPrayers[5] else null },
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Keep the toggle and location in one layout so the card can travel,
+                                        // resize and round into the floating pin instead of cross-fading
+                                        // between two unrelated components.
+                                        BoxWithConstraints(
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            // The location morph and row-3 expansion share the same state,
+                                            // duration and easing so neither can lead or catch up to the other.
+                                            val locationControlHeight by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationControlHeight",
+                                            ) { expanded ->
+                                                if (expanded) 40.dp else 92.dp
+                                            }
+                                            val locationCardWidth by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationCardWidth",
+                                            ) { expanded ->
+                                                if (expanded) 40.dp else maxWidth
+                                            }
+                                            val locationCardHeight by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationCardHeight",
+                                            ) { expanded ->
+                                                if (expanded) 40.dp else 52.dp
+                                            }
+                                            val locationCardOffsetY by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationCardOffsetY",
+                                            ) { expanded ->
+                                                // In the resting layout the Show All control starts at 2dp
+                                                // and ends at 34dp. A 36dp card offset leaves a compact 2dp
+                                                // gap, returning 4dp below the location card for navigation
+                                                // clearance without changing the dashboard's total height.
+                                                if (expanded) 0.dp else 36.dp
+                                            }
+                                            val locationCardEndInset by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationCardEndInset",
+                                            ) { expanded ->
+                                                if (expanded) 12.dp else 0.dp
+                                            }
+                                            val locationCardCornerRadius by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationCardCornerRadius",
+                                            ) { expanded ->
+                                                if (expanded) 20.dp else 16.dp
+                                            }
+                                            val locationMarkerInset by dashboardTransition.animateDp(
+                                                transitionSpec = {
+                                                    tween(durationMillis = 840, easing = FastOutSlowInEasing)
+                                                },
+                                                label = "locationMarkerInset",
+                                            ) { expanded ->
+                                                // 9dp centers a 22dp marker in the 40dp floating surface.
+                                                if (expanded) 9.dp else 14.dp
+                                            }
+                                            val locationCardShape = RoundedCornerShape(locationCardCornerRadius)
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(locationControlHeight),
+                                            ) {
+                                                TextButton(
+                                                    onClick = {
+                                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        // One state starts (or reverses) the prayer-row expansion,
+                                                        // dashboard scroll and location morph on the same frame.
+                                                        showAllPrayers = !showAllPrayers
+                                                    },
+                                                    colors = ButtonDefaults.textButtonColors(
+                                                        contentColor = MaterialTheme.colorScheme.primary,
+                                                    ),
+                                                    // Default 40dp min-height around a 14dp label; the carousel
+                                                    // uses the difference.
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopCenter)
+                                                        .offset(y = 2.dp)
+                                                        .height(32.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.ExpandMore,
+                                                        contentDescription = null,
+                                                        modifier = Modifier
+                                                            .size(18.dp)
+                                                            .graphicsLayer {
+                                                                rotationZ = buttonIconRotation
+                                                            },
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = if (showAllPrayers) "Show Less" else "Show All Prayers",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                    )
+                                                }
+
+                                                // One surface owns both states. Anchoring it to the end makes the
+                                                // full card contract naturally into the pin beside Show Less.
+                                                val locationTileContent = MaterialTheme.colorScheme.onSurface
+                                                val locationTileSupporting = MaterialTheme.colorScheme.onSurfaceVariant
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .offset(x = -locationCardEndInset, y = locationCardOffsetY)
+                                                        .width(locationCardWidth)
+                                                        .height(locationCardHeight)
+                                                        .zIndex(1f)
+                                                        .clip(locationCardShape)
+                                                        .combinedClickable(
+                                                            onClick = {
+                                                                if (showAllPrayers) {
+                                                                    hapticFeedback.performHapticFeedback(
+                                                                        HapticFeedbackType.TextHandleMove,
+                                                                    )
+                                                                    showAllPrayers = false
+                                                                } else {
+                                                                    showWeatherThresholds = true
+                                                                }
+                                                            },
+                                                            onLongClick = {
+                                                                if (showAllPrayers) {
+                                                                    hapticFeedback.performHapticFeedback(
+                                                                        HapticFeedbackType.TextHandleMove,
+                                                                    )
+                                                                    showAllPrayers = false
+                                                                } else {
+                                                                    hapticFeedback.performHapticFeedback(
+                                                                        HapticFeedbackType.LongPress,
+                                                                    )
+                                                                    showWeatherThresholds = true
+                                                                }
+                                                            },
+                                                        ),
+                                                    shape = locationCardShape,
+                                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                                    // Follows the prayer tiles: outlined only in dark, where a card
+                                                    // needs an edge to separate from the background. In light it was
+                                                    // the one outlined card on the screen, and primary at 20% renders
+                                                    // a cool blue hairline against these warm surfaces.
+                                                    border = if (showAllPrayers) {
+                                                        BorderStroke(
+                                                            1.dp,
+                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                                        )
+                                                    } else if (LocalDarkTheme.current) {
+                                                        BorderStroke(
+                                                            1.dp,
+                                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                                                        )
+                                                    } else {
+                                                        null
+                                                    },
+                                                    shadowElevation = if (showAllPrayers) {
+                                                        3.dp
+                                                    } else if (LocalDarkTheme.current) {
+                                                        0.dp
+                                                    } else {
+                                                        1.dp
+                                                    },
+                                                ) {
+                                                    Box(modifier = Modifier.fillMaxSize()) {
+                                                        // This is the same marker in both states. The surface's animated
+                                                        // right-anchored width carries it from the card's leading edge to
+                                                        // the floating position, so there is no icon handoff or blank frame.
+                                                        Image(
+                                                            painter = painterResource(R.drawable.ic_flaticon_location_marker),
+                                                            contentDescription = if (showAllPrayers) {
+                                                                "Collapse prayers and show location details"
+                                                            } else {
+                                                                "Prayer location"
+                                                            },
+                                                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                                                            modifier = Modifier
+                                                                .align(Alignment.CenterStart)
+                                                                .offset(x = locationMarkerInset)
+                                                                .size(22.dp)
+                                                                .zIndex(1f),
+                                                        )
+
+                                                        androidx.compose.animation.AnimatedVisibility(
+                                                            visible = !showAllPrayers,
+                                                            enter = fadeIn(
+                                                                animationSpec = tween(durationMillis = 220, delayMillis = 150),
+                                                            ),
+                                                            exit = fadeOut(
+                                                                animationSpec = tween(durationMillis = 180),
+                                                            ),
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxSize()
+                                                                    .padding(start = 46.dp, end = 14.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                            ) {
+                                                                val locationData = prayerTimes?.location
+                                                                val city = locationData?.city?.trim().orEmpty()
+                                                                val area = locationData?.area?.trim().takeUnless { it.isNullOrEmpty() }
+                                                                    ?: locationData?.subLocality?.trim().takeUnless { it.isNullOrEmpty() }
+                                                                val countryCode = locationData?.countryCode?.trim()?.uppercase()
+                                                                    ?.takeIf { it.length in 2..3 }
+                                                                val locationTitle = city.ifBlank {
+                                                                    getLocationWithCountryCode(location, locationData)
+                                                                }
+                                                                val locationDetail = area
+                                                                    ?.takeUnless { it.equals(locationTitle, ignoreCase = true) }
+                                                                    ?: locationData?.administrativeArea?.trim()
+                                                                        ?.takeUnless {
+                                                                            it.isEmpty() || it.equals(locationTitle, ignoreCase = true)
+                                                                        }
+                                                                    ?: locationData?.country?.trim().orEmpty()
+
+                                                                // Check if location text contains Arabic (Unicode range 0600-06FF)
+                                                                val containsArabic = (locationTitle + locationDetail)
+                                                                    .any { it in '\u0600'..'\u06FF' }
+
+                                                                // Get selected Arabic font if location contains Arabic
+                                                                val context = androidx.compose.ui.platform.LocalContext.current
+                                                                val arabicFontFamily = if (containsArabic) {
+                                                                    val prefs = context.getSharedPreferences("quran_prefs", android.content.Context.MODE_PRIVATE)
+                                                                    val selectedFont = prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+                                                                    when (selectedFont) {
+                                                                        "pdms_saleem" -> QuranFonts.PDMSSaleem
+                                                                        "noor_e_hidayat" -> QuranFonts.NoorEHidayat
+                                                                        "thabit" -> QuranFonts.Thabit
+                                                                        "uthmani_script" -> QuranFonts.UthmanicScript
+                                                                        "indopak_script" -> QuranFonts.IndoPakScript
+                                                                        else -> QuranFonts.PDMSSaleem
+                                                                    }
+                                                                } else {
+                                                                    null
+                                                                }
+
+                                                                val currentWeatherState by rememberCurrentWeatherLoadState(locationData)
+
+                                                                val supportingLocation = locationDetail.takeIf { it.isNotBlank() }
+                                                                    ?: countryCode.orEmpty()
+
+                                                                // Name and chevron claim the row's spare width as a group. The
+                                                                // continuously animated marker occupies the 32dp reserved by
+                                                                // the outer row's start padding.
+                                                                Row(
+                                                                    modifier = Modifier.weight(1f),
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                ) {
+                                                                    Column(
+                                                                        modifier = Modifier.weight(1f, fill = false),
+                                                                        verticalArrangement = Arrangement.Center,
+                                                                    ) {
+                                                                        Text(
+                                                                            text = locationTitle,
+                                                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                                                fontFamily = arabicFontFamily
+                                                                                    ?: MaterialTheme.typography.bodyLarge.fontFamily,
+                                                                                fontWeight = FontWeight.SemiBold,
+                                                                                fontSize = 15.sp,
+                                                                                lineHeight = 18.sp,
+                                                                            ),
+                                                                            color = locationTileContent,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis,
+                                                                        )
+
+                                                                        if (supportingLocation.isNotBlank()) {
+                                                                            Text(
+                                                                                text = supportingLocation,
+                                                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                                                    fontSize = 11.sp,
+                                                                                    lineHeight = 14.sp,
+                                                                                    letterSpacing = 0.sp,
+                                                                                ),
+                                                                                color = locationTileSupporting,
+                                                                                maxLines = 1,
+                                                                                overflow = TextOverflow.Ellipsis,
+                                                                            )
+                                                                        }
+                                                                    }
+
+                                                                    // Sits directly against the location text: the column above
+                                                                    // uses fill = false, so it reports only the width it needs and
+                                                                    // this lands right after it rather than at the row's far edge.
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.ChevronRight,
+                                                                        contentDescription = "Weather details",
+                                                                        tint = locationTileSupporting.copy(alpha = 0.7f),
+                                                                        modifier = Modifier
+                                                                            .padding(start = 2.dp)
+                                                                            .size(16.dp),
+                                                                    )
+                                                                }
+
+                                                                when (val weatherState = currentWeatherState) {
+                                                                    CurrentWeatherLoadState.Loading -> {
+                                                                        PortraitWeatherLoadingPlaceholder()
+                                                                    }
+                                                                    is CurrentWeatherLoadState.Available -> {
+                                                                        val weather = weatherState.weather
+                                                                        val conditionLabel = weatherConditionLabel(weather)
+                                                                        val temperatureLevel = temperatureThresholdLevel(
+                                                                            value = weather.temperatureCelsius,
+                                                                            threshold = prayerWeatherThresholds.temperatureCelsius,
+                                                                        )
+                                                                        val humidityLevel = humidityThresholdLevel(
+                                                                            value = weather.relativeHumidity,
+                                                                            threshold = prayerWeatherThresholds.humidity,
+                                                                        )
+                                                                        val rainLevel = rainThresholdLevel(
+                                                                            value = weather.precipitationProbability,
+                                                                            threshold = prayerWeatherThresholds.rainProbability,
+                                                                        )
+                                                                        val precipitationLabel = if (weather.precipitationProbability == 0) {
+                                                                            "No rain"
+                                                                        } else {
+                                                                            "${weather.precipitationProbability}% rain"
+                                                                        }
+
+                                                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                                                        // Rule separating location identity from conditions, as
+                                                                        // in the dashboard reference.
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .width(1.dp)
+                                                                                .height(32.dp)
+                                                                                .background(
+                                                                                    brush = Brush.verticalGradient(
+                                                                                        0f to Color.Transparent,
+                                                                                        0.2f to MaterialTheme.colorScheme.primary.copy(
+                                                                                            alpha = 0.06f,
+                                                                                        ),
+                                                                                        0.5f to MaterialTheme.colorScheme.primary.copy(
+                                                                                            alpha = 0.30f,
+                                                                                        ),
+                                                                                        0.8f to MaterialTheme.colorScheme.primary.copy(
+                                                                                            alpha = 0.06f,
+                                                                                        ),
+                                                                                        1f to Color.Transparent,
+                                                                                    ),
+                                                                                    shape = RoundedCornerShape(50),
+                                                                                ),
+                                                                        )
+
+                                                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                                                        Row(
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.spacedBy(
+                                                                                space = 5.dp,
+                                                                                alignment = Alignment.End,
+                                                                            ),
+                                                                        ) {
+                                                                            // Monochrome takes the palette tint fully, so it reads
+                                                                            // at this size against a pale card the way the location
+                                                                            // pin beside it does. Fill and Flat are both light
+                                                                            // artwork and washed out here, which is what the tinted
+                                                                            // disc was previously compensating for.
+                                                                            if (temperatureLevel == WeatherThresholdLevel.Normal) {
+                                                                                AnimatedCurrentWeatherIcon(
+                                                                                    weather = weather,
+                                                                                    styleOverride = MeteoconStyle.Monochrome,
+                                                                                    modifier = Modifier.size(32.dp),
+                                                                                )
+                                                                            } else {
+                                                                                AnimatedPrayerWeatherIcon(
+                                                                                    visual = PrayerWeatherVisual.Heat,
+                                                                                    level = temperatureLevel,
+                                                                                    modifier = Modifier.size(32.dp),
+                                                                                )
+                                                                            }
+                                                                            Column(
+                                                                                // Keep the three lines on a shared leading edge
+                                                                                // so the icon and copy read as one compact unit.
+                                                                                // The parent row anchors that unit to the card's
+                                                                                // 14dp end inset.
+                                                                                horizontalAlignment = Alignment.Start,
+                                                                                verticalArrangement = Arrangement.Center,
+                                                                            ) {
+                                                                                // Keep these stacked. Setting temperature and
+                                                                                // condition on one line widened this block to
+                                                                                // ~135dp, and because it is unweighted it claims
+                                                                                // that width first — which truncated the location
+                                                                                // name to "Al Safo...". Stacked, the widest line
+                                                                                // is ~68dp and the location keeps its room.
+                                                                                Text(
+                                                                                    // The weather repository currently requests
+                                                                                    // Celsius explicitly, so always expose the unit
+                                                                                    // instead of leaving a bare degree ambiguous.
+                                                                                    text = "${weather.temperatureCelsius.roundToInt()}°C",
+                                                                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                                                                        fontWeight = FontWeight.SemiBold,
+                                                                                        fontSize = 15.sp,
+                                                                                        lineHeight = 18.sp,
+                                                                                        platformStyle = PlatformTextStyle(
+                                                                                            includeFontPadding = false,
+                                                                                        ),
+                                                                                    ),
+                                                                                    color = locationTileContent,
+                                                                                    maxLines = 1,
+                                                                                )
+                                                                                Text(
+                                                                                    text = conditionLabel,
+                                                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                                                        fontSize = 10.5.sp,
+                                                                                        lineHeight = 13.sp,
+                                                                                        letterSpacing = 0.sp,
+                                                                                        platformStyle = PlatformTextStyle(
+                                                                                            includeFontPadding = false,
+                                                                                        ),
+                                                                                    ),
+                                                                                    color = locationTileContent,
+                                                                                    maxLines = 1,
+                                                                                    overflow = TextOverflow.Ellipsis,
+                                                                                )
+                                                                                val feelsLike = weather.apparentTemperatureCelsius
+                                                                                val defaultSupportingText = if (feelsLike != null) {
+                                                                                    "Feels like ${feelsLike.roundToInt()}°C"
+                                                                                } else {
+                                                                                    "${weather.relativeHumidity}% · $precipitationLabel"
+                                                                                }
+                                                                                val thresholdSupportingText = when {
+                                                                                    rainLevel != WeatherThresholdLevel.Normal ->
+                                                                                        "Rain ${weather.precipitationProbability}%"
+                                                                                    humidityLevel != WeatherThresholdLevel.Normal ->
+                                                                                        "Humidity ${weather.relativeHumidity}%"
+                                                                                    else -> null
+                                                                                }
+                                                                                var showThresholdText by remember(thresholdSupportingText) {
+                                                                                    mutableStateOf(false)
+                                                                                }
+                                                                                LaunchedEffect(thresholdSupportingText) {
+                                                                                    showThresholdText = false
+                                                                                    if (thresholdSupportingText != null) {
+                                                                                        while (true) {
+                                                                                            delay(4_500L)
+                                                                                            showThresholdText = true
+                                                                                            delay(3_500L)
+                                                                                            showThresholdText = false
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                                // Measure both possible labels up front. This gives the
+                                                                                // animated layer one stable slot instead of letting
+                                                                                // AnimatedContent resize the weather column on every swap.
+                                                                                Box(
+                                                                                    modifier = Modifier.height(14.dp),
+                                                                                    contentAlignment = Alignment.CenterStart,
+                                                                                ) {
+                                                                                    listOfNotNull(
+                                                                                        defaultSupportingText,
+                                                                                        thresholdSupportingText,
+                                                                                    ).forEach { measuredText ->
+                                                                                        Text(
+                                                                                            text = measuredText,
+                                                                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                                                                fontSize = 10.5.sp,
+                                                                                                lineHeight = 13.sp,
+                                                                                                letterSpacing = 0.sp,
+                                                                                                platformStyle = PlatformTextStyle(
+                                                                                                    includeFontPadding = false,
+                                                                                                ),
+                                                                                            ),
+                                                                                            maxLines = 1,
+                                                                                            modifier = Modifier
+                                                                                                .alpha(0f)
+                                                                                                .clearAndSetSemantics { },
+                                                                                        )
+                                                                                    }
+
+                                                                                    AnimatedContent(
+                                                                                        targetState = thresholdSupportingText
+                                                                                            ?.takeIf { showThresholdText }
+                                                                                            ?: defaultSupportingText,
+                                                                                        contentAlignment = Alignment.CenterStart,
+                                                                                        transitionSpec = {
+                                                                                            // Match the prayer-tile bell/weather morph:
+                                                                                            // fade through with a restrained scale, without
+                                                                                            // vertical travel that looks like a height change.
+                                                                                            (
+                                                                                                fadeIn(tween(220)) + scaleIn(
+                                                                                                    initialScale = 0.72f,
+                                                                                                    animationSpec = tween(
+                                                                                                        260,
+                                                                                                        easing = FastOutSlowInEasing,
+                                                                                                    ),
+                                                                                                )
+                                                                                                ) togetherWith
+                                                                                                (
+                                                                                                    fadeOut(tween(150)) + scaleOut(
+                                                                                                        targetScale = 0.78f,
+                                                                                                        animationSpec = tween(190),
+                                                                                                    )
+                                                                                                    )
+                                                                                        },
+                                                                                        modifier = Modifier.matchParentSize(),
+                                                                                        label = "locationWeatherSupportingText",
+                                                                                    ) { supportingText ->
+                                                                                        Text(
+                                                                                            text = supportingText,
+                                                                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                                                                fontSize = 10.5.sp,
+                                                                                                lineHeight = 13.sp,
+                                                                                                letterSpacing = 0.sp,
+                                                                                                platformStyle = PlatformTextStyle(
+                                                                                                    includeFontPadding = false,
+                                                                                                ),
+                                                                                            ),
+                                                                                            color = locationTileSupporting,
+                                                                                            maxLines = 1,
+                                                                                            overflow = TextOverflow.Ellipsis,
+                                                                                        )
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    CurrentWeatherLoadState.Unavailable -> Unit
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(
+                                            modifier = Modifier.height(
+                                                // The floating bar already includes its own 8dp outer inset.
+                                                // Reserving another 10dp here left a large visible gutter
+                                                // below the final dashboard action in both layout states.
+                                                FloatingNavClearance - 6.dp - effectiveSyncBottomClearanceReclaim,
+                                            ),
+                                        )
+                                    }
+                                } // End of portrait layout else block
                             }
-                            }
-                            CurrentWeatherLoadState.Unavailable -> Unit
                         }
-                    }
-                    }
-                    }
-                }
-                }
-                }
 
-                Spacer(
-                    modifier = Modifier.height(
-                        // The floating bar already includes its own 8dp outer inset.
-                        // Reserving another 10dp here left a large visible gutter
-                        // below the final dashboard action in both layout states.
-                        FloatingNavClearance - 6.dp - effectiveSyncBottomClearanceReclaim,
-                    ),
-                )
-            }
-            } // End of portrait layout else block
-        }
-    }
+                        // MATERIAL 3 EXPRESSIVE LOCATION SERVICE DIALOG
+                        AnimatedVisibility(
+                            visible = showLocationServiceDialog,
+                            enter = fadeIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + scaleIn(
+                                initialScale = 0.9f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ),
+                            exit = fadeOut(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessHigh,
+                                ),
+                            ) + scaleOut(
+                                targetScale = 0.95f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessHigh,
+                                ),
+                            ),
+                        ) {
+                            AlertDialog(
+                                onDismissRequest = { showLocationServiceDialog = false },
+                                title = {
+                                    Text(
+                                        text = "Enable Location Services?",
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            fontWeight = FontWeight.Medium,
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                },
+                                text = {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            text = "Prayer Times needs location access to calculate accurate prayer times for your area.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 20.sp,
+                                        )
 
-    // MATERIAL 3 EXPRESSIVE LOCATION SERVICE DIALOG
-    AnimatedVisibility(
-        visible = showLocationServiceDialog,
-        enter = fadeIn(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ) + scaleIn(
-            initialScale = 0.9f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ),
-        exit = fadeOut(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        ) + scaleOut(
-            targetScale = 0.95f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        )
-    ) {
-        AlertDialog(
-            onDismissRequest = { showLocationServiceDialog = false },
-            title = {
-                Text(
-                    text = "Enable Location Services?",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Prayer Times needs location access to calculate accurate prayer times for your area.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 20.sp
-                    )
-                    
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "Your location will be used to determine prayer times",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        showLocationServiceDialog = false
-                        // Open device location settings
-                        val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                        screenContext.startActivity(intent)
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = "ENABLE",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { 
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        showLocationServiceDialog = false
-                        // Continue with cached/default location
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Text(
-                        text = "NOT NOW",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(28.dp)
-        )
-    }
-    
-    // MATERIAL 3 EXPRESSIVE COMPASS POPUP - Enhanced entrance with slide and scale
-    AnimatedVisibility(
-        visible = showCompassPopup,
-        enter = slideInVertically(
-            initialOffsetY = { fullHeight -> fullHeight / 3 },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ) + fadeIn(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ) + scaleIn(
-            initialScale = 0.85f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        ),
-        exit = slideOutVertically(
-            targetOffsetY = { fullHeight -> fullHeight / 4 },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        ) + fadeOut(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        ) + scaleOut(
-            targetScale = 0.9f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh
-            )
-        )
-    ) {
-        Log.d("PrayerTimes", "showCompassPopup is true, rendering CompassPopupScreen")
-        CompassPopupScreen(
-            progress = prayerTimes?.let { times ->
-                PrayerTimeHelpers.getNextPrayer(currentTime, times)?.let { nextPrayer ->
-                    // Calculate progress based on current time and next prayer time
-                    val now = currentTime.toSecondOfDay().toFloat()
-                    val nextPrayerTime = nextPrayer.second.toSecondOfDay().toFloat()
-                    if (nextPrayerTime > now) {
-                        val totalDaySeconds = 24 * 60 * 60f
-                        val timeUntilNext = nextPrayerTime - now
-                        1f - (timeUntilNext / totalDaySeconds).coerceIn(0f, 1f)
-                    } else 0.7f
-                } ?: 0.7f
-            } ?: 0.7f,
-            locationService = locationService,
-            onDismiss = {
-                Log.d("PrayerTimes", "onDismiss called, hiding compass popup")
-                showCompassPopup = false
-            },
-            userLatitude = prayerTimes?.location?.latitude ?: 0.0,
-            userLongitude = prayerTimes?.location?.longitude ?: 0.0,
-            showGlobe = true
-        )
-    }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.LocationOn,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            Text(
+                                                text = "Your location will be used to determine prayer times",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            showLocationServiceDialog = false
+                                            // Open device location settings
+                                            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                                            screenContext.startActivity(intent)
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.primary,
+                                        ),
+                                    ) {
+                                        Text(
+                                            text = "ENABLE",
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                fontWeight = FontWeight.SemiBold,
+                                            ),
+                                        )
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            showLocationServiceDialog = false
+                                            // Continue with cached/default location
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
+                                    ) {
+                                        Text(
+                                            text = "NOT NOW",
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                fontWeight = FontWeight.Medium,
+                                            ),
+                                        )
+                                    }
+                                },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(28.dp),
+                            )
+                        }
 
-        } // Close Column inside AppTopSearchBar content lambda
-        } // Close AppTopSearchBar scaffold (content lambda)
-        } // Close PullToSyncContainer lambda
+                        // MATERIAL 3 EXPRESSIVE COMPASS POPUP - Enhanced entrance with slide and scale
+                        AnimatedVisibility(
+                            visible = showCompassPopup,
+                            enter = slideInVertically(
+                                initialOffsetY = { fullHeight -> fullHeight / 3 },
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + fadeIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ) + scaleIn(
+                                initialScale = 0.85f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium,
+                                ),
+                            ),
+                            exit = slideOutVertically(
+                                targetOffsetY = { fullHeight -> fullHeight / 4 },
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessHigh,
+                                ),
+                            ) + fadeOut(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessHigh,
+                                ),
+                            ) + scaleOut(
+                                targetScale = 0.9f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessHigh,
+                                ),
+                            ),
+                        ) {
+                            Log.d("PrayerTimes", "showCompassPopup is true, rendering CompassPopupScreen")
+                            CompassPopupScreen(
+                                progress = prayerTimes?.let { times ->
+                                    PrayerTimeHelpers.getNextPrayer(currentTime, times)?.let { nextPrayer ->
+                                        // Calculate progress based on current time and next prayer time
+                                        val now = currentTime.toSecondOfDay().toFloat()
+                                        val nextPrayerTime = nextPrayer.second.toSecondOfDay().toFloat()
+                                        if (nextPrayerTime > now) {
+                                            val totalDaySeconds = 24 * 60 * 60f
+                                            val timeUntilNext = nextPrayerTime - now
+                                            1f - (timeUntilNext / totalDaySeconds).coerceIn(0f, 1f)
+                                        } else {
+                                            0.7f
+                                        }
+                                    } ?: 0.7f
+                                } ?: 0.7f,
+                                locationService = locationService,
+                                onDismiss = {
+                                    Log.d("PrayerTimes", "onDismiss called, hiding compass popup")
+                                    showCompassPopup = false
+                                },
+                                userLatitude = prayerTimes?.location?.latitude ?: 0.0,
+                                userLongitude = prayerTimes?.location?.longitude ?: 0.0,
+                                showGlobe = true,
+                            )
+                        }
+                    } // Close Column inside AppTopSearchBar content lambda
+                } // Close AppTopSearchBar scaffold (content lambda)
+            } // Close PullToSyncContainer lambda
         } // Close Box with layerBackdrop
 
         // INTERACTIVE PRAYER DIAL POPUP - Control Center overlay (OUTSIDE PullToSyncContainer, inside Box)
@@ -3992,7 +4050,7 @@ fun PrayerTimesScreen(
                                 val appContext = screenContext.applicationContext
                                 val serviceManager = dagger.hilt.android.EntryPointAccessors.fromApplication(
                                     appContext,
-                                    com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java
+                                    com.starception.submission.prayer.service.PrayerNotificationServiceManagerEntryPoint::class.java,
                                 ).prayerNotificationServiceManager()
                                 serviceManager.updatePrayerNotifications()
                                 Log.i("PrayerTimes", "🔔 Notifications updated for $prayerName")
@@ -4013,7 +4071,7 @@ fun PrayerTimesScreen(
                     }
                 },
                 backdrop = controlCenterBackdrop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         } // Close if (popupDialState != null)
     } // Close outer Box
@@ -4343,67 +4401,67 @@ private fun LandscapeLocationWeatherTile(
                         LandscapeWeatherLineLoadingPlaceholder()
                     }
                     is CurrentWeatherLoadState.Available -> {
-                    val current = state.weather
-                    val conditionLabel = weatherConditionLabel(current)
-                    val humidityLevel = humidityThresholdLevel(
-                        value = current.relativeHumidity,
-                        threshold = thresholds.humidity,
-                    )
-                    val rainLevel = rainThresholdLevel(
-                        value = current.precipitationProbability,
-                        threshold = thresholds.rainProbability,
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Text(
-                            text = "$conditionLabel ·",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp,
-                                letterSpacing = 0.sp,
-                                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                            ),
-                            color = supportingColor,
-                            maxLines = 1,
+                        val current = state.weather
+                        val conditionLabel = weatherConditionLabel(current)
+                        val humidityLevel = humidityThresholdLevel(
+                            value = current.relativeHumidity,
+                            threshold = thresholds.humidity,
                         )
-                        AnimatedPrayerWeatherIcon(
-                            visual = PrayerWeatherVisual.Humidity,
-                            level = humidityLevel,
-                            modifier = Modifier.size(20.dp),
+                        val rainLevel = rainThresholdLevel(
+                            value = current.precipitationProbability,
+                            threshold = thresholds.rainProbability,
                         )
-                        Text(
-                            text = "${current.relativeHumidity}% ·",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp,
-                                letterSpacing = 0.sp,
-                            ),
-                            color = supportingColor,
-                            maxLines = 1,
-                        )
-                        AnimatedPrayerWeatherIcon(
-                            visual = PrayerWeatherVisual.Rain,
-                            level = rainLevel,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = if (current.precipitationProbability == 0) {
-                                "No rain"
-                            } else {
-                                "${current.precipitationProbability}% rain"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                lineHeight = 13.sp,
-                                letterSpacing = 0.sp,
-                            ),
-                            color = supportingColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = "$conditionLabel ·",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    letterSpacing = 0.sp,
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                ),
+                                color = supportingColor,
+                                maxLines = 1,
+                            )
+                            AnimatedPrayerWeatherIcon(
+                                visual = PrayerWeatherVisual.Humidity,
+                                level = humidityLevel,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text(
+                                text = "${current.relativeHumidity}% ·",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    letterSpacing = 0.sp,
+                                ),
+                                color = supportingColor,
+                                maxLines = 1,
+                            )
+                            AnimatedPrayerWeatherIcon(
+                                visual = PrayerWeatherVisual.Rain,
+                                level = rainLevel,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text(
+                                text = if (current.precipitationProbability == 0) {
+                                    "No rain"
+                                } else {
+                                    "${current.precipitationProbability}% rain"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp,
+                                    letterSpacing = 0.sp,
+                                ),
+                                color = supportingColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                     CurrentWeatherLoadState.Unavailable -> Text(
                         text = fallbackDetail,
@@ -4425,49 +4483,49 @@ private fun LandscapeLocationWeatherTile(
                     LandscapeTemperatureLoadingPlaceholder()
                 }
                 is CurrentWeatherLoadState.Available -> {
-                val current = state.weather
-                val temperatureLevel = temperatureThresholdLevel(
-                    value = current.temperatureCelsius,
-                    threshold = thresholds.temperatureCelsius,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Row(
-                    modifier = Modifier
-                        .wrapContentWidth()
-                        .height(32.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = "${current.temperatureCelsius.roundToInt()}°C",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 19.sp,
-                            lineHeight = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                        ),
-                        color = contentColor,
-                        modifier = Modifier
-                            .offset(y = 2.dp),
+                    val current = state.weather
+                    val temperatureLevel = temperatureThresholdLevel(
+                        value = current.temperatureCelsius,
+                        threshold = thresholds.temperatureCelsius,
                     )
-                    if (temperatureLevel == WeatherThresholdLevel.Normal) {
-                        AnimatedCurrentWeatherIcon(
-                            weather = current,
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .height(32.dp),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Text(
+                            text = "${current.temperatureCelsius.roundToInt()}°C",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 19.sp,
+                                lineHeight = 22.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            ),
+                            color = contentColor,
                             modifier = Modifier
-                                .align(Alignment.Top)
-                                .size(24.dp)
-                                .offset(x = (-2).dp, y = 1.dp),
+                                .offset(y = 2.dp),
                         )
-                    } else {
-                        AnimatedPrayerWeatherIcon(
-                            visual = PrayerWeatherVisual.Heat,
-                            level = temperatureLevel,
-                            modifier = Modifier
-                                .align(Alignment.Top)
-                                .size(24.dp)
-                                .offset(x = (-2).dp, y = 1.dp),
-                        )
+                        if (temperatureLevel == WeatherThresholdLevel.Normal) {
+                            AnimatedCurrentWeatherIcon(
+                                weather = current,
+                                modifier = Modifier
+                                    .align(Alignment.Top)
+                                    .size(24.dp)
+                                    .offset(x = (-2).dp, y = 1.dp),
+                            )
+                        } else {
+                            AnimatedPrayerWeatherIcon(
+                                visual = PrayerWeatherVisual.Heat,
+                                level = temperatureLevel,
+                                modifier = Modifier
+                                    .align(Alignment.Top)
+                                    .size(24.dp)
+                                    .offset(x = (-2).dp, y = 1.dp),
+                            )
+                        }
                     }
-                }
                 }
                 CurrentWeatherLoadState.Unavailable -> Unit
             }
@@ -4726,7 +4784,7 @@ private fun WeatherThresholdControl(
  */
 private fun getLocationWithCountryCode(
     locationString: String,
-    locationData: com.starception.submission.prayer.model.Location?
+    locationData: com.starception.submission.prayer.model.Location?,
 ): String {
     android.util.Log.d("LocationDisplay", "🏷️ SMART LOCATION PRIORITY:")
     android.util.Log.d("LocationDisplay", "   Input: '$locationString'")

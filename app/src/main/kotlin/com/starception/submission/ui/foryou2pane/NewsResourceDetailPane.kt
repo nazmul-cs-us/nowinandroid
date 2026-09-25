@@ -190,7 +190,7 @@ fun NewsResourceDetailPane(
                             toolbarColor = backgroundColor,
                         )
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(text = stringResource(R.string.feature_foryou_open_in_browser))
                 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.starception.submission.widget.samples.toolbars.layout
 
-import com.starception.submission.widget.LocalWidgetHostBackground
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -46,7 +46,7 @@ import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.starception.submission.R
+import com.starception.submission.widget.LocalWidgetHostBackground
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.headerItemHeight
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.iconSize
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutDimens.itemsSpacing
@@ -61,7 +61,6 @@ import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLa
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutSize.SideBarTwoRowGrid
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutSize.TwoByTwoGrid
 import com.starception.submission.widget.samples.toolbars.layout.SearchToolBarLayoutSize.VerticalColumn
-import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDemoActivity
 
 /**
  * Layout focused on presenting a search entrypoint along with additional handy shortcuts that
@@ -78,84 +77,84 @@ import com.starception.submission.widget.samples.utils.ActionUtils.actionStartDe
  */
 @Composable
 fun SearchToolBarLayout(
-  searchButton: SearchToolBarButton,
-  // 4 items, as a list here for convenience, that you might inline in your implementation.
-  trailingButtons: List<SearchToolBarButton>,
+    searchButton: SearchToolBarButton,
+    // 4 items, as a list here for convenience, that you might inline in your implementation.
+    trailingButtons: List<SearchToolBarButton>,
 ) {
-  val searchButtonItem: @Composable () -> Unit = {
-    if (canShowSearchText()) {
-      SearchBar(searchButton = searchButton)
-    } else {
-      SearchIconButton(
-        searchButton = searchButton,
-        filled = canUseFilledButtons()
-      )
-    }
-  }
-
-  val trailingButtonItems: List<@Composable () -> Unit> =
-    trailingButtons.map {
-      {
-        TrailingButton(
-          button = it,
-          filled = canUseFilledButtons()
-        )
-      }
-    }
-
-  Scaffold(
-    backgroundColor = LocalWidgetHostBackground.current,
-    modifier = GlanceModifier
-      .padding(vertical = widgetPadding),
-    horizontalPadding = widgetPadding
-  ) {
-    when (val layoutSize = SearchToolBarLayoutSize.fromLocalSize()) {
-      HorizontalRow, VerticalColumn -> {
-        val horizontal = (layoutSize == HorizontalRow)
-        val numberOfItems = numberOfItemsThatFit(
-          horizontal = horizontal,
-          minItemSize = minButtonSize,
-          spacing = itemsSpacing
-        )
-        val allItems = listOf(searchButtonItem) + trailingButtonItems
-        val finalItems = allItems.take(numberOfItems)
-
-        if (horizontal) {
-          SpacedRow(
-            items = finalItems,
-            spacing = itemsSpacing,
-            modifier = GlanceModifier.fillMaxSize()
-          )
+    val searchButtonItem: @Composable () -> Unit = {
+        if (canShowSearchText()) {
+            SearchBar(searchButton = searchButton)
         } else {
-          SpacedColumn(
-            items = finalItems,
-            spacing = itemsSpacing,
-            modifier = GlanceModifier.fillMaxSize()
-          )
+            SearchIconButton(
+                searchButton = searchButton,
+                filled = canUseFilledButtons(),
+            )
         }
-      }
-
-      TwoByTwoGrid -> TwoRowGrid(
-        // 4 items including search button
-        items = listOf(searchButtonItem) + trailingButtonItems.take(3),
-        spacing = itemsSpacing
-      )
-
-      SideBarTwoRowGrid -> SideBarTwoRowGrid(
-        sideBarItem = searchButtonItem,
-        items = trailingButtonItems.take(4),
-        sideBarWidth = sideBarLeadingItemWidth,
-        spacing = itemsSpacing
-      )
-
-      HeaderTwoRowGrid -> HeaderTwoRowGrid(
-        headerItem = searchButtonItem,
-        items = trailingButtonItems.take(4),
-        headerHeight = headerItemHeight,
-        spacing = itemsSpacing
-      )
     }
-  }
+
+    val trailingButtonItems: List<@Composable () -> Unit> =
+        trailingButtons.map {
+            {
+                TrailingButton(
+                    button = it,
+                    filled = canUseFilledButtons(),
+                )
+            }
+        }
+
+    Scaffold(
+        backgroundColor = LocalWidgetHostBackground.current,
+        modifier = GlanceModifier
+            .padding(vertical = widgetPadding),
+        horizontalPadding = widgetPadding,
+    ) {
+        when (val layoutSize = SearchToolBarLayoutSize.fromLocalSize()) {
+            HorizontalRow, VerticalColumn -> {
+                val horizontal = (layoutSize == HorizontalRow)
+                val numberOfItems = numberOfItemsThatFit(
+                    horizontal = horizontal,
+                    minItemSize = minButtonSize,
+                    spacing = itemsSpacing,
+                )
+                val allItems = listOf(searchButtonItem) + trailingButtonItems
+                val finalItems = allItems.take(numberOfItems)
+
+                if (horizontal) {
+                    SpacedRow(
+                        items = finalItems,
+                        spacing = itemsSpacing,
+                        modifier = GlanceModifier.fillMaxSize(),
+                    )
+                } else {
+                    SpacedColumn(
+                        items = finalItems,
+                        spacing = itemsSpacing,
+                        modifier = GlanceModifier.fillMaxSize(),
+                    )
+                }
+            }
+
+            TwoByTwoGrid -> TwoRowGrid(
+                // 4 items including search button
+                items = listOf(searchButtonItem) + trailingButtonItems.take(3),
+                spacing = itemsSpacing,
+            )
+
+            SideBarTwoRowGrid -> SideBarTwoRowGrid(
+                sideBarItem = searchButtonItem,
+                items = trailingButtonItems.take(4),
+                sideBarWidth = sideBarLeadingItemWidth,
+                spacing = itemsSpacing,
+            )
+
+            HeaderTwoRowGrid -> HeaderTwoRowGrid(
+                headerItem = searchButtonItem,
+                items = trailingButtonItems.take(4),
+                headerHeight = headerItemHeight,
+                spacing = itemsSpacing,
+            )
+        }
+    }
 }
 
 /**
@@ -167,10 +166,10 @@ fun SearchToolBarLayout(
  * @param text optional text that can be displayed if space is available.
  */
 data class SearchToolBarButton(
-  @DrawableRes val iconRes: Int,
-  val contentDescription: String,
-  val onClick: Action,
-  val text: String? = null,
+    @DrawableRes val iconRes: Int,
+    val contentDescription: String,
+    val onClick: Action,
+    val text: String? = null,
 )
 
 /**
@@ -178,27 +177,27 @@ data class SearchToolBarButton(
  */
 @Composable
 private fun SearchIconButton(
-  searchButton: SearchToolBarButton,
-  filled: Boolean,
+    searchButton: SearchToolBarButton,
+    filled: Boolean,
 ) {
-  RectangularIconButton(
-    imageProvider = ImageProvider(searchButton.iconRes),
-    contentDescription = searchButton.contentDescription,
-    backgroundColor = if (filled) {
-      GlanceTheme.colors.tertiary
-    } else {
-      ColorProvider(Color.Transparent, Color.Transparent)
-    },
-    contentColor = if (filled) {
-      GlanceTheme.colors.onTertiary
-    } else {
-      GlanceTheme.colors.onSecondaryContainer
-    },
-    iconSize = iconSize,
-    roundedCornerShape = RoundedCornerShape.FULL,
-    onClick = searchButton.onClick,
-    modifier = GlanceModifier.fillMaxSize()
-  )
+    RectangularIconButton(
+        imageProvider = ImageProvider(searchButton.iconRes),
+        contentDescription = searchButton.contentDescription,
+        backgroundColor = if (filled) {
+            GlanceTheme.colors.tertiary
+        } else {
+            ColorProvider(Color.Transparent, Color.Transparent)
+        },
+        contentColor = if (filled) {
+            GlanceTheme.colors.onTertiary
+        } else {
+            GlanceTheme.colors.onSecondaryContainer
+        },
+        iconSize = iconSize,
+        roundedCornerShape = RoundedCornerShape.FULL,
+        onClick = searchButton.onClick,
+        modifier = GlanceModifier.fillMaxSize(),
+    )
 }
 
 /**
@@ -206,38 +205,38 @@ private fun SearchIconButton(
  */
 @Composable
 private fun SearchBar(searchButton: SearchToolBarButton) {
-  Row(
-    horizontalAlignment = Alignment.Start,
-    verticalAlignment = Alignment.CenterVertically,
-    modifier = GlanceModifier
-      .fillMaxSize()
-      .padding(horizontal = 16.dp, vertical = 12.dp)
-      .background(GlanceTheme.colors.secondaryContainer)
-      .cornerRadius(RoundedCornerShape.FULL.cornerRadius)
-      .semantics { this.contentDescription = searchButton.contentDescription }
-      .clickable(searchButton.onClick),
-  ) {
-    // Search or brand icon
-    Image(
-      provider = ImageProvider(searchButton.iconRes),
-      contentDescription = null,
-      colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-      modifier = GlanceModifier.size(iconSize)
-    )
-    // Followed by text
-    searchButton.text?.let {
-      Spacer(GlanceModifier.width(8.dp))
-      Text(
-        text = it,
-        maxLines = 1,
-        style = TextStyle(
-          color = GlanceTheme.colors.onSecondaryContainer,
-          fontSize = 16.sp,
-          fontWeight = FontWeight.Medium
-        ),
-      )
+    Row(
+        horizontalAlignment = Alignment.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .background(GlanceTheme.colors.secondaryContainer)
+            .cornerRadius(RoundedCornerShape.FULL.cornerRadius)
+            .semantics { this.contentDescription = searchButton.contentDescription }
+            .clickable(searchButton.onClick),
+    ) {
+        // Search or brand icon
+        Image(
+            provider = ImageProvider(searchButton.iconRes),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+            modifier = GlanceModifier.size(iconSize),
+        )
+        // Followed by text
+        searchButton.text?.let {
+            Spacer(GlanceModifier.width(8.dp))
+            Text(
+                text = it,
+                maxLines = 1,
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSecondaryContainer,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+            )
+        }
     }
-  }
 }
 
 /**
@@ -245,128 +244,130 @@ private fun SearchBar(searchButton: SearchToolBarButton) {
  */
 @Composable
 private fun TrailingButton(
-  button: SearchToolBarButton,
-  filled: Boolean = true,
+    button: SearchToolBarButton,
+    filled: Boolean = true,
 ) {
-  RectangularIconButton(
-    imageProvider = ImageProvider(button.iconRes),
-    contentDescription = button.contentDescription,
-    backgroundColor = if (filled) {
-      GlanceTheme.colors.secondaryContainer
-    } else {
-      ColorProvider(Color.Transparent, Color.Transparent)
-    },
-    contentColor = GlanceTheme.colors.onSecondaryContainer,
-    onClick = button.onClick,
-    iconSize = iconSize,
-    roundedCornerShape = RoundedCornerShape.MEDIUM,
-    modifier = GlanceModifier.fillMaxSize()
-  )
+    RectangularIconButton(
+        imageProvider = ImageProvider(button.iconRes),
+        contentDescription = button.contentDescription,
+        backgroundColor = if (filled) {
+            GlanceTheme.colors.secondaryContainer
+        } else {
+            ColorProvider(Color.Transparent, Color.Transparent)
+        },
+        contentColor = GlanceTheme.colors.onSecondaryContainer,
+        onClick = button.onClick,
+        iconSize = iconSize,
+        roundedCornerShape = RoundedCornerShape.MEDIUM,
+        modifier = GlanceModifier.fillMaxSize(),
+    )
 }
 
 // Breakpoints based on the UX design.
 private enum class SearchToolBarLayoutSize {
-  // Row of search button followed by action buttons that fit horizontally.
-  HorizontalRow,
+    // Row of search button followed by action buttons that fit horizontally.
+    HorizontalRow,
 
-  // Column of search button and action buttons that fit vertically.
-  VerticalColumn,
+    // Column of search button and action buttons that fit vertically.
+    VerticalColumn,
 
-  // A two row, two column grid containing search button and 3 trailing buttons.
-  TwoByTwoGrid,
+    // A two row, two column grid containing search button and 3 trailing buttons.
+    TwoByTwoGrid,
 
-  // A side bar for search followed by a 2x2 grid of trailing buttons.
-  SideBarTwoRowGrid,
+    // A side bar for search followed by a 2x2 grid of trailing buttons.
+    SideBarTwoRowGrid,
 
-  // A header containing header bar followed by a 2x2 grid of trailing buttons.
-  HeaderTwoRowGrid;
+    // A header containing header bar followed by a 2x2 grid of trailing buttons.
+    HeaderTwoRowGrid,
 
-  companion object {
-    @Composable
-    fun fromLocalSize(): SearchToolBarLayoutSize {
-      val size = LocalSize.current
-      val height = size.height
-      val width = size.width
+    ;
 
-      return if (height < 128.dp) {
-        HorizontalRow
-      } else if (width < 128.dp) {
-        VerticalColumn
-      } else if (height < 188.dp && width < 188.dp) {
-        TwoByTwoGrid
-      } else if (height < 188.dp) {
-        SideBarTwoRowGrid
-      } else {
-        HeaderTwoRowGrid
-      }
+    companion object {
+        @Composable
+        fun fromLocalSize(): SearchToolBarLayoutSize {
+            val size = LocalSize.current
+            val height = size.height
+            val width = size.width
+
+            return if (height < 128.dp) {
+                HorizontalRow
+            } else if (width < 128.dp) {
+                VerticalColumn
+            } else if (height < 188.dp && width < 188.dp) {
+                TwoByTwoGrid
+            } else if (height < 188.dp) {
+                SideBarTwoRowGrid
+            } else {
+                HeaderTwoRowGrid
+            }
+        }
+
+        /**
+         * Helper to decide whether to show search text in current widget size.
+         */
+        @Composable
+        fun canShowSearchText(): Boolean {
+            val localSize = LocalSize.current
+
+            // Per breakpoints in the UX design
+            return localSize.width >= 184.dp && localSize.height >= 188.dp
+        }
+
+        /**
+         * Helper to decide whether to show filled icons vs without containers in current widget size.
+         */
+        @Composable
+        fun canUseFilledButtons(): Boolean {
+            val localSize = LocalSize.current
+
+            // Per breakpoints in the UX design
+            return localSize.height >= 72.dp && localSize.width >= 72.dp
+        }
+
+        /**
+         * Helper to decide how many items to show in the available space in given orientation.
+         *
+         * @param horizontal if its a horizontal orientation
+         * @param minItemSize min size to maintain for each item when identify how many to fit
+         * @param spacing spacing to between items
+         */
+        @Composable
+        fun numberOfItemsThatFit(horizontal: Boolean, minItemSize: Dp, spacing: Dp): Int {
+            val size = if (horizontal) {
+                LocalSize.current.width
+            } else {
+                LocalSize.current.height
+            }
+
+            // n buttons have n-1 content spacers, so, we add one to total width to make the width division
+            // simpler.
+            val normalizedWidth: Dp = size + spacing
+            val normalizedButtonWidth: Dp = minItemSize + spacing
+            // Number of equally wide buttons that fit in a row
+            return ((normalizedWidth / normalizedButtonWidth)).toInt()
+        }
     }
-
-    /**
-     * Helper to decide whether to show search text in current widget size.
-     */
-    @Composable
-    fun canShowSearchText(): Boolean {
-      val localSize = LocalSize.current
-
-      // Per breakpoints in the UX design
-      return localSize.width >= 184.dp && localSize.height >= 188.dp
-    }
-
-    /**
-     * Helper to decide whether to show filled icons vs without containers in current widget size.
-     */
-    @Composable
-    fun canUseFilledButtons(): Boolean {
-      val localSize = LocalSize.current
-
-      // Per breakpoints in the UX design
-      return localSize.height >= 72.dp && localSize.width >= 72.dp
-    }
-
-    /**
-     * Helper to decide how many items to show in the available space in given orientation.
-     *
-     * @param horizontal if its a horizontal orientation
-     * @param minItemSize min size to maintain for each item when identify how many to fit
-     * @param spacing spacing to between items
-     */
-    @Composable
-    fun numberOfItemsThatFit(horizontal: Boolean, minItemSize: Dp, spacing: Dp): Int {
-      val size = if (horizontal) {
-        LocalSize.current.width
-      } else {
-        LocalSize.current.height
-      }
-
-      // n buttons have n-1 content spacers, so, we add one to total width to make the width division
-      // simpler.
-      val normalizedWidth: Dp = size + spacing
-      val normalizedButtonWidth: Dp = minItemSize + spacing
-      // Number of equally wide buttons that fit in a row
-      return ((normalizedWidth / normalizedButtonWidth)).toInt()
-    }
-  }
 }
 
 // Various dimensions coming from the UX design
 private object SearchToolBarLayoutDimens {
-  /** Minimum size needed for buttons / clickable areas for accessibility. */
-  val minButtonSize = 48.dp
+    /** Minimum size needed for buttons / clickable areas for accessibility. */
+    val minButtonSize = 48.dp
 
-  /** Padding around the content within the widget. */
-  val widgetPadding = 12.dp
+    /** Padding around the content within the widget. */
+    val widgetPadding = 12.dp
 
-  /** Spacing between buttons in all layouts. */
-  val itemsSpacing = 8.dp
+    /** Spacing between buttons in all layouts. */
+    val itemsSpacing = 8.dp
 
-  /** Size of icons in all buttons */
-  val iconSize = 24.dp
+    /** Size of icons in all buttons */
+    val iconSize = 24.dp
 
-  /** Height of side bar in the [SideBarTwoRowGrid] layout. */
-  val sideBarLeadingItemWidth = 52.dp
+    /** Height of side bar in the [SideBarTwoRowGrid] layout. */
+    val sideBarLeadingItemWidth = 52.dp
 
-  /** Height of header in the [HeaderTwoRowGrid] layout. */
-  val headerItemHeight = 52.dp
+    /** Height of header in the [HeaderTwoRowGrid] layout. */
+    val headerItemHeight = 52.dp
 }
 
 /**

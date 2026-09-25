@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Starception
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,11 +43,10 @@ import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
 import com.starception.submission.R
 import com.starception.submission.config.TravelDuaSettings
+import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.feature.course.CourseProgressTracker
-import com.starception.submission.feature.course.QuranListeningProgress
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranData
-import com.starception.submission.download.AudioDownloadHelper
 import com.starception.submission.prayer.util.FileLogger
 import com.starception.submission.settings.components.TtsVoice
 import com.starception.submission.voice.EnglishTtsTextNormalizer
@@ -110,6 +109,7 @@ class DrivingAudioService : Service() {
     // Callbacks
     var onPlaybackComplete: (() -> Unit)? = null
     var onStateChanged: ((PlaybackState) -> Unit)? = null
+
     // Secondary callback for the global media controller (does not overwrite primary callback)
     var onGlobalStateChanged: ((PlaybackState) -> Unit)? = null
 
@@ -129,7 +129,7 @@ class DrivingAudioService : Service() {
         PLAYING_HADITH_TTS,
         PLAYING_QURAN,
         VOICE_PROMPT,
-        PAUSED
+        PAUSED,
     }
 
     companion object {
@@ -185,7 +185,7 @@ class DrivingAudioService : Service() {
     private enum class ChainQuranAudioLanguage {
         ARABIC_ONLY,
         BENGALI_TRANSLATION,
-        ENGLISH_TRANSLATION
+        ENGLISH_TRANSLATION,
     }
 
     inner class DrivingAudioBinder : Binder() {
@@ -207,7 +207,7 @@ class DrivingAudioService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "DrivingAudio::WakeLock"
+            "DrivingAudio::WakeLock",
         ).apply {
             acquire(2 * 60 * 60 * 1000L) // 2 hours max
         }
@@ -217,7 +217,7 @@ class DrivingAudioService : Service() {
         mediaSession = MediaSessionCompat(this, "DrivingAudioService").apply {
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS,
             )
 
             setCallback(object : MediaSessionCompat.Callback() {
@@ -271,7 +271,7 @@ class DrivingAudioService : Service() {
                         if (isChainActive()) {
                             Log.w(
                                 TAG,
-                                "Ignoring duplicate TYPE_TRAVEL_DUA start; chain already active in state=$currentState"
+                                "Ignoring duplicate TYPE_TRAVEL_DUA start; chain already active in state=$currentState",
                             )
                             return START_STICKY
                         }
@@ -346,7 +346,7 @@ class DrivingAudioService : Service() {
                 startForeground(
                     NOTIFICATION_ID,
                     createNotification(),
-                    serviceType
+                    serviceType,
                 )
                 Log.i(
                     TAG,
@@ -354,14 +354,14 @@ class DrivingAudioService : Service() {
                         "🚗 Foreground service started with mediaPlayback + microphone"
                     } else {
                         "🚗 Foreground service started with mediaPlayback only"
-                    }
+                    },
                 )
             } catch (e: SecurityException) {
                 Log.w(TAG, "🚗 Failed to start with microphone type, falling back to mediaPlayback: ${e.message}")
                 startForeground(
                     NOTIFICATION_ID,
                     createNotification(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
                 )
             }
         } else {
@@ -388,7 +388,7 @@ class DrivingAudioService : Service() {
                         NOTIFICATION_ID,
                         createNotification(),
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
                     )
                     Log.i(TAG, "🎤 Upgraded foreground service to include MICROPHONE type")
                 } catch (e: SecurityException) {
@@ -404,7 +404,7 @@ class DrivingAudioService : Service() {
                     NOTIFICATION_ID,
                     createNotification(),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
                 )
                 Log.i(TAG, "🎤 Upgraded foreground service to include MICROPHONE type (API ${Build.VERSION.SDK_INT})")
             } catch (e: Exception) {
@@ -464,7 +464,6 @@ class DrivingAudioService : Service() {
             mediaPlayer?.start()
             isPaused = false
             persistTravelDuaStartTime()
-
         } catch (e: Exception) {
             Log.e(TAG, "Error playing travel dua", e)
             onTravelDuaComplete()
@@ -593,7 +592,7 @@ class DrivingAudioService : Service() {
                             Log.i(TAG, "🔄 Pre-generating hadith #$nextHadithToCache (${fullText.length} chars, hash=${fullText.hashCode()}) [${cachedHadithNumbers.size + generatedCount + 1}/$CACHE_TARGET_SIZE]")
                             sherpaOnnxTts.preGenerateAsync(
                                 text = fullText,
-                                speakerId = selectedSpeakerId
+                                speakerId = selectedSpeakerId,
                             )
                             cachedHadithNumbers.add(nextHadithToCache)
                             generatedCount++
@@ -610,7 +609,6 @@ class DrivingAudioService : Service() {
 
                 Log.i(TAG, "📦 Cache updated: ${cachedHadithNumbers.size}/$CACHE_TARGET_SIZE hadiths now cached: $cachedHadithNumbers")
                 Log.i(TAG, "📦 ${sherpaOnnxTts.getCacheInfo()}")
-
             } catch (e: Exception) {
                 Log.e(TAG, "🔄 Error maintaining cache: ${e.message}")
             }
@@ -729,7 +727,7 @@ class DrivingAudioService : Service() {
                 val formattedNumber = String.format("%04d", hadithNumber)
                 val legacyFiles = listOf(
                     File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.ogg"),
-                    File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.mp3")
+                    File(BUKHARI_AUDIO_PATH, "bukhari_$formattedNumber.mp3"),
                 )
                 audioFile = legacyFiles.find { it.exists() }
                 if (audioFile == null) {
@@ -771,7 +769,6 @@ class DrivingAudioService : Service() {
 
             mediaPlayer?.start()
             isPaused = false
-
         } catch (e: Exception) {
             Log.e(TAG, "Error playing hadith audio", e)
             playExactEnglishHadithFallback(hadithNumber)
@@ -847,7 +844,7 @@ class DrivingAudioService : Service() {
                     onComplete = {
                         Log.d(TAG, "📚 Sherpa-ONNX TTS completed")
                         handler.post { onHadithComplete(hadithNumber) }
-                    }
+                    },
                 )
 
                 if (!success) {
@@ -982,7 +979,7 @@ class DrivingAudioService : Service() {
                 markHadithPlayed(hadithNumber)
                 // Continue to Quran playback if enrolled (even on error)
                 startQuranPlaybackIfEnrolled(hadithNumber)
-            }
+            },
         )
     }
 
@@ -1053,12 +1050,12 @@ class DrivingAudioService : Service() {
                 if (audioFile == null && selectedPlaybackLanguage != AudioLanguage.ARABIC_ONLY) {
                     val fallbackArabicFile = audioDownloadHelper.resolveQuranAudioFile(
                         candidateIndex,
-                        AudioLanguage.ARABIC_ONLY
+                        AudioLanguage.ARABIC_ONLY,
                     )
                     if (fallbackArabicFile != null) {
                         Log.w(
                             TAG,
-                            "🕌 Selected Quran audio ($selectedAudioLanguage) missing for Surah ${surah.number}; falling back to Arabic"
+                            "🕌 Selected Quran audio ($selectedAudioLanguage) missing for Surah ${surah.number}; falling back to Arabic",
                         )
                         audioFile = fallbackArabicFile
                     }
@@ -1074,10 +1071,12 @@ class DrivingAudioService : Service() {
                 val selectedCdnKey = audioDownloadHelper.getQuranCdnKey(candidateIndex, selectedPlaybackLanguage)
                 val fallbackCdnKey = if (selectedPlaybackLanguage != AudioLanguage.ARABIC_ONLY) {
                     audioDownloadHelper.getQuranCdnKey(candidateIndex, AudioLanguage.ARABIC_ONLY)
-                } else null
+                } else {
+                    null
+                }
                 Log.w(
                     TAG,
-                    "🕌 Quran audio missing for Surah ${surah.number}. selected=$selectedAudioLanguage key=${selectedCdnKey ?: "n/a"} fallback=${fallbackCdnKey ?: "n/a"}"
+                    "🕌 Quran audio missing for Surah ${surah.number}. selected=$selectedAudioLanguage key=${selectedCdnKey ?: "n/a"} fallback=${fallbackCdnKey ?: "n/a"}",
                 )
                 // Fire-and-forget background download so the next driving session
                 // (or a later retry in this chain) will find the audio on disk.
@@ -1153,7 +1152,6 @@ class DrivingAudioService : Service() {
             updateState(PlaybackState.PLAYING_QURAN, "Surah ${surah.nameEnglish}", surah.nameArabic)
             updateNotification()
             isPaused = false
-
         } catch (e: Exception) {
             Log.e(TAG, "🕌 Error playing Quran surah", e)
             onQuranComplete()
@@ -1193,7 +1191,7 @@ class DrivingAudioService : Service() {
     private fun promptForSurahCompletion(
         surahIndex: Int,
         surahNumber: Int,
-        surahNameEnglish: String
+        surahNameEnglish: String,
     ) {
         val lessonId = "surah_$surahNumber"
         val lessonTitle = "Surah #$surahNumber"
@@ -1221,27 +1219,27 @@ class DrivingAudioService : Service() {
         scope.launch {
             kotlinx.coroutines.delay(500)
             voiceCompletionManager.promptForCompletion(
-            courseId = "complete_quran_listening",
-            lessonId = lessonId,
-            lessonTitle = lessonTitle,
-            onComplete = {
-                Log.i(TAG, "🕌 ✅ User confirmed completion for $lessonId")
-                continueToNextSurahAfterCompletion(surahIndex)
-            },
-            onSkipped = {
-                Log.i(TAG, "🕌 ⏭️ User explicitly skipped completion for $lessonId - ending Quran flow")
-                onQuranComplete()
-            },
-            onInconclusive = { reason ->
-                Log.w(TAG, "🕌 ⚠️ Voice completion inconclusive for $lessonId: $reason")
-                queuePendingCompletion("complete_quran_listening", lessonId, lessonTitle, reason)
-                onQuranComplete()
-            },
-            onError = { error ->
-                Log.e(TAG, "🕌 Voice completion error for $lessonId: $error - ending Quran flow safely")
-                onQuranComplete()
-            }
-        )
+                courseId = "complete_quran_listening",
+                lessonId = lessonId,
+                lessonTitle = lessonTitle,
+                onComplete = {
+                    Log.i(TAG, "🕌 ✅ User confirmed completion for $lessonId")
+                    continueToNextSurahAfterCompletion(surahIndex)
+                },
+                onSkipped = {
+                    Log.i(TAG, "🕌 ⏭️ User explicitly skipped completion for $lessonId - ending Quran flow")
+                    onQuranComplete()
+                },
+                onInconclusive = { reason ->
+                    Log.w(TAG, "🕌 ⚠️ Voice completion inconclusive for $lessonId: $reason")
+                    queuePendingCompletion("complete_quran_listening", lessonId, lessonTitle, reason)
+                    onQuranComplete()
+                },
+                onError = { error ->
+                    Log.e(TAG, "🕌 Voice completion error for $lessonId: $error - ending Quran flow safely")
+                    onQuranComplete()
+                },
+            )
         }
     }
 
@@ -1310,7 +1308,8 @@ class DrivingAudioService : Service() {
         when (currentState) {
             PlaybackState.PLAYING_TRAVEL_DUA,
             PlaybackState.PLAYING_HADITH_AUDIO,
-            PlaybackState.PLAYING_QURAN -> {
+            PlaybackState.PLAYING_QURAN,
+            -> {
                 mediaPlayer?.pause()
                 isPaused = true
                 if (currentState == PlaybackState.PLAYING_QURAN) {
@@ -1345,7 +1344,9 @@ class DrivingAudioService : Service() {
                 currentTitle.contains("Surah") -> {
                     val surah = if (currentQuranSurahIndex < QuranData.surahs.size) {
                         QuranData.surahs[currentQuranSurahIndex]
-                    } else null
+                    } else {
+                        null
+                    }
                     updateState(PlaybackState.PLAYING_QURAN, currentTitle, surah?.nameArabic ?: "ٱلْقُرْآنُ")
                     startQuranPositionUpdates()
                 }
@@ -1386,7 +1387,8 @@ class DrivingAudioService : Service() {
                 onTravelDuaComplete()
             }
             PlaybackState.PLAYING_HADITH_AUDIO,
-            PlaybackState.PLAYING_HADITH_TTS -> {
+            PlaybackState.PLAYING_HADITH_TTS,
+            -> {
                 stopAndReleaseMediaPlayer("skip hadith")
                 textToSpeech?.stop()
                 sherpaOnnxTts.stopSpeaking()
@@ -1445,7 +1447,7 @@ class DrivingAudioService : Service() {
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Driving Mode")
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, mediaPlayer?.duration?.toLong() ?: 0L)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, appIcon)
-                .build()
+                .build(),
         )
     }
 
@@ -1463,12 +1465,12 @@ class DrivingAudioService : Service() {
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
-                    PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_STOP or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                        PlaybackStateCompat.ACTION_PAUSE or
+                        PlaybackStateCompat.ACTION_STOP or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
                 )
                 .setState(state, position, 1.0f)
-                .build()
+                .build(),
         )
     }
 
@@ -1479,7 +1481,7 @@ class DrivingAudioService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Driving Audio",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Travel dua and hadith playback during driving"
                 setShowBadge(false)
@@ -1498,7 +1500,7 @@ class DrivingAudioService : Service() {
             this,
             0,
             contentIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         // Stop action
@@ -1509,7 +1511,7 @@ class DrivingAudioService : Service() {
             this,
             1,
             stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -1524,7 +1526,7 @@ class DrivingAudioService : Service() {
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(0, 1, 2),
             )
             // Play/Pause button
             .addAction(
@@ -1532,8 +1534,8 @@ class DrivingAudioService : Service() {
                 if (isPlaying) "Pause" else "Play",
                 MediaButtonReceiver.buildMediaButtonPendingIntent(
                     this,
-                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY
-                )
+                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY,
+                ),
             )
             // Skip button
             .addAction(
@@ -1541,14 +1543,14 @@ class DrivingAudioService : Service() {
                 "Skip",
                 MediaButtonReceiver.buildMediaButtonPendingIntent(
                     this,
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                )
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
+                ),
             )
             // Stop button
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "Stop",
-                stopPendingIntent
+                stopPendingIntent,
             )
             .build()
     }

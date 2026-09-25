@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.duadatabase
 
 import androidx.room.ColumnInfo
@@ -25,7 +41,7 @@ data class DuaMetadataEntity(
     val publisher: String?,
 
     @ColumnInfo(name = "source_ids")
-    val sourceIds: String?
+    val sourceIds: String?,
 )
 
 /**
@@ -42,7 +58,7 @@ data class DuaChapterEntity(
     val title: String,
 
     @ColumnInfo(name = "audio_url")
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
 )
 
 /**
@@ -56,10 +72,10 @@ data class DuaChapterEntity(
             entity = DuaChapterEntity::class,
             parentColumns = ["id"],
             childColumns = ["chapter_id"],
-            onDelete = ForeignKey.NO_ACTION
-        )
+            onDelete = ForeignKey.NO_ACTION,
+        ),
     ],
-    indices = [Index(name = "idx_invocations_chapter", value = ["chapter_id"])]
+    indices = [Index(name = "idx_invocations_chapter", value = ["chapter_id"])],
 )
 data class DuaInvocationEntity(
     @PrimaryKey(autoGenerate = true)
@@ -101,7 +117,7 @@ data class DuaInvocationEntity(
 
     // Per-dua recitation audio (added alongside chapter-level chapters.audio_url).
     @ColumnInfo(name = "audio_url")
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
 )
 
 /**
@@ -134,7 +150,7 @@ data class HadithReferenceEntity(
     val referenceStr: String?,
 
     @ColumnInfo(name = "database_file")
-    val databaseFile: String?
+    val databaseFile: String?,
 )
 
 /**
@@ -147,10 +163,10 @@ data class HadithReferenceEntity(
             entity = DuaChapterEntity::class,
             parentColumns = ["id"],
             childColumns = ["chapter_id"],
-            onDelete = ForeignKey.NO_ACTION
-        )
+            onDelete = ForeignKey.NO_ACTION,
+        ),
     ],
-    indices = [Index(name = "idx_footnotes_chapter", value = ["chapter_id"])]
+    indices = [Index(name = "idx_footnotes_chapter", value = ["chapter_id"])],
 )
 data class DuaFootnoteEntity(
     @PrimaryKey(autoGenerate = true)
@@ -170,7 +186,7 @@ data class DuaFootnoteEntity(
     val note: String?,
 
     @ColumnInfo(name = "source_ids")
-    val sourceIds: String?
+    val sourceIds: String?,
 )
 
 // ============= Domain Models =============
@@ -181,7 +197,7 @@ data class DuaFootnoteEntity(
 data class DuaChapter(
     val id: Int,
     val title: String,
-    val duaCount: Int = 0
+    val duaCount: Int = 0,
 )
 
 /**
@@ -213,7 +229,7 @@ data class DuaBasic(
     val position: Int,
     val arabic: String?,
     val transliteration: String?,
-    val translation: String?
+    val translation: String?,
 )
 
 /**
@@ -222,7 +238,7 @@ data class DuaBasic(
 data class ChapterWithDuas(
     val chapter: DuaChapter,
     val invocations: List<Dua>,
-    val footnotes: List<DuaFootnote>
+    val footnotes: List<DuaFootnote>,
 )
 
 /**
@@ -232,7 +248,7 @@ data class DuaFootnote(
     val id: Int,
     val term: String?,
     val definition: String?,
-    val note: String?
+    val note: String?,
 )
 
 /**
@@ -241,7 +257,7 @@ data class DuaFootnote(
 data class DuaBookMetadata(
     val title: String,
     val subtitle: String?,
-    val publisher: String?
+    val publisher: String?,
 )
 
 /**
@@ -254,7 +270,7 @@ data class HadithReference(
     val collectionName: String?,
     val hadithNumber: Int?,
     val referenceStr: String?,
-    val databaseFile: String?
+    val databaseFile: String?,
 ) {
     /**
      * Get display name for the reference (e.g., "Bukhari #113")
@@ -279,7 +295,7 @@ data class HadithReference(
 fun DuaChapterEntity.toDuaChapter(duaCount: Int = 0) = DuaChapter(
     id = id,
     title = title,
-    duaCount = duaCount
+    duaCount = duaCount,
 )
 
 fun DuaInvocationEntity.toDua(chapterTitle: String = "") = Dua(
@@ -304,20 +320,20 @@ fun DuaInvocationEntity.toDuaBasic() = DuaBasic(
     position = position,
     arabic = arabic,
     transliteration = transliteration,
-    translation = translation
+    translation = translation,
 )
 
 fun DuaFootnoteEntity.toDuaFootnote() = DuaFootnote(
     id = id,
     term = term,
     definition = definition,
-    note = note
+    note = note,
 )
 
 fun DuaMetadataEntity.toDuaBookMetadata() = DuaBookMetadata(
     title = title,
     subtitle = subtitle,
-    publisher = publisher
+    publisher = publisher,
 )
 
 fun HadithReferenceEntity.toHadithReference() = HadithReference(
@@ -327,5 +343,5 @@ fun HadithReferenceEntity.toHadithReference() = HadithReference(
     collectionName = collectionName,
     hadithNumber = hadithNumber,
     referenceStr = referenceStr,
-    databaseFile = databaseFile
+    databaseFile = databaseFile,
 )

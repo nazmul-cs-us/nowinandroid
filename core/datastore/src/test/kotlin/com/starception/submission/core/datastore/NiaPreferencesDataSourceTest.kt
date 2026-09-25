@@ -77,8 +77,10 @@ class NiaPreferencesDataSourceTest {
         }
 
     @Test
-    fun shouldUseDynamicColorFalseByDefault() = testScope.runTest {
-        assertFalse(subject.userData.first().useDynamicColor)
+    fun shouldUseDynamicColorTrueByDefault() = testScope.runTest {
+        // This fork defaults dynamic color ON
+        // (NiaPreferencesDataSource: useDynamicColor = !dynamicColorDisabled).
+        assertTrue(subject.userData.first().useDynamicColor)
     }
 
     @Test

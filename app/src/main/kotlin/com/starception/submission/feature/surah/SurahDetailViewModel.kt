@@ -1,18 +1,34 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.surah
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.qurandatabase.Ayah
-import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.core.qurandatabase.QuranDatabaseUnavailableException
 import com.starception.submission.core.qurandatabase.QuranTranslationHelper
 import com.starception.submission.core.qurandatabase.QuranTranslationRepository
+import com.starception.submission.core.qurandatabase.Surah
 import com.starception.submission.core.topicsdatabase.Topic
 import com.starception.submission.core.topicsdatabase.TopicsDatabase
 import com.starception.submission.core.topicsdatabase.toTopic
-import com.starception.submission.core.contentdatabase.NewsDatabase
 import com.starception.submission.core.translation.TranslationService
 import com.starception.submission.download.AssetDownloadManager
 import com.starception.submission.download.AssetRepository
@@ -47,49 +63,49 @@ class SurahDetailViewModel @Inject constructor(
     val showBismillahRow: StateFlow<Boolean> = _showBismillahRow.asStateFlow()
 
     private val _currentTranslation = MutableStateFlow(
-        prefs.getString("quran_translation", "ar") ?: "ar"
+        prefs.getString("quran_translation", "ar") ?: "ar",
     )
     val currentTranslation: StateFlow<String> = _currentTranslation.asStateFlow()
 
     private val _selectedArabicFont = MutableStateFlow(
-        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem"
+        prefs.getString("arabic_font", "pdms_saleem") ?: "pdms_saleem",
     )
     val selectedArabicFont: StateFlow<String> = _selectedArabicFont.asStateFlow()
 
     private val _arabicFontSize = MutableStateFlow(
-        prefs.getFloat("arabic_font_size", 41f)
+        prefs.getFloat("arabic_font_size", 41f),
     )
     val arabicFontSize: StateFlow<Float> = _arabicFontSize.asStateFlow()
 
     private val _currentVolume = MutableStateFlow(
-        prefs.getFloat("audio_volume", 0.7f)
+        prefs.getFloat("audio_volume", 0.7f),
     )
     val currentVolume: StateFlow<Float> = _currentVolume.asStateFlow()
 
     private val _currentAudioLanguage = MutableStateFlow(
-        prefs.getString("audio_language", "ARABIC_ONLY") ?: "ARABIC_ONLY"
+        prefs.getString("audio_language", "ARABIC_ONLY") ?: "ARABIC_ONLY",
     )
     val currentAudioLanguage: StateFlow<String> = _currentAudioLanguage.asStateFlow()
 
     private val _showTranslation = MutableStateFlow(
-        prefs.getBoolean("show_translation", true)
+        prefs.getBoolean("show_translation", true),
     )
     val showTranslation: StateFlow<Boolean> = _showTranslation.asStateFlow()
 
     private val _textAlignment = MutableStateFlow(
-        prefs.getString("text_alignment", "start") ?: "start"
+        prefs.getString("text_alignment", "start") ?: "start",
     )
     val textAlignment: StateFlow<String> = _textAlignment.asStateFlow()
 
     // Tajweed settings
     private val _showTajweed = MutableStateFlow(
-        prefs.getBoolean("show_tajweed", false)
+        prefs.getBoolean("show_tajweed", false),
     )
     val showTajweed: StateFlow<Boolean> = _showTajweed.asStateFlow()
 
     // Continuous (Mushaf) reading mode
     private val _continuousReadingMode = MutableStateFlow(
-        prefs.getBoolean("continuous_reading_mode", true)
+        prefs.getBoolean("continuous_reading_mode", true),
     )
     val continuousReadingMode: StateFlow<Boolean> = _continuousReadingMode.asStateFlow()
 
@@ -114,7 +130,7 @@ class SurahDetailViewModel @Inject constructor(
     private fun hasBismillah(ayahText: String): Boolean {
         val bismillahRegex = Regex(
             "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
-            RegexOption.IGNORE_CASE
+            RegexOption.IGNORE_CASE,
         )
 
         if (bismillahRegex.containsMatchIn(ayahText)) {
@@ -126,7 +142,7 @@ class SurahDetailViewModel @Inject constructor(
             "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
             "بسم الله الرحمن الرحيم",
             "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ",
-            "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
+            "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
         )
 
         return bismillahPatterns.any { ayahText.trim().startsWith(it) }
@@ -145,7 +161,7 @@ class SurahDetailViewModel @Inject constructor(
         // Pattern matches: بسم الله الرحمن الرحيم (with any combination of diacritics)
         val bismillahRegex = Regex(
             "^\\s*ب[ِ]*س[ْۡ]*م[ِ]*\\s*[اٱ]لل[َّ]*ه[ِ]*\\s*[اٱ]لر[َّ]*ح[ْۡ]*م[َٰ]*ن[ِ]*\\s*[اٱ]لر[َّ]*ح[ِ]*ي[ۡ]*م[ِ]*\\s*",
-            RegexOption.IGNORE_CASE
+            RegexOption.IGNORE_CASE,
         )
 
         var cleanedText = ayahText
@@ -156,10 +172,10 @@ class SurahDetailViewModel @Inject constructor(
         // If regex didn't match (ayah text unchanged), try exact pattern matching
         if (cleanedText == ayahText) {
             val bismillahPatterns = listOf(
-                "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ",  // With Quranic diacritics
-                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",  // Standard diacritics
-                "بسم الله الرحمن الرحيم",                  // Without diacritics
-                "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ"   // Another variant
+                "بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ", // With Quranic diacritics
+                "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", // Standard diacritics
+                "بسم الله الرحمن الرحيم", // Without diacritics
+                "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ", // Another variant
             )
 
             for (pattern in bismillahPatterns) {
@@ -327,16 +343,16 @@ class SurahDetailViewModel @Inject constructor(
                         val cleanedArabicText = removeBismillahIfNeeded(
                             arabicAyah.text,
                             surahNumber,
-                            arabicAyah.numberInSurah
+                            arabicAyah.numberInSurah,
                         )
                         val cleanedTranslationText = removeBismillahIfNeeded(
                             translationText,
                             surahNumber,
-                            arabicAyah.numberInSurah
+                            arabicAyah.numberInSurah,
                         )
                         // Create a combined ayah with both texts separated by newlines
                         arabicAyah.copy(
-                            text = "$cleanedArabicText\n\n$cleanedTranslationText"
+                            text = "$cleanedArabicText\n\n$cleanedTranslationText",
                         )
                     }
                 } else {
@@ -346,8 +362,8 @@ class SurahDetailViewModel @Inject constructor(
                             text = removeBismillahIfNeeded(
                                 ayah.text,
                                 surahNumber,
-                                ayah.numberInSurah
-                            )
+                                ayah.numberInSurah,
+                            ),
                         )
                     }
                 }
@@ -488,7 +504,7 @@ class SurahDetailViewModel @Inject constructor(
         "noor_e_hidayat",
         "thabit",
         "uthmani_script",
-        "indopak_script"
+        "indopak_script",
     )
 
     fun getArabicFontDisplayName(font: String): String = when (font) {
@@ -515,12 +531,12 @@ class SurahDetailViewModel @Inject constructor(
 
     // Tafseer translation states
     private val _tafseerTranslationLanguage = MutableStateFlow(
-        prefs.getString("tafseer_translation_lang", "ar") ?: "ar"
+        prefs.getString("tafseer_translation_lang", "ar") ?: "ar",
     )
     val tafseerTranslationLanguage: StateFlow<String> = _tafseerTranslationLanguage.asStateFlow()
 
     private val _tafseerTranslationProvider = MutableStateFlow(
-        translationService.getSelectedProvider()
+        translationService.getSelectedProvider(),
     )
     val tafseerTranslationProvider: StateFlow<String> = _tafseerTranslationProvider.asStateFlow()
 
@@ -624,7 +640,7 @@ class SurahDetailViewModel @Inject constructor(
     }
 
     fun getAvailableTafseerTranslations(): List<String> = listOf(
-        "ar", "en", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur"
+        "ar", "en", "bn", "zh", "es", "fr", "id", "ru", "sv", "tr", "ur",
     )
 
     fun getTafseerTranslationName(code: String): String = when (code) {
@@ -645,7 +661,7 @@ class SurahDetailViewModel @Inject constructor(
     fun getAvailableTafseerProviders(): List<Pair<String, String>> = listOf(
         "auto" to "Auto (Reverso → Google)",
         "google" to "Google Translate",
-        "reverso" to "Reverso"
+        "reverso" to "Reverso",
     )
 
     fun changeTafseerTranslationProvider(providerCode: String) {
@@ -729,7 +745,6 @@ class SurahDetailViewModel @Inject constructor(
 
                 _topics.value = topicEntities.map { it.toTopic() }
                 android.util.Log.d("SurahDetailVM", "📚 Loaded topics: ${_topics.value.map { it.name }}")
-
             } catch (e: Exception) {
                 android.util.Log.e("SurahDetailVM", "❌ Error loading topics: ${e.message}", e)
                 _topics.value = emptyList()

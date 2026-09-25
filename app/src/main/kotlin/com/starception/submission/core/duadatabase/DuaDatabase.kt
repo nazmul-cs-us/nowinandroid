@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.duadatabase
 
 import android.content.Context
@@ -28,10 +44,10 @@ import java.io.FileOutputStream
         DuaChapterEntity::class,
         DuaInvocationEntity::class,
         DuaFootnoteEntity::class,
-        HadithReferenceEntity::class
+        HadithReferenceEntity::class,
     ],
     version = 10,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class DuaDatabase : RoomDatabase() {
 
@@ -52,7 +68,7 @@ abstract class DuaDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     DuaDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
                     .createFromAsset("databases/$DATABASE_NAME")
                     .fallbackToDestructiveMigration()
@@ -111,7 +127,6 @@ abstract class DuaDatabase : RoomDatabase() {
                     android.util.Log.d(TAG, "📖 Total Hadith References: $count")
                 }
                 hadithCursor.close()
-
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Error logging database info", e)
             }
@@ -151,7 +166,7 @@ abstract class DuaDatabase : RoomDatabase() {
                     val assetDb = SQLiteDatabase.openDatabase(
                         tempFile.absolutePath,
                         null,
-                        SQLiteDatabase.OPEN_READONLY
+                        SQLiteDatabase.OPEN_READONLY,
                     )
 
                     // Read metadata
@@ -163,7 +178,7 @@ abstract class DuaDatabase : RoomDatabase() {
                             title = metadataCursor.getString(metadataCursor.getColumnIndexOrThrow("title")),
                             subtitle = metadataCursor.getString(metadataCursor.getColumnIndexOrThrow("subtitle")),
                             publisher = metadataCursor.getString(metadataCursor.getColumnIndexOrThrow("publisher")),
-                            sourceIds = metadataCursor.getString(metadataCursor.getColumnIndexOrThrow("source_ids"))
+                            sourceIds = metadataCursor.getString(metadataCursor.getColumnIndexOrThrow("source_ids")),
                         )
                     }
                     metadataCursor.close()
@@ -172,12 +187,14 @@ abstract class DuaDatabase : RoomDatabase() {
                     val chapters = mutableListOf<DuaChapterEntity>()
                     val chaptersCursor = assetDb.rawQuery("SELECT * FROM chapters ORDER BY id ASC", null)
                     while (chaptersCursor.moveToNext()) {
-                        chapters.add(DuaChapterEntity(
-                            id = chaptersCursor.getInt(chaptersCursor.getColumnIndexOrThrow("id")),
-                            title = chaptersCursor.getString(chaptersCursor.getColumnIndexOrThrow("title")),
-                            audioUrl = chaptersCursor.getColumnIndex("audio_url")
-                                .takeIf { it >= 0 }?.let { chaptersCursor.getString(it) }
-                        ))
+                        chapters.add(
+                            DuaChapterEntity(
+                                id = chaptersCursor.getInt(chaptersCursor.getColumnIndexOrThrow("id")),
+                                title = chaptersCursor.getString(chaptersCursor.getColumnIndexOrThrow("title")),
+                                audioUrl = chaptersCursor.getColumnIndex("audio_url")
+                                    .takeIf { it >= 0 }?.let { chaptersCursor.getString(it) },
+                            ),
+                        )
                     }
                     chaptersCursor.close()
 
@@ -185,22 +202,24 @@ abstract class DuaDatabase : RoomDatabase() {
                     val invocations = mutableListOf<DuaInvocationEntity>()
                     val invocationsCursor = assetDb.rawQuery("SELECT * FROM invocations ORDER BY id ASC", null)
                     while (invocationsCursor.moveToNext()) {
-                        invocations.add(DuaInvocationEntity(
-                            id = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("id")),
-                            chapterId = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("chapter_id")),
-                            position = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("position")),
-                            arabic = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("arabic")),
-                            transliteration = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("transliteration")),
-                            translation = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("translation")),
-                            context = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("context")),
-                            instruction = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("instruction")),
-                            note = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("note")),
-                            postContext = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("post_context")),
-                            description = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("description")),
-                            sourceIds = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("source_ids")),
-                            audioUrl = invocationsCursor.getColumnIndex("audio_url")
-                                .takeIf { it >= 0 }?.let { invocationsCursor.getString(it) }
-                        ))
+                        invocations.add(
+                            DuaInvocationEntity(
+                                id = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("id")),
+                                chapterId = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("chapter_id")),
+                                position = invocationsCursor.getInt(invocationsCursor.getColumnIndexOrThrow("position")),
+                                arabic = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("arabic")),
+                                transliteration = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("transliteration")),
+                                translation = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("translation")),
+                                context = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("context")),
+                                instruction = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("instruction")),
+                                note = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("note")),
+                                postContext = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("post_context")),
+                                description = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("description")),
+                                sourceIds = invocationsCursor.getString(invocationsCursor.getColumnIndexOrThrow("source_ids")),
+                                audioUrl = invocationsCursor.getColumnIndex("audio_url")
+                                    .takeIf { it >= 0 }?.let { invocationsCursor.getString(it) },
+                            ),
+                        )
                     }
                     invocationsCursor.close()
 
@@ -208,14 +227,16 @@ abstract class DuaDatabase : RoomDatabase() {
                     val footnotes = mutableListOf<DuaFootnoteEntity>()
                     val footnotesCursor = assetDb.rawQuery("SELECT * FROM footnotes ORDER BY id ASC", null)
                     while (footnotesCursor.moveToNext()) {
-                        footnotes.add(DuaFootnoteEntity(
-                            id = footnotesCursor.getInt(footnotesCursor.getColumnIndexOrThrow("id")),
-                            chapterId = footnotesCursor.getInt(footnotesCursor.getColumnIndexOrThrow("chapter_id")),
-                            term = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("term")),
-                            definition = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("definition")),
-                            note = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("note")),
-                            sourceIds = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("source_ids"))
-                        ))
+                        footnotes.add(
+                            DuaFootnoteEntity(
+                                id = footnotesCursor.getInt(footnotesCursor.getColumnIndexOrThrow("id")),
+                                chapterId = footnotesCursor.getInt(footnotesCursor.getColumnIndexOrThrow("chapter_id")),
+                                term = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("term")),
+                                definition = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("definition")),
+                                note = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("note")),
+                                sourceIds = footnotesCursor.getString(footnotesCursor.getColumnIndexOrThrow("source_ids")),
+                            ),
+                        )
                     }
                     footnotesCursor.close()
 
@@ -223,17 +244,25 @@ abstract class DuaDatabase : RoomDatabase() {
                     val hadithRefs = mutableListOf<HadithReferenceEntity>()
                     val hadithCursor = assetDb.rawQuery("SELECT * FROM hadith_references ORDER BY id ASC", null)
                     while (hadithCursor.moveToNext()) {
-                        hadithRefs.add(HadithReferenceEntity(
-                            id = hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("id")),
-                            invocationId = hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("invocation_id")),
-                            collectionId = if (hadithCursor.isNull(hadithCursor.getColumnIndexOrThrow("collection_id"))) null
-                                else hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("collection_id")),
-                            collectionName = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("collection_name")),
-                            hadithNumber = if (hadithCursor.isNull(hadithCursor.getColumnIndexOrThrow("hadith_number"))) null
-                                else hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("hadith_number")),
-                            referenceStr = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("reference_str")),
-                            databaseFile = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("database_file"))
-                        ))
+                        hadithRefs.add(
+                            HadithReferenceEntity(
+                                id = hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("id")),
+                                invocationId = hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("invocation_id")),
+                                collectionId = if (hadithCursor.isNull(hadithCursor.getColumnIndexOrThrow("collection_id"))) {
+                                    null
+                                } else {
+                                    hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("collection_id"))
+                                },
+                                collectionName = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("collection_name")),
+                                hadithNumber = if (hadithCursor.isNull(hadithCursor.getColumnIndexOrThrow("hadith_number"))) {
+                                    null
+                                } else {
+                                    hadithCursor.getInt(hadithCursor.getColumnIndexOrThrow("hadith_number"))
+                                },
+                                referenceStr = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("reference_str")),
+                                databaseFile = hadithCursor.getString(hadithCursor.getColumnIndexOrThrow("database_file")),
+                            ),
+                        )
                     }
                     hadithCursor.close()
 
@@ -283,7 +312,7 @@ abstract class DuaDatabase : RoomDatabase() {
                     chapterCount = chapterCount,
                     duaCount = duaCount,
                     lastModified = dbFile.lastModified(),
-                    sizeBytes = dbFile.length()
+                    sizeBytes = dbFile.length(),
                 )
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Error getting database info", e)
@@ -301,5 +330,5 @@ data class DuaDatabaseInfo(
     val chapterCount: Int,
     val duaCount: Int,
     val lastModified: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )

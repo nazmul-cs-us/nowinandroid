@@ -20,7 +20,6 @@ import android.content.Context
 import android.util.Log
 import java.io.File
 import java.io.FileWriter
-import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -151,7 +150,7 @@ object FileLogger {
         prayerName: String,
         scheduledTime: String? = null,
         actualTime: String? = null,
-        details: Map<String, Any?> = emptyMap()
+        details: Map<String, Any?> = emptyMap(),
     ) {
         val sb = StringBuilder()
         sb.append("PRAYER_EVENT: $event")
@@ -173,7 +172,7 @@ object FileLogger {
         scheduledTimeMillis: Long,
         currentTimeMillis: Long = System.currentTimeMillis(),
         alarmType: String = "EXACT",
-        details: Map<String, Any?> = emptyMap()
+        details: Map<String, Any?> = emptyMap(),
     ) {
         val scheduledTime = fullTimestampFormat.format(Date(scheduledTimeMillis))
         val currentTime = fullTimestampFormat.format(Date(currentTimeMillis))
@@ -191,7 +190,7 @@ object FileLogger {
             event = "ADHAN_SCHEDULED",
             prayerName = prayerName,
             scheduledTime = scheduledTime,
-            details = allDetails
+            details = allDetails,
         )
     }
 
@@ -202,7 +201,7 @@ object FileLogger {
         prayerName: String,
         expectedTimeMillis: Long? = null,
         actualTimeMillis: Long = System.currentTimeMillis(),
-        details: Map<String, Any?> = emptyMap()
+        details: Map<String, Any?> = emptyMap(),
     ) {
         val actualTime = fullTimestampFormat.format(Date(actualTimeMillis))
         val allDetails = details.toMutableMap()
@@ -214,14 +213,20 @@ object FileLogger {
             allDetails["expectedTime"] = expectedTime
             allDetails["diffMs"] = diffMs
             allDetails["diffSeconds"] = String.format("%.2f", diffSeconds)
-            allDetails["status"] = if (kotlin.math.abs(diffMs) < 60000) "ON_TIME" else if (diffMs > 0) "LATE" else "EARLY"
+            allDetails["status"] = if (kotlin.math.abs(diffMs) < 60000) {
+                "ON_TIME"
+            } else if (diffMs > 0) {
+                "LATE"
+            } else {
+                "EARLY"
+            }
         }
 
         logPrayerEvent(
             event = "ADHAN_FIRED",
             prayerName = prayerName,
             actualTime = actualTime,
-            details = allDetails
+            details = allDetails,
         )
     }
 

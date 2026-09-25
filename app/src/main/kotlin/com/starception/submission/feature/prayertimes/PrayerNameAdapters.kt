@@ -16,10 +16,10 @@
 
 package com.starception.submission.feature.prayertimes
 
-import com.starception.submission.prayer.model.getPrayerDisplayName as sharedDisplayName
-import com.starception.submission.prayer.model.getPrayerNameInLocalLanguage as sharedLocalName
 import java.time.DayOfWeek
 import java.time.LocalDate
+import com.starception.submission.prayer.model.getPrayerDisplayName as sharedDisplayName
+import com.starception.submission.prayer.model.getPrayerNameInLocalLanguage as sharedLocalName
 
 /**
  * java.time front doors for the shared prayer name translator.

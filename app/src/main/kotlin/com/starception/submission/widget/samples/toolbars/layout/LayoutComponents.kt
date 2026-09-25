@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.starception.submission.widget.samples.toolbars.layout
 
 import androidx.compose.runtime.Composable
@@ -34,43 +35,43 @@ import androidx.glance.layout.width
  */
 @Composable
 fun SpacedColumn(
-  items: List<@Composable () -> Unit>,
-  spacing: Dp,
-  modifier: GlanceModifier = GlanceModifier.fillMaxHeight(),
+    items: List<@Composable () -> Unit>,
+    spacing: Dp,
+    modifier: GlanceModifier = GlanceModifier.fillMaxHeight(),
 ) {
-  val padding = spacing / 2 // split spacing between siblings
+    val padding = spacing / 2 // split spacing between siblings
 
-  Row(modifier = modifier) {
-    Column(
-      modifier = GlanceModifier
-        .fillMaxHeight()
-        .defaultWeight()
-    ) {
-      items.forEachIndexed { index, item ->
-        val paddingModifier = when (index) {
-          // Only bottom padding
-          0 -> GlanceModifier.padding(bottom = padding)
-
-          // Top and bottom padding
-          items.lastIndex -> GlanceModifier.padding(top = padding)
-
-          // Only top padding
-          else -> GlanceModifier.padding(
-            top = padding,
-            bottom = padding
-          )
-        }
-
-        Box(
-          modifier = paddingModifier
-            .fillMaxWidth()
-            .defaultWeight()
+    Row(modifier = modifier) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxHeight()
+                .defaultWeight(),
         ) {
-          item()
+            items.forEachIndexed { index, item ->
+                val paddingModifier = when (index) {
+                    // Only bottom padding
+                    0 -> GlanceModifier.padding(bottom = padding)
+
+                    // Top and bottom padding
+                    items.lastIndex -> GlanceModifier.padding(top = padding)
+
+                    // Only top padding
+                    else -> GlanceModifier.padding(
+                        top = padding,
+                        bottom = padding,
+                    )
+                }
+
+                Box(
+                    modifier = paddingModifier
+                        .fillMaxWidth()
+                        .defaultWeight(),
+                ) {
+                    item()
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /**
@@ -78,40 +79,40 @@ fun SpacedColumn(
  */
 @Composable
 fun SpacedRow(
-  items: List<@Composable () -> Unit>,
-  spacing: Dp,
-  modifier: GlanceModifier = GlanceModifier.fillMaxWidth(),
+    items: List<@Composable () -> Unit>,
+    spacing: Dp,
+    modifier: GlanceModifier = GlanceModifier.fillMaxWidth(),
 ) {
-  val padding = spacing / 2 // split spacing between siblings
+    val padding = spacing / 2 // split spacing between siblings
 
-  Column(modifier = modifier) {
-    Row(
-      modifier = GlanceModifier
-        .fillMaxWidth()
-        .defaultWeight()
-    ) {
-      items.forEachIndexed { index, item ->
-        val paddingModifier = when (index) {
-          // Right padding only
-          0 -> GlanceModifier.padding(end = padding)
-
-          // Left padding only
-          items.lastIndex -> GlanceModifier.padding(start = padding)
-
-          // Both left and right padding
-          else -> GlanceModifier.padding(start = padding, end = padding)
-        }
-
-        Box(
-          modifier = paddingModifier
-            .fillMaxHeight()
-            .defaultWeight()
+    Column(modifier = modifier) {
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .defaultWeight(),
         ) {
-          item()
+            items.forEachIndexed { index, item ->
+                val paddingModifier = when (index) {
+                    // Right padding only
+                    0 -> GlanceModifier.padding(end = padding)
+
+                    // Left padding only
+                    items.lastIndex -> GlanceModifier.padding(start = padding)
+
+                    // Both left and right padding
+                    else -> GlanceModifier.padding(start = padding, end = padding)
+                }
+
+                Box(
+                    modifier = paddingModifier
+                        .fillMaxHeight()
+                        .defaultWeight(),
+                ) {
+                    item()
+                }
+            }
         }
-      }
     }
-  }
 }
 
 /**
@@ -121,36 +122,36 @@ fun SpacedRow(
  */
 @Composable
 fun TwoRowGrid(
-  items: List<@Composable () -> Unit>,
-  spacing: Dp,
-  modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
+    items: List<@Composable () -> Unit>,
+    spacing: Dp,
+    modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
 ) {
-  val middle = items.size / 2
-  val rowOneItems = items.subList(0, middle)
-  val rowTwoItems = items.subList(middle, items.size)
+    val middle = items.size / 2
+    val rowOneItems = items.subList(0, middle)
+    val rowTwoItems = items.subList(middle, items.size)
 
-  Column(modifier = modifier) {
-    if (rowOneItems.isNotEmpty()) {
-      SpacedRow(
-        items = rowOneItems,
-        spacing = spacing,
-        modifier = GlanceModifier
-          .fillMaxWidth()
-          .defaultWeight()
-          .padding(bottom = spacing / 2),
-      )
+    Column(modifier = modifier) {
+        if (rowOneItems.isNotEmpty()) {
+            SpacedRow(
+                items = rowOneItems,
+                spacing = spacing,
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .defaultWeight()
+                    .padding(bottom = spacing / 2),
+            )
+        }
+        if (rowTwoItems.isNotEmpty()) {
+            SpacedRow(
+                items = rowTwoItems,
+                spacing = spacing,
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .padding(top = spacing / 2)
+                    .defaultWeight(),
+            )
+        }
     }
-    if (rowTwoItems.isNotEmpty()) {
-      SpacedRow(
-        items = rowTwoItems,
-        spacing = spacing,
-        modifier = GlanceModifier
-          .fillMaxWidth()
-          .padding(top = spacing / 2)
-          .defaultWeight()
-      )
-    }
-  }
 }
 
 /**
@@ -159,33 +160,33 @@ fun TwoRowGrid(
  */
 @Composable
 fun SideBarTwoRowGrid(
-  sideBarItem: @Composable () -> Unit,
-  items: List<@Composable () -> Unit>,
-  sideBarWidth: Dp,
-  spacing: Dp,
-  modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
+    sideBarItem: @Composable () -> Unit,
+    items: List<@Composable () -> Unit>,
+    sideBarWidth: Dp,
+    spacing: Dp,
+    modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
 ) {
-  Row(modifier = modifier) {
-    Box(
-      modifier = GlanceModifier
-        .fillMaxHeight()
-        .width(sideBarWidth)
-    ) {
-      sideBarItem()
+    Row(modifier = modifier) {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxHeight()
+                .width(sideBarWidth),
+        ) {
+            sideBarItem()
+        }
+        Spacer(
+            modifier = GlanceModifier
+                .fillMaxHeight()
+                .width(spacing),
+        )
+        TwoRowGrid(
+            items = items,
+            spacing = spacing,
+            modifier = GlanceModifier
+                .fillMaxHeight()
+                .defaultWeight(),
+        )
     }
-    Spacer(
-      modifier = GlanceModifier
-        .fillMaxHeight()
-        .width(spacing)
-    )
-    TwoRowGrid(
-      items = items,
-      spacing = spacing,
-      modifier = GlanceModifier
-        .fillMaxHeight()
-        .defaultWeight()
-    )
-  }
 }
 
 /**
@@ -193,31 +194,31 @@ fun SideBarTwoRowGrid(
  */
 @Composable
 fun HeaderTwoRowGrid(
-  headerItem: @Composable () -> Unit,
-  items: List<@Composable () -> Unit>,
-  headerHeight: Dp,
-  spacing: Dp,
-  modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
+    headerItem: @Composable () -> Unit,
+    items: List<@Composable () -> Unit>,
+    headerHeight: Dp,
+    spacing: Dp,
+    modifier: GlanceModifier = GlanceModifier.fillMaxSize(),
 ) {
-  Column(modifier = modifier) {
-    Box(
-      modifier = GlanceModifier
-        .height(headerHeight)
-        .fillMaxWidth()
-    ) {
-      headerItem()
+    Column(modifier = modifier) {
+        Box(
+            modifier = GlanceModifier
+                .height(headerHeight)
+                .fillMaxWidth(),
+        ) {
+            headerItem()
+        }
+        Spacer(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(spacing),
+        )
+        TwoRowGrid(
+            items = items,
+            spacing = spacing,
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .defaultWeight(),
+        )
     }
-    Spacer(
-      modifier = GlanceModifier
-        .fillMaxWidth()
-        .height(spacing)
-    )
-    TwoRowGrid(
-      items = items,
-      spacing = spacing,
-      modifier = GlanceModifier
-        .fillMaxWidth()
-        .defaultWeight()
-    )
-  }
 }

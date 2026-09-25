@@ -25,6 +25,10 @@ android {
         consumerProguardFiles("consumer-proguard-rules.pro")
     }
     namespace = "com.starception.submission.core.datastore"
+    // android.util.Log is an unimplemented stub on the JVM and throws by default;
+    // NiaPreferencesDataSource logs heavily, so mirror :app's workaround and
+    // return defaults from unit tests instead.
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {

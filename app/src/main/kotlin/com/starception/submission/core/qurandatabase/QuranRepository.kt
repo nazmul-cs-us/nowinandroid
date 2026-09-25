@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import android.content.Context
@@ -34,9 +50,9 @@ class QuranRepository(
         private const val PREF_BOOKMARKED_SURAHS = "bookmarked_surahs"
         private const val PREF_FAVOURITE_AYAHS = "favourite_ayahs"
     }
-    
+
     // ============= Surah Operations =============
-    
+
     /**
      * Get all Surahs
      */
@@ -47,7 +63,7 @@ class QuranRepository(
             }
         }
     }
-    
+
     /**
      * Get all Surahs with their Ayah counts
      */
@@ -59,7 +75,7 @@ class QuranRepository(
             emptyList()
         }
     }
-    
+
     /**
      * Get a specific Surah by number (1-114)
      */
@@ -71,13 +87,13 @@ class QuranRepository(
             if (allSurahs.isNotEmpty()) {
                 Log.d(TAG, "📖 Sample Surah: ${allSurahs.first().nameEnglish} (number=${allSurahs.first().number})")
             }
-            
+
             val entity = quranDao.getSurahByNumber(surahNumber)
             if (entity == null) {
                 Log.e(TAG, "❌ Surah with number $surahNumber not found")
                 return@withContext null
             }
-            
+
             Log.d(TAG, "✅ Found Surah: ${entity.nameEnglish} (ID: ${entity.id}, Number: ${entity.number})")
             val surahId = entity.id ?: 0 // Handle nullable id (should never be null in practice)
             val ayahCount = quranDao.getAyahCount(surahId)
@@ -89,7 +105,7 @@ class QuranRepository(
             null
         }
     }
-    
+
     /**
      * Get a specific Surah by ID
      */
@@ -101,7 +117,7 @@ class QuranRepository(
             null
         }
     }
-    
+
     /**
      * Get Surahs by revelation type (Meccan/Medinan)
      */
@@ -110,7 +126,7 @@ class QuranRepository(
             entities.map { it.toSurah() }
         }
     }
-    
+
     /**
      * Search Surahs by name
      */
@@ -119,9 +135,9 @@ class QuranRepository(
             entities.map { it.toSurah() }
         }
     }
-    
+
     // ============= Ayah Operations =============
-    
+
     /**
      * Get all Ayahs for a specific Surah
      */
@@ -130,7 +146,7 @@ class QuranRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get all Ayahs for a specific Surah (one-time read)
      */
@@ -144,7 +160,7 @@ class QuranRepository(
             emptyList()
         }
     }
-    
+
     /**
      * Get a specific Ayah by its global number
      */
@@ -155,13 +171,15 @@ class QuranRepository(
                 // Get surah to get its number
                 val surah = quranDao.getSurahById(ayah.surahId)
                 ayah.toAyah(surah?.number ?: 0)
-            } else null
+            } else {
+                null
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error loading Ayah $ayahNumber", e)
             null
         }
     }
-    
+
     /**
      * Get Ayahs by page number
      */
@@ -170,7 +188,7 @@ class QuranRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get Ayahs by Juz (part) number
      */
@@ -179,7 +197,7 @@ class QuranRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Get all Ayahs that require Sajda (prostration)
      */
@@ -188,7 +206,7 @@ class QuranRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Search Ayahs by text content
      */
@@ -197,7 +215,7 @@ class QuranRepository(
             entities.map { it.toAyah(0) } // surahNumber will be 0 for now
         }
     }
-    
+
     /**
      * Search Ayahs with result limit
      */
@@ -209,9 +227,9 @@ class QuranRepository(
             emptyList()
         }
     }
-    
+
     // ============= Statistics =============
-    
+
     /**
      * Get total number of Ayahs in the Quran (should be 6236)
      */
@@ -223,7 +241,7 @@ class QuranRepository(
             0
         }
     }
-    
+
     /**
      * Get number of Ayahs in a specific Surah
      */
@@ -235,9 +253,9 @@ class QuranRepository(
             0
         }
     }
-    
+
     // ============= Pagination =============
-    
+
     /**
      * Get a page of Ayahs for pagination
      */
@@ -250,9 +268,9 @@ class QuranRepository(
             emptyList()
         }
     }
-    
+
     // ============= Health Check =============
-    
+
     /**
      * Check if database is properly initialized
      */
@@ -348,7 +366,7 @@ class QuranRepository(
         Log.d("QuranRepository_BOOKMARK", "💾 SAVE | count=${bookmarkedSurahs.size} | bookmarks=$bookmarkedSurahs | string='$bookmarksString'")
         preferences.edit().putString(
             PREF_BOOKMARKED_SURAHS,
-            bookmarksString
+            bookmarksString,
         ).apply()
         Log.d("QuranRepository_BOOKMARK", "💾 SAVE_COMPLETE | key='$PREF_BOOKMARKED_SURAHS'")
     }
@@ -384,7 +402,7 @@ class QuranRepository(
             if (favourite) {
                 val entity = FavouriteAyahEntity(
                     surahNumber = surahNumber,
-                    ayahNumber = ayahNumber
+                    ayahNumber = ayahNumber,
                 )
                 quranDao.insertFavouriteAyah(entity)
                 Log.d("QuranRepository_FAVOURITE", "➕ ADDED | surah=$surahNumber | ayah=$ayahNumber")
@@ -450,7 +468,7 @@ class QuranRepository(
             val note = AyahNoteEntity(
                 surahNumber = surahNumber,
                 ayahNumber = ayahNumber,
-                noteText = noteText
+                noteText = noteText,
             )
             val id = quranDao.insertAyahNote(note)
             Log.d("QuranRepository_NOTE", "✅ ADDED | id=$id | surah=$surahNumber | ayah=$ayahNumber")
@@ -601,4 +619,3 @@ class QuranRepository(
         return quranDao.searchNotesFlow(query)
     }
 }
-

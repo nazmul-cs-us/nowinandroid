@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.automotive
 
 import android.content.Context
@@ -8,9 +24,9 @@ import com.starception.submission.prayer.model.Location
 import com.starception.submission.prayer.model.PrayerSettings
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.service.PrayerTimeCalculatorService
-import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,7 +66,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
     private val entryPoint: AutomotiveEntryPoint by lazy {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
-            AutomotiveEntryPoint::class.java
+            AutomotiveEntryPoint::class.java,
         )
     }
 
@@ -69,7 +85,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
         val name: String,
         val time: LocalTime,
         val isNext: Boolean = false,
-        val isCurrent: Boolean = false
+        val isCurrent: Boolean = false,
     )
 
     /**
@@ -81,7 +97,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
         val compassDirection: String,
         val locationName: String,
         val latitude: Double,
-        val longitude: Double
+        val longitude: Double,
     )
 
     /**
@@ -91,7 +107,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
         val prayerTimes: List<AutomotivePrayerTime>,
         val locationName: String,
         val calculationMethod: String,
-        val nextPrayerCountdown: String?
+        val nextPrayerCountdown: String?,
     )
 
     /**
@@ -124,7 +140,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             val dayPrayerTimes = prayerService.calculatePrayerTimes(
                 LocalDate.now(),
                 location,
-                settings
+                settings,
             )
 
             if (dayPrayerTimes != null) {
@@ -134,7 +150,6 @@ class AutomotivePrayerDataProvider(private val context: Context) {
 
             Log.w(TAG, "⚠️ Calculation failed, using defaults")
             return@withContext getDefaultPrayerData()
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error getting prayer times", e)
             return@withContext getDefaultPrayerData()
@@ -155,8 +170,10 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             if (location != null) {
                 val direction = calculateQiblaDirection(location.latitude, location.longitude)
                 val distance = calculateDistance(
-                    location.latitude, location.longitude,
-                    KAABA_LATITUDE, KAABA_LONGITUDE
+                    location.latitude,
+                    location.longitude,
+                    KAABA_LATITUDE,
+                    KAABA_LONGITUDE,
                 )
 
                 Log.i(TAG, "✅ Qibla calculated: ${direction.toInt()}° at ${distance.toInt()} km")
@@ -167,7 +184,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
                     compassDirection = getCompassDirection(direction),
                     locationName = location.getDisplayName(),
                     latitude = location.latitude,
-                    longitude = location.longitude
+                    longitude = location.longitude,
                 )
             }
 
@@ -177,8 +194,10 @@ class AutomotivePrayerDataProvider(private val context: Context) {
                 val loc = cachedTimes.location
                 val direction = calculateQiblaDirection(loc.latitude, loc.longitude)
                 val distance = calculateDistance(
-                    loc.latitude, loc.longitude,
-                    KAABA_LATITUDE, KAABA_LONGITUDE
+                    loc.latitude,
+                    loc.longitude,
+                    KAABA_LATITUDE,
+                    KAABA_LONGITUDE,
                 )
 
                 return@withContext QiblaInfo(
@@ -187,7 +206,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
                     compassDirection = getCompassDirection(direction),
                     locationName = loc.getDisplayName(),
                     latitude = loc.latitude,
-                    longitude = loc.longitude
+                    longitude = loc.longitude,
                 )
             }
 
@@ -199,9 +218,8 @@ class AutomotivePrayerDataProvider(private val context: Context) {
                 compassDirection = "N",
                 locationName = "Location unavailable",
                 latitude = 0.0,
-                longitude = 0.0
+                longitude = 0.0,
             )
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error calculating Qibla", e)
             return@withContext QiblaInfo(
@@ -210,7 +228,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
                 compassDirection = "N",
                 locationName = "Error",
                 latitude = 0.0,
-                longitude = 0.0
+                longitude = 0.0,
             )
         }
     }
@@ -260,7 +278,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             AutomotivePrayerTime("Dhuhr", dhuhr),
             AutomotivePrayerTime("Asr", asr),
             AutomotivePrayerTime("Maghrib", maghrib),
-            AutomotivePrayerTime("Isha", isha)
+            AutomotivePrayerTime("Isha", isha),
         )
 
         // Determine next and current prayer
@@ -283,7 +301,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             prayerTimes = prayersWithStatus,
             locationName = dayPrayerTimes.location.getDisplayName(),
             calculationMethod = settings.calculationMethod.displayName,
-            nextPrayerCountdown = countdown
+            nextPrayerCountdown = countdown,
         )
     }
 
@@ -299,7 +317,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             AutomotivePrayerTime("Dhuhr", LocalTime.of(12, 30)),
             AutomotivePrayerTime("Asr", LocalTime.of(15, 45)),
             AutomotivePrayerTime("Maghrib", LocalTime.of(18, 30)),
-            AutomotivePrayerTime("Isha", LocalTime.of(20, 0))
+            AutomotivePrayerTime("Isha", LocalTime.of(20, 0)),
         )
 
         val nextIndex = defaults.indexOfFirst { it.time.isAfter(now) }
@@ -311,7 +329,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
             prayerTimes = withStatus,
             locationName = "Location unavailable",
             calculationMethod = "Default",
-            nextPrayerCountdown = withStatus.find { it.isNext }?.let { calculateTimeUntil(it.time) }
+            nextPrayerCountdown = withStatus.find { it.isNext }?.let { calculateTimeUntil(it.time) },
         )
     }
 
@@ -334,7 +352,7 @@ class AutomotivePrayerDataProvider(private val context: Context) {
         } else {
             // Next day
             val duration = java.time.Duration.between(now, LocalTime.MAX) +
-                    java.time.Duration.between(LocalTime.MIN, prayerTime)
+                java.time.Duration.between(LocalTime.MIN, prayerTime)
             val hours = duration.toHours()
             val minutes = duration.toMinutesPart()
 
@@ -375,8 +393,8 @@ class AutomotivePrayerDataProvider(private val context: Context) {
         val deltaLonRad = Math.toRadians(lon2 - lon1)
 
         val a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-                cos(lat1Rad) * cos(lat2Rad) *
-                sin(deltaLonRad / 2) * sin(deltaLonRad / 2)
+            cos(lat1Rad) * cos(lat2Rad) *
+            sin(deltaLonRad / 2) * sin(deltaLonRad / 2)
 
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
 

@@ -1,22 +1,38 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.islamic.salah.domain.model
 
 import java.time.LocalTime
 
 /**
  * Islamic Prayer Time Model
- * 
+ *
  * Represents a single Islamic prayer (Salah) with its precise timing and current status.
  * This is the core data model used throughout the Islamic prayer system.
- * 
+ *
  * ## Islamic Prayer Context
- * 
+ *
  * The five daily obligatory prayers (Salah):
  * - **Fajr** (ٱلْفَجْر): Dawn prayer - before sunrise
  * - **Dhuhr** (ٱلظُّهْر): Noon prayer - after sun's zenith
  * - **Asr** (ٱلْعَصْر): Afternoon prayer - based on shadow length
  * - **Maghrib** (ٱلْمَغْرِب): Sunset prayer - just after sunset
  * - **Isha** (ٱلْعِشَاء): Night prayer - after twilight ends
- * 
+ *
  * @param name Prayer name (Fajr, Dhuhr, Asr, Maghrib, Isha)
  * @param arabicName Arabic name of the prayer
  * @param time Calculated prayer time
@@ -28,12 +44,12 @@ data class PrayerTime(
     val arabicName: String,
     val time: LocalTime,
     val isNext: Boolean = false,
-    val isCurrently: Boolean = false
+    val isCurrently: Boolean = false,
 )
 
 /**
  * Prayer Names Enumeration
- * 
+ *
  * Contains all Islamic prayer names with their Arabic equivalents
  */
 object PrayerNames {
@@ -43,14 +59,14 @@ object PrayerNames {
     const val ASR = "Asr"
     const val MAGHRIB = "Maghrib"
     const val ISHA = "Isha"
-    
+
     const val FAJR_ARABIC = "ٱلْفَجْر"
     const val SUNRISE_ARABIC = "ٱلشُّرُوق"
     const val DHUHR_ARABIC = "ٱلظُّهْر"
     const val ASR_ARABIC = "ٱلْعَصْر"
     const val MAGHRIB_ARABIC = "ٱلْمَغْرِب"
     const val ISHA_ARABIC = "ٱلْعِشَاء"
-    
+
     /**
      * Get Arabic name for prayer
      */

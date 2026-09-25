@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import android.content.Context
@@ -7,8 +23,6 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.starception.submission.download.AssetRepository
-import java.io.File
-import java.io.FileOutputStream
 
 /**
  * Room Database for Quran
@@ -21,16 +35,16 @@ import java.io.FileOutputStream
         JuzEntity::class,
         HizbEntity::class,
         FavouriteAyahEntity::class,
-        AyahNoteEntity::class
+        AyahNoteEntity::class,
     ],
     version = 3,
     exportSchema = false,
-    autoMigrations = []
+    autoMigrations = [],
 )
 abstract class QuranDatabase : RoomDatabase() {
-    
+
     abstract fun quranDao(): QuranDao
-    
+
     companion object {
         private const val DATABASE_NAME = "quran.db"
         private const val CDN_KEY = "databases/quran/quran.db"
@@ -46,20 +60,24 @@ abstract class QuranDatabase : RoomDatabase() {
                 android.util.Log.d("QuranDatabase", "🔄 Migrating database from version 1 to 2...")
 
                 // Create favourite_ayahs table
-                database.execSQL("""
+                database.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS favourite_ayahs (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         surah_number INTEGER NOT NULL,
                         ayah_number INTEGER NOT NULL,
                         created_at INTEGER NOT NULL
                     )
-                """.trimIndent())
+                    """.trimIndent(),
+                )
 
                 // Create unique index on surah_number and ayah_number
-                database.execSQL("""
+                database.execSQL(
+                    """
                     CREATE UNIQUE INDEX IF NOT EXISTS idx_favourite_unique
                     ON favourite_ayahs (surah_number, ayah_number)
-                """.trimIndent())
+                    """.trimIndent(),
+                )
 
                 android.util.Log.d("QuranDatabase", "✅ Migration completed: favourite_ayahs table created")
             }
@@ -73,7 +91,8 @@ abstract class QuranDatabase : RoomDatabase() {
                 android.util.Log.d("QuranDatabase", "🔄 Migrating database from version 2 to 3...")
 
                 // Create ayah_notes table for user notes
-                database.execSQL("""
+                database.execSQL(
+                    """
                     CREATE TABLE IF NOT EXISTS ayah_notes (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         surah_number INTEGER NOT NULL,
@@ -82,13 +101,16 @@ abstract class QuranDatabase : RoomDatabase() {
                         created_at INTEGER NOT NULL,
                         updated_at INTEGER NOT NULL
                     )
-                """.trimIndent())
+                    """.trimIndent(),
+                )
 
                 // Create index on surah_number and ayah_number for fast lookups
-                database.execSQL("""
+                database.execSQL(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_note_surah_ayah
                     ON ayah_notes (surah_number, ayah_number)
-                """.trimIndent())
+                    """.trimIndent(),
+                )
 
                 android.util.Log.d("QuranDatabase", "✅ Migration completed: ayah_notes table created")
             }
@@ -102,7 +124,7 @@ abstract class QuranDatabase : RoomDatabase() {
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
 
                 // Try CDN/extracted file first, fall back to bundled asset
@@ -132,7 +154,7 @@ abstract class QuranDatabase : RoomDatabase() {
                 instance
             }
         }
-        
+
         /**
          * Convert SQL file to SQLite database
          * This function should be called to prepare the database file from quran.sql
@@ -140,13 +162,13 @@ abstract class QuranDatabase : RoomDatabase() {
         fun convertSqlToDatabase(context: Context, sqlFilePath: String): Boolean {
             return try {
                 android.util.Log.d("QuranDatabase", "📥 Converting SQL file to database...")
-                
+
                 // This is a placeholder - actual conversion would be done offline
                 // and the resulting .db file would be placed in assets/databases/
-                
+
                 android.util.Log.w("QuranDatabase", "⚠️  SQL conversion should be done offline")
                 android.util.Log.i("QuranDatabase", "💡 Place the converted quran.db file in app/src/main/assets/databases/")
-                
+
                 false
             } catch (e: Exception) {
                 android.util.Log.e("QuranDatabase", "❌ Error converting SQL file", e)
@@ -155,4 +177,3 @@ abstract class QuranDatabase : RoomDatabase() {
         }
     }
 }
-

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.quran
 
 import android.app.Notification
@@ -7,7 +23,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.os.Binder
@@ -90,7 +105,7 @@ class QuranPlaybackService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "QuranPlayer::WakeLock"
+            "QuranPlayer::WakeLock",
         ).apply {
             acquire(10 * 60 * 60 * 1000L) // 10 hours
         }
@@ -100,7 +115,7 @@ class QuranPlaybackService : Service() {
         mediaSession = MediaSessionCompat(this, "QuranPlaybackService").apply {
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS,
             )
 
             setCallback(object : MediaSessionCompat.Callback() {
@@ -210,7 +225,6 @@ class QuranPlaybackService : Service() {
             onGlobalSurahChanged?.invoke(index)
             updateMediaSessionMetadata()
             startForeground(NOTIFICATION_ID, createNotification())
-
         } catch (e: Exception) {
             Log.e("QuranService", "Failed to play surah", e)
         }
@@ -297,7 +311,7 @@ class QuranPlaybackService : Service() {
         audioUrl: String,
         surahName: String,
         ayahNumber: Int,
-        shouldAutoPlay: Boolean = true
+        shouldAutoPlay: Boolean = true,
     ) {
         try {
             // Save the current playing state
@@ -317,11 +331,10 @@ class QuranPlaybackService : Service() {
                     .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "$surahName - Ayah $ayahNumber")
                     .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "ٱلْقُرْآنُ ٱلْكَرِيم")
                     .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Quran")
-                    .build()
+                    .build(),
             )
 
             startForeground(NOTIFICATION_ID, createNotification())
-
         } catch (e: Exception) {
             Log.e("QuranService", "Failed to play ayah from URL: $audioUrl", e)
         }
@@ -340,7 +353,7 @@ class QuranPlaybackService : Service() {
     fun playSurahForCourse(
         surahIndex: Int,
         startPosition: Int = 0,
-        forCourse: Boolean = true
+        forCourse: Boolean = true,
     ) {
         try {
             isPlayingForCourse = forCourse
@@ -397,7 +410,6 @@ class QuranPlaybackService : Service() {
             onGlobalSurahChanged?.invoke(surahIndex)
             updateMediaSessionMetadata()
             startForeground(NOTIFICATION_ID, createNotification())
-
         } catch (e: Exception) {
             Log.e("QuranService", "🕌 Failed to play surah for course", e)
         }
@@ -467,7 +479,7 @@ class QuranPlaybackService : Service() {
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, getDuration().toLong())
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, appIcon)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, appIcon)
-                .build()
+                .build(),
         )
     }
 
@@ -477,14 +489,14 @@ class QuranPlaybackService : Service() {
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
-                    PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                    PlaybackStateCompat.ACTION_SEEK_TO or
-                    PlaybackStateCompat.ACTION_STOP
+                        PlaybackStateCompat.ACTION_PAUSE or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_SEEK_TO or
+                        PlaybackStateCompat.ACTION_STOP,
                 )
                 .setState(state, position, 1.0f)
-                .build()
+                .build(),
         )
     }
 
@@ -496,14 +508,14 @@ class QuranPlaybackService : Service() {
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                     onProgressChanged?.invoke(
                         mediaPlayer?.currentPosition ?: 0,
-                        mediaPlayer?.duration ?: 0
+                        mediaPlayer?.duration ?: 0,
                     )
                     handler.postDelayed(this, 1000) // Update every second
                 } else {
                     // Still update once while paused to keep UI in sync
                     onProgressChanged?.invoke(
                         mediaPlayer?.currentPosition ?: 0,
-                        mediaPlayer?.duration ?: 0
+                        mediaPlayer?.duration ?: 0,
                     )
                 }
             }
@@ -523,7 +535,7 @@ class QuranPlaybackService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Quran Playback",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Shows currently playing Surah"
                 setShowBadge(false)
@@ -543,7 +555,7 @@ class QuranPlaybackService : Service() {
             this,
             0,
             contentIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -559,7 +571,7 @@ class QuranPlaybackService : Service() {
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
+                    .setShowActionsInCompactView(0, 1, 2),
             )
             // Add media control actions
             .addAction(
@@ -567,24 +579,24 @@ class QuranPlaybackService : Service() {
                 "Previous",
                 MediaButtonReceiver.buildMediaButtonPendingIntent(
                     this,
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                )
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS,
+                ),
             )
             .addAction(
                 if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
                 if (isPlaying) "Pause" else "Play",
                 MediaButtonReceiver.buildMediaButtonPendingIntent(
                     this,
-                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY
-                )
+                    if (isPlaying) PlaybackStateCompat.ACTION_PAUSE else PlaybackStateCompat.ACTION_PLAY,
+                ),
             )
             .addAction(
                 android.R.drawable.ic_media_next,
                 "Next",
                 MediaButtonReceiver.buildMediaButtonPendingIntent(
                     this,
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                )
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
+                ),
             )
             .build()
     }

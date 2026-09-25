@@ -1,7 +1,20 @@
-package com.starception.submission.widget.samples.collections
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.starception.submission.widget.StarceptionWidgetTheme
-import com.starception.submission.widget.loadWidgetThemeSource
+package com.starception.submission.widget.samples.collections
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -16,6 +29,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import com.starception.submission.R
+import com.starception.submission.widget.StarceptionWidgetTheme
+import com.starception.submission.widget.loadWidgetThemeSource
 import com.starception.submission.widget.samples.collections.data.FakeCheckListDataRepository
 import com.starception.submission.widget.samples.collections.data.FakeCheckListDataRepository.Companion.getCheckListDataRepo
 import com.starception.submission.widget.samples.collections.layout.CheckListItem
@@ -30,69 +45,69 @@ import kotlinx.coroutines.withContext
  * Has ability to toggle between placeholder text and real-like text.
  */
 class CheckListAppWidget : GlanceAppWidget() {
-  // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
-  // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
-  // supported size to be held in the widget host's memory.
-  override val sizeMode: SizeMode = SizeMode.Exact
+    // Unlike the "Single" size mode, using "Exact" allows us to have better control over rendering in
+    // different sizes. And, unlike the "Responsive" mode, it doesn't cause several views for each
+    // supported size to be held in the widget host's memory.
+    override val sizeMode: SizeMode = SizeMode.Exact
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val repo = getCheckListDataRepo(id)
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val repo = getCheckListDataRepo(id)
 
-    val initialItems = withContext(Dispatchers.Default) {
-      repo.load()
+        val initialItems = withContext(Dispatchers.Default) {
+            repo.load()
+        }
+        val themeSource = loadWidgetThemeSource(context)
+
+        provideContent {
+            val items by repo.items().collectAsState(initial = initialItems)
+            val checkedItems by repo.checkedItems().collectAsState(initial = emptyList())
+
+            StarceptionWidgetTheme(themeSource) {
+                WidgetContent(
+                    items = items,
+                    checkedItems = checkedItems,
+                    checkItemAction = { key: String -> repo.checkItem(key) },
+                )
+            }
+        }
     }
-    val themeSource = loadWidgetThemeSource(context)
 
-    provideContent {
-      val items by repo.items().collectAsState(initial = initialItems)
-      val checkedItems by repo.checkedItems().collectAsState(initial = emptyList())
+    @Composable
+    fun WidgetContent(
+        items: List<CheckListItem>,
+        checkedItems: List<String>,
+        checkItemAction: (String) -> Unit,
+    ) {
+        val context = LocalContext.current
 
-      StarceptionWidgetTheme(themeSource) {
-        WidgetContent(
-          items = items,
-          checkedItems = checkedItems,
-          checkItemAction = { key: String -> repo.checkItem(key) }
+        CheckListLayout(
+            title = context.getString(R.string.sample_check_list_app_widget_name),
+            titleIconRes = R.drawable.sample_pin_icon,
+            titleBarActionIconRes = R.drawable.sample_add_icon,
+            titleBarActionIconContentDescription = context.getString(
+                R.string.sample_add_button_text,
+            ),
+            titleBarAction = actionStartDemoActivity("Add icon in title bar"),
+            items = items,
+            checkedItems = checkedItems,
+            checkButtonContentDescription = context.getString(
+                R.string.sample_mark_done_button_content_description,
+            ),
+            checkedIconRes = R.drawable.sample_checked_circle_icon,
+            unCheckedIconRes = R.drawable.sample_circle_icon,
+            onCheck = checkItemAction,
         )
-      }
     }
-  }
-
-  @Composable
-  fun WidgetContent(
-    items: List<CheckListItem>,
-    checkedItems: List<String>,
-    checkItemAction: (String) -> Unit,
-  ) {
-    val context = LocalContext.current
-
-    CheckListLayout(
-      title = context.getString(R.string.sample_check_list_app_widget_name),
-      titleIconRes = R.drawable.sample_pin_icon,
-      titleBarActionIconRes = R.drawable.sample_add_icon,
-      titleBarActionIconContentDescription = context.getString(
-        R.string.sample_add_button_text
-      ),
-      titleBarAction = actionStartDemoActivity("Add icon in title bar"),
-      items = items,
-      checkedItems = checkedItems,
-      checkButtonContentDescription = context.getString(
-        R.string.sample_mark_done_button_content_description
-      ),
-      checkedIconRes = R.drawable.sample_checked_circle_icon,
-      unCheckedIconRes = R.drawable.sample_circle_icon,
-      onCheck = checkItemAction
-    )
-  }
 }
 
 class CheckListAppWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget = CheckListAppWidget()
+    override val glanceAppWidget = CheckListAppWidget()
 
-  @SuppressLint("RestrictedApi")
-  override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-    appWidgetIds.forEach {
-      FakeCheckListDataRepository.cleanUp(AppWidgetId(appWidgetId = it))
+    @SuppressLint("RestrictedApi")
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        appWidgetIds.forEach {
+            FakeCheckListDataRepository.cleanUp(AppWidgetId(appWidgetId = it))
+        }
+        super.onDeleted(context, appWidgetIds)
     }
-    super.onDeleted(context, appWidgetIds)
-  }
 }

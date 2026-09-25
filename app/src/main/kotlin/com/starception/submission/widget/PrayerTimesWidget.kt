@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Starception
+ * Copyright 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,59 +17,50 @@
 package com.starception.submission.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Paint
+import android.graphics.Outline
+import android.graphics.Path
+import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
-import android.content.res.Configuration
-import android.content.Context
 import android.util.TypedValue
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.RemoteViews
 import androidx.annotation.FontRes
 import androidx.annotation.LayoutRes
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.glance.LocalGlanceId
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
+import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.GlanceId
-import androidx.core.content.res.ResourcesCompat
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalGlanceId
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
-import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
 import androidx.glance.action.clickable
-import android.widget.RemoteViews
-import android.view.ViewGroup
-import android.graphics.RectF
-import android.graphics.Rect
-import android.graphics.Path
-import android.graphics.Outline
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.async
-import kotlinx.coroutines.Dispatchers
-import android.widget.FrameLayout
-import android.view.View
 import androidx.glance.appwidget.AndroidRemoteViews
-import androidx.glance.appwidget.compose
-import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -78,6 +69,7 @@ import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
+import androidx.glance.appwidget.compose
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -88,8 +80,8 @@ import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxHeight
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -99,15 +91,17 @@ import androidx.glance.layout.wrapContentHeight
 import androidx.glance.layout.wrapContentWidth
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
-import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
-import androidx.glance.text.TextAlign
-import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import androidx.glance.color.ColorProvider as DayNightColorProvider
 import com.starception.submission.MainActivity
 import com.starception.submission.R
 import com.starception.submission.core.designsystem.icon.topicIconResFor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import androidx.glance.appwidget.action.actionStartActivity as actionStartIntent
 
 /** The reference keeps its inner cards close to the outer shell: roughly 2% per side. */
 private val WIDGET_PADDING = 8.dp
@@ -122,10 +116,12 @@ private val ReferenceMuted = ColorProvider(Color(0xFF4F665D))
 private val ReferenceQuote = ColorProvider(Color(0xFF24463D))
 private val ReferenceQuoteMark = ColorProvider(Color(0xFFA9A08D))
 private val ReferenceHeaderPill = ColorProvider(Color(0xFFF0F2F5))
+
 // Sampled from the supplied header design.
 private val ReferenceTopHeaderPill = ColorProvider(Color(0xFFEAEAEF))
 private val ReferenceTopHeaderInk = ColorProvider(Color(0xFF110F3B))
 private val ReferenceTopHeaderMuted = ColorProvider(Color(0xFF61607A))
+
 // Dark-plate variants: the location name and date sit directly on the widget plate, which
 // turns dark when the widget's colour mode is Dark (or follows a dark system). The fixed
 // indigo inks above vanish on that surface, so the on-plate copy switches to light inks.
@@ -199,6 +195,7 @@ private val DEVOTIONAL_COLUMN_INSETS = 28.dp
 private val DHIKR_LINES = listOf("SMALL", "DHIKR", "A BRIGHTER", "TOMORROW")
 private const val DHIKR_TRACKING_EM = 0.16f
 private const val HERO_ARTWORK_MIN_ALPHA = 0.86f
+
 /**
  * Tallest the hero may grow relative to its width. The 3:1 artwork's sky and foliage
  * margins absorb the difference (see alphaAdjustedImageProvider); past this the margins
@@ -226,6 +223,7 @@ private val REFERENCE_HEADER_DISC = 34.dp
 private val HEADER_TOUCH_TARGET_TOP_PADDING = 8.dp
 private val HEADER_TOUCH_TARGET_BOTTOM_PADDING = 6.dp
 private val TITLE_BAR_HEIGHT = 61.dp
+
 /** The weather capsule stands a little taller than the discs it sits between. */
 private val REFERENCE_HEADER_CAPSULE_HEIGHT = 40.dp
 
@@ -312,6 +310,7 @@ private val FULL_SCHEDULE_MIN_HEIGHT = 300.dp
 // A 5x4 grant on One UI leaves 387dp after the header; it must land here, not in the flipper.
 private val REFERENCE_LAYOUT_MIN_HEIGHT = 376.dp
 private val REFERENCE_LAYOUT_MIN_WIDTH = 280.dp
+
 /** Shortest content area whose single page can hold the timeline or the devotional card. */
 private val REFERENCE_FLIP_MIN_HEIGHT = 120.dp
 private val REFERENCE_COMPACT_MIN_HEIGHT = 90.dp
@@ -451,160 +450,162 @@ abstract class BasePrayerTimesWidget protected constructor(
                     LocalHostTextScale provides hostTextScale(context, id),
                     LocalWidgetThemeSource provides themeSource,
                 ) {
-                when (state) {
-                    PrayerWidgetState.Unavailable -> {
-                        val size = hostReportedWidgetSize(context, id) ?: LocalSize.current
-                        val singleRow = size.height <= SINGLE_ROW_WIDGET_MAX_HEIGHT
-                        BareSurface(
-                            padding = if (singleRow) {
-                                SINGLE_ROW_WIDGET_PADDING
-                            } else {
-                                WIDGET_PADDING
-                            },
-                        ) {
-                            UnavailableContent(singleRow = singleRow)
-                        }
-                    }
-                    is PrayerWidgetState.Available -> {
-                        // One UI 8 currently hands Glance a stale 405x98 LocalSize when a
-                        // resized widget refreshes, even though AppWidgetManager still
-                        // reports the correct 405x334 footprint. Prefer the provider
-                        // options when present so refreshes cannot collapse an x3/x4 card
-                        // back to its original picker height.
-                        // Resolve this inside the composition: resizing can reuse the
-                        // same Glance session, so capturing it above provideContent would
-                        // freeze whichever intermediate row-span the drag first crossed.
-                        val size = hostReportedWidgetSize(context, id) ?: LocalSize.current
-                        // Each surface insets the card by a different amount, so what the
-                        // hero actually gets is worked out here — the hero cannot see
-                        // which surface wrapped it. Deciding the layout from the same two
-                        // figures that are then handed to it is what keeps the choice and
-                        // the sizing from disagreeing.
-                        val innerWidth = (size.width - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
-                        // The title bar owns the top inset. Titled content ends in an
-                        // inset surface, so its smaller shell inset avoids double-padding
-                        // below the final row.
-                        // The reference header is a fixed strip — 32dp discs, 12sp name —
-                        // whatever height the widget has; only the cards below it scale.
-                        // Scaling it with the grant was tried and made it read as heavier
-                        // than the design at every tall footprint.
-                        val headerScale = 1f
-                        val titledHeight =
-                            (size.height - TITLE_BAR_HEIGHT - TITLED_WIDGET_BOTTOM_PADDING)
-                                .coerceAtLeast(1.dp)
-                        val bareHeight =
-                            (size.height - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
-                        if (standaloneSection != null) {
+                    when (state) {
+                        PrayerWidgetState.Unavailable -> {
+                            val size = hostReportedWidgetSize(context, id) ?: LocalSize.current
+                            val singleRow = size.height <= SINGLE_ROW_WIDGET_MAX_HEIGHT
                             BareSurface(
-                                verticalAlignment = Alignment.Vertical.Top,
-                                padding = WIDGET_PADDING,
+                                padding = if (singleRow) {
+                                    SINGLE_ROW_WIDGET_PADDING
+                                } else {
+                                    WIDGET_PADDING
+                                },
                             ) {
-                                StandalonePrayerSection(
-                                    section = standaloneSection,
-                                    state = state,
-                                    contentSize = DpSize(innerWidth, bareHeight),
-                                )
+                                UnavailableContent(singleRow = singleRow)
                             }
-                        } else when {
-                            // A real one-row footprint cannot carry a header plus a body.
-                            // Use the launcher's live height rather than its nominal x1
-                            // label: display scaling and grid density change the actual dp.
-                            size.height <= SINGLE_ROW_WIDGET_MAX_HEIGHT -> {
-                                val singleRowWidth = (
-                                    size.width - (SINGLE_ROW_WIDGET_PADDING * 2)
-                                    ).coerceAtLeast(1.dp)
-                                val singleRowHeight = (
-                                    size.height - (SINGLE_ROW_WIDGET_PADDING * 2)
-                                    ).coerceAtLeast(1.dp)
+                        }
+                        is PrayerWidgetState.Available -> {
+                            // One UI 8 currently hands Glance a stale 405x98 LocalSize when a
+                            // resized widget refreshes, even though AppWidgetManager still
+                            // reports the correct 405x334 footprint. Prefer the provider
+                            // options when present so refreshes cannot collapse an x3/x4 card
+                            // back to its original picker height.
+                            // Resolve this inside the composition: resizing can reuse the
+                            // same Glance session, so capturing it above provideContent would
+                            // freeze whichever intermediate row-span the drag first crossed.
+                            val size = hostReportedWidgetSize(context, id) ?: LocalSize.current
+                            // Each surface insets the card by a different amount, so what the
+                            // hero actually gets is worked out here — the hero cannot see
+                            // which surface wrapped it. Deciding the layout from the same two
+                            // figures that are then handed to it is what keeps the choice and
+                            // the sizing from disagreeing.
+                            val innerWidth = (size.width - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
+                            // The title bar owns the top inset. Titled content ends in an
+                            // inset surface, so its smaller shell inset avoids double-padding
+                            // below the final row.
+                            // The reference header is a fixed strip — 32dp discs, 12sp name —
+                            // whatever height the widget has; only the cards below it scale.
+                            // Scaling it with the grant was tried and made it read as heavier
+                            // than the design at every tall footprint.
+                            val headerScale = 1f
+                            val titledHeight =
+                                (size.height - TITLE_BAR_HEIGHT - TITLED_WIDGET_BOTTOM_PADDING)
+                                    .coerceAtLeast(1.dp)
+                            val bareHeight =
+                                (size.height - (WIDGET_PADDING * 2)).coerceAtLeast(1.dp)
+                            if (standaloneSection != null) {
                                 BareSurface(
-                                    padding = SINGLE_ROW_WIDGET_PADDING,
+                                    verticalAlignment = Alignment.Vertical.Top,
+                                    padding = WIDGET_PADDING,
                                 ) {
-                                    if (singleRowWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
-                                        ReferencePrayerHero(
-                                            state = state,
-                                            width = singleRowWidth,
-                                            height = singleRowHeight,
-                                        )
-                                    } else {
-                                        NextPrayerStripContent(
-                                            state = state,
-                                            contentSize = DpSize(singleRowWidth, singleRowHeight),
-                                        )
-                                    }
-                                }
-                            }
-
-                            // A shallow multi-row or compact-square footprint still has
-                            // enough room for a header and current/next prayer summary.
-                            bareHeight < HERO_MIN_HEIGHT -> {
-                                if (innerWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
-                                    BareSurface(padding = WIDGET_PADDING) {
-                                        ReferencePrayerHero(
-                                            state = state,
-                                            width = innerWidth,
-                                            height = bareHeight,
-                                        )
-                                    }
-                                } else {
-                                    CompactPrayerSurface(
+                                    StandalonePrayerSection(
+                                        section = standaloneSection,
                                         state = state,
                                         contentSize = DpSize(innerWidth, bareHeight),
                                     )
                                 }
-                            }
-
-                            // Everything taller renders the same hero. Only the surface
-                            // around it differs: the title bar has to earn its 52dp, so it
-                            // needs both the width to show a title and enough height left
-                            // afterwards for the hero to still fit. Gating on width alone
-                            // handed a 4x1 a title bar over a zero-height content box.
-                            //
-                            // The width threshold is what the bar's own contents need —
-                            // padding, pin, a readable place name and the refresh target —
-                            // not a cell size. It was 230dp when this compared against the
-                            // granted cell; measuring the drawable area instead made that
-                            // the same test at a different scale, and a 3-column card
-                            // silently lost its header.
-                            size.width >= TITLE_BAR_MIN_WIDTH && titledHeight >= HERO_MIN_HEIGHT -> {
-                                val useReferenceLayout =
-                                    innerWidth >= REFERENCE_COMPACT_MIN_WIDTH &&
-                                        titledHeight >= REFERENCE_COMPACT_MIN_HEIGHT
-                                TitledSurface(
-                                    state = state,
-                                    detailedHeader = innerWidth >= REFERENCE_LAYOUT_MIN_WIDTH,
-                                    headerScale = headerScale,
-                                    headerWidth = innerWidth,
-                                ) {
-                                    if (useReferenceLayout) {
-                                        ReferencePrayerContent(
-                                            state = state,
-                                            contentSize = DpSize(innerWidth, titledHeight),
-                                        )
-                                    } else {
-                                        AdaptivePrayerContent(
-                                            state = state,
-                                            contentSize = DpSize(innerWidth, titledHeight),
-                                        )
+                            } else {
+                                when {
+                                    // A real one-row footprint cannot carry a header plus a body.
+                                    // Use the launcher's live height rather than its nominal x1
+                                    // label: display scaling and grid density change the actual dp.
+                                    size.height <= SINGLE_ROW_WIDGET_MAX_HEIGHT -> {
+                                        val singleRowWidth = (
+                                            size.width - (SINGLE_ROW_WIDGET_PADDING * 2)
+                                            ).coerceAtLeast(1.dp)
+                                        val singleRowHeight = (
+                                            size.height - (SINGLE_ROW_WIDGET_PADDING * 2)
+                                            ).coerceAtLeast(1.dp)
+                                        BareSurface(
+                                            padding = SINGLE_ROW_WIDGET_PADDING,
+                                        ) {
+                                            if (singleRowWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
+                                                ReferencePrayerHero(
+                                                    state = state,
+                                                    width = singleRowWidth,
+                                                    height = singleRowHeight,
+                                                )
+                                            } else {
+                                                NextPrayerStripContent(
+                                                    state = state,
+                                                    contentSize = DpSize(singleRowWidth, singleRowHeight),
+                                                )
+                                            }
+                                        }
                                     }
-                                }
-                            }
 
-                            else -> BareSurface(Alignment.Vertical.Top) {
-                                if (innerWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
-                                    ReferencePrayerContent(
-                                        state = state,
-                                        contentSize = DpSize(innerWidth, bareHeight),
-                                    )
-                                } else {
-                                    AdaptivePrayerContent(
-                                        state = state,
-                                        contentSize = DpSize(innerWidth, bareHeight),
-                                    )
+                                    // A shallow multi-row or compact-square footprint still has
+                                    // enough room for a header and current/next prayer summary.
+                                    bareHeight < HERO_MIN_HEIGHT -> {
+                                        if (innerWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
+                                            BareSurface(padding = WIDGET_PADDING) {
+                                                ReferencePrayerHero(
+                                                    state = state,
+                                                    width = innerWidth,
+                                                    height = bareHeight,
+                                                )
+                                            }
+                                        } else {
+                                            CompactPrayerSurface(
+                                                state = state,
+                                                contentSize = DpSize(innerWidth, bareHeight),
+                                            )
+                                        }
+                                    }
+
+                                    // Everything taller renders the same hero. Only the surface
+                                    // around it differs: the title bar has to earn its 52dp, so it
+                                    // needs both the width to show a title and enough height left
+                                    // afterwards for the hero to still fit. Gating on width alone
+                                    // handed a 4x1 a title bar over a zero-height content box.
+                                    //
+                                    // The width threshold is what the bar's own contents need —
+                                    // padding, pin, a readable place name and the refresh target —
+                                    // not a cell size. It was 230dp when this compared against the
+                                    // granted cell; measuring the drawable area instead made that
+                                    // the same test at a different scale, and a 3-column card
+                                    // silently lost its header.
+                                    size.width >= TITLE_BAR_MIN_WIDTH && titledHeight >= HERO_MIN_HEIGHT -> {
+                                        val useReferenceLayout =
+                                            innerWidth >= REFERENCE_COMPACT_MIN_WIDTH &&
+                                                titledHeight >= REFERENCE_COMPACT_MIN_HEIGHT
+                                        TitledSurface(
+                                            state = state,
+                                            detailedHeader = innerWidth >= REFERENCE_LAYOUT_MIN_WIDTH,
+                                            headerScale = headerScale,
+                                            headerWidth = innerWidth,
+                                        ) {
+                                            if (useReferenceLayout) {
+                                                ReferencePrayerContent(
+                                                    state = state,
+                                                    contentSize = DpSize(innerWidth, titledHeight),
+                                                )
+                                            } else {
+                                                AdaptivePrayerContent(
+                                                    state = state,
+                                                    contentSize = DpSize(innerWidth, titledHeight),
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    else -> BareSurface(Alignment.Vertical.Top) {
+                                        if (innerWidth >= REFERENCE_COMPACT_MIN_WIDTH) {
+                                            ReferencePrayerContent(
+                                                state = state,
+                                                contentSize = DpSize(innerWidth, bareHeight),
+                                            )
+                                        } else {
+                                            AdaptivePrayerContent(
+                                                state = state,
+                                                contentSize = DpSize(innerWidth, bareHeight),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
                 }
             }
         }
@@ -864,7 +865,6 @@ private fun NarrowSquarePrayerContent(
         )
     }
 }
-
 
 /**
  * Titled surface matching the ported layouts.
@@ -1328,10 +1328,12 @@ internal enum class WidgetTextAlign(val gravity: Int) {
 /** The three weights the widget draws in, each backed by its own one-TextView layout. */
 internal enum class WidgetFontWeight(@LayoutRes val layout: Int) {
     Regular(R.layout.widget_text_regular),
+
     /** Regular Ubuntu Sans without narrow-column inter-word stretching. */
     RegularRagged(R.layout.widget_text_regular_ragged),
     Medium(R.layout.widget_text_medium),
     Bold(R.layout.widget_text_bold),
+
     /** White-on-wallpaper header faces with a dark halo for mixed light/dark imagery. */
     ShadowRegular(R.layout.widget_text_shadow_regular),
     ShadowMedium(R.layout.widget_text_shadow_medium),
@@ -3310,8 +3312,10 @@ private fun ExpandedPrayerContent(
     // The panel and titled surface already carry their own lower insets. Give all other
     // available height to the rows so a compact resize does not leave a second band below
     // Isha. Heights too small to support these rows use ShortPrayerContent instead.
-    val scheduleRowHeight = ((contentSize.height.value - 165f) /
-        state.prayers.size.coerceAtLeast(1))
+    val scheduleRowHeight = (
+        (contentSize.height.value - 165f) /
+            state.prayers.size.coerceAtLeast(1)
+        )
         .coerceAtLeast(21f)
         .dp
 
@@ -3340,8 +3344,10 @@ private fun FullPrayerContent(
     // The schedule panel already provides its own lower padding and the titled surface
     // adds the safe widget-edge inset. Spend the remaining height on the five rows rather
     // than creating a second visible band below the panel.
-    val scheduleRowHeight = ((contentSize.height.value - 221f) /
-        state.prayers.size.coerceAtLeast(1))
+    val scheduleRowHeight = (
+        (contentSize.height.value - 221f) /
+            state.prayers.size.coerceAtLeast(1)
+        )
         // Samsung exposes taller row spans than Pixel for the same nominal widget size.
         // Let the five rows share all remaining space instead of leaving a band below
         // Isha; 30dp is the minimum at the smallest size that enters this layout.
@@ -3959,7 +3965,6 @@ private fun ExpressiveProgressBar(progress: Float, width: androidx.compose.ui.un
     }
 }
 
-
 // ---------------------------------------------------------------------------------
 // Components
 // ---------------------------------------------------------------------------------
@@ -3986,7 +3991,6 @@ private fun AnimatedFoliage(
     }
     AndroidRemoteViews(remoteViews = remoteViews, modifier = modifier)
 }
-
 
 /**
  * The next prayer's static Meteocon.

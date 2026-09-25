@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.datacollection
 
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,21 +44,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.starception.submission.core.designsystem.component.NiaOutlinedButton
+import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 import com.starception.submission.ml.SalahPosture
 import java.io.File
-import com.starception.submission.core.designsystem.theme.FloatingNavClearance
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrayerReviewScreen(
     filePath: String,
     onBack: () -> Unit,
-    viewModel: PrayerReviewViewModel = hiltViewModel()
+    viewModel: PrayerReviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -66,19 +81,19 @@ fun PrayerReviewScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
                         )
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         if (state.isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()
             }
@@ -89,19 +104,19 @@ fun PrayerReviewScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // File info
                 Text(
                     text = "File: ${File(filePath).name}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 // Summary card
                 SummaryCard(
                     totalSamples = state.totalSamples,
-                    postureCounts = state.postureCounts
+                    postureCounts = state.postureCounts,
                 )
 
                 // Model-vs-label quality analysis
@@ -111,14 +126,14 @@ fun PrayerReviewScreen(
                     totalSamples = state.totalSamples,
                     analysis = state.analysis,
                     onAnalyze = viewModel::analyzeQuality,
-                    onFlagTap = viewModel::selectSegmentAtWindow
+                    onFlagTap = viewModel::selectSegmentAtWindow,
                 )
 
                 // Instruction text
                 Text(
                     text = "Tap a segment to change its posture",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
 
                 // Timeline
@@ -129,20 +144,20 @@ fun PrayerReviewScreen(
                             elevation = 3.dp,
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                             ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                         ),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Box(
                                 modifier = Modifier
@@ -152,23 +167,23 @@ fun PrayerReviewScreen(
                                         brush = Brush.linearGradient(
                                             colors = listOf(
                                                 MaterialTheme.colorScheme.primaryContainer,
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                            )
-                                        )
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                            ),
+                                        ),
                                     ),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Timeline,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
                             Text(
                                 text = "Posture Timeline",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
 
@@ -177,14 +192,14 @@ fun PrayerReviewScreen(
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState())
                                 .height(80.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             state.segments.forEachIndexed { index, segment ->
                                 PostureSegmentBox(
                                     segment = segment,
                                     isSelected = state.selectedSegmentIndex == index,
                                     flaggedWindows = state.flaggedPerSegment[index] ?: 0,
-                                    onClick = { viewModel.selectSegment(index) }
+                                    onClick = { viewModel.selectSegment(index) },
                                 )
                             }
                         }
@@ -197,7 +212,7 @@ fun PrayerReviewScreen(
                         currentPosture = state.segments[selectedIndex].posture,
                         onPostureSelected = { newPosture ->
                             viewModel.changeSegmentPosture(selectedIndex, newPosture)
-                        }
+                        },
                     )
                 }
 
@@ -213,17 +228,17 @@ fun PrayerReviewScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
-                    enabled = !state.isSaving
+                    enabled = !state.isSaving,
                 ) {
                     if (state.isSaving) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     } else {
                         Text(
                             text = "Confirm Review & Save",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
                         )
                     }
                 }
@@ -238,11 +253,11 @@ fun PrayerReviewScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(56.dp),
                 ) {
                     Text(
                         text = "Discard Recording",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
 
@@ -255,7 +270,7 @@ fun PrayerReviewScreen(
 @Composable
 private fun SummaryCard(
     totalSamples: Int,
-    postureCounts: Map<SalahPosture, Int>
+    postureCounts: Map<SalahPosture, Int>,
 ) {
     Card(
         modifier = Modifier
@@ -264,20 +279,20 @@ private fun SummaryCard(
                 elevation = 3.dp,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             ),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -287,44 +302,44 @@ private fun SummaryCard(
                             brush = Brush.linearGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
-                            )
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                ),
+                            ),
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Assessment,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Text(
                     text = "Summary",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = "Total Samples:",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
                     text = totalSamples.toString(),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
             // Gradient divider
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Box(
                     modifier = Modifier
@@ -335,28 +350,28 @@ private fun SummaryCard(
                                     Color.Transparent,
                                     MaterialTheme.colorScheme.outlineVariant,
                                     MaterialTheme.colorScheme.outlineVariant,
-                                    Color.Transparent
-                                )
-                            )
+                                    Color.Transparent,
+                                ),
+                            ),
                         )
-                        .padding(vertical = 0.5.dp)
+                        .padding(vertical = 0.5.dp),
                 )
             }
 
             Text(
                 text = "Posture Counts:",
                 style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
 
             postureCounts.forEach { (posture, count) ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             modifier = Modifier
@@ -365,21 +380,21 @@ private fun SummaryCard(
                                     brush = Brush.linearGradient(
                                         colors = listOf(
                                             getPostureColor(posture),
-                                            getPostureColor(posture).copy(alpha = 0.7f)
-                                        )
+                                            getPostureColor(posture).copy(alpha = 0.7f),
+                                        ),
                                     ),
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                                )
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                ),
                         )
                         Text(
                             text = posture.displayName,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     Text(
                         text = count.toString(),
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -392,13 +407,13 @@ private fun PostureSegmentBox(
     segment: PostureSegment,
     isSelected: Boolean,
     onClick: () -> Unit,
-    flaggedWindows: Int = 0
+    flaggedWindows: Int = 0,
 ) {
     val width = ((segment.endIndex - segment.startIndex + 1) * 2).dp.coerceAtLeast(20.dp)
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.05f else 1f,
         animationSpec = tween(200, easing = FastOutSlowInEasing),
-        label = "segmentScale"
+        label = "segmentScale",
     )
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -416,35 +431,41 @@ private fun PostureSegmentBox(
                 brush = Brush.linearGradient(
                     colors = listOf(
                         getPostureColor(segment.posture),
-                        getPostureColor(segment.posture).copy(alpha = 0.7f)
-                    )
+                        getPostureColor(segment.posture).copy(alpha = 0.7f),
+                    ),
                 ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
             )
             .border(
-                width = if (isSelected) 3.dp else if (flaggedWindows > 0) 2.dp else 0.dp,
+                width = if (isSelected) {
+                    3.dp
+                } else if (flaggedWindows > 0) {
+                    2.dp
+                } else {
+                    0.dp
+                },
                 color = borderColor,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
             )
             .clickable(onClick = {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             })
             .padding(4.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         when {
             flaggedWindows > 0 -> Text(
                 text = "!",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             segment.wasEdited -> Text(
                 text = "✓",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
         }
     }
@@ -462,7 +483,7 @@ private fun DataQualityCard(
     totalSamples: Int,
     analysis: com.starception.submission.ml.SalahBatchInference.BatchResult?,
     onAnalyze: () -> Unit,
-    onFlagTap: (Int) -> Unit
+    onFlagTap: (Int) -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -471,18 +492,18 @@ private fun DataQualityCard(
                 elevation = 3.dp,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             ),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -492,23 +513,23 @@ private fun DataQualityCard(
                             brush = Brush.linearGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
-                            )
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                ),
+                            ),
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Assessment,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Text(
                     text = "Model vs Labels",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
@@ -516,13 +537,13 @@ private fun DataQualityCard(
                 isAnalyzing -> {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Text(
                             text = "Analyzing… $analysisProgress / $totalSamples windows",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -530,7 +551,7 @@ private fun DataQualityCard(
                 analysis == null -> {
                     NiaOutlinedButton(
                         onClick = onAnalyze,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Analyze data quality")
                     }
@@ -546,19 +567,19 @@ private fun DataQualityCard(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column {
                             Text(
                                 text = "$agreementPct%",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = agreementColor
+                                color = agreementColor,
                             )
                             Text(
                                 text = "model agrees with labels",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
@@ -570,12 +591,12 @@ private fun DataQualityCard(
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 } else {
                                     MaterialTheme.colorScheme.error
-                                }
+                                },
                             )
                             Text(
                                 text = "${analysis.unclassifiedWindows} unclassified",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -595,7 +616,7 @@ private fun DataQualityCard(
                                 Text(
                                     text = "${label.displayName} read as ${predicted.displayName} · $count windows",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -611,17 +632,17 @@ private fun DataQualityCard(
                                 .clickable { onFlagTap(flag.startIndex) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = "${flag.label.displayName} → ${flag.predicted.displayName}",
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                             Text(
                                 text = "${flag.windowCount}w · ${(flag.avgConfidence * 100).toInt()}%",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -636,7 +657,7 @@ private fun DataQualityCard(
 @Composable
 private fun PosturePicker(
     currentPosture: SalahPosture,
-    onPostureSelected: (SalahPosture) -> Unit
+    onPostureSelected: (SalahPosture) -> Unit,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -647,20 +668,20 @@ private fun PosturePicker(
                 elevation = 4.dp,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             ),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -670,36 +691,36 @@ private fun PosturePicker(
                             brush = Brush.linearGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.primaryContainer,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                )
-                            )
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                ),
+                            ),
                         ),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Text(
                     text = "Change Posture",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
 
             Text(
                 text = "Current: ${currentPosture.displayName}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
 
             // Gradient divider
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Box(
                     modifier = Modifier
@@ -710,11 +731,11 @@ private fun PosturePicker(
                                     Color.Transparent,
                                     MaterialTheme.colorScheme.outlineVariant,
                                     MaterialTheme.colorScheme.outlineVariant,
-                                    Color.Transparent
-                                )
-                            )
+                                    Color.Transparent,
+                                ),
+                            ),
                         )
-                        .padding(vertical = 0.5.dp)
+                        .padding(vertical = 0.5.dp),
                 )
             }
 
@@ -723,7 +744,7 @@ private fun PosturePicker(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SalahPosture.classificationLabels.forEach { posture ->
                     FilterChip(
@@ -735,7 +756,7 @@ private fun PosturePicker(
                         label = {
                             Text(
                                 text = posture.displayName,
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
                             )
                         },
                         leadingIcon = {
@@ -746,13 +767,13 @@ private fun PosturePicker(
                                         brush = Brush.linearGradient(
                                             colors = listOf(
                                                 getPostureColor(posture),
-                                                getPostureColor(posture).copy(alpha = 0.7f)
-                                            )
+                                                getPostureColor(posture).copy(alpha = 0.7f),
+                                            ),
                                         ),
-                                        shape = androidx.compose.foundation.shape.CircleShape
-                                    )
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                    ),
                             )
-                        }
+                        },
                     )
                 }
             }

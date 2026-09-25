@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.visualization
 
 import kotlin.math.max
@@ -16,17 +32,17 @@ enum class BodyShapeStyle(val displayName: String) {
  */
 data class BodyProportionFeatures(
     // k1 = lh / (lu + ll)
-    val headToBody: Float,          
+    val headToBody: Float,
     // k2 = bs / bh
-    val shoulderToAbdomen: Float,   
+    val shoulderToAbdomen: Float,
     // k3 = lu / ll
-    val upperToLowerBody: Float,    
+    val upperToLowerBody: Float,
     // k4
-    val shoulderCurve: Float,       
+    val shoulderCurve: Float,
     // k5 = theta-a
-    val armAngle: Float,            
+    val armAngle: Float,
     // k6 = theta-l
-    val legAngle: Float,            
+    val legAngle: Float,
 )
 
 data class BodyMeasurements(
@@ -121,12 +137,18 @@ object ShapeProportionModel {
         return base.copy(
             torsoWeights = torso,
             abdomenWeights = abdomen,
-            torsoWidthScale = (base.torsoWidthScale *
-                (1f + 0.055f * shoulderDominance + 0.015f * armSpread)).coerceIn(0.68f, 1.42f),
-            abdomenWidthScale = (base.abdomenWidthScale *
-                (1f - 0.04f * shoulderDominance + 0.02f * legSpread)).coerceIn(0.62f, 1.48f),
-            depthScale = (base.depthScale *
-                (1f + 0.025f * headBalance + 0.02f * torsoLength)).coerceIn(0.72f, 1.38f),
+            torsoWidthScale = (
+                base.torsoWidthScale *
+                    (1f + 0.055f * shoulderDominance + 0.015f * armSpread)
+                ).coerceIn(0.68f, 1.42f),
+            abdomenWidthScale = (
+                base.abdomenWidthScale *
+                    (1f - 0.04f * shoulderDominance + 0.02f * legSpread)
+                ).coerceIn(0.62f, 1.48f),
+            depthScale = (
+                base.depthScale *
+                    (1f + 0.025f * headBalance + 0.02f * torsoLength)
+                ).coerceIn(0.72f, 1.38f),
         )
     }
 

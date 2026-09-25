@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.api
 
 import android.util.Log
@@ -49,7 +65,7 @@ class AladhanApiService @Inject constructor() {
     suspend fun fetchPrayerTimes(
         location: Location,
         date: LocalDate,
-        calculationMethod: CalculationMethod
+        calculationMethod: CalculationMethod,
     ): AladhanPrayerTimes? = withContext(Dispatchers.IO) {
         try {
             val methodCode = getAladhanMethodCode(calculationMethod)
@@ -95,7 +111,7 @@ class AladhanApiService @Inject constructor() {
                     maghrib = parseTimeString(timings.maghrib),
                     isha = parseTimeString(timings.isha),
                     date = date,
-                    method = calculationMethod
+                    method = calculationMethod,
                 )
 
                 Log.i(TAG, "✨ AI Reference times fetched successfully:")
@@ -110,7 +126,6 @@ class AladhanApiService @Inject constructor() {
                 Log.e(TAG, "❌ API returned error code: ${response.code}")
                 return@withContext null
             }
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to fetch from Aladhan API: ${e.message}", e)
             return@withContext null
@@ -173,14 +188,14 @@ class AladhanApiService @Inject constructor() {
 data class AladhanApiResponse(
     val code: Int,
     val status: String,
-    val data: AladhanData? = null
+    val data: AladhanData? = null,
 )
 
 @Serializable
 data class AladhanData(
     val timings: AladhanTimings,
     val date: AladhanDate,
-    val meta: AladhanMeta
+    val meta: AladhanMeta,
 )
 
 @Serializable
@@ -195,7 +210,7 @@ data class AladhanTimings(
     @SerialName("Imsak") val imsak: String = "",
     @SerialName("Midnight") val midnight: String = "",
     @SerialName("Firstthird") val firstthird: String = "",
-    @SerialName("Lastthird") val lastthird: String = ""
+    @SerialName("Lastthird") val lastthird: String = "",
 )
 
 @Serializable
@@ -203,7 +218,7 @@ data class AladhanDate(
     val readable: String,
     val timestamp: String,
     val gregorian: AladhanGregorian? = null,
-    val hijri: AladhanHijri? = null
+    val hijri: AladhanHijri? = null,
 )
 
 @Serializable
@@ -215,13 +230,13 @@ data class AladhanGregorian(
     val month: AladhanMonth? = null,
     val year: String,
     val designation: AladhanDesignation? = null,
-    val lunarSighting: Boolean = false
+    val lunarSighting: Boolean = false,
 )
 
 @Serializable
 data class AladhanDesignation(
     val abbreviated: String = "",
-    val expanded: String = ""
+    val expanded: String = "",
 )
 
 @Serializable
@@ -235,20 +250,20 @@ data class AladhanHijri(
     val designation: AladhanDesignation? = null,
     val holidays: List<String> = emptyList(),
     val adjustedHolidays: List<String> = emptyList(),
-    val method: String? = null
+    val method: String? = null,
 )
 
 @Serializable
 data class AladhanWeekday(
     val en: String = "",
-    val ar: String = ""
+    val ar: String = "",
 )
 
 @Serializable
 data class AladhanMonth(
     val number: Int = 0,
     val en: String = "",
-    val ar: String = ""
+    val ar: String = "",
 )
 
 @Serializable
@@ -260,7 +275,7 @@ data class AladhanMeta(
     val latitudeAdjustmentMethod: String? = null,
     val midnightMode: String? = null,
     val school: String? = null,
-    val offset: AladhanOffset? = null
+    val offset: AladhanOffset? = null,
 )
 
 @Serializable
@@ -273,7 +288,7 @@ data class AladhanOffset(
     @SerialName("Maghrib") val maghrib: Int = 0,
     @SerialName("Sunset") val sunset: Int = 0,
     @SerialName("Isha") val isha: Int = 0,
-    @SerialName("Midnight") val midnight: Int = 0
+    @SerialName("Midnight") val midnight: Int = 0,
 )
 
 @Serializable
@@ -281,19 +296,19 @@ data class AladhanMethodInfo(
     val id: Int,
     val name: String,
     val params: AladhanMethodParams? = null,
-    val location: AladhanLocation? = null
+    val location: AladhanLocation? = null,
 )
 
 @Serializable
 data class AladhanLocation(
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
 )
 
 @Serializable
 data class AladhanMethodParams(
     @SerialName("Fajr") val fajr: kotlinx.serialization.json.JsonPrimitive? = null,
-    @SerialName("Isha") val isha: kotlinx.serialization.json.JsonPrimitive? = null
+    @SerialName("Isha") val isha: kotlinx.serialization.json.JsonPrimitive? = null,
 )
 
 /**
@@ -307,5 +322,5 @@ data class AladhanPrayerTimes(
     val maghrib: LocalTime?,
     val isha: LocalTime?,
     val date: LocalDate,
-    val method: CalculationMethod
+    val method: CalculationMethod,
 )

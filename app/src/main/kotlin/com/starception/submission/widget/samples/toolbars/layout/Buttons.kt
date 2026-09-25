@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.starception.submission.widget.samples.toolbars.layout
 
 import androidx.compose.runtime.Composable
@@ -52,30 +53,30 @@ import androidx.glance.unit.ColorProvider
  */
 @Composable
 fun RectangularIconButton(
-  imageProvider: ImageProvider,
-  onClick: Action,
-  roundedCornerShape: RoundedCornerShape,
-  contentDescription: String,
-  iconSize: Dp,
-  modifier: GlanceModifier,
-  backgroundColor: ColorProvider = GlanceTheme.colors.primary,
-  contentColor: ColorProvider = GlanceTheme.colors.onPrimary,
+    imageProvider: ImageProvider,
+    onClick: Action,
+    roundedCornerShape: RoundedCornerShape,
+    contentDescription: String,
+    iconSize: Dp,
+    modifier: GlanceModifier,
+    backgroundColor: ColorProvider = GlanceTheme.colors.primary,
+    contentColor: ColorProvider = GlanceTheme.colors.onPrimary,
 ) {
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier = modifier
-      .background(backgroundColor)
-      .cornerRadius(roundedCornerShape.cornerRadius)
-      .semantics { this.contentDescription = contentDescription }
-      .clickable(onClick)
-  ) {
-    Image(
-      provider = imageProvider,
-      contentDescription = null,
-      colorFilter = ColorFilter.tint(contentColor),
-      modifier = GlanceModifier.size(iconSize)
-    )
-  }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .background(backgroundColor)
+            .cornerRadius(roundedCornerShape.cornerRadius)
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(onClick),
+    ) {
+        Image(
+            provider = imageProvider,
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(contentColor),
+            modifier = GlanceModifier.size(iconSize),
+        )
+    }
 }
 
 /**
@@ -92,37 +93,37 @@ fun RectangularIconButton(
  */
 @Composable
 fun PillShapedButton(
-  iconImageProvider: ImageProvider,
-  iconSize: Dp,
-  backgroundColor: ColorProvider,
-  contentColor: ColorProvider,
-  contentDescription: String,
-  onClick: Action,
-  modifier: GlanceModifier,
+    iconImageProvider: ImageProvider,
+    iconSize: Dp,
+    backgroundColor: ColorProvider,
+    contentColor: ColorProvider,
+    contentDescription: String,
+    onClick: Action,
+    modifier: GlanceModifier,
 ) {
-  Box( // A clickable transparent outer container
-    contentAlignment = Alignment.Center,
-    modifier = modifier
-      .semantics { this.contentDescription = contentDescription }
-      .height(48.dp)
-      .clickable(onClick),
-  ) {
-    Box( // A filled background with smaller height
-      contentAlignment = Alignment.Center,
-      modifier = GlanceModifier
-        .width(52.dp)
-        .height(32.dp)
-        .background(backgroundColor)
-        .cornerRadius(RoundedCornerShape.FULL.cornerRadius)
-    ) { // The icon.
-      Image(
-        provider = iconImageProvider,
-        contentDescription = null,
-        colorFilter = ColorFilter.tint(contentColor),
-        modifier = GlanceModifier.size(iconSize)
-      )
+    Box( // A clickable transparent outer container
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .semantics { this.contentDescription = contentDescription }
+            .height(48.dp)
+            .clickable(onClick),
+    ) {
+        Box( // A filled background with smaller height
+            contentAlignment = Alignment.Center,
+            modifier = GlanceModifier
+                .width(52.dp)
+                .height(32.dp)
+                .background(backgroundColor)
+                .cornerRadius(RoundedCornerShape.FULL.cornerRadius),
+        ) { // The icon.
+            Image(
+                provider = iconImageProvider,
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(contentColor),
+                modifier = GlanceModifier.size(iconSize),
+            )
+        }
     }
-  }
 }
 
 /**
@@ -130,6 +131,6 @@ fun PillShapedButton(
  * https://m3.material.io/styles/shape/shape-scale-tokens
  */
 enum class RoundedCornerShape(val cornerRadius: Dp) {
-  FULL(100.dp),
-  MEDIUM(16.dp),
+    FULL(100.dp),
+    MEDIUM(16.dp),
 }

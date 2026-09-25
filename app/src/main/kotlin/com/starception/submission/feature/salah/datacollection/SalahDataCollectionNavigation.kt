@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.feature.salah.datacollection
 
 import androidx.navigation.NavController
@@ -25,7 +41,7 @@ fun NavController.navigateToSalahPrayerReview(filePath: String) = navigate(Salah
 fun NavGraphBuilder.salahDataCollectionScreen(
     onBackClick: () -> Unit,
     onNavigateToLiveRecording: () -> Unit = {},
-    onNavigateToReview: (String) -> Unit = {}
+    onNavigateToReview: (String) -> Unit = {},
 ) {
     composable<SalahDataCollectionRoute>(
         enterTransition = { NiaTransitions.detailEnter() },
@@ -36,14 +52,14 @@ fun NavGraphBuilder.salahDataCollectionScreen(
         SalahDataCollectionScreen(
             onBackClick = onBackClick,
             onNavigateToLiveRecording = onNavigateToLiveRecording,
-            onNavigateToReview = onNavigateToReview
+            onNavigateToReview = onNavigateToReview,
         )
     }
 }
 
 fun NavGraphBuilder.salahLiveRecordingScreen(
     onNavigateToReview: (String) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     composable<SalahLiveRecordingRoute>(
         enterTransition = { NiaTransitions.detailEnter() },
@@ -53,13 +69,13 @@ fun NavGraphBuilder.salahLiveRecordingScreen(
     ) {
         LivePrayerRecordingScreen(
             onNavigateToReview = onNavigateToReview,
-            onBack = onBackClick
+            onBack = onBackClick,
         )
     }
 }
 
 fun NavGraphBuilder.salahPrayerReviewScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     composable<SalahPrayerReviewRoute>(
         enterTransition = { NiaTransitions.detailEnter() },
@@ -70,7 +86,7 @@ fun NavGraphBuilder.salahPrayerReviewScreen(
         val route = backStackEntry.toRoute<SalahPrayerReviewRoute>()
         PrayerReviewScreen(
             filePath = route.filePath,
-            onBack = onBackClick
+            onBack = onBackClick,
         )
     }
 }

@@ -1,8 +1,23 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.prayer.service
 
 import android.content.Context
 import android.util.Log
-import com.starception.submission.prayer.model.DayPrayerTimes
 import com.starception.submission.prayer.repository.PrayerSettingsRepository
 import com.starception.submission.prayer.scheduler.PrayerNotificationScheduler
 import com.starception.submission.services.PrayerNotificationService
@@ -29,11 +44,11 @@ private fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTim
 
 /**
  * Prayer Notification Service Manager
- * 
+ *
  * This class manages the integration between the foreground service
  * and the backup notification system, ensuring users always get
  * prayer notifications regardless of service state.
- * 
+ *
  * Strategy:
  * 1. Primary: Foreground service for live updates
  * 2. Backup: WorkManager + AlarmManager for exact timing
@@ -43,9 +58,9 @@ private fun applyOffsetToTime(baseTime: LocalTime, offsetMinutes: Int): LocalTim
 class PrayerNotificationServiceManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prayerTimeCalculatorService: PrayerTimeCalculatorService,
-    private val prayerSettingsRepository: PrayerSettingsRepository
+    private val prayerSettingsRepository: PrayerSettingsRepository,
 ) {
-    
+
     companion object {
         private const val TAG = "PrayerNotificationServiceManager"
 
@@ -61,7 +76,7 @@ class PrayerNotificationServiceManager @Inject constructor(
                     // Get repository from Hilt
                     val entryPoint = dagger.hilt.android.EntryPointAccessors.fromApplication(
                         context.applicationContext,
-                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java
+                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
                     )
                     val repository = entryPoint.prayerSettingsRepository()
                     val notificationPrefs = repository.getNotificationPreferences()
@@ -86,7 +101,7 @@ class PrayerNotificationServiceManager @Inject constructor(
                             val dayPrayerTimes = calculatorService.calculatePrayerTimes(
                                 date = today,
                                 location = location,
-                                settings = settings
+                                settings = settings,
                             )
 
                             if (dayPrayerTimes != null) {
@@ -99,7 +114,7 @@ class PrayerNotificationServiceManager @Inject constructor(
                                     "Dhuhr" to applyOffsetToTime(dayPrayerTimes.dhuhr, offsets.dhuhr).format(formatter),
                                     "Asr" to applyOffsetToTime(dayPrayerTimes.asr, offsets.asr).format(formatter),
                                     "Maghrib" to applyOffsetToTime(dayPrayerTimes.maghrib, offsets.maghrib).format(formatter),
-                                    "Isha" to applyOffsetToTime(dayPrayerTimes.isha, offsets.isha).format(formatter)
+                                    "Isha" to applyOffsetToTime(dayPrayerTimes.isha, offsets.isha).format(formatter),
                                 )
 
                                 // Log all prior notification settings for debugging
@@ -118,7 +133,7 @@ class PrayerNotificationServiceManager @Inject constructor(
                                         context = context,
                                         prayerName = prayerName,
                                         prayerTime = prayerTime,
-                                        reminderMinutes = reminderMinutes
+                                        reminderMinutes = reminderMinutes,
                                     )
                                 }
 
@@ -128,7 +143,6 @@ class PrayerNotificationServiceManager @Inject constructor(
                     } else {
                         Log.d(TAG, "🔕 Notifications and silent-during-prayer disabled, not rescheduling")
                     }
-
                 } catch (e: Exception) {
                     Log.e(TAG, "❌ Failed to reschedule notifications", e)
                 }
@@ -145,10 +159,10 @@ class PrayerNotificationServiceManager @Inject constructor(
             return adjustedDateTime.toLocalTime()
         }
     }
-    
+
     /**
      * Initialize the complete prayer notification system
-     * 
+     *
      * This method sets up both the foreground service and backup
      * notification system to ensure reliable prayer notifications.
      */
@@ -156,33 +170,32 @@ class PrayerNotificationServiceManager @Inject constructor(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d(TAG, "🚀 Initializing complete prayer notification system")
-                
+
                 // Check if we can schedule exact alarms
                 val canScheduleExact = PrayerNotificationScheduler.canScheduleExactAlarms(context)
                 if (!canScheduleExact) {
                     Log.w(TAG, "⚠️ Cannot schedule exact alarms - permission not granted")
                     Log.w(TAG, "📝 User must enable 'Alarms & reminders' in app settings")
                 }
-                
+
                 // 1. Start the foreground service for live updates
                 startForegroundService()
-                
+
                 // 2. Schedule backup notifications for exact timing
                 scheduleBackupNotifications()
-                
+
                 // 3. Test notification disabled - system is working!
                 // if (canScheduleExact) {
                 //     PrayerNotificationScheduler.scheduleTestNotification(context, delaySeconds = 120)
                 // }
-                
+
                 Log.d(TAG, "✅ Prayer notification system initialized successfully")
-                
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to initialize notification system", e)
             }
         }
     }
-    
+
     /**
      * Start the foreground service for live prayer time updates
      */
@@ -200,7 +213,7 @@ class PrayerNotificationServiceManager @Inject constructor(
             Log.e(TAG, "❌ Failed to start foreground service", e)
         }
     }
-    
+
     /**
      * Schedule backup notifications using WorkManager + AlarmManager
      */
@@ -243,17 +256,16 @@ class PrayerNotificationServiceManager @Inject constructor(
                     context = context,
                     prayerName = prayerName,
                     prayerTime = prayerTime,
-                    reminderMinutes = reminderMinutes
+                    reminderMinutes = reminderMinutes,
                 )
             }
 
             Log.d(TAG, "✅ Scheduled ${prayerTimes.size} backup prayer notifications")
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule backup notifications", e)
         }
     }
-    
+
     /**
      * Get prayer times for today from the calculator service
      */
@@ -261,48 +273,47 @@ class PrayerNotificationServiceManager @Inject constructor(
         return try {
             val today = LocalDate.now()
             val formatter = DateTimeFormatter.ofPattern("h:mm a")
-            
+
             // Get current settings
             val settings = prayerSettingsRepository.getSettings()
-            
+
             // Calculate prayer times for today
             val dayPrayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(
                 date = today,
                 location = settings.location ?: return emptyMap(),
-                settings = settings
+                settings = settings,
             )
-            
+
             // Check if dayPrayerTimes is null
             if (dayPrayerTimes == null) {
                 Log.w(TAG, "⚠️ Prayer times calculation returned null")
                 return emptyMap()
             }
-            
+
             // Convert to map of name -> time string with offset applied
             val prayerTimesMap = mutableMapOf<String, String>()
             val offsets = settings.timeOffsets
-            
+
             // Apply user offsets to base prayer times before scheduling notifications
             val fajrAdjusted = applyOffsetToTime(dayPrayerTimes.fajr, offsets.fajr)
             val dhuhrAdjusted = applyOffsetToTime(dayPrayerTimes.dhuhr, offsets.dhuhr)
             val asrAdjusted = applyOffsetToTime(dayPrayerTimes.asr, offsets.asr)
             val maghribAdjusted = applyOffsetToTime(dayPrayerTimes.maghrib, offsets.maghrib)
             val ishaAdjusted = applyOffsetToTime(dayPrayerTimes.isha, offsets.isha)
-            
+
             prayerTimesMap["Fajr"] = fajrAdjusted.format(formatter)
             prayerTimesMap["Dhuhr"] = dhuhrAdjusted.format(formatter)
             prayerTimesMap["Asr"] = asrAdjusted.format(formatter)
             prayerTimesMap["Maghrib"] = maghribAdjusted.format(formatter)
             prayerTimesMap["Isha"] = ishaAdjusted.format(formatter)
-            
+
             prayerTimesMap
-            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to get prayer times for today", e)
             emptyMap()
         }
     }
-    
+
     /**
      * Update prayer notifications when settings change
      */
@@ -310,42 +321,40 @@ class PrayerNotificationServiceManager @Inject constructor(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d(TAG, "🔄 Updating prayer notifications due to settings change")
-                
+
                 // Cancel existing notifications
                 PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
-                
+
                 // Reschedule with new settings
                 scheduleBackupNotifications()
-                
+
                 Log.d(TAG, "✅ Prayer notifications updated successfully")
-                
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to update prayer notifications", e)
             }
         }
     }
-    
+
     /**
      * Stop all prayer notifications
      */
     fun stopAllNotifications() {
         try {
             Log.d(TAG, "🛑 Stopping all prayer notifications")
-            
+
             // Stop foreground service
             val serviceIntent = android.content.Intent(context, PrayerNotificationService::class.java)
             context.stopService(serviceIntent)
-            
+
             // Cancel backup notifications
             PrayerNotificationScheduler.cancelAllPrayerNotifications(context)
-            
+
             Log.d(TAG, "✅ All prayer notifications stopped")
-            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to stop notifications", e)
         }
     }
-    
+
     /**
      * Check if the notification system is working
      */
@@ -353,13 +362,12 @@ class PrayerNotificationServiceManager @Inject constructor(
         // Check if foreground service is running
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         val runningServices = activityManager.getRunningServices(Integer.MAX_VALUE)
-        
-        val isServiceRunning = runningServices.any { 
-            it.service.className == PrayerNotificationService::class.java.name 
+
+        val isServiceRunning = runningServices.any {
+            it.service.className == PrayerNotificationService::class.java.name
         }
-        
+
         Log.d(TAG, "📊 Notification system status - Service running: $isServiceRunning")
         return isServiceRunning
     }
-    
 }

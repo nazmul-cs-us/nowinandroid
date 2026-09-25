@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.quranicduas
 
 import android.content.Context
@@ -20,7 +36,7 @@ import java.io.FileOutputStream
 @Database(
     entities = [QuranicDuaEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class QuranicDuaDatabase : RoomDatabase() {
 
@@ -41,7 +57,7 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     QuranicDuaDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
                     .createFromAsset("databases/$DATABASE_NAME")
                     .fallbackToDestructiveMigration()
@@ -112,25 +128,27 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
                     val assetDb = SQLiteDatabase.openDatabase(
                         tempFile.absolutePath,
                         null,
-                        SQLiteDatabase.OPEN_READONLY
+                        SQLiteDatabase.OPEN_READONLY,
                     )
 
                     val duas = mutableListOf<QuranicDuaEntity>()
                     val cursor = assetDb.rawQuery("SELECT * FROM quranic_duas ORDER BY dua_number ASC", null)
 
                     while (cursor.moveToNext()) {
-                        duas.add(QuranicDuaEntity(
-                            id = cursor.getInt(cursor.getColumnIndexOrThrow("id")),
-                            duaNumber = cursor.getInt(cursor.getColumnIndexOrThrow("dua_number")),
-                            title = cursor.getString(cursor.getColumnIndexOrThrow("title")),
-                            surahReference = cursor.getString(cursor.getColumnIndexOrThrow("surah_reference")),
-                            arabic = cursor.getString(cursor.getColumnIndexOrThrow("arabic")),
-                            transliteration = cursor.getString(cursor.getColumnIndexOrThrow("transliteration")),
-                            translation = cursor.getString(cursor.getColumnIndexOrThrow("translation")),
-                            explanation = cursor.getString(cursor.getColumnIndexOrThrow("explanation")),
-                            createdAt = cursor.getString(cursor.getColumnIndexOrThrow("created_at")),
-                            updatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at"))
-                        ))
+                        duas.add(
+                            QuranicDuaEntity(
+                                id = cursor.getInt(cursor.getColumnIndexOrThrow("id")),
+                                duaNumber = cursor.getInt(cursor.getColumnIndexOrThrow("dua_number")),
+                                title = cursor.getString(cursor.getColumnIndexOrThrow("title")),
+                                surahReference = cursor.getString(cursor.getColumnIndexOrThrow("surah_reference")),
+                                arabic = cursor.getString(cursor.getColumnIndexOrThrow("arabic")),
+                                transliteration = cursor.getString(cursor.getColumnIndexOrThrow("transliteration")),
+                                translation = cursor.getString(cursor.getColumnIndexOrThrow("translation")),
+                                explanation = cursor.getString(cursor.getColumnIndexOrThrow("explanation")),
+                                createdAt = cursor.getString(cursor.getColumnIndexOrThrow("created_at")),
+                                updatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at")),
+                            ),
+                        )
                     }
                     cursor.close()
                     assetDb.close()
@@ -168,7 +186,7 @@ abstract class QuranicDuaDatabase : RoomDatabase() {
                     name = "Quranic Duas",
                     itemCount = count,
                     lastModified = dbFile.lastModified(),
-                    sizeBytes = dbFile.length()
+                    sizeBytes = dbFile.length(),
                 )
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error getting database info", e)
@@ -185,5 +203,5 @@ data class QuranicDuaDatabaseInfo(
     val name: String,
     val itemCount: Int,
     val lastModified: Long,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )

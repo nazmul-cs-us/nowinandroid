@@ -16,8 +16,6 @@
 
 package com.starception.submission.widget.samples
 
-
-import com.starception.submission.widget.LocalWidgetHostBackground
 import android.os.Build
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -33,6 +31,7 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
+import com.starception.submission.widget.LocalWidgetHostBackground
 
 /**
  * Provide a Box composable that be used as app widget's background
@@ -50,7 +49,7 @@ fun AppWidgetBox(
         backgroundColor = LocalWidgetHostBackground.current,
         horizontalPadding = widgetPadding,
         modifier = GlanceModifier
-            .padding(vertical = widgetPadding)
+            .padding(vertical = widgetPadding),
     ) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -78,7 +77,7 @@ fun AppWidgetColumn(
         backgroundColor = LocalWidgetHostBackground.current,
         horizontalPadding = widgetPadding,
         modifier = GlanceModifier
-            .padding(vertical = widgetPadding)
+            .padding(vertical = widgetPadding),
     ) {
         Column(
             modifier = modifier,

@@ -1,7 +1,28 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.settings.components
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -13,10 +34,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -39,10 +58,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.Campaign
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,14 +66,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import android.Manifest
-import android.graphics.BlurMaskFilter
-import android.graphics.Paint
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -70,14 +77,15 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.starception.submission.core.ui.FlaticonIcon
 import com.starception.submission.core.ui.FlaticonIcons
 import kotlin.math.PI
@@ -92,20 +100,20 @@ enum class VoiceRecognitionEngine(
     val displayName: String,
     val description: String,
     val speed: String,
-    val iconGlyph: String
+    val iconGlyph: String,
 ) {
     SHERPA_KWS(
         displayName = "Fast Keywords",
         description = "Real-time yes/no detection, optimized for hands-free responses",
         speed = "~100ms",
-        iconGlyph = FlaticonIcons.QUICK_ACTION
+        iconGlyph = FlaticonIcons.QUICK_ACTION,
     ),
     WHISPER(
         displayName = "Full Transcription",
         description = "Complete speech-to-text using Whisper.cpp for accurate offline transcription",
         speed = "~2 sec",
-        iconGlyph = FlaticonIcons.VOICE
-    )
+        iconGlyph = FlaticonIcons.VOICE,
+    ),
 }
 
 /**
@@ -116,7 +124,7 @@ enum class VoiceTestState {
     LISTENING,
     PROCESSING,
     SUCCESS,
-    ERROR
+    ERROR,
 }
 
 /**
@@ -149,14 +157,14 @@ fun VoiceSettingsSection(
     onStopTest: () -> Unit = {},
     downloadManager: com.starception.submission.download.AssetDownloadManager? = null,
     onDownloadComplete: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
 
     // Permission launcher for RECORD_AUDIO
     val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+        contract = ActivityResultContracts.RequestPermission(),
     ) { isGranted ->
         if (isGranted) {
             onTestVoice()
@@ -166,7 +174,8 @@ fun VoiceSettingsSection(
     // Wrapper that checks/requests permission before starting voice test
     val onTestVoiceWithPermission: () -> Unit = {
         val hasPermission = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.RECORD_AUDIO
+            context,
+            Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
@@ -178,7 +187,7 @@ fun VoiceSettingsSection(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Keep the engine choice compact so the voice test remains the focus.
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -186,7 +195,7 @@ fun VoiceSettingsSection(
                 text = "Recognition mode",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
 
             Row(
@@ -236,7 +245,7 @@ fun VoiceSettingsSection(
                 },
                 downloadManager = downloadManager,
                 onDownloadComplete = onDownloadComplete,
-                modifier = Modifier.padding(horizontal = 0.dp)
+                modifier = Modifier.padding(horizontal = 0.dp),
             )
         } else {
             // Voice test section (only show when model is available)
@@ -245,7 +254,7 @@ fun VoiceSettingsSection(
                     text = "Test Voice Recognition",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
 
                 ModernVoiceTestCard(
@@ -255,7 +264,7 @@ fun VoiceSettingsSection(
                     testError = state.testError,
                     amplitude = state.amplitude,
                     onTestVoice = onTestVoiceWithPermission,
-                    onStopTest = onStopTest
+                    onStopTest = onStopTest,
                 )
             }
         }
@@ -267,7 +276,7 @@ private fun ModernEngineCard(
     engine: VoiceRecognitionEngine,
     isSelected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
@@ -276,16 +285,17 @@ private fun ModernEngineCard(
             MaterialTheme.colorScheme.surfaceContainerLow
         },
         animationSpec = tween(260, easing = FastOutSlowInEasing),
-        label = "cardBackground"
+        label = "cardBackground",
     )
 
     val borderColor by animateColorAsState(
-        targetValue = if (isSelected)
+        targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
-        else
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        },
         animationSpec = tween(260, easing = FastOutSlowInEasing),
-        label = "cardBorder"
+        label = "cardBorder",
     )
 
     Surface(
@@ -295,15 +305,15 @@ private fun ModernEngineCard(
             .border(
                 width = if (isSelected) 1.5.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(18.dp)
+                shape = RoundedCornerShape(18.dp),
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = MaterialTheme.colorScheme.primary),
-                onClick = onClick
+                onClick = onClick,
             ),
         color = backgroundColor,
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(18.dp),
     ) {
         Column(
             modifier = Modifier
@@ -320,16 +330,22 @@ private fun ModernEngineCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceContainerHighest,
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
                     FlaticonIcon(
                         glyph = engine.iconGlyph,
                         contentDescription = null,
-                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         fontSize = 15.sp,
                     )
                 }
@@ -356,8 +372,11 @@ private fun ModernEngineCard(
                     },
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
@@ -381,7 +400,7 @@ private data class AnimatedDot(
     val size: Float,
     val color: Color,
     val phaseOffset: Float,
-    val speedMultiplier: Float
+    val speedMultiplier: Float,
 )
 
 /**
@@ -391,7 +410,7 @@ private data class AnimatedDot(
 private fun GoogleHumVisualization(
     isAnimating: Boolean,
     amplitude: Float = 0f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val googleColors = listOf(GoogleBlue, GoogleRed, GoogleYellow, GoogleGreen)
 
@@ -411,7 +430,7 @@ private fun GoogleHumVisualization(
                 size = 4f + random.nextFloat() * 8f,
                 color = googleColors[index % googleColors.size],
                 phaseOffset = random.nextFloat() * 2f * PI.toFloat(),
-                speedMultiplier = 0.9f + random.nextFloat() * 0.2f
+                speedMultiplier = 0.9f + random.nextFloat() * 0.2f,
             )
         }
     }
@@ -422,9 +441,9 @@ private fun GoogleHumVisualization(
         targetValue = 2f * PI.toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(10000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "rotationAngle"
+        label = "rotationAngle",
     )
 
     val activityLevel by animateFloatAsState(
@@ -436,7 +455,7 @@ private fun GoogleHumVisualization(
     val smoothAmplitude by animateFloatAsState(
         targetValue = amplitude,
         animationSpec = tween(280, easing = FastOutSlowInEasing),
-        label = "smoothAmplitude"
+        label = "smoothAmplitude",
     )
 
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -470,7 +489,7 @@ private fun GoogleHumVisualization(
             drawCircle(
                 color = dot.color.copy(alpha = alpha),
                 radius = finalSize,
-                center = Offset(projectedX, projectedY)
+                center = Offset(projectedX, projectedY),
             )
         }
     }
@@ -486,18 +505,18 @@ private fun GoogleHumVisualization(
 private fun AnimatedMicButton(
     isActive: Boolean,
     amplitude: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "micPulse")
 
     // Corner radius animation (square to circle morph)
     val cornerRadius by animateFloatAsState(
-        targetValue = if (isActive) 50f else 30f,  // 30% rounded when idle, full circle when active
+        targetValue = if (isActive) 50f else 30f, // 30% rounded when idle, full circle when active
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessLow,
         ),
-        label = "cornerRadius"
+        label = "cornerRadius",
     )
 
     // Scale animation
@@ -505,9 +524,9 @@ private fun AnimatedMicButton(
         targetValue = if (isActive) 1.1f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "scale"
+        label = "scale",
     )
 
     // Pulsing animation for idle state
@@ -516,9 +535,9 @@ private fun AnimatedMicButton(
         targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
             animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "idlePulse"
+        label = "idlePulse",
     )
 
     // Rotation for processing state
@@ -527,9 +546,9 @@ private fun AnimatedMicButton(
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "rotation"
+        label = "rotation",
     )
 
     // Ring animations for listening
@@ -538,48 +557,48 @@ private fun AnimatedMicButton(
         targetValue = 1.8f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "ring1"
+        label = "ring1",
     )
     val ring1Alpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "ring1Alpha"
+        label = "ring1Alpha",
     )
     val ring2Scale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.8f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing, delayMillis = 400),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "ring2"
+        label = "ring2",
     )
     val ring2Alpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing, delayMillis = 400),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Restart,
         ),
-        label = "ring2Alpha"
+        label = "ring2Alpha",
     )
 
     // Dynamic amplitude response
     val amplitudeScale by animateFloatAsState(
         targetValue = 1f + (amplitude * 0.2f),
         animationSpec = tween(50),
-        label = "amplitudeScale"
+        label = "amplitudeScale",
     )
     val iconScale by animateFloatAsState(
         targetValue = if (isActive) 1.08f + (amplitude * 0.08f) else 1f,
         animationSpec = tween(120),
-        label = "iconScale"
+        label = "iconScale",
     )
 
     val buttonSize = 60.dp
@@ -592,7 +611,7 @@ private fun AnimatedMicButton(
 
     Box(
         modifier = modifier.size(90.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         // Expanding rings when active
         if (isActive) {
@@ -600,13 +619,13 @@ private fun AnimatedMicButton(
                 modifier = Modifier
                     .size(buttonSize * ring1Scale)
                     .clip(RoundedCornerShape(cornerRadius.toInt()))
-                    .background(primaryColor.copy(alpha = ring1Alpha))
+                    .background(primaryColor.copy(alpha = ring1Alpha)),
             )
             Box(
                 modifier = Modifier
                     .size(buttonSize * ring2Scale)
                     .clip(RoundedCornerShape(cornerRadius.toInt()))
-                    .background(secondaryColor.copy(alpha = ring2Alpha))
+                    .background(secondaryColor.copy(alpha = ring2Alpha)),
             )
         }
 
@@ -617,14 +636,15 @@ private fun AnimatedMicButton(
                 .clip(RoundedCornerShape(cornerRadius.toInt()))
                 .background(
                     brush = Brush.sweepGradient(
-                        colors = if (isActive)
+                        colors = if (isActive) {
                             listOf(primaryColor, secondaryColor, tertiaryColor, primaryColor)
-                        else
-                            listOf(primaryColor, secondaryColor, primaryColor),
-                        center = Offset(0.5f, 0.5f)
-                    )
+                        } else {
+                            listOf(primaryColor, secondaryColor, primaryColor)
+                        },
+                        center = Offset(0.5f, 0.5f),
+                    ),
                 ),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             // Inner circle for better visual
             Box(
@@ -632,12 +652,13 @@ private fun AnimatedMicButton(
                     .size((buttonSize.value * 0.85f).dp)
                     .clip(RoundedCornerShape((cornerRadius * 0.9f).toInt()))
                     .background(
-                        if (isActive)
+                        if (isActive) {
                             Color.White.copy(alpha = 0.15f)
-                        else
+                        } else {
                             Color.White.copy(alpha = 0.1f)
+                        },
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     FlaticonIcon(
@@ -654,7 +675,7 @@ private fun AnimatedMicButton(
                                 .offset(x = 5.dp, y = (-5).dp)
                                 .size(5.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = (0.25f + ring1Alpha).coerceIn(0f, 1f)))
+                                .background(Color.White.copy(alpha = (0.25f + ring1Alpha).coerceIn(0f, 1f))),
                         )
                         Box(
                             modifier = Modifier
@@ -662,7 +683,7 @@ private fun AnimatedMicButton(
                                 .offset(x = 9.dp, y = 4.dp)
                                 .size(7.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = (0.2f + ring2Alpha).coerceIn(0f, 1f)))
+                                .background(Color.White.copy(alpha = (0.2f + ring2Alpha).coerceIn(0f, 1f))),
                         )
                     }
                 }
@@ -680,7 +701,7 @@ private fun ModernVoiceTestCard(
     amplitude: Float,
     onTestVoice: () -> Unit,
     onStopTest: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val isActive = testState == VoiceTestState.LISTENING || testState == VoiceTestState.PROCESSING
     val haptic = LocalHapticFeedback.current
@@ -813,7 +834,7 @@ private fun ModernVoiceTestCard(
 private fun BubbleSpeakerPad(
     isActive: Boolean,
     amplitude: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val stageStart = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
     val stageEnd = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -826,7 +847,7 @@ private fun BubbleSpeakerPad(
                         stageStart,
                         stageEnd,
                     ),
-                )
+                ),
             ),
     ) {
         Box(
@@ -835,12 +856,12 @@ private fun BubbleSpeakerPad(
                 .fillMaxHeight()
                 .width(maxWidth * 0.43f)
                 .padding(horizontal = 2.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             GoogleHumVisualization(
                 isAnimating = isActive,
                 amplitude = amplitude,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
 

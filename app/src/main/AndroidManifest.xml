@@ -513,6 +513,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Debug receiver to trigger adhan playback via adb -->
+        <receiver
+            android:name=".util.DebugAdhanReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.starception.submission.DEBUG_PLAY_ADHAN" />
+            </intent-filter>
+        </receiver>
+
         <!-- Debug receiver to simulate a prayer alert in PullToSyncContainer via adb -->
         <receiver
             android:name=".util.DebugPrayerAlertReceiver"
@@ -602,6 +611,13 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
+
+        <!-- Adhan Playback Service: owns the prayer-time adhan audio so the user
+             can control its volume and mute it (volume keys / Mute action / tap). -->
+        <service
+            android:name=".prayer.service.AdhanPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Driving Audio Service for travel dua, hadith, and TTS with notification controls -->
         <service

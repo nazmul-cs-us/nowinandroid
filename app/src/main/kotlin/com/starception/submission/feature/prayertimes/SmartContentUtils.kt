@@ -1,79 +1,27 @@
-/**
- * SMART CONTENT UTILS
- * 
- * This file contains intelligent content generation utilities that provide contextual,
- * time-aware content for the Prayer Times feature. It creates dynamic spiritual guidance
- * and progress tracking based on the current time of day and prayer completion status.
- * 
- * WHAT IT DOES:
- * - Generates time-based spiritual content and guidance messages
- * - Provides contextual titles that change throughout the day
- * - Calculates daily prayer completion progress and statistics
- * - Creates motivational messages based on prayer completion status
- * - Offers Islamic spiritual guidance appropriate for different times
- * - Tracks prayer completion metrics and provides encouraging feedback
- * 
- * WHERE IT'S USED:
- * - SwipeableBigTiles.kt: Smart Info Tile and Daily Stats Tile (lines ~490-501)
- * - PrayerTimesScreen.kt: Called indirectly through SwipeableBigTiles component
- * - Replaces ~90 lines of inline smart content generation functions
- * - Called through SmartContentUtils.functionName() static methods
- * 
- * CONTENT CATEGORIES:
- * 
- * TIME-BASED CONTENT:
- * - Morning Focus (5-11 AM): "Start your day with intention and gratitude"
- * - Afternoon Progress (12-17 PM): "Keep Allah in your thoughts as you work"
- * - Evening Reflection (18-22 PM): "Reflect on today's blessings and lessons"
- * - Night Preparation (23-4 AM): "Prepare your heart for tomorrow's opportunities"
- * 
- * PRAYER PROGRESS TRACKING:
- * - Counts completed prayers (prayers whose time has passed)
- * - Calculates progress ratio (completed/total prayers)
- * - Provides encouraging titles based on completion status
- * - Generates motivational messages for remaining prayers
- * 
- * KEY FUNCTIONS:
- * - getSmartTitle(): Returns time-appropriate titles (Morning Focus, etc.)
- * - getSmartContent(): Provides spiritual guidance messages
- * - getSmartFooter(): Shows current prayer context ("In Fajr time", etc.)
- * - getPrayerProgress(): Calculates daily completion (3/5 prayers completed)
- * - getDailyStatsTitle(): Dynamic titles based on progress ("Great Progress!", etc.)
- * - getDailyStatsMessage(): Encouraging messages ("2 prayers remaining today")
- * 
- * PROGRESS STATUS LOGIC:
- * - Perfect Day: All 5 prayers completed
- * - Great Progress: 3+ prayers completed
- * - Keep Going: 1-2 prayers completed
- * - New Day Begins: No prayers completed yet
- * 
- * SPIRITUAL GUIDANCE PRINCIPLES:
- * - Islamic context: References Allah and Islamic concepts appropriately
- * - Positive messaging: Always encouraging and supportive
- * - Time-sensitive: Content changes based on natural daily rhythms
- * - Progress-focused: Celebrates achievements and motivates completion
- * 
- * DATA DEPENDENCIES:
- * - DayPrayerTimes: For calculating prayer completion progress
- * - LocalTime: For time-based content selection and progress tracking
- * - Current/Next prayer data: For contextual footer messages
- * 
- * DESIGN PATTERNS:
- * - Object singleton: All functions are static utility methods
- * - Pure functions: Deterministic output based on input parameters
- * - Islamic UX: Content respects Islamic values and terminology
- * - Motivational design: Always positive and encouraging messaging
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package com.starception.submission.feature.prayertimes
 
-
 import com.starception.submission.prayer.model.DayPrayerTimes
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.Duration
+import java.time.LocalTime
 
 object SmartContentUtils {
-    
+
     // Get smart information based on time of day and prayer status
     fun getSmartTitle(currentTime: LocalTime): String {
         val hour = currentTime.hour
@@ -85,25 +33,25 @@ object SmartContentUtils {
             else -> "Night's Rest"
         }
     }
-    
+
     fun getSmartContent(
         currentTime: LocalTime,
         prayerTimes: DayPrayerTimes? = null,
-        getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null
+        getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null,
     ): String {
         // Use the formatTimeSinceCurrentPrayer function for consistent display
         val timeSinceCurrentPrayer = getMinutesSinceCurrentPrayer(prayerTimes, currentTime, getCurrentPrayer)
         val formatted = formatTimeSinceCurrentPrayer(timeSinceCurrentPrayer)
-        
+
         // If we have time since current prayer data, show it
         if (formatted.isNotEmpty()) {
             return formatted
         }
-        
+
         // Otherwise, fall back to spiritual guidance
         return getFallbackContent(currentTime)
     }
-    
+
     private fun getFallbackContent(currentTime: LocalTime): String {
         // Fallback to time-based spiritual guidance
         val hour = currentTime.hour
@@ -116,10 +64,10 @@ object SmartContentUtils {
         android.util.Log.d("SmartContentUtils", "Returning fallback content: $result")
         return result
     }
-    
+
     fun getSmartFooter(
         currentPrayer: Pair<String, LocalTime>?,
-        nextPrayer: Pair<String, LocalTime>?
+        nextPrayer: Pair<String, LocalTime>?,
     ): String {
         return when {
             currentPrayer != null -> "${currentPrayer.first} time"
@@ -127,26 +75,26 @@ object SmartContentUtils {
             else -> "Be mindful"
         }
     }
-    
+
     // Calculate daily prayer progress
     fun getPrayerProgress(
         prayerTimes: DayPrayerTimes?,
-        currentTime: LocalTime
+        currentTime: LocalTime,
     ): Pair<Int, Int> {
         val times = prayerTimes ?: return Pair(0, 5)
-        
+
         val prayers = listOf(
             "Fajr" to times.fajr,
             "Dhuhr" to times.dhuhr,
             "Asr" to times.asr,
             "Maghrib" to times.maghrib,
-            "Isha" to times.isha
+            "Isha" to times.isha,
         )
-        
+
         val completedCount = prayers.count { it.second.isBefore(currentTime) }
         return Pair(completedCount, 5)
     }
-    
+
     fun getDailyStatsTitle(completed: Int, total: Int): String {
         return when {
             completed == total -> "Alhamdulillah"
@@ -166,7 +114,7 @@ object SmartContentUtils {
             else -> "Begin your day"
         }
     }
-    
+
     /**
      * Calculate minutes since current prayer (optimized to prevent ANRs)
      * Returns positive if current prayer has passed, negative if current prayer is upcoming, null if no prayer times
@@ -174,29 +122,29 @@ object SmartContentUtils {
     fun getMinutesSinceCurrentPrayer(
         prayerTimes: DayPrayerTimes?,
         currentTime: LocalTime,
-        getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null
+        getCurrentPrayer: (() -> Pair<String, LocalTime>?)? = null,
     ): Pair<Int, String>? {
         return try {
             val times = prayerTimes ?: run {
                 android.util.Log.d("SmartPrediction", "❌ No prayer times available")
                 return null
             }
-            
+
             android.util.Log.d("SmartPrediction", "📊 Current time: $currentTime")
             android.util.Log.d("SmartPrediction", "📊 Prayer times - Fajr: ${times.fajr}, Dhuhr: ${times.dhuhr}, Asr: ${times.asr}, Maghrib: ${times.maghrib}, Isha: ${times.isha}")
-            
+
             // First try to get current prayer (within 30-min window)
             val currentPrayer = getCurrentPrayer?.invoke()
-            
+
             if (currentPrayer != null) {
                 // We have a current active prayer
                 val (prayerName, prayerTime) = currentPrayer
                 val duration = Duration.between(prayerTime, currentTime)
                 val minutes = duration.toMinutes().toInt()
-                
+
                 android.util.Log.d("SmartPrediction", "✅ Current active prayer: $prayerName at $prayerTime")
                 android.util.Log.d("SmartPrediction", "⏱️ Minutes since $prayerName: $minutes")
-                
+
                 return when {
                     minutes < -720 -> {
                         android.util.Log.d("SmartPrediction", "⚠️ Minutes < -720, returning null")
@@ -212,24 +160,24 @@ object SmartContentUtils {
                     }
                 }
             }
-            
+
             android.util.Log.d("SmartPrediction", "ℹ️ No current active prayer")
-            
+
             // No current active prayer - determine if we should show last prayer or next prayer
             val allPrayerTimes = listOf(
                 "Fajr" to times.fajr,
                 "Dhuhr" to times.dhuhr,
                 "Asr" to times.asr,
                 "Maghrib" to times.maghrib,
-                "Isha" to times.isha
+                "Isha" to times.isha,
             )
-            
+
             val passedPrayers = allPrayerTimes.filter { (_, time) -> currentTime.isAfter(time) }
             val upcomingPrayers = allPrayerTimes.filter { (_, time) -> currentTime.isBefore(time) }
-            
+
             android.util.Log.d("SmartPrediction", "📋 Passed prayers: ${passedPrayers.map { it.first }}")
             android.util.Log.d("SmartPrediction", "📋 Upcoming prayers: ${upcomingPrayers.map { it.first }}")
-            
+
             // Determine which prayer to show
             val targetPrayer = when {
                 upcomingPrayers.isNotEmpty() -> {
@@ -245,7 +193,7 @@ object SmartContentUtils {
                     val minutesSinceLast = Duration.between(lastPrayer.second, currentTime).toMinutes().toInt()
                     android.util.Log.d("SmartPrediction", "🌙 All prayers passed. Last: ${lastPrayer.first} at ${lastPrayer.second}")
                     android.util.Log.d("SmartPrediction", "⏱️ Minutes since ${lastPrayer.first}: $minutesSinceLast")
-                    
+
                     if (minutesSinceLast <= 180) { // 3 hours
                         android.util.Log.d("SmartPrediction", "✅ Within 3 hours, showing time since ${lastPrayer.first}")
                         lastPrayer
@@ -254,13 +202,13 @@ object SmartContentUtils {
                         val minutesUntilMidnight = Duration.between(currentTime, LocalTime.MAX).toMinutes()
                         val minutesFromMidnightToFajr = Duration.between(LocalTime.MIN, times.fajr).toMinutes()
                         val totalMinutesUntilFajr = (minutesUntilMidnight + minutesFromMidnightToFajr + 1).toInt()
-                        
+
                         android.util.Log.d("SmartPrediction", "🌃 Late night mode activated")
                         android.util.Log.d("SmartPrediction", "⏰ Minutes until midnight: $minutesUntilMidnight")
                         android.util.Log.d("SmartPrediction", "⏰ Minutes from midnight to Fajr: $minutesFromMidnightToFajr")
                         android.util.Log.d("SmartPrediction", "⏰ Total minutes until tomorrow's Fajr: $totalMinutesUntilFajr")
                         android.util.Log.d("SmartPrediction", "✅ Returning: (-$totalMinutesUntilFajr, Fajr)")
-                        
+
                         return Pair(-totalMinutesUntilFajr, "Fajr")
                     }
                 }
@@ -269,7 +217,7 @@ object SmartContentUtils {
                     null
                 }
             }
-            
+
             if (targetPrayer != null) {
                 val (prayerName, prayerTime) = targetPrayer
                 val duration = if (currentTime.isBefore(prayerTime)) {
@@ -282,10 +230,10 @@ object SmartContentUtils {
                 } else {
                     duration.toMinutes().toInt() // Positive for passed prayers
                 }
-                
+
                 android.util.Log.d("SmartPrediction", "🎯 Target prayer: $prayerName at $prayerTime")
                 android.util.Log.d("SmartPrediction", "⏱️ Calculated minutes: $minutes")
-                
+
                 return when {
                     minutes < -720 -> {
                         android.util.Log.d("SmartPrediction", "⚠️ Minutes < -720, returning null")
@@ -301,7 +249,7 @@ object SmartContentUtils {
                     }
                 }
             }
-            
+
             android.util.Log.d("SmartPrediction", "❌ No target prayer determined, returning null")
             return null
         } catch (e: Exception) {
@@ -309,7 +257,7 @@ object SmartContentUtils {
             null // Return null on any error
         }
     }
-    
+
     /**
      * Format minutes since current prayer for display (optimized to prevent ANRs)
      */
@@ -339,7 +287,7 @@ object SmartContentUtils {
             "" // Return empty on any error to prevent crashes
         }
     }
-    
+
     /**
      * @deprecated Use getMinutesSinceCurrentPrayer instead
      * Calculate minutes since Asr prayer (optimized to prevent ANRs)
@@ -348,26 +296,26 @@ object SmartContentUtils {
     @Deprecated("Use getMinutesSinceCurrentPrayer instead")
     fun getMinutesSinceAsr(
         prayerTimes: DayPrayerTimes?,
-        currentTime: LocalTime
+        currentTime: LocalTime,
     ): Int? {
         return try {
             val times = prayerTimes ?: return null
-            
+
             // Calculate duration from Asr to current time with error handling
             val duration = Duration.between(times.asr, currentTime)
             val minutes = duration.toMinutes().toInt()
-            
+
             // Limit to reasonable range to prevent display issues
             return when {
                 minutes < -720 -> null // More than 12 hours before Asr - don't show
-                minutes > 720 -> null  // More than 12 hours after Asr - don't show
+                minutes > 720 -> null // More than 12 hours after Asr - don't show
                 else -> minutes
             }
         } catch (e: Exception) {
             null // Return null on any error
         }
     }
-    
+
     /**
      * @deprecated Use formatTimeSinceCurrentPrayer instead
      * Format minutes since Asr for display (optimized to prevent ANRs)
@@ -395,15 +343,15 @@ object SmartContentUtils {
             "" // Return empty on any error to prevent crashes
         }
     }
-    
+
     /**
      * Get notification-synchronized prayer content
      * Returns the exact same text that appears in prayer time notifications
      * This ensures consistency between the Smart Prediction tile and notifications
-     * 
+     *
      * IMPORTANT: This function uses ADJUSTED prayer times (base + user offsets).
      * This matches the small tiles display and ensures consistency across the UI.
-     * 
+     *
      * @param prayerTimes BASE prayer times (DayPrayerTimes contains astronomical times only, no offsets)
      * @param currentTime Current local time
      * @param timeOffsets User offset adjustments to apply to base times
@@ -441,7 +389,7 @@ object SmartContentUtils {
                 "Dhuhr" to adjustedDhuhr,
                 "Asr" to adjustedAsr,
                 "Maghrib" to adjustedMaghrib,
-                "Isha" to adjustedIsha
+                "Isha" to adjustedIsha,
             )
 
             // Find current prayer (the most recent prayer that has passed TODAY)
@@ -487,7 +435,7 @@ object SmartContentUtils {
                 isNextPrayerTomorrow = false
             } else {
                 // All prayers passed, next is tomorrow's Fajr
-                nextPrayer = allPrayers.first()  // Fajr
+                nextPrayer = allPrayers.first() // Fajr
                 isNextPrayerTomorrow = true
             }
 
@@ -540,14 +488,16 @@ object SmartContentUtils {
                     }
                     val nextFormatted = formatNotificationTimeRemaining(timeUntilNext)
                     "Next • ${getPrayerDisplayName(nextName)} in $nextFormatted"
-                } else ""
+                } else {
+                    ""
+                }
 
                 android.util.Log.d("SmartPrediction", "📝 Next prayer info: $nextPrayerText")
 
                 return NotificationSyncContent(
                     title = title,
                     content = content,
-                    nextPrayerInfo = nextPrayerText
+                    nextPrayerInfo = nextPrayerText,
                 )
             }
 
@@ -557,7 +507,7 @@ object SmartContentUtils {
             null
         }
     }
-    
+
     /**
      * Format elapsed time exactly like the notification service
      * Uses "minutes" spelled out for < 60 minutes, abbreviated for >= 60 minutes
@@ -577,7 +527,7 @@ object SmartContentUtils {
             }
         }
     }
-    
+
     /**
      * Format time remaining exactly like the notification service
      */
@@ -601,9 +551,9 @@ object SmartContentUtils {
  */
 data class NotificationSyncContent(
     // e.g., "Best Time to Pray Fajr"
-    val title: String,          
+    val title: String,
     // e.g., "6h 51m since Fajr"
-    val content: String,        
+    val content: String,
     // e.g., "Next • Dhuhr in 2h 15m"
-    val nextPrayerInfo: String  
+    val nextPrayerInfo: String,
 )

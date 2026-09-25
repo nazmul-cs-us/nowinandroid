@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.starception.submission.core.qurandatabase
 
 import android.content.Context
@@ -23,7 +39,7 @@ import com.starception.submission.download.AssetRepository
 @Database(
     entities = [QuranEnhancedEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class QuranEnhancedDatabase : RoomDatabase() {
 
@@ -44,7 +60,7 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
                 val builder = Room.databaseBuilder(
                     context.applicationContext,
                     QuranEnhancedDatabase::class.java,
-                    DATABASE_NAME
+                    DATABASE_NAME,
                 )
 
                 // Try CDN/extracted file first, fall back to bundled asset
@@ -63,7 +79,7 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
                             super.onCreate(db)
                             android.util.Log.d(
                                 "QuranEnhancedDB",
-                                "✅ Enhanced Quran database created successfully"
+                                "✅ Enhanced Quran database created successfully",
                             )
                         }
 
@@ -71,7 +87,7 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
                             super.onOpen(db)
                             android.util.Log.d(
                                 "QuranEnhancedDB",
-                                "📖 Enhanced Quran database opened"
+                                "📖 Enhanced Quran database opened",
                             )
                             // Log database info
                             logDatabaseInfo(db)
@@ -111,7 +127,6 @@ abstract class QuranEnhancedDatabase : RoomDatabase() {
                     android.util.Log.d("QuranEnhancedDB", "📄 Total Pages: $count")
                 }
                 pageCursor.close()
-
             } catch (e: Exception) {
                 android.util.Log.e("QuranEnhancedDB", "❌ Error logging database info", e)
             }
