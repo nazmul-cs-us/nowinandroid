@@ -118,6 +118,16 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
                     audioDownloadHelper.resolveFortressAudioUrlToLocalPath(url)
                 }
 
+                // Bridge core/ui's surah news cards to the CDN-downloaded chapter
+                // artwork (the art is no longer bundled — it alone was ~60 MB).
+                // A null return keeps the bundled placeholder.
+                com.starception.submission.core.ui.SurahArtworkBridge.artworkFileResolver =
+                    { surahNumber ->
+                        com.starception.submission.feature.quran.SurahArtworkResolver
+                            .from(this)
+                            .resolveArtworkFile(surahNumber)
+                    }
+
                 // Bridge ChapterAudioController <-> GlobalMediaViewModel so Fortress chapter
                 // playback surfaces the shared media mini-bar with a progress sweep (like Surah/
                 // Hadith). core/ui can't reference the app-module media layer, so wire it here.

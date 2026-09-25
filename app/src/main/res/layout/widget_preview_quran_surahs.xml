@@ -73,7 +73,7 @@
             android:clipToOutline="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/surah_001_al_fatihah" />
+            android:src="@drawable/insight_quran" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -127,7 +127,7 @@
             android:clipToOutline="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/surah_002_al_baqarah" />
+            android:src="@drawable/insight_quran" />
 
         <LinearLayout
             android:layout_width="0dp"

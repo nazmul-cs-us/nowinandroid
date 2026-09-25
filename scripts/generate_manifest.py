@@ -66,6 +66,7 @@ CATEGORY_RULES = [
     ("databases/hadith/muwatta_malik.db", "hadith_muwatta_malik"),
     ("databases/hadith/sunan_darimi.db", "hadith_sunan_darimi"),
     ("databases/news.db", "news"),
+    ("surah_artwork/", "surah_artwork"),
     ("audio/fortress/arabic", "fortress_audio_arabic"),
     ("databases/fortress_of_the_muslim", "dua"),
     ("databases/quranic_duas.db", "dua"),

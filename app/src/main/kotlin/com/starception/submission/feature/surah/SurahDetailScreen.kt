@@ -144,6 +144,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import coil.compose.rememberAsyncImagePainter
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
@@ -170,7 +171,8 @@ import com.starception.submission.feature.course.CourseCompletionInfo
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranPlaybackService
-import com.starception.submission.feature.quran.surahArtworkRes
+import com.starception.submission.feature.quran.SurahArtwork
+import com.starception.submission.feature.quran.SurahArtworkResolver
 import com.starception.submission.util.toLocalizedDigits
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
 import dagger.hilt.android.EntryPointAccessors
@@ -4301,7 +4303,18 @@ private fun AlbumHeader(
     scrollOffset: Int = 0,
 ) {
     // Reuse the exact chapter-specific artwork shown by the Quran Grid widget.
-    val artwork = remember(surah.number) { surahArtworkRes(surah.number) }
+    // The art ships from the CDN (not bundled; it alone was ~60 MB) and is
+    // downloaded on demand, showing the bundled placeholder until then.
+    val artworkContext = androidx.compose.ui.platform.LocalContext.current
+    val artworkResolver = remember { SurahArtworkResolver.from(artworkContext) }
+    var artworkFile by remember(surah.number) {
+        mutableStateOf(artworkResolver.resolveArtworkFile(surah.number))
+    }
+    androidx.compose.runtime.LaunchedEffect(surah.number) {
+        if (artworkFile == null) {
+            artworkFile = artworkResolver.ensureArtworkDownloaded(surah.number)
+        }
+    }
 
     // Parallax factor - image moves at 0.4x the scroll speed for depth effect
     val parallaxOffset = scrollOffset * 0.4f
@@ -4324,7 +4337,13 @@ private fun AlbumHeader(
     ) {
         // Album cover image with parallax effect
         Image(
-            painter = painterResource(artwork),
+            painter = if (artworkFile != null) {
+                rememberAsyncImagePainter(
+                    model = artworkFile,
+                )
+            } else {
+                painterResource(SurahArtwork.PLACEHOLDER)
+            },
             contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
             modifier = Modifier
                 .fillMaxSize()

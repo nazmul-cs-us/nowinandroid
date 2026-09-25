@@ -21,13 +21,13 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Log
-import androidx.annotation.DrawableRes
 import androidx.glance.GlanceId
 import coil.ImageLoader
 import coil.request.ErrorResult
 import coil.request.ImageRequest
 import com.starception.submission.feature.quran.QuranData
-import com.starception.submission.feature.quran.surahArtworkRes
+import com.starception.submission.feature.quran.SurahArtwork
+import com.starception.submission.feature.quran.SurahArtworkResolver
 import com.starception.submission.widget.samples.collections.layout.ImageGridItemData
 import com.starception.submission.widget.samples.utils.AspectRatio
 import com.starception.submission.widget.samples.utils.AspectRatio.Companion.asDouble
@@ -98,9 +98,16 @@ class FakeImageGridDataRepository {
                 async(Dispatchers.IO) {
                     var bitmap: Bitmap? = null
 
+                    // Chapter artwork ships from the CDN; use the cached file when
+                    // present and the bundled placeholder otherwise.
+                    val artworkFile = runCatching {
+                        SurahArtworkResolver.from(context).resolveArtworkFile(item.surahNumber)
+                    }.getOrNull()
+                    val imageData: Any = artworkFile ?: SurahArtwork.PLACEHOLDER
+
                     val result = ImageLoader(context).execute(
                         ImageRequest.Builder(context)
-                            .data(item.imageRes)
+                            .data(imageData)
                             .size(width, height)
                             .target { res: Drawable ->
                                 bitmap = (res as BitmapDrawable).bitmap
@@ -128,7 +135,7 @@ class FakeImageGridDataRepository {
 
     private data class ImageGridItemBackendData(
         val key: String,
-        @DrawableRes val imageRes: Int,
+        val surahNumber: Int,
         val imageContentDescription: String?,
         val title: String? = null,
         val supportingText: String? = null,
@@ -154,7 +161,7 @@ class FakeImageGridDataRepository {
         private val demoItems = QuranData.surahs.mapIndexed { index, surah ->
             ImageGridItemBackendData(
                 key = surah.number.toString(),
-                imageRes = surahArtworkRes(surah.number),
+                surahNumber = surah.number,
                 imageContentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
                 title = "Surah ${surah.nameEnglish}",
                 supportingText = "${ayahCounts[index]} ayahs · ${surah.revelationType}",

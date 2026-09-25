@@ -78,7 +78,7 @@
                 android:clipToOutline="true"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
-                android:src="@drawable/surah_001_al_fatihah" />
+                android:src="@drawable/insight_quran" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -109,7 +109,7 @@
                 android:clipToOutline="true"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
-                android:src="@drawable/surah_002_al_baqarah" />
+                android:src="@drawable/insight_quran" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -148,7 +148,7 @@
                 android:clipToOutline="true"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
-                android:src="@drawable/surah_018_al_kahf" />
+                android:src="@drawable/insight_quran" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -179,7 +179,7 @@
                 android:clipToOutline="true"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
-                android:src="@drawable/surah_036_ya_sin" />
+                android:src="@drawable/insight_quran" />
 
             <TextView
                 android:layout_width="match_parent"

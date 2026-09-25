@@ -256,6 +256,18 @@ private fun ChapterPlayButton(audioUrl: String, title: String) {
     }
 }
 
+/**
+ * Bridge for core/ui to reach the app module's surah artwork without a
+ * dependency on the download system (same pattern as ChapterAudioController).
+ * The artwork ships from the CDN and is not bundled; the app module resolves a
+ * downloaded chapter artwork file on demand. While a chapter's art has not been
+ * downloaded, callers fall back to the bundled placeholder.
+ */
+object SurahArtworkBridge {
+    /** Returns the locally downloaded artwork file for a surah number, or null. */
+    var artworkFileResolver: ((Int) -> java.io.File?)? = null
+}
+
 @Composable
 fun NewsResourceHeaderImage(
     headerImageUrl: String?,
@@ -283,6 +295,20 @@ fun NewsResourceHeaderImage(
         }
     }
 
+    // Surah artwork moved to the CDN (its 60 MB was cut from the APK). Resolve
+    // the downloaded file through the app-module bridge; fall back to the
+    // bundled placeholder while a chapter's art has not been fetched.
+    val surahArtworkFile = remember(drawableResId, headerImageUrl) {
+        if (isDrawableResource && drawableResId == null) {
+            val name = headerImageUrl?.substringAfter("drawable://").orEmpty()
+            val surahNumber = Regex("surah_(\\d{3})").find(name)
+                ?.groupValues?.get(1)?.toIntOrNull()
+            surahNumber?.let { SurahArtworkBridge.artworkFileResolver?.invoke(it) }
+        } else {
+            null
+        }
+    }
+
     // Decode at the rendered card size instead of materializing each 2560x1440
     // master bitmap on the main thread. Coil performs this work off-thread and
     // caches the downsampled result for subsequent cards/scrolls.
@@ -291,10 +317,12 @@ fun NewsResourceHeaderImage(
     val imageRequest = remember(
         headerImageUrl,
         drawableResId,
+        surahArtworkFile,
         targetWidthPx,
         targetHeightPx,
     ) {
-        val model = if (isDrawableResource) drawableResId else headerImageUrl
+        val model = surahArtworkFile
+            ?: if (isDrawableResource) drawableResId else headerImageUrl
         model?.let {
             ImageRequest.Builder(context)
                 .data(it)

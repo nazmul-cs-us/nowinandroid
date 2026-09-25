@@ -114,7 +114,9 @@ android {
         // downloads them on demand into cdn_assets/. Bundling them would (a) bloat the APK
         // ~68 MB and (b) make AssetDownloadManager.isAssetBundled() short-circuit the
         // on-demand download so files never cache and the sync banner never shows.
-        ignoreAssetsPattern = "!audio"
+        // Surah artwork ships from the CDN on demand (see SurahArtworkResolver);
+        // it is staged under src/main/assets for the R2 upload only.
+        ignoreAssetsPattern = "!audio:!surah_artwork"
     }
     testOptions.unitTests.isIncludeAndroidResources = true
     // android.util.Log is an unimplemented stub on the JVM and throws by default,
