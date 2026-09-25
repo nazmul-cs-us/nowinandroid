@@ -166,7 +166,7 @@ jobs:
     timeout-minutes: 55
     strategy:
       matrix:
-        api-level: [26, 34]
+        api-level: [28, 34]  # app minSdk is 28; API 26 emulator cannot install the app
 
     steps:
       - name: Delete unnecessary tools 🔧
@@ -218,13 +218,13 @@ jobs:
           script: ./gradlew connectedDemoDebugAndroidTest --daemon
 
       - name: Run local tests (including Roborazzi) for the combined coverage report (only API 30)
-        if: matrix.api-level == 30
+        if: matrix.api-level == 34
         # There is no need to verify Roborazzi tests to generate coverage.
         run: ./gradlew testDemoDebugUnitTest -Proborazzi.test.verify=false # Add Prod if we ever add JVM tests for prod
 
       # Add `createProdDebugUnitTestCoverageReport` if we ever add JVM tests for prod
       - name: Generate coverage reports for Debug variants (only API 30)
-        if: matrix.api-level == 30
+        if: matrix.api-level == 34
         run: ./gradlew createDemoDebugCombinedCoverageReport
         
       - name: Upload test reports
@@ -235,7 +235,7 @@ jobs:
           path: '**/build/reports/androidTests'
 
       - name: Display local test coverage (only API 30)
-        if: matrix.api-level == 30
+        if: matrix.api-level == 34
         id: jacoco
         uses: madrapps/jacoco-report@v1.7.1
         with:
@@ -247,7 +247,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Upload local coverage reports (XML + HTML) (only API 30)
-        if: matrix.api-level == 30
+        if: matrix.api-level == 34
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
