@@ -29,7 +29,7 @@ import kotlin.test.assertEquals
 internal class NewsResourceDaoTest : DatabaseTest() {
 
     @Test
-    fun getNewsResources_allEntries_areOrderedByPublishDateDesc() = runTest {
+    fun getNewsResources_allEntries_areOrderedByNumericIdAsc() = runTest {
         val newsResourceEntities = listOf(
             testNewsResource(
                 id = "0",
@@ -55,8 +55,10 @@ internal class NewsResourceDaoTest : DatabaseTest() {
         val savedNewsResourceEntities = newsResourceDao.getNewsResources()
             .first()
 
+        // The DAO orders by CAST(id AS INTEGER) ASC (surah order for the Quran
+        // news cards); ids 0..3 carry publishDates 0,3,1,2.
         assertEquals(
-            listOf(3L, 2L, 1L, 0L),
+            listOf(0L, 3L, 1L, 2L),
             savedNewsResourceEntities.map {
                 it.asExternalModel().publishDate.toEpochMilliseconds()
             },
@@ -64,7 +66,7 @@ internal class NewsResourceDaoTest : DatabaseTest() {
     }
 
     @Test
-    fun getNewsResources_filteredById_areOrderedByDescendingPublishDate() = runTest {
+    fun getNewsResources_filteredById_areOrderedByNumericIdAsc() = runTest {
         val newsResourceEntities = listOf(
             testNewsResource(
                 id = "0",
@@ -93,8 +95,9 @@ internal class NewsResourceDaoTest : DatabaseTest() {
         )
             .first()
 
+        // Ordered by CAST(id AS INTEGER) ASC, so 0 comes before 3.
         assertEquals(
-            listOf("3", "0"),
+            listOf("0", "3"),
             savedNewsResourceEntities.map {
                 it.entity.id
             },
@@ -102,7 +105,7 @@ internal class NewsResourceDaoTest : DatabaseTest() {
     }
 
     @Test
-    fun getNewsResources_filteredByTopicId_areOrderedByDescendingPublishDate() = runTest {
+    fun getNewsResources_filteredByTopicId_areOrderedByNumericIdAsc() = runTest {
         val topicEntities = listOf(
             testTopicEntity(
                 id = "1",
@@ -155,8 +158,9 @@ internal class NewsResourceDaoTest : DatabaseTest() {
                 .toSet(),
         ).first()
 
+        // Ordered by CAST(id AS INTEGER) ASC, so 0 comes before 1.
         assertEquals(
-            listOf("1", "0"),
+            listOf("0", "1"),
             filteredNewsResources.map { it.entity.id },
         )
     }
