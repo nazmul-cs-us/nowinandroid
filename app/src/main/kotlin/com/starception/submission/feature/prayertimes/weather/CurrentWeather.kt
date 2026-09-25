@@ -202,6 +202,139 @@ object CurrentWeatherRepository {
     private const val STALE_CACHE_LIMIT_MS = 6 * 60 * 60 * 1_000L
     private const val TAG = "CurrentWeather"
 
+    private const val PREFS_NAME = "weather_cache"
+    private const val KEY_CURRENT = "current_cache_json"
+    private const val KEY_FORECAST = "forecast_cache_json"
+
+    /** Set from Application.onCreate so the cache survives process restarts. */
+    @Volatile
+    private var appContext: Context? = null
+
+    fun attach(context: Context) {
+        if (appContext == null) appContext = context.applicationContext
+    }
+
+    private fun prefs() = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    @kotlinx.serialization.Serializable
+    private data class WeatherWire(
+        val temp: Double,
+        val precip: Int = 0,
+        val humidity: Int = 0,
+        val code: Int = 0,
+        val day: Boolean = true,
+        val apparent: Double? = null,
+    )
+
+    @kotlinx.serialization.Serializable
+    private data class CurrentCacheWire(
+        val lat: Int,
+        val lon: Int,
+        val at: Long,
+        val w: WeatherWire,
+    )
+
+    @kotlinx.serialization.Serializable
+    private data class ForecastItemWire(
+        val t: String,
+        val temp: Double,
+        val precip: Int,
+        val humidity: Int,
+        val code: Int,
+    )
+
+    @kotlinx.serialization.Serializable
+    private data class ForecastCacheWire(
+        val lat: Int,
+        val lon: Int,
+        val at: Long,
+        val items: List<ForecastItemWire>,
+    )
+
+    private fun loadPersistedCurrentCache(): CacheEntry? {
+        val json = prefs()?.getString(KEY_CURRENT, null) ?: return null
+        return runCatching {
+            val wire = kotlinx.serialization.json.Json.decodeFromString<CurrentCacheWire>(json)
+            CacheEntry(
+                latitudeBucket = wire.lat,
+                longitudeBucket = wire.lon,
+                weather = CurrentWeather(
+                    temperatureCelsius = wire.w.temp,
+                    precipitationProbability = wire.w.precip,
+                    relativeHumidity = wire.w.humidity,
+                    weatherCode = wire.w.code,
+                    isDay = wire.w.day,
+                    apparentTemperatureCelsius = wire.w.apparent,
+                ),
+                fetchedAtMillis = wire.at,
+            )
+        }.onFailure { Log.w(TAG, "Unable to restore persisted weather cache", it) }.getOrNull()
+    }
+
+    private fun persistCurrentCache(entry: CacheEntry) {
+        val wire = CurrentCacheWire(
+            lat = entry.latitudeBucket,
+            lon = entry.longitudeBucket,
+            at = entry.fetchedAtMillis,
+            w = WeatherWire(
+                temp = entry.weather.temperatureCelsius,
+                precip = entry.weather.precipitationProbability,
+                humidity = entry.weather.relativeHumidity,
+                code = entry.weather.weatherCode,
+                day = entry.weather.isDay,
+                apparent = entry.weather.apparentTemperatureCelsius,
+            ),
+        )
+        prefs()?.edit()?.putString(
+            KEY_CURRENT,
+            kotlinx.serialization.json.Json.encodeToString(wire),
+        )?.apply()
+    }
+
+    private fun loadPersistedForecastCache(): ForecastCacheEntry? {
+        val json = prefs()?.getString(KEY_FORECAST, null) ?: return null
+        return runCatching {
+            val wire = kotlinx.serialization.json.Json.decodeFromString<ForecastCacheWire>(json)
+            ForecastCacheEntry(
+                latitudeBucket = wire.lat,
+                longitudeBucket = wire.lon,
+                fetchedAtMillis = wire.at,
+                forecasts = wire.items.mapNotNull { item ->
+                    val dateTime = runCatching { LocalDateTime.parse(item.t) }.getOrNull()
+                        ?: return@mapNotNull null
+                    PrayerWeatherForecast(
+                        dateTime = dateTime,
+                        temperatureCelsius = item.temp,
+                        precipitationProbability = item.precip,
+                        relativeHumidity = item.humidity,
+                        weatherCode = item.code,
+                    )
+                },
+            )
+        }.onFailure { Log.w(TAG, "Unable to restore persisted forecast cache", it) }.getOrNull()
+    }
+
+    private fun persistForecastCache(entry: ForecastCacheEntry) {
+        val wire = ForecastCacheWire(
+            lat = entry.latitudeBucket,
+            lon = entry.longitudeBucket,
+            at = entry.fetchedAtMillis,
+            items = entry.forecasts.map {
+                ForecastItemWire(
+                    t = it.dateTime.toString(),
+                    temp = it.temperatureCelsius,
+                    precip = it.precipitationProbability,
+                    humidity = it.relativeHumidity,
+                    code = it.weatherCode,
+                )
+            },
+        )
+        prefs()?.edit()?.putString(
+            KEY_FORECAST,
+            kotlinx.serialization.json.Json.encodeToString(wire),
+        )?.apply()
+    }
+
     private data class CacheEntry(
         val latitudeBucket: Int,
         val longitudeBucket: Int,
@@ -227,6 +360,11 @@ object CurrentWeatherRepository {
             val latitudeBucket = (latitude * 100).toInt()
             val longitudeBucket = (longitude * 100).toInt()
             val now = System.currentTimeMillis()
+            // Seed from the persisted cache so a fresh (offline) launch still
+            // serves the last known conditions, mirroring the location cache.
+            if (cache == null) {
+                loadPersistedCurrentCache()?.let { cache = it }
+            }
             val cached = cache
             val sameArea = cached?.latitudeBucket == latitudeBucket &&
                 cached.longitudeBucket == longitudeBucket
@@ -289,6 +427,7 @@ object CurrentWeatherRepository {
                     weather = weather,
                     fetchedAtMillis = now,
                 )
+                persistCurrentCache(cache!!)
                 weather
             } catch (error: Exception) {
                 Log.w(TAG, "Unable to load current conditions", error)
@@ -369,6 +508,11 @@ object CurrentWeatherRepository {
         val latitudeBucket = (latitude * 100).toInt()
         val longitudeBucket = (longitude * 100).toInt()
         val now = System.currentTimeMillis()
+        // Seed from the persisted cache so a fresh (offline) launch still has
+        // per-prayer weather insights.
+        if (forecastCache == null) {
+            loadPersistedForecastCache()?.let { forecastCache = it }
+        }
         val cached = forecastCache
         val sameArea = cached?.latitudeBucket == latitudeBucket &&
             cached.longitudeBucket == longitudeBucket
@@ -447,6 +591,7 @@ object CurrentWeatherRepository {
                 forecasts = forecasts,
                 fetchedAtMillis = now,
             )
+            persistForecastCache(forecastCache!!)
             forecasts
         } catch (error: Exception) {
             Log.w(TAG, "Unable to load hourly prayer forecast", error)

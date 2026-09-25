@@ -2065,6 +2065,35 @@ fun PrayerTimesScreen(
                                 // slider in the tile.
                                 if (prayerTimeEditMode && prayerName != "Sunrise") {
                                     val tileContext = LocalContext.current
+                                    // The adhan plays on the system notification stream, so a
+                                    // stream volume of 0 means it would be silent: the speaker
+                                    // must show the muted state even while the adhan is enabled.
+                                    val notificationVolume = remember {
+                                        val am = tileContext.getSystemService(
+                                            Context.AUDIO_SERVICE,
+                                        ) as android.media.AudioManager
+                                        androidx.compose.runtime.mutableIntStateOf(
+                                            am.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION),
+                                        )
+                                    }
+                                    androidx.compose.runtime.DisposableEffect(prayerName) {
+                                        val receiver = object : android.content.BroadcastReceiver() {
+                                            override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
+                                                val am = tileContext.getSystemService(
+                                                    Context.AUDIO_SERVICE,
+                                                ) as android.media.AudioManager
+                                                notificationVolume.intValue = am.getStreamVolume(
+                                                    android.media.AudioManager.STREAM_NOTIFICATION,
+                                                )
+                                            }
+                                        }
+                                        tileContext.registerReceiver(
+                                            receiver,
+                                            android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+                                        )
+                                        onDispose { tileContext.unregisterReceiver(receiver) }
+                                    }
+                                    val adhanAudible = adhanEnabled && notificationVolume.intValue > 0
                                     Box(
                                         modifier = Modifier
                                             .padding(bottom = 2.dp)
@@ -2096,21 +2125,22 @@ fun PrayerTimesScreen(
                                             },
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        // Flaticon sound icons (14925297 on / 14925198 muted)
+                                        // Flaticon sound icons (14925297 on / 14925198 muted).
+                                        // A silent stream (volume 0) shows the muted speaker.
                                         Icon(
                                             painter = androidx.compose.ui.res.painterResource(
-                                                if (adhanEnabled) {
+                                                if (adhanAudible) {
                                                     R.drawable.flaticon_sound_14925297
                                                 } else {
                                                     R.drawable.flaticon_sound_14925198
                                                 },
                                             ),
-                                            contentDescription = if (adhanEnabled) {
-                                                "Mute adhan for $prayerName"
-                                            } else {
-                                                "Enable adhan for $prayerName"
+                                            contentDescription = when {
+                                                adhanAudible -> "Mute adhan for $prayerName"
+                                                adhanEnabled -> "Adhan for $prayerName is silent — raise the volume"
+                                                else -> "Enable adhan for $prayerName"
                                             },
-                                            tint = if (adhanEnabled) {
+                                            tint = if (adhanAudible) {
                                                 MaterialTheme.colorScheme.primary
                                             } else {
                                                 MaterialTheme.colorScheme.onSurfaceVariant

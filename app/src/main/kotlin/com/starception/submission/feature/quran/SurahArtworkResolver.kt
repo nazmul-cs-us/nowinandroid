@@ -39,22 +39,31 @@ class SurahArtworkResolver(private val downloadManager: AssetDownloadManager) {
     /**
      * Ensures the artwork for [surahNumber] exists locally, downloading it from
      * the CDN when needed. Returns the file once available (or null when the
-     * download fails or the prayer number has no artwork).
+     * download fails or the surah number has no artwork).
      */
-    suspend fun ensureArtworkDownloaded(surahNumber: Int): File? {
+    suspend fun ensureArtworkDownloaded(surahNumber: Int): java.io.File? {
         resolveArtworkFile(surahNumber)?.let { return it }
-        val cdnKey = SurahArtwork.cdnKey(surahNumber) ?: return null
-        val manifest = downloadManager.loadManifest() ?: return null
-        // A manifest entry can be absent right after an app update ships the
-        // new category but the CDN manifest hasn't been replaced yet.
-        if (!manifest.assets.containsKey(cdnKey)) return null
-        return when (downloadManager.downloadAsset(cdnKey, manifest)) {
+        val cdnKey = SurahArtwork.cdnKey(surahNumber) ?: run {
+            android.util.Log.w(TAG, "No CDN key for surah $surahNumber")
+            return null
+        }
+        val manifest = downloadManager.loadManifest() ?: run {
+            android.util.Log.w(TAG, "Manifest unavailable (offline or parse failure); cannot fetch $cdnKey")
+            return null
+        }
+        android.util.Log.i(TAG, "Downloading artwork $cdnKey (in manifest: ${manifest.assets.containsKey(cdnKey)})")
+        return when (val state = downloadManager.downloadAsset(cdnKey, manifest)) {
             is AssetDownloadManager.DownloadState.Completed -> resolveArtworkFile(surahNumber)
-            else -> null
+            else -> {
+                android.util.Log.w(TAG, "Artwork download failed for $cdnKey: $state")
+                null
+            }
         }
     }
 
     companion object {
+        private const val TAG = "SurahArtworkResolver"
+
         fun from(context: Context): SurahArtworkResolver =
             SurahArtworkResolver(
                 dagger.hilt.android.EntryPointAccessors.fromApplication(

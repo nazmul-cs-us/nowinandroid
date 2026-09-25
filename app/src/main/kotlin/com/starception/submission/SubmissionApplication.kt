@@ -75,6 +75,9 @@ class SubmissionApplication : Application(), ImageLoaderFactory {
         // Initialize FileLogger for prayer/adhan debugging
         FileLogger.init(this)
         FileLogger.i("SubmissionApplication", "Application onCreate started - FileLogger initialized")
+        // Disk-backed weather cache so a fresh offline launch still shows the
+        // last known conditions next to the cached location.
+        com.starception.submission.feature.prayertimes.weather.CurrentWeatherRepository.attach(this)
 
         // Initialize Prayer Tracker for tracking completed prayers
         com.starception.submission.util.PrayerTracker.initialize(this)

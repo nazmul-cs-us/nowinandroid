@@ -4342,7 +4342,9 @@ private fun AlbumHeader(
                     model = artworkFile,
                 )
             } else {
-                painterResource(SurahArtwork.PLACEHOLDER)
+                // Bundled fallback while the chapter's CDN artwork downloads.
+                // Direct R reference — no cross-class constant indirection.
+                painterResource(R.drawable.insight_quran)
             },
             contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
             modifier = Modifier
