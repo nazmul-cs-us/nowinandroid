@@ -150,7 +150,13 @@ internal object DailyReminderRepository {
 
             var found: DailyReminder? = null
             for (number in candidates) {
-                val hadith = repository.getHadith(BUKHARI_DB, number)
+                // The collection DB can be absent (not yet downloaded); the
+                // repository throws for that. This runs inside the widget, where
+                // nothing can surface a download prompt, so treat it like a
+                // missing hadith — stop and fall back to the dua.
+                val hadith = runCatching {
+                    repository.getHadith(BUKHARI_DB, number)
+                }.getOrNull()
                 // A lookup that fails is a database problem, not a verdict on this hadith.
                 // Moving on would make the selection depend on database health; stopping lets
                 // the caller fall through to the dua, which is honest and still deterministic.

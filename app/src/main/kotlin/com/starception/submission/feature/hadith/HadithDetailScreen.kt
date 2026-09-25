@@ -709,7 +709,13 @@ fun HadithDetailScreen(
             while (playlistIndex < playlistOrder.size) {
                 if (!bookPlaylistEnabled) break
                 val number = playlistOrder[playlistIndex]
-                val nextHadith = repository.getHadith(databaseFile, number)
+                // The collection DB may not be downloaded yet — HadithDatabase
+                // throws IllegalStateException for a missing file. Treat that
+                // like a missing hadith and skip on instead of crashing the
+                // playlist effect.
+                val nextHadith = runCatching {
+                    repository.getHadith(databaseFile, number)
+                }.getOrNull()
                 if (nextHadith == null) {
                     playlistIndex += 1
                     continue
@@ -761,7 +767,9 @@ fun HadithDetailScreen(
                         EnglishTtsTextNormalizer.bukhariIntro(upcoming)
                     } else {
                         val nextEnglishText = bukhariTranslationRepo.getEnglishText(upcoming)
-                            ?: repository.getHadith(databaseFile, upcoming)?.textPlain
+                            ?: runCatching {
+                                repository.getHadith(databaseFile, upcoming)
+                            }.getOrNull()?.textPlain
                         nextEnglishText?.let {
                             "${EnglishTtsTextNormalizer.bukhariIntro(upcoming)} $it"
                         }
