@@ -113,6 +113,10 @@ class AdhanPlaybackService : Service() {
                     .build(),
             )
             // Any volume-key press while the adhan plays silences it.
+            // onSetVolumeTo must ignore the system's session-activation
+            // volume sync (it re-asserts the current value, not a user
+            // action) — treating it as a mute request killed playback
+            // ~6ms after start.
             setPlaybackToRemote(
                 object : VolumeProviderCompat(
                     VOLUME_CONTROL_ABSOLUTE,
@@ -120,13 +124,26 @@ class AdhanPlaybackService : Service() {
                     MAX_VOLUME,
                 ) {
                     override fun onAdjustVolume(direction: Int) {
-                        Log.d(TAG, "Volume key pressed during adhan — muting")
-                        mute()
+                        // direction == 0 is the volume panel opening (ADJUST_SAME)
+                        if (direction != 0) {
+                            Log.d(TAG, "Volume key pressed during adhan — muting")
+                            com.starception.submission.prayer.util.FileLogger.log(
+                                "INFO", TAG, "ADHAN_MUTED_BY_VOLUME_KEY",
+                            )
+                            mute()
+                        }
                     }
 
                     override fun onSetVolumeTo(volume: Int) {
-                        Log.d(TAG, "Volume changed during adhan — muting")
-                        mute()
+                        // Only a real CHANGE is a user mute request; the system
+                        // syncs the provider volume when the session activates.
+                        if (volume != currentVolume) {
+                            Log.d(TAG, "Volume changed during adhan — muting")
+                            com.starception.submission.prayer.util.FileLogger.log(
+                                "INFO", TAG, "ADHAN_MUTED_BY_VOLUME_SET ($volume)",
+                            )
+                            mute()
+                        }
                     }
                 },
             )
@@ -135,7 +152,11 @@ class AdhanPlaybackService : Service() {
     }
 
     private fun play(prayerName: String, volumePercent: Int) {
-        stopPlayback()
+        // Only release any previous PLAYER — a full stopPlayback() here would
+        // also stopForeground()/stopSelf() and have the system destroy the
+        // service (and the fresh player with it) the moment onStartCommand
+        // returns.
+        releasePlayer()
         try {
             val player = MediaPlayer()
             val attrs = AudioAttributes.Builder()
@@ -191,13 +212,19 @@ class AdhanPlaybackService : Service() {
         stopPlayback()
     }
 
-    private fun stopPlayback() {
+    /** Releases the current player and audio focus WITHOUT stopping the service. */
+    private fun releasePlayer() {
         mediaPlayer?.run {
             runCatching { stop() }
             runCatching { release() }
         }
         mediaPlayer = null
         abandonAudioFocus()
+    }
+
+    /** Full teardown: player, focus, session, foreground state, and the service. */
+    private fun stopPlayback() {
+        releasePlayer()
         mediaSession?.isActive = false
         if (foregroundStarted) {
             stopForeground(STOP_FOREGROUND_REMOVE)
