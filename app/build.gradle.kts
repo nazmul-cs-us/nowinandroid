@@ -92,6 +92,14 @@ android {
         }
     }
 
+    lint {
+        // Snapshot of pre-existing lint findings inherited from the fork's
+        // long history. Baseline keeps new code enforced while acknowledging
+        // the existing debt; regenerate with `./gradlew :app:updateLintBaseline`
+        // after intentional cleanups.
+        baseline = file("lint-baseline.xml")
+    }
+
     packaging {
         resources {
             excludes.add("/META-INF/{AL2.0,LGPL2.1}")
