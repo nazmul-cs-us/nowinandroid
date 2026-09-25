@@ -94,21 +94,32 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
 
             // The alarm fires whenever EITHER notification or silent-mode is enabled.
             // Only show the notification banner if this prayer's notification toggle is on.
+            val preferences = readNotificationPreferences(context)
             if (isNotificationEnabledForPrayer(context, prayerName)) {
                 showPrayerNotification(context, prayerName, prayerTime, notificationType, priorMinutes)
                 // The adhan is played by AdhanPlaybackService (volume-controlled,
-                // mutable via volume keys / Mute action) rather than the old
-                // notification-channel sound, which could do neither.
-                val preferences = readNotificationPreferences(context)
-                if (notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
-                    preferences?.isAdhanEnabledForPrayer(prayerName) == true
-                ) {
-                    AdhanPlaybackService.start(
+                // mutable via volume keys / Mute action). Unreadable preferences
+                // default to PLAYING — the legacy behaviour before the toggle
+                // existed — so a storage hiccup can never silence the adhan.
+                val adhanWanted = notificationType == PrayerNotificationWorker.TYPE_PRAYER_TIME &&
+                    (preferences?.isAdhanEnabledForPrayer(prayerName) ?: true)
+                if (adhanWanted) {
+                    val volumePercent = preferences?.getAdhanVolumeForPrayer(prayerName) ?: 100
+                    FileLogger.log(
+                        "INFO", "PrayerNotificationReceiver",
+                        "ADHAN_TRIGGER: starting playback service for $prayerName at $volumePercent%",
+                    )
+                    AdhanPlaybackService.startOrFallback(
                         context = context,
                         prayerName = prayerName,
-                        volumePercent = preferences.getAdhanVolumeForPrayer(prayerName),
+                        prayerTime = prayerTime,
+                        volumePercent = volumePercent,
                     )
                 } else {
+                    FileLogger.log(
+                        "INFO", "PrayerNotificationReceiver",
+                        "ADHAN_SKIPPED: adhan toggle off for $prayerName",
+                    )
                     Log.d(TAG, "🔇 Adhan off for $prayerName — playing silent notification only")
                 }
             } else {

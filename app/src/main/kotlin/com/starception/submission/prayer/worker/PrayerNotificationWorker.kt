@@ -149,9 +149,10 @@ class PrayerNotificationWorker @AssistedInject constructor(
             if (notificationType == TYPE_PRAYER_TIME &&
                 notificationPreferences.isAdhanEnabledForPrayer(prayerName)
             ) {
-                AdhanPlaybackService.start(
+                AdhanPlaybackService.startOrFallback(
                     context = applicationContext,
                     prayerName = prayerName,
+                    prayerTime = prayerTime,
                     volumePercent = notificationPreferences.getAdhanVolumeForPrayer(prayerName),
                 )
             } else {

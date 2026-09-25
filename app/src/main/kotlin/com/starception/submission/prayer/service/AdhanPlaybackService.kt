@@ -153,10 +153,17 @@ class AdhanPlaybackService : Service() {
 
             player.setOnCompletionListener {
                 Log.d(TAG, "Adhan for $prayerName completed")
+                com.starception.submission.prayer.util.FileLogger.log(
+                    "INFO", TAG, "ADHAN_COMPLETED: $prayerName",
+                )
                 stopPlayback()
             }
             player.setOnErrorListener { _, what, extra ->
                 Log.e(TAG, "Adhan MediaPlayer error: what=$what extra=$extra")
+                com.starception.submission.prayer.util.FileLogger.e(
+                    TAG, "ADHAN_MEDIA_ERROR for $prayerName: what=$what extra=$extra",
+                    RuntimeException("MediaPlayer error what=$what extra=$extra"),
+                )
                 stopPlayback()
                 true
             }
@@ -165,6 +172,10 @@ class AdhanPlaybackService : Service() {
             player.prepare()
             player.start()
             mediaPlayer = player
+            com.starception.submission.prayer.util.FileLogger.log(
+                "INFO", TAG,
+                "ADHAN_PLAYING: $prayerName at $volumePercent% volume",
+            )
             Log.d(
                 TAG,
                 "🕌 Playing adhan for $prayerName at $volumePercent% volume",
@@ -307,6 +318,8 @@ class AdhanPlaybackService : Service() {
         // Volume-provider capacity used to capture volume-key presses; the
         // adhan's own level comes from the user's adhanVolume preference.
         private const val MAX_VOLUME = 100
+        private const val ADHAN_FALLBACK_CHANNEL_ID = "prayer_adhan_fallback"
+        private const val FALLBACK_NOTIFICATION_ID = 2003
 
         /**
          * Starts adhan playback for [prayerName] at [volumePercent] (0–100).
@@ -319,6 +332,107 @@ class AdhanPlaybackService : Service() {
                 putExtra(EXTRA_VOLUME_PERCENT, volumePercent.coerceIn(0, 100))
             }
             androidx.core.content.ContextCompat.startForegroundService(context, intent)
+        }
+
+        /**
+         * Robust entry point for alarm-driven callers: tries the volume-controlled
+         * playback service, and when Android 12+/OEM background-start restrictions
+         * reject the foreground-service start, falls back to a notification whose
+         * channel sound IS the adhan — the system plays it, so the adhan still
+         * sounds even if our process is killed immediately afterwards.
+         */
+        fun startOrFallback(
+            context: Context,
+            prayerName: String,
+            prayerTime: String,
+            volumePercent: Int,
+        ) {
+            try {
+                start(context, prayerName, volumePercent)
+                com.starception.submission.prayer.util.FileLogger.log(
+                    "INFO", "AdhanPlaybackService",
+                    "ADHAN_SERVICE_STARTED: $prayerName at $volumePercent%",
+                )
+            } catch (e: Exception) {
+                com.starception.submission.prayer.util.FileLogger.e(
+                    "AdhanPlaybackService",
+                    "ADHAN_SERVICE_START_FAILED for $prayerName — falling back to channel sound: ${e.message}",
+                    e,
+                )
+                postAdhanFallbackNotification(context, prayerName, prayerTime)
+            }
+        }
+
+        /**
+         * Fallback adhan: high-importance notification on a channel whose sound
+         * is the adhan clip. No volume/mute control on this path — strictly
+         * better than silence.
+         */
+        private fun postAdhanFallbackNotification(context: Context, prayerName: String, prayerTime: String) {
+            try {
+                val notificationManager =
+                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                    val fallbackChannel = NotificationChannel(
+                        ADHAN_FALLBACK_CHANNEL_ID,
+                        "Prayer Adhan (Fallback)",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ).apply {
+                        description = "Plays the adhan when the playback service is unavailable"
+                        setSound(
+                            android.net.Uri.parse(
+                                "android.resource://${context.packageName}/${
+                                    context.resources.getIdentifier(
+                                        "short_adhan", "raw", context.packageName,
+                                    )
+                                }",
+                            ),
+                            audioAttributes,
+                        )
+                    }
+                    notificationManager.createNotificationChannel(fallbackChannel)
+                }
+
+                val openAppIntent = Intent(context, com.starception.submission.MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                val contentPendingIntent = android.app.PendingIntent.getActivity(
+                    context,
+                    FALLBACK_NOTIFICATION_ID,
+                    openAppIntent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                        android.app.PendingIntent.FLAG_IMMUTABLE,
+                )
+
+                val notification = androidx.core.app.NotificationCompat.Builder(
+                    context, ADHAN_FALLBACK_CHANNEL_ID,
+                )
+                    .setContentTitle("It's time for $prayerName")
+                    .setContentText("Adhan for $prayerName (${prayerTime.ifBlank { "now" }})")
+                    .setSmallIcon(
+                        context.resources.getIdentifier("ic_prayer", "drawable", context.packageName),
+                    )
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+                    .setAutoCancel(true)
+                    .setContentIntent(contentPendingIntent)
+                    .build()
+                notificationManager.notify(FALLBACK_NOTIFICATION_ID, notification)
+                com.starception.submission.prayer.util.FileLogger.log(
+                    "INFO", "AdhanPlaybackService",
+                    "ADHAN_FALLBACK_POSTED: $prayerName adhan posted via channel sound",
+                )
+            } catch (e: Exception) {
+                com.starception.submission.prayer.util.FileLogger.e(
+                    "AdhanPlaybackService",
+                    "ADHAN_FALLBACK_FAILED for $prayerName",
+                    e,
+                )
+            }
         }
 
         fun stop(context: Context) {
