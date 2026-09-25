@@ -24,10 +24,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,7 +45,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -94,6 +90,13 @@ fun NotificationsSection(
     hasDndAccess: Boolean = true,
     onOpenDndAccessSettings: () -> Unit = {},
     showSilentDuringPrayer: Boolean = true,
+    /**
+     * Shows the platform's own volume bar (Android: the system volume panel on
+     * the notification stream — the stream the adhan plays on). Called when a
+     * prayer's adhan is turned on so the user can set the volume right away.
+     * iOS has no system overlay API from Compose, so the default is a no-op.
+     */
+    onShowSystemVolume: () -> Unit = {},
 ) {
     val notificationsActive = preferences.notificationsEnabled && notificationPermissionGranted
 
@@ -227,6 +230,7 @@ fun NotificationsSection(
                 AdhanPlaybackSection(
                     preferences = preferences,
                     onPreferencesChanged = onPreferencesChanged,
+                    onShowSystemVolume = onShowSystemVolume,
                 )
 
                 if (showSilentDuringPrayer) {
@@ -263,355 +267,47 @@ private val ResetSettingsIcon: androidx.compose.ui.graphics.vector.ImageVector b
 }
 
 /**
- * Adhan playback controls: a master volume row and one row per prayer with
- * an on/off switch, a compact volume readout, and a full-width volume slider
- * beneath the name. Everything in a row morphs together — colors spring
- * between live and disabled states, the thumb scales while dragging, and the
- * reset icon pops in when a custom volume is set. The adhan plays through
- * AdhanPlaybackService when that prayer's notification fires; volume keys or
- * the Mute action silence it mid-play.
+ * Adhan playback controls: one speaker switch per prayer. Turning a prayer's
+ * adhan on shows the platform's own volume bar (see [NotificationsSection]'s
+ * onShowSystemVolume) — the adhan plays on the notification stream, so the
+ * system volume panel IS the adhan volume control.
  */
 @Composable
 private fun AdhanPlaybackSection(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
+    onShowSystemVolume: () -> Unit,
 ) {
     CollapsibleSubSection(
         title = "Adhan Playback",
-        subtitle = "Per-prayer adhan sound and volume",
+        subtitle = "Per-prayer adhan sound (volume follows the system volume bar)",
     ) {
-        // Master volume: applies to every prayer without its own override,
-        // and dragging it resets all overrides so every prayer follows it.
-        // The slider hides while silent ("Silent" readout restores it).
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 2.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Master",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
-                AdhanVolumeValue(
-                    value = preferences.adhanVolume,
-                    enabled = true,
-                    onRestore = { onPreferencesChanged(preferences.copy(adhanVolume = 100)) },
-                )
-            }
-            AnimatedVisibility(
-                visible = preferences.adhanVolume > 0,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                AdhanVolumeTrack(
-                    value = preferences.adhanVolume,
-                    enabled = true,
-                ) { value ->
-                    onPreferencesChanged(
-                        preferences.copy(
-                            adhanVolume = value,
-                            fajrAdhanVolume = null,
-                            dhuhrAdhanVolume = null,
-                            asrAdhanVolume = null,
-                            maghribAdhanVolume = null,
-                            ishaAdhanVolume = null,
-                        ),
-                    )
-                }
-            }
-        }
-
-        AdhanPrayerRow(
-            prayerName = "Fajr",
-            masterVolume = preferences.adhanVolume,
-            adhanEnabled = preferences.fajrAdhanEnabled,
-            volume = preferences.fajrAdhanVolume ?: preferences.adhanVolume,
-            isCustomVolume = preferences.fajrAdhanVolume != null,
-            onEnabledChange = { enabled ->
-                onPreferencesChanged(preferences.copy(fajrAdhanEnabled = enabled))
-            },
-            onVolumeChange = { value ->
-                onPreferencesChanged(preferences.copy(fajrAdhanVolume = value))
-            },
-            onResetVolume = {
-                onPreferencesChanged(preferences.copy(fajrAdhanVolume = null))
-            },
+        val adhanToggles = listOf(
+            "Fajr" to preferences.fajrAdhanEnabled,
+            "Dhuhr" to preferences.dhuhrAdhanEnabled,
+            "Asr" to preferences.asrAdhanEnabled,
+            "Maghrib" to preferences.maghribAdhanEnabled,
+            "Isha" to preferences.ishaAdhanEnabled,
         )
-        AdhanPrayerRow(
-            prayerName = "Dhuhr",
-            masterVolume = preferences.adhanVolume,
-            adhanEnabled = preferences.dhuhrAdhanEnabled,
-            volume = preferences.dhuhrAdhanVolume ?: preferences.adhanVolume,
-            isCustomVolume = preferences.dhuhrAdhanVolume != null,
-            onEnabledChange = { enabled ->
-                onPreferencesChanged(preferences.copy(dhuhrAdhanEnabled = enabled))
-            },
-            onVolumeChange = { value ->
-                onPreferencesChanged(preferences.copy(dhuhrAdhanVolume = value))
-            },
-            onResetVolume = {
-                onPreferencesChanged(preferences.copy(dhuhrAdhanVolume = null))
-            },
-        )
-        AdhanPrayerRow(
-            prayerName = "Asr",
-            masterVolume = preferences.adhanVolume,
-            adhanEnabled = preferences.asrAdhanEnabled,
-            volume = preferences.asrAdhanVolume ?: preferences.adhanVolume,
-            isCustomVolume = preferences.asrAdhanVolume != null,
-            onEnabledChange = { enabled ->
-                onPreferencesChanged(preferences.copy(asrAdhanEnabled = enabled))
-            },
-            onVolumeChange = { value ->
-                onPreferencesChanged(preferences.copy(asrAdhanVolume = value))
-            },
-            onResetVolume = {
-                onPreferencesChanged(preferences.copy(asrAdhanVolume = null))
-            },
-        )
-        AdhanPrayerRow(
-            prayerName = "Maghrib",
-            masterVolume = preferences.adhanVolume,
-            adhanEnabled = preferences.maghribAdhanEnabled,
-            volume = preferences.maghribAdhanVolume ?: preferences.adhanVolume,
-            isCustomVolume = preferences.maghribAdhanVolume != null,
-            onEnabledChange = { enabled ->
-                onPreferencesChanged(preferences.copy(maghribAdhanEnabled = enabled))
-            },
-            onVolumeChange = { value ->
-                onPreferencesChanged(preferences.copy(maghribAdhanVolume = value))
-            },
-            onResetVolume = {
-                onPreferencesChanged(preferences.copy(maghribAdhanVolume = null))
-            },
-        )
-        AdhanPrayerRow(
-            prayerName = "Isha",
-            masterVolume = preferences.adhanVolume,
-            adhanEnabled = preferences.ishaAdhanEnabled,
-            volume = preferences.ishaAdhanVolume ?: preferences.adhanVolume,
-            isCustomVolume = preferences.ishaAdhanVolume != null,
-            onEnabledChange = { enabled ->
-                onPreferencesChanged(preferences.copy(ishaAdhanEnabled = enabled))
-            },
-            onVolumeChange = { value ->
-                onPreferencesChanged(preferences.copy(ishaAdhanVolume = value))
-            },
-            onResetVolume = {
-                onPreferencesChanged(preferences.copy(ishaAdhanVolume = null))
-            },
-        )
-    }
-}
-
-/**
- * One prayer's adhan control on a subtle background chip: name + volume
- * readout + reset + switch on the first line, a full-width volume slider
- * beneath. The slider hides (animated) when the prayer's adhan is off or the
- * volume is silent; tapping the "Silent" readout restores the volume.
- * Everything morphs together — colors spring between live/disabled states,
- * the thumb scales while dragging, and the reset icon pops in for custom
- * volumes.
- */
-@Composable
-private fun AdhanPrayerRow(
-    prayerName: String,
-    masterVolume: Int,
-    adhanEnabled: Boolean,
-    volume: Int,
-    isCustomVolume: Boolean,
-    onEnabledChange: (Boolean) -> Unit,
-    onVolumeChange: (Int) -> Unit,
-    onResetVolume: () -> Unit,
-) {
-    // One spring spec for every morph so the row moves as a single unit.
-    val morphSpec = spring<Float>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMediumLow,
-    )
-    val colorMorphSpec = spring<Color>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMediumLow,
-    )
-
-    val nameColor by animateColorAsState(
-        targetValue = if (adhanEnabled) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = colorMorphSpec,
-        label = "adhanNameColor",
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = prayerName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = nameColor,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-            )
-            // Volume + reset merged into one control in a fixed-width slot, so
-            // nothing shifts when switching between a custom volume and
-            // following the master. Custom: tertiary pill with the reset
-            // glyph and the custom percentage (tap = follow master). Default:
-            // plain percentage ("Silent" is tappable to restore volume).
-            Box(
-                modifier = Modifier.width(64.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                androidx.compose.animation.AnimatedContent(
-                    targetState = isCustomVolume,
-                    transitionSpec = {
-                        (
-                            scaleIn(
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMedium,
-                                ),
-                            ) + fadeIn()
-                            ).togetherWith(scaleOut() + fadeOut())
+        adhanToggles.forEachIndexed { index, (prayer, enabled) ->
+            ToggleItem(prayer, enabled) { newValue ->
+                onPreferencesChanged(
+                    when (index) {
+                        0 -> preferences.copy(fajrAdhanEnabled = newValue)
+                        1 -> preferences.copy(dhuhrAdhanEnabled = newValue)
+                        2 -> preferences.copy(asrAdhanEnabled = newValue)
+                        3 -> preferences.copy(maghribAdhanEnabled = newValue)
+                        else -> preferences.copy(ishaAdhanEnabled = newValue)
                     },
-                    label = "adhanVolumeControl",
-                ) { custom ->
-                    if (custom) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer)
-                                .clickable { onResetVolume() }
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = ResetSettingsIcon,
-                                contentDescription = "Follow master volume",
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Text(
-                                text = "$volume%",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = if (volume == 0) "Silent" else "$volume%",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (adhanEnabled && volume > 0) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            textAlign = TextAlign.End,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (volume == 0) {
-                                        Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                onVolumeChange(
-                                                    if (masterVolume > 0) masterVolume else 100,
-                                                )
-                                            }
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
-                        )
-                    }
+                )
+                // The system volume bar is the adhan volume: surface it as the
+                // user enables a prayer so it can be adjusted right away.
+                if (newValue) {
+                    onShowSystemVolume()
                 }
             }
-            Switch(
-                checked = adhanEnabled,
-                onCheckedChange = onEnabledChange,
-            )
-        }
-        // The volume bar hides while the adhan is off or silent.
-        AnimatedVisibility(
-            visible = adhanEnabled && volume > 0,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            AdhanVolumeTrack(
-                value = volume,
-                enabled = adhanEnabled,
-                onValueChange = onVolumeChange,
-            )
         }
     }
-}
-
-/**
- * Compact volume readout: "Silent" at 0, otherwise a percentage. Fixed width
- * so the layout does not jitter while dragging. When the slider is hidden
- * because the volume is silent, tapping the readout restores the volume.
- */
-@Composable
-private fun AdhanVolumeValue(
-    value: Int,
-    enabled: Boolean,
-    onRestore: (() -> Unit)? = null,
-) {
-    val color by animateColorAsState(
-        targetValue = if (enabled && value > 0) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = spring<Color>(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "adhanValueColor",
-    )
-    Text(
-        text = if (value == 0) "Silent" else "$value%",
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = color,
-        textAlign = TextAlign.End,
-        modifier = Modifier
-            .width(48.dp)
-            .then(
-                if (value == 0 && onRestore != null) {
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onRestore() }
-                } else {
-                    Modifier
-                },
-            ),
-    )
 }
 
 /**

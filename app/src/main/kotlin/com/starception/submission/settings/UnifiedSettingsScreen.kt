@@ -379,6 +379,19 @@ fun UnifiedSettingsScreen(
                                     com.starception.submission.prayer.silent
                                         .openDndAccessSettings(dndContext)
                                 },
+                                onShowSystemVolume = {
+                                    // The adhan plays on the notification stream; the
+                                    // system volume panel for that stream IS the adhan
+                                    // volume control.
+                                    val audioManager = dndContext.getSystemService(
+                                        android.content.Context.AUDIO_SERVICE,
+                                    ) as android.media.AudioManager
+                                    audioManager.adjustStreamVolume(
+                                        android.media.AudioManager.STREAM_NOTIFICATION,
+                                        android.media.AudioManager.ADJUST_SAME,
+                                        android.media.AudioManager.FLAG_SHOW_UI,
+                                    )
+                                },
                             )
                         }
                     }

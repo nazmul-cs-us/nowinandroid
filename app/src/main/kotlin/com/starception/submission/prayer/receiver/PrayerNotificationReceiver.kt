@@ -106,7 +106,8 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                 if (adhanWanted) {
                     val volumePercent = preferences?.getAdhanVolumeForPrayer(prayerName) ?: 100
                     FileLogger.log(
-                        "INFO", "PrayerNotificationReceiver",
+                        "INFO",
+                        "PrayerNotificationReceiver",
                         "ADHAN_TRIGGER: starting playback service for $prayerName at $volumePercent%",
                     )
                     AdhanPlaybackService.startOrFallback(
@@ -117,7 +118,8 @@ class PrayerNotificationReceiver : BroadcastReceiver() {
                     )
                 } else {
                     FileLogger.log(
-                        "INFO", "PrayerNotificationReceiver",
+                        "INFO",
+                        "PrayerNotificationReceiver",
                         "ADHAN_SKIPPED: adhan toggle off for $prayerName",
                     )
                     Log.d(TAG, "🔇 Adhan off for $prayerName — playing silent notification only")

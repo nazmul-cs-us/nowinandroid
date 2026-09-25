@@ -128,7 +128,9 @@ class AdhanPlaybackService : Service() {
                         if (direction != 0) {
                             Log.d(TAG, "Volume key pressed during adhan — muting")
                             com.starception.submission.prayer.util.FileLogger.log(
-                                "INFO", TAG, "ADHAN_MUTED_BY_VOLUME_KEY",
+                                "INFO",
+                                TAG,
+                                "ADHAN_MUTED_BY_VOLUME_KEY",
                             )
                             mute()
                         }
@@ -140,7 +142,9 @@ class AdhanPlaybackService : Service() {
                         if (volume != currentVolume) {
                             Log.d(TAG, "Volume changed during adhan — muting")
                             com.starception.submission.prayer.util.FileLogger.log(
-                                "INFO", TAG, "ADHAN_MUTED_BY_VOLUME_SET ($volume)",
+                                "INFO",
+                                TAG,
+                                "ADHAN_MUTED_BY_VOLUME_SET ($volume)",
                             )
                             mute()
                         }
@@ -169,20 +173,25 @@ class AdhanPlaybackService : Service() {
             player.setDataSource(assetFd.fileDescriptor, assetFd.startOffset, assetFd.length)
             assetFd.close()
 
-            val volume = (volumePercent.coerceIn(0, 100) / 100f)
-            player.setVolume(volume, volume)
+            // The system notification-stream volume is the adhan volume control
+            // (the tile/settings surface the system volume panel). Play at full
+            // player scale so the stream volume alone determines loudness.
+            player.setVolume(1f, 1f)
 
             player.setOnCompletionListener {
                 Log.d(TAG, "Adhan for $prayerName completed")
                 com.starception.submission.prayer.util.FileLogger.log(
-                    "INFO", TAG, "ADHAN_COMPLETED: $prayerName",
+                    "INFO",
+                    TAG,
+                    "ADHAN_COMPLETED: $prayerName",
                 )
                 stopPlayback()
             }
             player.setOnErrorListener { _, what, extra ->
                 Log.e(TAG, "Adhan MediaPlayer error: what=$what extra=$extra")
                 com.starception.submission.prayer.util.FileLogger.e(
-                    TAG, "ADHAN_MEDIA_ERROR for $prayerName: what=$what extra=$extra",
+                    TAG,
+                    "ADHAN_MEDIA_ERROR for $prayerName: what=$what extra=$extra",
                     RuntimeException("MediaPlayer error what=$what extra=$extra"),
                 )
                 stopPlayback()
@@ -194,7 +203,8 @@ class AdhanPlaybackService : Service() {
             player.start()
             mediaPlayer = player
             com.starception.submission.prayer.util.FileLogger.log(
-                "INFO", TAG,
+                "INFO",
+                TAG,
                 "ADHAN_PLAYING: $prayerName at $volumePercent% volume",
             )
             Log.d(
@@ -377,7 +387,8 @@ class AdhanPlaybackService : Service() {
             try {
                 start(context, prayerName, volumePercent)
                 com.starception.submission.prayer.util.FileLogger.log(
-                    "INFO", "AdhanPlaybackService",
+                    "INFO",
+                    "AdhanPlaybackService",
                     "ADHAN_SERVICE_STARTED: $prayerName at $volumePercent%",
                 )
             } catch (e: Exception) {
@@ -414,7 +425,9 @@ class AdhanPlaybackService : Service() {
                             android.net.Uri.parse(
                                 "android.resource://${context.packageName}/${
                                     context.resources.getIdentifier(
-                                        "short_adhan", "raw", context.packageName,
+                                        "short_adhan",
+                                        "raw",
+                                        context.packageName,
                                     )
                                 }",
                             ),
@@ -436,7 +449,8 @@ class AdhanPlaybackService : Service() {
                 )
 
                 val notification = androidx.core.app.NotificationCompat.Builder(
-                    context, ADHAN_FALLBACK_CHANNEL_ID,
+                    context,
+                    ADHAN_FALLBACK_CHANNEL_ID,
                 )
                     .setContentTitle("It's time for $prayerName")
                     .setContentText("Adhan for $prayerName (${prayerTime.ifBlank { "now" }})")
@@ -450,7 +464,8 @@ class AdhanPlaybackService : Service() {
                     .build()
                 notificationManager.notify(FALLBACK_NOTIFICATION_ID, notification)
                 com.starception.submission.prayer.util.FileLogger.log(
-                    "INFO", "AdhanPlaybackService",
+                    "INFO",
+                    "AdhanPlaybackService",
                     "ADHAN_FALLBACK_POSTED: $prayerName adhan posted via channel sound",
                 )
             } catch (e: Exception) {

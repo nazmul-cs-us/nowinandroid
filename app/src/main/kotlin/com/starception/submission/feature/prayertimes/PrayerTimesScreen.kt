@@ -34,13 +34,11 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -2013,19 +2011,64 @@ fun PrayerTimesScreen(
                                 Pair(String.format("%d:%02d", hour12, adjusted.minute), period)
                             } ?: Pair("", "")
 
-                            // In Tune-schedule mode the adjusted time is
-                            // replaced by this prayer's adhan control: the
-                            // speaker icon alone when off, and a
-                            // system-volume-style bar when turned on.
-                            if (prayerTimeEditMode && prayerName != "Sunrise") {
+                            // Time display - NO direct gestures, use swipe-to-reveal instead.
+                            // In Tune-schedule mode the bottom-right offset badge ("+Xm")
+                            // spot is replaced by this prayer's adhan control: the speaker
+                            // icon alone when off, and a system-volume-style bar next to
+                            // it when turned on. The time itself always stays visible.
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                val baseColor = accentColor
+
+                                // Left side: Time + AM/PM grouped together
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Start,
+                                    verticalAlignment = Alignment.Bottom,
                                 ) {
+                                    // Time (hour:minute). headlineMedium's default ~36sp
+                                    // line box PLUS the extra font padding overflows the
+                                    // shorter expanded tile and clips the time. Drop the
+                                    // font padding and use a snug (but glyph-safe) line box
+                                    // so it stays fully visible without taller tiles.
+                                    Text(
+                                        text = timeOnly,
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontSize = if (compactTile) 19.sp else 24.sp,
+                                            lineHeight = if (compactTile) 22.sp else 30.sp,
+                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                        ),
+                                        color = baseColor,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+
+                                    Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
+
+                                    // AM/PM (smaller)
+                                    Text(
+                                        text = amPm,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = if (compactTile) 11.sp else 14.sp,
+                                        ),
+                                        color = baseColor.copy(alpha = 0.85f),
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(bottom = 2.dp),
+                                    )
+                                }
+
+                                // Right side: offset badge normally, adhan speaker
+                                // while tuning the schedule. Tapping the speaker ON
+                                // brings up the SYSTEM volume panel (the adhan plays
+                                // on the notification stream) instead of embedding a
+                                // slider in the tile.
+                                if (prayerTimeEditMode && prayerName != "Sunrise") {
+                                    val tileContext = LocalContext.current
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
+                                            .padding(bottom = 2.dp)
+                                            .size(26.dp)
                                             .clip(CircleShape)
                                             .background(
                                                 if (adhanEnabled) {
@@ -2036,12 +2079,32 @@ fun PrayerTimesScreen(
                                             )
                                             .clickable {
                                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                onAdhanEnabledChange(!adhanEnabled)
+                                                val enable = !adhanEnabled
+                                                onAdhanEnabledChange(enable)
+                                                if (enable) {
+                                                    // Show the system volume bar for the
+                                                    // stream the adhan plays on.
+                                                    val audioManager = tileContext.getSystemService(
+                                                        Context.AUDIO_SERVICE,
+                                                    ) as android.media.AudioManager
+                                                    audioManager.adjustStreamVolume(
+                                                        android.media.AudioManager.STREAM_NOTIFICATION,
+                                                        android.media.AudioManager.ADJUST_SAME,
+                                                        android.media.AudioManager.FLAG_SHOW_UI,
+                                                    )
+                                                }
                                             },
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        FlaticonIcon(
-                                            glyph = FlaticonIcons.VOLUME,
+                                        // Flaticon sound icons (14925297 on / 14925198 muted)
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(
+                                                if (adhanEnabled) {
+                                                    R.drawable.flaticon_sound_14925297
+                                                } else {
+                                                    R.drawable.flaticon_sound_14925198
+                                                },
+                                            ),
                                             contentDescription = if (adhanEnabled) {
                                                 "Mute adhan for $prayerName"
                                             } else {
@@ -2052,88 +2115,11 @@ fun PrayerTimesScreen(
                                             } else {
                                                 MaterialTheme.colorScheme.onSurfaceVariant
                                             },
-                                            fontSize = 16.sp,
+                                            modifier = Modifier.size(18.dp),
                                         )
                                     }
-                                    androidx.compose.animation.AnimatedVisibility(
-                                        visible = adhanEnabled,
-                                        enter = fadeIn() + expandHorizontally(),
-                                        exit = fadeOut() + shrinkHorizontally(),
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            androidx.compose.material3.Slider(
-                                                value = adhanVolume.toFloat(),
-                                                onValueChange = { newValue ->
-                                                    onAdhanVolumeChange(newValue.toInt().coerceIn(0, 100))
-                                                },
-                                                valueRange = 0f..100f,
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(24.dp),
-                                                colors = androidx.compose.material3.SliderDefaults.colors(
-                                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                                    inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                                    thumbColor = MaterialTheme.colorScheme.surface,
-                                                ),
-                                            )
-                                            Text(
-                                                text = "$adhanVolume%",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Time display - NO direct gestures, use swipe-to-reveal instead
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Bottom,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    val baseColor = accentColor
-
-                                    // Left side: Time + AM/PM grouped together
-                                    Row(
-                                        horizontalArrangement = Arrangement.Start,
-                                        verticalAlignment = Alignment.Bottom,
-                                    ) {
-                                        // Time (hour:minute). headlineMedium's default ~36sp
-                                        // line box PLUS the extra font padding overflows the
-                                        // shorter expanded tile and clips the time. Drop the
-                                        // font padding and use a snug (but glyph-safe) line box
-                                        // so it stays fully visible without taller tiles.
-                                        Text(
-                                            text = timeOnly,
-                                            style = MaterialTheme.typography.headlineMedium.copy(
-                                                fontSize = if (compactTile) 19.sp else 24.sp,
-                                                lineHeight = if (compactTile) 22.sp else 30.sp,
-                                                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                            ),
-                                            color = baseColor,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-
-                                        Spacer(modifier = Modifier.width(if (compactTile) 2.dp else 4.dp))
-
-                                        // AM/PM (smaller)
-                                        Text(
-                                            text = amPm,
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontSize = if (compactTile) 11.sp else 14.sp,
-                                            ),
-                                            color = baseColor.copy(alpha = 0.85f),
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.padding(bottom = 2.dp),
-                                        )
-                                    }
-
-                                    // Right side: Offset indicator with AI suggestion alternation
+                                } else {
+                                    // Offset indicator with AI suggestion alternation
                                     com.starception.submission.feature.prayertimes.components.AiSuggestionBadge(
                                         currentOffset = currentOffset,
                                         suggestion = suggestion,
