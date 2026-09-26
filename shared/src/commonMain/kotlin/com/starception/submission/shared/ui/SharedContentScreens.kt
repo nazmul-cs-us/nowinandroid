@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -110,6 +111,7 @@ import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.content.sharedTopic
 import com.starception.submission.shared.hadith.SharedHadith
 import com.starception.submission.shared.hadith.createSharedHadithRepository
+import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.quran.filterQuranVerses
@@ -339,13 +341,16 @@ internal fun QuranDetailScreen(
     var playing by remember(number) { mutableStateOf(false) }
     var query by remember(number) { mutableStateOf("") }
     var loadAttempt by remember(number) { mutableStateOf(0) }
+    var translationLanguage by remember {
+        mutableStateOf(QuranTranslationLanguage.fromCode(store.quranTranslationLanguage()))
+    }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
     DisposableEffect(player) { onDispose { player.stop() } }
     LaunchedEffect(number, loadAttempt) {
         ayahState = QuranAyahState.Loading
         ayahState = try {
-            val verses = repository.getVersesBySurah(number)
+            val verses = repository.getVersesBySurah(number, translationLanguage)
             if (verses.isEmpty()) {
                 QuranAyahState.Error("No ayahs were found for this surah.")
             } else {
@@ -358,6 +363,10 @@ internal fun QuranDetailScreen(
         }
     }
     var showTranslation by remember(number) { mutableStateOf(true) }
+    LaunchedEffect(number, translationLanguage) {
+        // Reload the ayahs when the translation language changes.
+        loadAttempt += 1
+    }
     SharedDetailScaffold(title = surah.nameEnglish, onBack = onBack) {
         // Chapter artwork header (CDN-downloaded on demand), matching the
         // Android album header's 3:2 canvas.
@@ -430,6 +439,26 @@ internal fun QuranDetailScreen(
                 Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, null)
                 Spacer(Modifier.size(6.dp))
                 Text(if (saved) "Saved" else "Save")
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        // Translation language selector; non-English DBs download from the CDN
+        // on demand, Arabic-only included as the "None" chip.
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        ) {
+            QuranTranslationLanguage.entries.forEach { language ->
+                androidx.compose.material3.FilterChip(
+                    selected = language == translationLanguage,
+                    onClick = {
+                        translationLanguage = language
+                        store.saveQuranTranslationLanguage(language.code)
+                    },
+                    label = { Text(language.displayName) },
+                )
             }
         }
         Spacer(Modifier.height(10.dp))

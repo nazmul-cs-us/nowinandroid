@@ -16,6 +16,7 @@
 
 package com.starception.submission.shared.content
 
+import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.storage.KeyValueStore
 import com.starception.submission.shared.storage.platformKeyValueStore
 
@@ -43,6 +44,15 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         val updated = toggle(SAVED_SURAHS, number, 1..114)
         if (number in 1..114) setNewsBookmarked(SURAH_NEWS_ID_OFFSET + number, number in updated)
         return updated
+    }
+
+    /** Selected Quran translation language code (see [QuranTranslationLanguage]). */
+    fun quranTranslationLanguage(): String =
+        store.getString(QURAN_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank)
+            ?: QuranTranslationLanguage.English.code
+
+    fun saveQuranTranslationLanguage(code: String) {
+        store.putString(QURAN_TRANSLATION_LANGUAGE, code)
     }
 
     fun savedBukhariBooks(): Set<Int> = intSet(SAVED_BUKHARI, 1..97)
@@ -242,6 +252,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val BOOKMARKED_NEWS_IDS = "shared_bookmarked_news_ids"
         private const val VIEWED_NEWS_IDS = "shared_viewed_news_ids"
         private const val ONBOARDING_HIDDEN = "shared_onboarding_hidden"
+        private const val QURAN_TRANSLATION_LANGUAGE = "shared_quran_translation_language"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"
         private const val SURAH_NEWS_ID_OFFSET = 2000

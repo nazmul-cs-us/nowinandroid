@@ -27,10 +27,45 @@ data class QuranVerse(
 )
 
 interface QuranVerseRepository {
-    suspend fun getVersesBySurah(surahNumber: Int): List<QuranVerse>
+    suspend fun getVersesBySurah(surahNumber: Int): List<QuranVerse> =
+        getVersesBySurah(surahNumber, QuranTranslationLanguage.English)
+
+    suspend fun getVersesBySurah(
+        surahNumber: Int,
+        language: QuranTranslationLanguage,
+    ): List<QuranVerse>
 }
 
 expect fun createQuranVerseRepository(): QuranVerseRepository
+
+/**
+ * Translation languages shipped on the CDN (databases/quran/quran_XX.db).
+ * Arabic-only reading selects [None]; the English DB is bundled with the app
+ * so it also works offline on first run.
+ */
+enum class QuranTranslationLanguage(
+    val code: String,
+    val displayName: String,
+) {
+    English("en", "English"),
+    Bengali("bn", "বাংলা"),
+    Spanish("es", "Español"),
+    French("fr", "Français"),
+    Indonesian("id", "Indonesia"),
+    Russian("ru", "Русский"),
+    Swedish("sv", "Svenska"),
+    Turkish("tr", "Türkçe"),
+    Urdu("ur", "اردو"),
+    Chinese("zh", "中文"),
+    Transliteration("transliteration", "Roman transliteration"),
+    None("", "Arabic only"),
+    ;
+
+    companion object {
+        fun fromCode(code: String): QuranTranslationLanguage =
+            entries.firstOrNull { it.code == code } ?: English
+    }
+}
 
 private val ArabicMarks = Regex("[\\u0640\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]")
 

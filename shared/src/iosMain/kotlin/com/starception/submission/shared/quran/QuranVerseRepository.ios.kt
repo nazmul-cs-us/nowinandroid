@@ -49,19 +49,29 @@ import sqlite3.sqlite3_step
 actual fun createQuranVerseRepository(): QuranVerseRepository = IosQuranVerseRepository()
 
 private class IosQuranVerseRepository : QuranVerseRepository {
-    override suspend fun getVersesBySurah(surahNumber: Int): List<QuranVerse> {
+    override suspend fun getVersesBySurah(
+        surahNumber: Int,
+        language: QuranTranslationLanguage,
+    ): List<QuranVerse> {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
-        return withContext(Dispatchers.Default) { readVerses(surahNumber) }
+        return withContext(Dispatchers.Default) { readVerses(surahNumber, language) }
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private suspend fun readVerses(surahNumber: Int): List<QuranVerse> {
+    private suspend fun readVerses(
+        surahNumber: Int,
+        language: QuranTranslationLanguage,
+    ): List<QuranVerse> {
         val databasePath = resolveDatabaseAsset(
             bundledPath = NSBundle.mainBundle.pathForResource("quran", ofType = "db"),
             remotePath = "databases/quran/quran.db",
             cacheName = "quran.db",
         )
-        val translations = runCatching { readTranslations(surahNumber) }.getOrDefault(emptyMap())
+        val translations = if (language == QuranTranslationLanguage.None) {
+            emptyMap()
+        } else {
+            runCatching { readTranslations(surahNumber, language) }.getOrDefault(emptyMap())
+        }
         return memScoped {
             val database = alloc<CPointerVar<sqlite3>>()
             val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
@@ -122,11 +132,20 @@ private class IosQuranVerseRepository : QuranVerseRepository {
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    private suspend fun readTranslations(surahNumber: Int): Map<Int, String> {
+    private suspend fun readTranslations(
+        surahNumber: Int,
+        language: QuranTranslationLanguage,
+    ): Map<Int, String> {
+        // English ships in the app bundle; every other language resolves from
+        // the CDN (databases/quran/quran_XX.db) and downloads on demand.
         val databasePath = resolveDatabaseAsset(
-            bundledPath = NSBundle.mainBundle.pathForResource("quran_en", ofType = "db"),
-            remotePath = "databases/quran/quran_en.db",
-            cacheName = "quran_en.db",
+            bundledPath = if (language == QuranTranslationLanguage.English) {
+                NSBundle.mainBundle.pathForResource("quran_en", ofType = "db")
+            } else {
+                null
+            },
+            remotePath = "databases/quran/quran_${language.code}.db",
+            cacheName = "quran_${language.code}.db",
         )
         return memScoped {
             val database = alloc<CPointerVar<sqlite3>>()
