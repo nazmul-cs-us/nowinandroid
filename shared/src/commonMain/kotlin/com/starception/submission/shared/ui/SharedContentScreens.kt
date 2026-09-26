@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -358,6 +359,21 @@ internal fun QuranDetailScreen(
     }
     var showTranslation by remember(number) { mutableStateOf(true) }
     SharedDetailScaffold(title = surah.nameEnglish, onBack = onBack) {
+        // Chapter artwork header (CDN-downloaded on demand), matching the
+        // Android album header's 3:2 canvas.
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 2f)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)),
+        ) {
+            com.starception.submission.shared.quran.SurahArtworkHeader(
+                surahNumber = number,
+                contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = RoundedCornerShape(20.dp),
