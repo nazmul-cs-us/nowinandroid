@@ -539,7 +539,7 @@ private fun LazyListScope.hadithBookBrowser(
                             bottomStart = 20.dp,
                         ),
                     ) {
-                        Text("Feeling lucky")
+                        Text("Feeling blessed")
                     }
                 }
                 OutlinedTextField(

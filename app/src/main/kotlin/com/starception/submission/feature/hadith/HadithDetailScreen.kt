@@ -175,6 +175,35 @@ private const val HADITH_SECTION_ORDER_PREFS = "hadith_section_order_prefs"
 private const val HADITH_SECTION_ORDER_KEY = "section_order"
 
 /**
+ * Remembers which hadiths the user has actually heard, per collection, so the
+ * "Feeling blessed" shuffle prefers unplayed ones until the collection has been
+ * fully played through.
+ */
+private object PlayedHadithTracker {
+    private const val PREFS = "hadith_played_tracker"
+
+    private fun prefs(context: android.content.Context) =
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+
+    private fun key(databaseFile: String) =
+        "played_${databaseFile.removeSuffix(".db")}"
+
+    fun playedSet(context: android.content.Context, databaseFile: String): Set<Int> =
+        prefs(context).getStringSet(key(databaseFile), emptySet())
+            ?.mapNotNull { it.toIntOrNull() }
+            ?.toSet()
+            ?: emptySet()
+
+    fun markPlayed(context: android.content.Context, databaseFile: String, number: Int) {
+        val current = playedSet(context, databaseFile)
+        if (number in current) return
+        prefs(context).edit()
+            .putStringSet(key(databaseFile), (current + number).map(Int::toString).toSet())
+            .apply()
+    }
+}
+
+/**
  * Save hadith section order to SharedPreferences
  */
 private fun saveHadithSectionOrder(context: android.content.Context, order: List<HadithSection>) {
@@ -699,8 +728,19 @@ fun HadithDetailScreen(
         sherpaOnnxTts.setVoice(selectedVoice)
 
         try {
+            // Feeling blessed tracks every hadith the user has actually heard:
+            // in shuffle mode unplayed ones come first (random within each
+            // group), so nothing repeats until the whole collection has been
+            // played through.
+            val playedSet = PlayedHadithTracker.playedSet(context, databaseFile)
             val playlistOrder = if (shufflePlayback) {
-                (rangeStart..rangeEnd).shuffled()
+                val shuffled = (rangeStart..rangeEnd).shuffled()
+                val unplayed = shuffled.filter { it !in playedSet }
+                if (unplayed.size < shuffled.size) {
+                    unplayed + shuffled.filter { it in playedSet }
+                } else {
+                    unplayed
+                }
             } else {
                 (rangeStart..rangeEnd).toList()
             }
@@ -737,6 +777,7 @@ fun HadithDetailScreen(
                 playbackGeneration += 1
                 prevHadithNumberRef = number
                 hadithNumber = number
+                PlayedHadithTracker.markPlayed(context, databaseFile, number)
                 hadithCache[number] = nextHadith
                 hadith = nextHadith
                 translatedText = spokenText
