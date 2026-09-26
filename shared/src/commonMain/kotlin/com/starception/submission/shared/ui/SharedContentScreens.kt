@@ -380,9 +380,7 @@ internal fun QuranDetailScreen(
         // Reload the ayahs when the translation language changes.
         loadAttempt += 1
     }
-    SharedDetailScaffold(title = surah.nameEnglish, onBack = onBack) {
-        // Chapter artwork header (CDN-downloaded on demand), matching the
-        // Android album header's 3:2 canvas.
+    ImmersiveDetailScaffold(onBack = onBack, header = {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -394,8 +392,15 @@ internal fun QuranDetailScreen(
                 contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
                 modifier = Modifier.fillMaxSize(),
             )
+            // Android's album-header scrim: surah title overlaid on the artwork.
+            ImmersiveDetailHeaderScrim(
+                title = "Surah ${surah.number}",
+                supportingText = surah.nameEnglish,
+                arabicTitle = surah.nameArabic,
+                modifier = Modifier.matchParentSize(),
+            )
         }
-        Spacer(Modifier.height(10.dp))
+    }) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = RoundedCornerShape(20.dp),
@@ -888,7 +893,16 @@ internal fun BukhariHadithDetailScreen(
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
-    SharedDetailScaffold(title = "Hadith $hadithId", onBack = onBack) {
+    ImmersiveDetailScaffold(onBack = onBack, header = {
+        Box(Modifier.fillMaxWidth().height(190.dp)) {
+            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            ImmersiveDetailHeaderScrim(
+                title = "Sahih al-Bukhari",
+                supportingText = "Hadith $hadithId",
+                arabicTitle = "صحيح البخاري",
+            )
+        }
+    }) {
         when (val current = state) {
             HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -902,11 +916,8 @@ internal fun BukhariHadithDetailScreen(
                     contentPadding = PaddingValues(bottom = 28.dp),
                 ) {
                     item {
-                        NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(20.dp)))
-                    }
-                    item {
                         Column {
-                            Text("Sahih al-Bukhari", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Hadith $hadithId", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ReaderTag("HADITH $hadithId")
@@ -1060,7 +1071,16 @@ internal fun ShamayelHadithDetailScreen(
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
-    SharedDetailScaffold(title = "Hadith $hadithId", onBack = onBack) {
+    ImmersiveDetailScaffold(onBack = onBack, header = {
+        Box(Modifier.fillMaxWidth().height(190.dp)) {
+            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            ImmersiveDetailHeaderScrim(
+                title = "Shama'il At-Tirmidhi",
+                supportingText = "Hadith $hadithId",
+                arabicTitle = "شمائل الترمذي",
+            )
+        }
+    }) {
         when (val current = state) {
             HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -1074,11 +1094,8 @@ internal fun ShamayelHadithDetailScreen(
                     contentPadding = PaddingValues(bottom = 28.dp),
                 ) {
                     item {
-                        NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(20.dp)))
-                    }
-                    item {
                         Column {
-                            Text("Shama'il At-Tirmidhi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Hadith $hadithId", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ReaderTag("HADITH $hadithId")
@@ -1989,7 +2006,16 @@ internal fun NewsDetailScreen(
         }
     }
 
-    SharedDetailScaffold(title = "News", onBack = onBack) {
+    ImmersiveDetailScaffold(onBack = onBack, header = {
+        Box(Modifier.fillMaxWidth().height(190.dp)) {
+            NewsHeaderArtwork("masjid_al_haram", Modifier.fillMaxSize())
+            ImmersiveDetailHeaderScrim(
+                title = "Invocations",
+                supportingText = "From the Noble Quran",
+                arabicTitle = "دعاء",
+            )
+        }
+    }) {
         when (val current = state) {
             SharedNewsState.Loading -> Box(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -2000,7 +2026,7 @@ internal fun NewsDetailScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                SupportingCard("Unable to load news", current.message)
+                SupportingCard("Unable to load this item", current.message)
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { loadAttempt++ }) { Text("Try again") }
             }
