@@ -23,7 +23,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -152,6 +155,7 @@ fun PrayerTimesScreen(
     onRefresh: () -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onTogglePrayerNotification: (String) -> Unit = {},
+    onTogglePrayerAdhan: (String) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onVoiceTap: (() -> Unit)? = null,
@@ -330,6 +334,7 @@ fun PrayerTimesScreen(
                                             showAllPrayers = true,
                                             onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                             onAdjustPrayer = onAdjustPrayer,
+                                            onTogglePrayerAdhan = onTogglePrayerAdhan,
                                             isTuning = isTuningSchedule,
                                             onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                             notifications = notifications,
@@ -377,6 +382,7 @@ fun PrayerTimesScreen(
                                     showAllPrayers = true,
                                     onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                     onAdjustPrayer = onAdjustPrayer,
+                                    onTogglePrayerAdhan = onTogglePrayerAdhan,
                                     isTuning = isTuningSchedule,
                                     onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                     notifications = notifications,
@@ -429,6 +435,7 @@ fun PrayerTimesScreen(
                                         showAllPrayers = showAllPrayers,
                                         onToggleExpanded = { showAllPrayers = !showAllPrayers },
                                         onAdjustPrayer = onAdjustPrayer,
+                                        onTogglePrayerAdhan = onTogglePrayerAdhan,
                                         isTuning = isTuningSchedule,
                                         onToggleTuning = { isTuningSchedule = !isTuningSchedule },
                                         notifications = notifications,
@@ -604,6 +611,7 @@ private fun PrayerScheduleSection(
     onToggleTuning: () -> Unit,
     notifications: PrayerNotificationPreferences,
     onTogglePrayerNotification: (String) -> Unit,
+    onTogglePrayerAdhan: (String) -> Unit,
     showExpandControl: Boolean,
     compact: Boolean,
     columns: Int = 2,
@@ -701,6 +709,7 @@ private fun PrayerScheduleSection(
                 onRevealChange = { revealedCard = it },
                 notifications = notifications,
                 onTogglePrayerNotification = onTogglePrayerNotification,
+                onTogglePrayerAdhan = onTogglePrayerAdhan,
                 compact = compact,
                 cardMinHeight = cardMinHeight,
             )
@@ -720,6 +729,7 @@ private fun PrayerScheduleSection(
                         slots = pair,
                         offsets = offsets,
                         onAdjustPrayer = onAdjustPrayer,
+                        onTogglePrayerAdhan = onTogglePrayerAdhan,
                         isTuning = isTuning,
                         revealedCard = revealedCard,
                         onRevealChange = { revealedCard = it },
@@ -766,6 +776,7 @@ private fun PrayerCardRow(
     onRevealChange: (RevealedPrayerCard?) -> Unit,
     notifications: PrayerNotificationPreferences,
     onTogglePrayerNotification: (String) -> Unit,
+    onTogglePrayerAdhan: (String) -> Unit,
     compact: Boolean,
     cardMinHeight: Dp? = null,
 ) {
@@ -784,6 +795,9 @@ private fun PrayerCardRow(
                 },
                 notificationEnabled = notifications.isNotificationEnabledForPrayer(slot.name),
                 onToggleNotification = { onTogglePrayerNotification(slot.name) },
+                adhanEnabled = slot.name != "Sunrise" &&
+                    notifications.isAdhanEnabledForPrayer(slot.name),
+                onToggleAdhan = { onTogglePrayerAdhan(slot.name) },
                 compact = compact,
                 minHeight = cardMinHeight,
                 modifier = Modifier.weight(1f),
@@ -803,6 +817,8 @@ private fun PrayerCard(
     onRevealChange: (PrayerCardRevealSide?) -> Unit,
     notificationEnabled: Boolean,
     onToggleNotification: () -> Unit,
+    adhanEnabled: Boolean,
+    onToggleAdhan: () -> Unit,
     compact: Boolean,
     minHeight: Dp? = null,
     modifier: Modifier = Modifier,
@@ -1110,18 +1126,65 @@ private fun PrayerCard(
                             modifier = Modifier.padding(bottom = 2.dp),
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.08f))
-                            .padding(horizontal = 7.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = offsetLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = accentColor.copy(alpha = 0.78f),
-                        )
+                    // The offset badge spot: while tuning, it morphs into this
+                    // prayer's adhan speaker toggle (mirroring the Android tile);
+                    // outside tuning it is the "+Xm" offset badge.
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = isTuning && slot.name != "Sunrise",
+                        transitionSpec = {
+                            (
+                                fadeIn(tween(220)) +
+                                    scaleIn(
+                                        initialScale = 0.72f,
+                                        animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                    )
+                                ) togetherWith (
+                                fadeOut(tween(150)) +
+                                    scaleOut(
+                                        targetScale = 0.78f,
+                                        animationSpec = tween(190),
+                                    )
+                                )
+                        },
+                        label = "tileAdhanBadgeMorph",
+                    ) { showAdhanControl ->
+                        if (showAdhanControl) {
+                            Box(
+                                modifier = Modifier
+                                    .size(if (compact) 28.dp else 32.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor.copy(alpha = if (adhanEnabled) 0.12f else 0.04f))
+                                    .clickable(onClick = onToggleAdhan),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                FlaticonIcon(
+                                    glyph = FlaticonIcons.VOLUME,
+                                    contentDescription = if (adhanEnabled) {
+                                        "Disable ${slot.name} adhan"
+                                    } else {
+                                        "Enable ${slot.name} adhan"
+                                    },
+                                    tint = accentColor.copy(
+                                        alpha = if (adhanEnabled) 0.9f else 0.25f,
+                                    ),
+                                    fontSize = if (compact) 13.sp else 16.sp,
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(accentColor.copy(alpha = 0.08f))
+                                    .padding(horizontal = 7.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = offsetLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = accentColor.copy(alpha = 0.78f),
+                                )
+                            }
+                        }
                     }
                 }
             }

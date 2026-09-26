@@ -464,6 +464,10 @@ fun PrayerTimesViewController(
                         notificationPrefs = notificationPrefs.togglePrayer(prayer)
                         settingsStore.saveNotifications(notificationPrefs)
                     },
+                    onTogglePrayerAdhan = { prayer ->
+                        notificationPrefs = notificationPrefs.toggleAdhan(prayer)
+                        settingsStore.saveNotifications(notificationPrefs)
+                    },
                     onOpenProfile = actions.onOpenProfile,
                     onOpenSearch = actions.onOpenSearch,
                     onVoiceTap = actions.onOpenSearch,
@@ -847,5 +851,16 @@ private fun com.starception.submission.prayer.model.PrayerNotificationPreference
     "asr" -> copy(asrNotificationEnabled = !asrNotificationEnabled)
     "maghrib" -> copy(maghribNotificationEnabled = !maghribNotificationEnabled)
     "isha" -> copy(ishaNotificationEnabled = !ishaNotificationEnabled)
+    else -> this
+}
+
+private fun com.starception.submission.prayer.model.PrayerNotificationPreferences.toggleAdhan(
+    prayer: String,
+) = when (prayer.lowercase()) {
+    "fajr" -> copy(fajrAdhanEnabled = !fajrAdhanEnabled)
+    "dhuhr" -> copy(dhuhrAdhanEnabled = !dhuhrAdhanEnabled)
+    "asr" -> copy(asrAdhanEnabled = !asrAdhanEnabled)
+    "maghrib" -> copy(maghribAdhanEnabled = !maghribAdhanEnabled)
+    "isha" -> copy(ishaAdhanEnabled = !ishaAdhanEnabled)
     else -> this
 }
