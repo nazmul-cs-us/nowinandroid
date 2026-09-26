@@ -52,13 +52,42 @@ class SurahArtworkResolver(private val downloadManager: AssetDownloadManager) {
             return null
         }
         android.util.Log.i(TAG, "Downloading artwork $cdnKey (in manifest: ${manifest.assets.containsKey(cdnKey)})")
-        return when (val state = downloadManager.downloadAsset(cdnKey, manifest)) {
+        return when (val state = downloadAsset(cdnKey, manifest, allowManifestRefresh = true)) {
             is AssetDownloadManager.DownloadState.Completed -> resolveArtworkFile(surahNumber)
             else -> {
                 android.util.Log.w(TAG, "Artwork download failed for $cdnKey: $state")
                 null
             }
         }
+    }
+
+    /**
+     * Downloads [cdnKey] via [manifest], healing a stale manifest when the key
+     * is unexpectedly absent: the CDN may have gained this category after the
+     * cached manifest was loaded, so force-refresh once and retry.
+     */
+    private suspend fun downloadAsset(
+        cdnKey: String,
+        manifest: com.starception.submission.core.assetcache.AssetManifest,
+        allowManifestRefresh: Boolean,
+    ): AssetDownloadManager.DownloadState {
+        var state = if (manifest.assets.containsKey(cdnKey)) {
+            downloadManager.downloadAsset(cdnKey, manifest)
+        } else {
+            AssetDownloadManager.DownloadState.Failed("Asset not in manifest: $cdnKey")
+        }
+        if (
+            state is AssetDownloadManager.DownloadState.Failed &&
+            state.error.startsWith("Asset not in manifest") &&
+            allowManifestRefresh
+        ) {
+            android.util.Log.i(TAG, "Key $cdnKey missing from cached manifest — refreshing")
+            val fresh = downloadManager.refreshManifest()
+            if (fresh != null && fresh.assets.containsKey(cdnKey)) {
+                state = downloadManager.downloadAsset(cdnKey, fresh)
+            }
+        }
+        return state
     }
 
     companion object {

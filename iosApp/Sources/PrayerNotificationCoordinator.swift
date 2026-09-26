@@ -36,6 +36,7 @@ private struct PrayerEntry: Decodable {
     let enabled: Bool
     let priorMinutes: Int
     let activeMinutes: Int
+    let adhanEnabled: Bool?
 }
 
 private struct DatedPrayer {
@@ -147,13 +148,14 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
         }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
 
-        let events = prayers.flatMap { prayer -> [(String, Date, String, String)] in
+        let events = prayers.flatMap { prayer -> [(String, Date, String, String, Bool)] in
             let dayKey = Self.identifierDateFormatter.string(from: prayer.date)
             let start = (
                 "\(prayerNotificationPrefix)\(dayKey).\(prayer.entry.name).start",
                 prayer.date,
                 "Time for \(prayer.entry.name)",
-                "It is time to pray \(prayer.entry.name) in \(payload.locationName)."
+                "It is time to pray \(prayer.entry.name) in \(payload.locationName).",
+                prayer.entry.adhanEnabled ?? true
             )
             guard prayer.entry.priorMinutes > 0 else { return [start] }
             let reminderDate = prayer.date.addingTimeInterval(
@@ -165,7 +167,8 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
                     "\(prayerNotificationPrefix)\(dayKey).\(prayer.entry.name).reminder",
                     reminderDate,
                     "\(prayer.entry.name) is approaching",
-                    "\(prayer.entry.name) begins in \(prayer.entry.priorMinutes) minutes."
+                    "\(prayer.entry.name) begins in \(prayer.entry.priorMinutes) minutes.",
+                    false
                 ),
                 start,
             ]
@@ -180,7 +183,16 @@ final class PrayerNotificationCoordinator: NSObject, UNUserNotificationCenterDel
             content.categoryIdentifier = "PRAYER_TIME"
             content.threadIdentifier = "PRAYER_TIMES"
             content.interruptionLevel = .timeSensitive
-            if payload.soundEnabled { content.sound = .default }
+            // Per-prayer adhan: the prayer-START notification plays the bundled
+            // adhan audio (system-managed: honors the volume/mute switch);
+            // reminders keep the default sound. The adhan is 14s, within iOS's
+            // 30s notification-sound limit.
+            let isPrayerStart = event.0.hasSuffix(".start")
+            if isPrayerStart, event.4 {
+                content.sound = UNNotificationSound(named: UNNotificationSoundName("short_adhan.caf"))
+            } else if payload.soundEnabled {
+                content.sound = .default
+            }
 
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = scheduleTimeZone(for: payload)

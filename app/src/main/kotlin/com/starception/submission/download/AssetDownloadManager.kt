@@ -433,6 +433,20 @@ class AssetDownloadManager @Inject constructor(
         }
     }
 
+    /**
+     * Drops the in-memory manifest and re-fetches the remote copy, then returns
+     * it. Callers that noticed a missing asset key (e.g. after the CDN gained a
+     * new category) use this to heal a stale cached manifest.
+     */
+    suspend fun refreshManifest(): AssetManifest? = withContext(Dispatchers.IO) {
+        cachedManifest = null
+        if (!isOnline()) return@withContext null
+        sharedAssets.loadManifest(forceRefresh = true)?.also { manifest ->
+            cachedManifest = manifest
+            Log.i(TAG, "Refreshed shared Cloudflare manifest (version=${manifest.version})")
+        } ?: loadManifest()
+    }
+
     fun deleteAsset(cdnKey: String): Boolean {
         val file = File(cdnAssetsDir, cdnKey)
         val deletedAsset = file.delete()

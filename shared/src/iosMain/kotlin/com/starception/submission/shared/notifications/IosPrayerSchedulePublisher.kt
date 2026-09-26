@@ -75,6 +75,7 @@ internal object IosPrayerSchedulePublisher {
                             enabled = preferences.isNotificationEnabledForPrayer(slot.name),
                             priorMinutes = preferences.getPriorMinutesForPrayer(slot.name),
                             activeMinutes = preferences.getGoToMosqueDurationForPrayer(slot.name),
+                            adhanEnabled = preferences.isAdhanEnabledForPrayer(slot.name),
                         )
                     },
             )
@@ -120,4 +121,7 @@ private data class IosPrayerEntry(
     val enabled: Boolean,
     val priorMinutes: Int,
     val activeMinutes: Int,
+    // Per-prayer adhan toggle: the prayer-time notification plays the bundled
+    // adhan audio instead of the default sound.
+    val adhanEnabled: Boolean = false,
 )

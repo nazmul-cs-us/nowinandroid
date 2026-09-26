@@ -28,7 +28,11 @@ targets:
       - path: Sources
         excludes:
           - PrivacyInfo.xcprivacy
+          - short_adhan.caf
       - path: Sources/PrivacyInfo.xcprivacy
+        buildPhase: resources
+        type: file
+      - path: Sources/short_adhan.caf
         buildPhase: resources
         type: file
       - path: Shared
