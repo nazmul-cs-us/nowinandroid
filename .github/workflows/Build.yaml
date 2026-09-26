@@ -166,7 +166,7 @@ jobs:
     timeout-minutes: 55
     strategy:
       matrix:
-        api-level: [28, 34]  # app minSdk is 28; API 26 emulator cannot install the app
+        api-level: [30, 34]  # coverage steps below gate on api-level == 30; API 28 emu was flaky
 
     steps:
       - name: Delete unnecessary tools 🔧
