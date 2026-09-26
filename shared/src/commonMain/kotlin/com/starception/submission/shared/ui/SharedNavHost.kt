@@ -68,6 +68,10 @@ object PrayerSettingsRoute
 
 @Serializable data class BukhariBookRoute(val id: Int)
 
+@Serializable data class ShamayelBookRoute(val id: Int)
+
+@Serializable data class ShamayelHadithRoute(val id: Int)
+
 @Serializable data class BukhariHadithRoute(val id: Int)
 
 @Serializable data class TopicRoute(val id: Int)
@@ -269,6 +273,20 @@ fun SharedNavHost(
                 onBack = { navController.popBackStack() },
             )
         }
+        composable<ShamayelBookRoute> { entry ->
+            ShamayelBookDetailScreen(
+                id = entry.toRoute<ShamayelBookRoute>().id,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+                onOpenHadith = { navController.navigate(ShamayelHadithRoute(it)) },
+            )
+        }
+        composable<ShamayelHadithRoute> { entry ->
+            ShamayelHadithDetailScreen(
+                hadithId = entry.toRoute<ShamayelHadithRoute>().id,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable<TopicRoute> { entry ->
             TopicNewsScreen(
                 topicId = entry.toRoute<TopicRoute>().id,
@@ -276,6 +294,7 @@ fun SharedNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                 onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                onOpenShamayelBook = { navController.navigate(ShamayelBookRoute(it)) },
                 onOpenArticle = { topicId, articleId ->
                     navController.navigate(TopicArticleRoute(topicId, articleId))
                 },

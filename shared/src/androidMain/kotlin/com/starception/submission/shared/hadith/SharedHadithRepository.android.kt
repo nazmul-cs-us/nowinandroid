@@ -20,4 +20,5 @@ package com.starception.submission.shared.hadith
 actual fun createSharedHadithRepository(): SharedHadithRepository = object : SharedHadithRepository {
     override suspend fun getHadith(id: Int): SharedHadith? = null
     override suspend fun getHadiths(firstId: Int, lastId: Int): List<SharedHadith> = emptyList()
+    override suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith> = emptyList()
 }

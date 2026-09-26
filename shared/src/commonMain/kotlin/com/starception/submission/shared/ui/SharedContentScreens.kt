@@ -949,6 +949,169 @@ internal fun BukhariHadithDetailScreen(
 }
 
 @Composable
+internal fun ShamayelBookDetailScreen(
+    id: Int,
+    store: SharedContentStore,
+    onBack: () -> Unit,
+    onOpenHadith: (Int) -> Unit,
+) {
+    val book = com.starception.submission.core.model.data.ShamayelBooks.find(id)
+    if (book == null) {
+        SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) { Text("Book not found") }
+        return
+    }
+    var query by remember(id) { mutableStateOf("") }
+    var loadAttempt by remember(id) { mutableStateOf(0) }
+    var state by remember(id) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    val repository = remember { createSharedHadithRepository() }
+    LaunchedEffect(id, loadAttempt) {
+        state = try {
+            val hadiths = repository.getShamayelHadiths(book.firstHadithId, book.lastHadithId)
+            if (hadiths.isEmpty()) {
+                HadithsState.Error("No narrations were found for this book.")
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "The Shama'il At-Tirmidhi database could not be read.")
+        }
+    }
+    SharedDetailScaffold(title = book.nameEnglish, onBack = onBack, maxContentWidth = 900.dp) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Book ${book.id}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    book.nameBengali,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${book.lastHadithId - book.firstHadithId + 1} narrations",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        when (val current = state) {
+            HadithsState.Loading -> Box(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is HadithsState.Error -> SupportingCard("Unable to load narrations", current.message)
+            is HadithsState.Loaded -> {
+                val filtered = remember(current.hadiths, query) {
+                    val term = query.trim().lowercase()
+                    if (term.isEmpty()) {
+                        current.hadiths
+                    } else {
+                        current.hadiths.filter {
+                            it.english.lowercase().contains(term) || it.explanation.lowercase().contains(term)
+                        }
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    items(filtered, key = { it.id }) { hadith ->
+                        BukhariHadithTile(hadith = hadith, onClick = { onOpenHadith(hadith.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ShamayelHadithDetailScreen(
+    hadithId: Int,
+    onBack: () -> Unit,
+) {
+    val book = com.starception.submission.core.model.data.ShamayelBooks.findByHadithId(hadithId)
+    val repository = remember { createSharedHadithRepository() }
+    var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    LaunchedEffect(hadithId) {
+        state = try {
+            repository.getShamayelHadith(hadithId)?.let { HadithsState.Loaded(listOf(it)) }
+                ?: HadithsState.Error("Hadith $hadithId was not found.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            HadithsState.Error(error.message ?: "Unable to read this hadith.")
+        }
+    }
+    SharedDetailScaffold(title = "Hadith $hadithId", onBack = onBack) {
+        when (val current = state) {
+            HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            is HadithsState.Error -> SupportingCard("Unable to load hadith", current.message)
+            is HadithsState.Loaded -> {
+                val hadith = current.hadiths.first()
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    item {
+                        NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(20.dp)))
+                    }
+                    item {
+                        Column {
+                            Text("Shama'il At-Tirmidhi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ReaderTag("HADITH $hadithId")
+                                if (book != null) {
+                                    ReaderTag("BOOK ${book.id} · ${book.nameEnglish.uppercase()}", selected = false)
+                                }
+                            }
+                        }
+                    }
+                    if (hadith.arabic.isNotBlank()) {
+                        item {
+                            ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                                Text(
+                                    hadith.arabic,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    fontSize = 29.sp,
+                                    lineHeight = 46.sp,
+                                    textAlign = TextAlign.End,
+                                )
+                            }
+                        }
+                    }
+                    if (hadith.english.isNotBlank()) {
+                        item {
+                            ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
+                                Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                            }
+                        }
+                    }
+                    if (hadith.explanation.isNotBlank()) {
+                        item {
+                            ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
+                                Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun RecommendationScreen(
     date: LocalDate,
     onBack: () -> Unit,
@@ -1587,6 +1750,7 @@ internal fun TopicNewsScreen(
     onBack: () -> Unit,
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
+    onOpenShamayelBook: (Int) -> Unit = {},
     onOpenArticle: (Int, Int) -> Unit,
     onOpenNews: (Int) -> Unit = {},
     onOpenTopic: (Int) -> Unit = {},

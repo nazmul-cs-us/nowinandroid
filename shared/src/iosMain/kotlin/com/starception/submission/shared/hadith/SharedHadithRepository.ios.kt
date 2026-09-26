@@ -58,6 +58,71 @@ private class IosSharedHadithRepository : SharedHadithRepository {
             readHadiths(firstId, lastId)
         }
 
+    override suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith> =
+        withContext(Dispatchers.Default) {
+            require(firstId > 0 && lastId >= firstId)
+            readShamayelHadiths(firstId, lastId)
+        }
+
+    /**
+     * Shama'il At-Tirmidhi: the hadiths table carries the Arabic text; the
+     * curated hadith_details rows supply the English translation (falling back
+     * to the legacy text_plain elaboration column like the Android app).
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith> {
+        val path = resolveDatabaseAsset(
+            bundledPath = null,
+            remotePath = "databases/hadith/shamayele_tirmidhi_complete.db",
+            cacheName = "shamayele_tirmidhi_complete.db",
+        )
+        return memScoped {
+            val database = alloc<CPointerVar<sqlite3>>()
+            check(sqlite3_open_v2(path, database.ptr, SQLITE_OPEN_READONLY, null) == SQLITE_OK) {
+                "Unable to open the Shama'il At-Tirmidhi database: ${database.value.errorMessage()}"
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
+                SELECT h.id, h.text_arabic,
+                       COALESCE(NULLIF(TRIM(d.english_text), ''), h.text_plain),
+                       COALESCE(NULLIF(TRIM(d.bengali_explanation), ''), h.elaboration)
+                FROM hadiths h
+                LEFT JOIN hadith_details d ON d.hadith_id = h.id
+                WHERE h.id BETWEEN ? AND ?
+                ORDER BY h.id ASC
+                """.trimIndent()
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare the Shama'il query: ${database.value.errorMessage()}"
+                }
+                try {
+                    check(sqlite3_bind_int(statement.value, 1, firstId) == SQLITE_OK)
+                    check(sqlite3_bind_int(statement.value, 2, lastId) == SQLITE_OK)
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    SharedHadith(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        arabic = statement.value.text(1),
+                                        english = statement.value.text(2),
+                                        explanation = statement.value.text(3),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to read Shama'il: ${database.value.errorMessage()}")
+                            }
+                        }
+                    }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
+                }
+            } finally {
+                database.value?.let(::sqlite3_close)
+            }
+        }
+    }
+
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readHadiths(firstId: Int, lastId: Int): List<SharedHadith> {
         val path = resolveDatabaseAsset(

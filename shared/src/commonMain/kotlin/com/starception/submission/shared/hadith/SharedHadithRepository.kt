@@ -26,6 +26,14 @@ data class SharedHadith(
 interface SharedHadithRepository {
     suspend fun getHadith(id: Int): SharedHadith?
     suspend fun getHadiths(firstId: Int, lastId: Int): List<SharedHadith>
+
+    /**
+     * Shama'il At-Tirmidhi. Same [SharedHadith] shape, read from the
+     * shamayele_tirmidhi_complete database; the English field prefers the
+     * curated hadith_details translation when present.
+     */
+    suspend fun getShamayelHadith(id: Int): SharedHadith? = getShamayelHadiths(id, id).firstOrNull()
+    suspend fun getShamayelHadiths(firstId: Int, lastId: Int): List<SharedHadith>
 }
 
 expect fun createSharedHadithRepository(): SharedHadithRepository
