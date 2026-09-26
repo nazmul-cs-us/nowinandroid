@@ -25,6 +25,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -97,6 +98,15 @@ fun NotificationsSection(
      * iOS has no system overlay API from Compose, so the default is a no-op.
      */
     onShowSystemVolume: () -> Unit = {},
+    /**
+     * Per-prayer speaker tap from the Adhan Playback rows — the host opens the
+     * system volume bar armed for that prayer (same interaction as the home
+     * tune tile's speaker). Falls back to [onShowSystemVolume] when null.
+     */
+    onAdhanSpeakerTap: ((prayerName: String) -> Unit)? = null,
+    /** Optional on/mute speaker painters (the tile's Flaticon PNGs on Android). */
+    speakerOnPainter: androidx.compose.ui.graphics.painter.Painter? = null,
+    speakerMutedPainter: androidx.compose.ui.graphics.painter.Painter? = null,
 ) {
     val notificationsActive = preferences.notificationsEnabled && notificationPermissionGranted
 
@@ -231,6 +241,9 @@ fun NotificationsSection(
                     preferences = preferences,
                     onPreferencesChanged = onPreferencesChanged,
                     onShowSystemVolume = onShowSystemVolume,
+                    onAdhanSpeakerTap = onAdhanSpeakerTap,
+                    speakerOnPainter = speakerOnPainter,
+                    speakerMutedPainter = speakerMutedPainter,
                 )
 
                 if (showSilentDuringPrayer) {
@@ -277,6 +290,9 @@ private fun AdhanPlaybackSection(
     preferences: PrayerNotificationPreferences,
     onPreferencesChanged: (PrayerNotificationPreferences) -> Unit,
     onShowSystemVolume: () -> Unit,
+    onAdhanSpeakerTap: ((prayerName: String) -> Unit)? = null,
+    speakerOnPainter: androidx.compose.ui.graphics.painter.Painter? = null,
+    speakerMutedPainter: androidx.compose.ui.graphics.painter.Painter? = null,
 ) {
     CollapsibleSubSection(
         title = "Adhan Playback",
@@ -292,24 +308,119 @@ private fun AdhanPlaybackSection(
         adhanToggles.forEachIndexed { index, adhanEntry ->
             val (prayer, enabled) = adhanEntry.first
             val volumePercent = adhanEntry.second
-            ToggleItem(
-                prayerName = prayer,
-                enabled = enabled,
-                trailingLabel = if (volumePercent <= 0) "Muted" else "$volumePercent%",
-            ) { newValue ->
-                onPreferencesChanged(
-                    when (index) {
-                        0 -> preferences.copy(fajrAdhanEnabled = newValue)
-                        1 -> preferences.copy(dhuhrAdhanEnabled = newValue)
-                        2 -> preferences.copy(asrAdhanEnabled = newValue)
-                        3 -> preferences.copy(maghribAdhanEnabled = newValue)
-                        else -> preferences.copy(ishaAdhanEnabled = newValue)
-                    },
-                )
-                // The system volume bar is the adhan volume: surface it as the
-                // user enables a prayer so it can be adjusted right away.
-                if (newValue) {
-                    onShowSystemVolume()
+            // Speaker row — same icons, morph, and interaction as the home tune
+            // tile: on/mute reflects the per-prayer volume; tapping opens the
+            // system volume bar armed for this prayer. No on/off switch.
+            val audible = volumePercent > 0
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = prayer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (audible) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (volumePercent <= 0) "Muted" else "$volumePercent%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (audible) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(
+                            if (audible) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            } else {
+                                androidx.compose.ui.graphics.Color.Transparent
+                            },
+                        )
+                        .clickable {
+                            val tap = onAdhanSpeakerTap
+                            if (tap != null) {
+                                tap(prayer)
+                            } else {
+                                onShowSystemVolume()
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = audible,
+                        transitionSpec = {
+                            (
+                                androidx.compose.animation.fadeIn(
+                                    androidx.compose.animation.core.tween(220),
+                                ) + androidx.compose.animation.scaleIn(
+                                    initialScale = 0.72f,
+                                    animationSpec = androidx.compose.animation.core.tween(
+                                        260,
+                                        easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                                    ),
+                                )
+                                ) togetherWith (
+                                androidx.compose.animation.fadeOut(
+                                    androidx.compose.animation.core.tween(150),
+                                ) + androidx.compose.animation.scaleOut(
+                                    targetScale = 0.78f,
+                                    animationSpec = androidx.compose.animation.core.tween(190),
+                                )
+                                )
+                        },
+                        label = "settingsSpeakerMorph",
+                    ) { isAudible ->
+                        val painter = if (isAudible) speakerOnPainter else speakerMutedPainter
+                        if (painter != null) {
+                            androidx.compose.material3.Icon(
+                                painter = painter,
+                                contentDescription = if (isAudible) {
+                                    "Adjust adhan volume for $prayer"
+                                } else {
+                                    "Adhan for $prayer is muted — tap to raise the volume"
+                                },
+                                tint = if (isAudible) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(18.dp),
+                            )
+                        } else {
+                            FlaticonIcon(
+                                glyph = FlaticonIcons.VOLUME,
+                                contentDescription = if (isAudible) {
+                                    "Adjust adhan volume for $prayer"
+                                } else {
+                                    "Adhan for $prayer is muted — tap to raise the volume"
+                                },
+                                tint = if (isAudible) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontSize = 16.sp,
+                            )
+                        }
+                    }
                 }
             }
         }

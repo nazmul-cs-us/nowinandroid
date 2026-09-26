@@ -321,7 +321,7 @@ private sealed interface CurrentWeatherLoadState {
  * is a TRANSIENT dial: the stream is restored to its pre-session level when
  * the session expires, so only the per-prayer percent persists.
  */
-private object AdhanVolumeCapture {
+internal object AdhanVolumeCapture {
     @Volatile var prayer: String? = null
 
     @Volatile var lastChangeMillis: Long = 0L
@@ -350,6 +350,41 @@ private object AdhanVolumeCapture {
         }
         preSessionStreamVolume = -1
         prayer = null
+    }
+
+    /**
+     * Opens the system volume bar AT [storedPercent] (a transient dial) and
+     * arms the capture session for [prayerName]. Shared by the home tile's
+     * speaker and the Settings Adhan Playback rows.
+     */
+    fun beginSession(context: android.content.Context, prayerName: String, storedPercent: Int) {
+        val manager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val maxVolume = manager.getStreamMaxVolume(android.media.AudioManager.STREAM_NOTIFICATION)
+            .coerceAtLeast(1)
+        if (prayer != null && prayer != prayerName) {
+            endSession()
+        }
+        audioManager = manager
+        preSessionStreamVolume = manager.getStreamVolume(
+            android.media.AudioManager.STREAM_NOTIFICATION,
+        )
+        prayer = prayerName
+        lastChangeMillis = System.currentTimeMillis()
+        val targetStream = (storedPercent * maxVolume / 100).coerceIn(0, maxVolume)
+        if (targetStream != preSessionStreamVolume) {
+            runCatching {
+                manager.setStreamVolume(
+                    android.media.AudioManager.STREAM_NOTIFICATION,
+                    targetStream,
+                    0,
+                )
+            }
+        }
+        manager.adjustStreamVolume(
+            android.media.AudioManager.STREAM_NOTIFICATION,
+            android.media.AudioManager.ADJUST_SAME,
+            android.media.AudioManager.FLAG_SHOW_UI,
+        )
     }
 }
 

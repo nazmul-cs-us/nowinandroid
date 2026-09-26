@@ -392,6 +392,22 @@ fun UnifiedSettingsScreen(
                                         android.media.AudioManager.FLAG_SHOW_UI,
                                     )
                                 },
+                                onAdhanSpeakerTap = { prayerName ->
+                                    // Same interaction as the home tune tile: open the bar
+                                    // AT this prayer's stored percent and capture the
+                                    // adjustment as this prayer's own volume.
+                                    val stored = notificationPreferences
+                                        .getAdhanVolumeForPrayer(prayerName)
+                                    com.starception.submission.feature.prayertimes
+                                        .AdhanVolumeCapture
+                                        .beginSession(dndContext, prayerName, stored)
+                                },
+                                speakerOnPainter = androidx.compose.ui.res.painterResource(
+                                    com.starception.submission.R.drawable.flaticon_sound_14925297,
+                                ),
+                                speakerMutedPainter = androidx.compose.ui.res.painterResource(
+                                    com.starception.submission.R.drawable.flaticon_sound_14925198,
+                                ),
                             )
                         }
                     }
