@@ -117,6 +117,7 @@ import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
+import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -915,6 +916,15 @@ internal fun BukhariHadithDetailScreen(
                             }
                         }
                     }
+                    item {
+                        HadithListenButton(hadith.english) { enabled ->
+                            if (enabled) {
+                                PlatformSpeechSynthesizer().speak(text = hadith.english)
+                            } else {
+                                PlatformSpeechSynthesizer().stop()
+                            }
+                        }
+                    }
                     if (hadith.arabic.isNotBlank()) {
                         item {
                             ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
@@ -1078,6 +1088,15 @@ internal fun ShamayelHadithDetailScreen(
                             }
                         }
                     }
+                    item {
+                        HadithListenButton(hadith.english) { enabled ->
+                            if (enabled) {
+                                PlatformSpeechSynthesizer().speak(text = hadith.english)
+                            } else {
+                                PlatformSpeechSynthesizer().stop()
+                            }
+                        }
+                    }
                     if (hadith.arabic.isNotBlank()) {
                         item {
                             ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
@@ -1106,6 +1125,41 @@ internal fun ShamayelHadithDetailScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Listen/Stop toggle that TTS-reads the English translation through the
+ * shared PlatformSpeechSynthesizer (AVSpeechSynthesizer on iOS, the host's
+ * engine elsewhere). Stops automatically when the screen disposes.
+ */
+@Composable
+private fun HadithListenButton(
+    englishText: String,
+    onToggle: (enabled: Boolean) -> Unit,
+) {
+    var listening by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            if (listening) {
+                PlatformSpeechSynthesizer().stop()
+            }
+        }
+    }
+    if (englishText.isNotBlank()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                listening = !listening
+                onToggle(listening)
+            }) {
+                Icon(
+                    if (listening) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(if (listening) "Stop" else "Listen")
             }
         }
     }
