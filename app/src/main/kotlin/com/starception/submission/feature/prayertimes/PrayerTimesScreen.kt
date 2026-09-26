@@ -4204,23 +4204,21 @@ private fun PrayerHeaderAction(
         AnimatedContent(
             targetState = active,
             transitionSpec = {
-                if (targetState) {
-                    (
-                        fadeIn(tween(durationMillis = 180, delayMillis = 40)) +
-                            slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 5 }
-                        ).togetherWith(
-                        fadeOut(tween(durationMillis = 120)) +
-                            slideOutVertically(tween(170)) { -it / 5 },
+                // Same fade+scale morph as the bell <-> weather alert and the
+                // speaker/badge swaps, so every tune-schedule control moves alike.
+                (
+                    fadeIn(tween(220)) +
+                        scaleIn(
+                            initialScale = 0.72f,
+                            animationSpec = tween(260, easing = FastOutSlowInEasing),
+                        )
+                    ) togetherWith (
+                    fadeOut(tween(150)) +
+                        scaleOut(
+                            targetScale = 0.78f,
+                            animationSpec = tween(190),
+                        )
                     )
-                } else {
-                    (
-                        fadeIn(tween(durationMillis = 180, delayMillis = 40)) +
-                            slideInVertically(tween(220, easing = FastOutSlowInEasing)) { -it / 5 }
-                        ).togetherWith(
-                        fadeOut(tween(durationMillis = 120)) +
-                            slideOutVertically(tween(170)) { it / 5 },
-                    )
-                }
             },
             contentAlignment = Alignment.Center,
             label = "prayerActionState",

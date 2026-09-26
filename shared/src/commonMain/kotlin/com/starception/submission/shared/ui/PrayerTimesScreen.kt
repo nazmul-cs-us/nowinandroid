@@ -680,12 +680,34 @@ private fun PrayerScheduleSection(
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = if (isTuning) NiaIcons.Check else Icons.Outlined.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(if (compact) 16.dp else 18.dp),
-                        )
+                        // Same fade+scale morph as the bell <-> weather alert and
+                        // the speaker/badge swaps on the tune tile.
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = isTuning,
+                            transitionSpec = {
+                                (
+                                    fadeIn(tween(220)) +
+                                        scaleIn(
+                                            initialScale = 0.72f,
+                                            animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                        )
+                                    ) togetherWith (
+                                    fadeOut(tween(150)) +
+                                        scaleOut(
+                                            targetScale = 0.78f,
+                                            animationSpec = tween(190),
+                                        )
+                                    )
+                            },
+                            label = "tuneScheduleIconMorph",
+                        ) { tuning ->
+                            Icon(
+                                imageVector = if (tuning) NiaIcons.Check else Icons.Outlined.Tune,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(if (compact) 16.dp else 18.dp),
+                            )
+                        }
                     }
                     Text(
                         text = if (isTuning) "Done" else "Tune schedule",
