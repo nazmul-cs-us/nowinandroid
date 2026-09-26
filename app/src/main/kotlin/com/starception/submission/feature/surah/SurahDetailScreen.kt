@@ -4334,31 +4334,38 @@ private fun AlbumHeader(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Match info card background
             .clipToBounds(), // Clip the image so parallax doesn't overflow
     ) {
-        // Album cover image with parallax effect
-        Image(
-            painter = if (artworkFile != null) {
-                rememberAsyncImagePainter(
-                    model = artworkFile,
-                )
-            } else {
-                // Bundled fallback while the chapter's CDN artwork downloads.
-                // Direct R reference — no cross-class constant indirection.
-                painterResource(R.drawable.insight_quran)
-            },
-            contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    // Overscan provides enough room for a clearly visible
-                    // slower-moving image layer without revealing an edge.
-                    scaleX = 1.20f
-                    scaleY = 1.20f
-                    translationY = parallaxOffset
-                        .coerceAtMost(size.height * 0.085f)
+        // Album cover image with parallax effect. Crossfade from the bundled
+        // placeholder to the downloaded chapter artwork instead of an abrupt swap.
+        androidx.compose.animation.Crossfade(
+            targetState = artworkFile,
+            animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
+            label = "surahArtwork",
+        ) { file ->
+            Image(
+                painter = if (file != null) {
+                    rememberAsyncImagePainter(
+                        model = file,
+                    )
+                } else {
+                    // Bundled fallback while the chapter's CDN artwork downloads.
+                    // Direct R reference — no cross-class constant indirection.
+                    painterResource(R.drawable.insight_quran)
                 },
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-        )
+                contentDescription = "Symbolic artwork for Surah ${surah.nameEnglish}",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Overscan provides enough room for a clearly visible
+                        // slower-moving image layer without revealing an edge.
+                        scaleX = 1.20f
+                        scaleY = 1.20f
+                        translationY = parallaxOffset
+                            .coerceAtMost(size.height * 0.085f)
+                    },
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.Center,
+            )
+        }
 
         // The toolbar begins over this image, so preserve contrast across both
         // bright dawn scenes and darker night artwork without altering the asset.
