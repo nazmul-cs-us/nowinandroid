@@ -315,16 +315,13 @@ class UnifiedSettingsViewModel @Inject constructor(
         }
     }
 
-    // Notification preferences
+    // Notification preferences. Collecting the repository's flow (not a one-shot
+    // load) keeps the Settings screen in sync when preferences change elsewhere
+    // — e.g. the adhan volume captured from the home prayer tile's speaker.
     private fun loadNotificationPreferences() {
         viewModelScope.launch {
-            try {
-                Log.i(TAG, "Loading notification preferences...")
-                val prefs = prayerSettingsRepository.getNotificationPreferences()
+            prayerSettingsRepository.notificationPreferencesFlow.collect { prefs ->
                 _notificationPreferences.value = prefs
-                Log.i(TAG, "Notification preferences loaded: enabled=${prefs.notificationsEnabled}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error loading notification preferences", e)
             }
         }
     }

@@ -317,16 +317,37 @@ private sealed interface CurrentWeatherLoadState {
 /**
  * Which prayer's speaker tap opened the system volume bar. While set, the
  * notification-stream volume changes are captured as THAT prayer's own adhan
- * volume (as a percent of the stream max) instead of a shared value.
+ * volume (as a percent of the stream max) instead of a shared value. The bar
+ * is a TRANSIENT dial: the stream is restored to its pre-session level when
+ * the session expires, so only the per-prayer percent persists.
  */
 private object AdhanVolumeCapture {
     @Volatile var prayer: String? = null
 
     @Volatile var lastChangeMillis: Long = 0L
 
-    /** Auto-close the capture session a few seconds after the bar stops moving. */
+    @Volatile var preSessionStreamVolume: Int = -1
+
+    @Volatile var audioManager: android.media.AudioManager? = null
+
+    /**
+     * Auto-close the capture session a few seconds after the bar stops moving
+     * and RESTORE the notification stream to its pre-session level.
+     */
     fun maybeExpire(nowMillis: Long = System.currentTimeMillis()) {
         if (prayer != null && nowMillis - lastChangeMillis > 6_000L) {
+            val restore = preSessionStreamVolume
+            val manager = audioManager
+            if (restore >= 0 && manager != null) {
+                runCatching {
+                    manager.setStreamVolume(
+                        android.media.AudioManager.STREAM_NOTIFICATION,
+                        restore,
+                        0,
+                    )
+                }
+            }
+            preSessionStreamVolume = -1
             prayer = null
         }
     }
@@ -2146,12 +2167,29 @@ fun PrayerTimesScreen(
                                                 )
                                                 .clickable {
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    // Open the system bar and start capturing for this prayer.
-                                                    AdhanVolumeCapture.prayer = prayerName
-                                                    AdhanVolumeCapture.lastChangeMillis = System.currentTimeMillis()
+                                                    // Open the system bar AT this prayer's stored percent
+                                                    // (a transient dial); restore the stream after.
                                                     val audioManager = tileContext.getSystemService(
                                                         Context.AUDIO_SERVICE,
                                                     ) as android.media.AudioManager
+                                                    val maxVolume = audioManager.getStreamMaxVolume(
+                                                        android.media.AudioManager.STREAM_NOTIFICATION,
+                                                    ).coerceAtLeast(1)
+                                                    AdhanVolumeCapture.audioManager = audioManager
+                                                    AdhanVolumeCapture.preSessionStreamVolume =
+                                                        audioManager.getStreamVolume(
+                                                            android.media.AudioManager.STREAM_NOTIFICATION,
+                                                        )
+                                                    AdhanVolumeCapture.prayer = prayerName
+                                                    AdhanVolumeCapture.lastChangeMillis = System.currentTimeMillis()
+                                                    val targetStream = (adhanVolume * maxVolume / 100).coerceIn(0, maxVolume)
+                                                    if (targetStream != AdhanVolumeCapture.preSessionStreamVolume) {
+                                                        audioManager.setStreamVolume(
+                                                            android.media.AudioManager.STREAM_NOTIFICATION,
+                                                            targetStream,
+                                                            0,
+                                                        )
+                                                    }
                                                     audioManager.adjustStreamVolume(
                                                         android.media.AudioManager.STREAM_NOTIFICATION,
                                                         android.media.AudioManager.ADJUST_SAME,

@@ -283,14 +283,20 @@ private fun AdhanPlaybackSection(
         subtitle = "Per-prayer adhan sound (volume follows the system volume bar)",
     ) {
         val adhanToggles = listOf(
-            "Fajr" to preferences.fajrAdhanEnabled,
-            "Dhuhr" to preferences.dhuhrAdhanEnabled,
-            "Asr" to preferences.asrAdhanEnabled,
-            "Maghrib" to preferences.maghribAdhanEnabled,
-            "Isha" to preferences.ishaAdhanEnabled,
+            "Fajr" to preferences.fajrAdhanEnabled to preferences.getAdhanVolumeForPrayer("fajr"),
+            "Dhuhr" to preferences.dhuhrAdhanEnabled to preferences.getAdhanVolumeForPrayer("dhuhr"),
+            "Asr" to preferences.asrAdhanEnabled to preferences.getAdhanVolumeForPrayer("asr"),
+            "Maghrib" to preferences.maghribAdhanEnabled to preferences.getAdhanVolumeForPrayer("maghrib"),
+            "Isha" to preferences.ishaAdhanEnabled to preferences.getAdhanVolumeForPrayer("isha"),
         )
-        adhanToggles.forEachIndexed { index, (prayer, enabled) ->
-            ToggleItem(prayer, enabled) { newValue ->
+        adhanToggles.forEachIndexed { index, adhanEntry ->
+            val (prayer, enabled) = adhanEntry.first
+            val volumePercent = adhanEntry.second
+            ToggleItem(
+                prayerName = prayer,
+                enabled = enabled,
+                trailingLabel = if (volumePercent <= 0) "Muted" else "$volumePercent%",
+            ) { newValue ->
                 onPreferencesChanged(
                     when (index) {
                         0 -> preferences.copy(fajrAdhanEnabled = newValue)
@@ -649,6 +655,7 @@ private fun ToggleItem(
     prayerName: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    trailingLabel: String? = null,
     onEnabledChange: (Boolean) -> Unit,
 ) {
     Row(
@@ -658,11 +665,25 @@ private fun ToggleItem(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = prayerName,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = prayerName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier,
+            )
+            if (trailingLabel != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = trailingLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
         Switch(
             checked = enabled,
             onCheckedChange = onEnabledChange,
