@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -117,6 +118,7 @@ import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -344,6 +346,16 @@ internal fun QuranDetailScreen(
     var translationLanguage by remember {
         mutableStateOf(QuranTranslationLanguage.fromCode(store.quranTranslationLanguage()))
     }
+    val tafseerRepository = remember { com.starception.submission.shared.quran.createQuranTafseerRepository() }
+    val tafseerScope = androidx.compose.runtime.rememberCoroutineScope()
+    var tafseerRequest by remember {
+        mutableStateOf<com.starception.submission.shared.quran.AyahTafseer?>(null)
+    }
+    var tafseerLoading by remember { mutableStateOf(false) }
+    var tafseerSelectedBook by remember { mutableStateOf(0) }
+    LaunchedEffect(tafseerRequest) {
+        tafseerLoading = tafseerRequest != null
+    }
     var ayahState by remember(number) { mutableStateOf<QuranAyahState>(QuranAyahState.Loading) }
     val repository = remember { createQuranVerseRepository() }
     DisposableEffect(player) { onDispose { player.stop() } }
@@ -462,6 +474,86 @@ internal fun QuranDetailScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
+        // Tafseer / word-study sheet. Word study jumps straight to the word
+        // meanings book; Tafseer opens on As-Sa'di. Switching books is instant
+        // since the whole ayah row (all books + meanings) was loaded at once.
+        val tafseerSheet = tafseerRequest
+        if (tafseerSheet != null) {
+            Surface(
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (tafseerSelectedBook == 3) "Word meanings" else "Tafseer · Ayah ${tafseerSheet.ayahNumber}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        androidx.compose.material3.TextButton(
+                            onClick = { tafseerRequest = null },
+                        ) {
+                            Text("Close", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.foundation.layout.Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                    ) {
+                        listOf("As-Sa'di" to 0, "Al-Moyassar" to 1, "Al-Baghawi" to 2, "Word meanings" to 3).forEach { (label, index) ->
+                            androidx.compose.material3.FilterChip(
+                                selected = tafseerSelectedBook == index,
+                                onClick = { tafseerSelectedBook = index },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    if (tafseerLoading) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularProgressIndicator() }
+                    } else {
+                        val body = when (tafseerSelectedBook) {
+                            0 -> tafseerSheet.tafseerSaadi
+                            1 -> tafseerSheet.tafseerMoysar
+                            2 -> tafseerSheet.tafseerBaghawi
+                            else -> tafseerSheet.ayahMeanings
+                        }
+                        if (body.isBlank()) {
+                            Text(
+                                "The enhanced Quran database has no content for this ayah yet.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Text(
+                                body,
+                                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         when (val state = ayahState) {
             QuranAyahState.Loading -> Box(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -526,6 +618,20 @@ internal fun QuranDetailScreen(
                                 verse = verse,
                                 showTranslation = showTranslation,
                                 onToggleTranslation = { showTranslation = !showTranslation },
+                                onOpenTafseer = { verseId, preselectBook ->
+                                    tafseerSelectedBook = preselectBook
+                                    tafseerLoading = true
+                                    tafseerScope.launch {
+                                        val tafseer = runCatching {
+                                            tafseerRepository.getTafseer(
+                                                number,
+                                                verseId,
+                                            )
+                                        }.getOrNull()
+                                        tafseerRequest = tafseer ?: com.starception.submission.shared.quran.AyahTafseer.EMPTY
+                                        tafseerLoading = false
+                                    }
+                                },
                             )
                         }
                     }
@@ -541,6 +647,7 @@ private fun QuranAyahReadingBlock(
     verse: QuranVerse,
     showTranslation: Boolean,
     onToggleTranslation: () -> Unit,
+    onOpenTafseer: (ayahNumber: Int, preselectBook: Int) -> Unit = { _, _ -> },
 ) {
     Column(
         modifier = Modifier
@@ -575,7 +682,23 @@ private fun QuranAyahReadingBlock(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(14.dp))
+        // Ayah actions: word meanings + tafseer, matching the Android detail
+        // screen's ayah actions.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.TextButton(
+                onClick = { onOpenTafseer(verse.numberInSurah, 3) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            ) {
+                Text("Word study", style = MaterialTheme.typography.labelMedium)
+            }
+            androidx.compose.material3.TextButton(
+                onClick = { onOpenTafseer(verse.numberInSurah, 0) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            ) {
+                Text("Tafseer", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     }
 }
