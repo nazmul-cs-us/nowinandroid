@@ -60,7 +60,9 @@ internal object IosSherpaAssetResolver {
     }
 
     private suspend fun resolve(cdnKey: String): String? =
-        iosCloudAssets.lookupAsset(cdnKey)?.absolutePath
+        // resolveAsset (not lookupAsset): downloads from the CDN on first use
+        // instead of silently returning null when a voice model is missing.
+        iosCloudAssets.resolveAsset(cdnKey)?.absolutePath
 
     const val KOKORO_VOICE_ID = "SHERPA_KOKORO"
     const val VITS_VOICE_ID = "SHERPA_VITS_VCTK"
