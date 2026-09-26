@@ -35,6 +35,9 @@ targets:
       - path: Sources/short_adhan.caf
         buildPhase: resources
         type: file
+      - path: Sources/travel_dua.caf
+        buildPhase: resources
+        type: file
       - path: Shared
       - path: ../app/src/main/assets/manifest.json
         buildPhase: resources

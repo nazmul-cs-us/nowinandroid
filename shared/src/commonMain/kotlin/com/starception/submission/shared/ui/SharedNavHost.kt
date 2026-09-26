@@ -62,6 +62,8 @@ object PrayerSettingsRoute
 
 @Serializable object QuranLibraryRoute
 
+@Serializable object DrivingModeRoute
+
 @Serializable data class QuranDetailRoute(val number: Int)
 
 @Serializable data class NewsDetailRoute(val id: Int)
@@ -89,6 +91,7 @@ data class SharedHomeActions(
     val onOpenQuran: (Int) -> Unit,
     val onOpenQibla: () -> Unit,
     val onOpenRecommendation: () -> Unit,
+    val onOpenDrivingMode: () -> Unit = {},
     val onSelectBottom: (Int) -> Unit,
 )
 
@@ -106,6 +109,8 @@ internal val LocalQuranAudioPlayer = staticCompositionLocalOf<QuranAudioPlayer> 
  */
 @Composable
 fun SharedNavHost(
+    drivingCoordinator: com.starception.submission.shared.travel.DrivingModeCoordinator =
+        com.starception.submission.shared.travel.DrivingModeCoordinator(),
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startInSettings: Boolean = false,
@@ -174,6 +179,7 @@ fun SharedNavHost(
                         onOpenQuran = { navController.navigate(QuranDetailRoute(it)) },
                         onOpenQibla = { navController.navigate(QiblaRoute) },
                         onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                        onOpenDrivingMode = { navController.navigate(DrivingModeRoute) },
                         onSelectBottom = selectBottom,
                     ),
                 )
@@ -226,6 +232,12 @@ fun SharedNavHost(
         }
         composable<ProfileRoute> {
             ProfileScreen(contentStore) { navController.popBackStack() }
+        }
+        composable<DrivingModeRoute> {
+            DrivingModeScreen(
+                coordinator = drivingCoordinator,
+                onBack = { navController.popBackStack() },
+            )
         }
         composable<QuranLibraryRoute> {
             QuranLibraryScreen(
