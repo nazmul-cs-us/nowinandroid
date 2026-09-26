@@ -331,25 +331,25 @@ private object AdhanVolumeCapture {
     @Volatile var audioManager: android.media.AudioManager? = null
 
     /**
-     * Auto-close the capture session a few seconds after the bar stops moving
-     * and RESTORE the notification stream to its pre-session level.
+     * Ends the capture session (leaving tune mode, or starting a new one) and
+     * RESTORES the notification stream to its pre-session level. No timer:
+     * a session stays armed until it is explicitly ended, so slow adjustments
+     * through the system bar are still captured.
      */
-    fun maybeExpire(nowMillis: Long = System.currentTimeMillis()) {
-        if (prayer != null && nowMillis - lastChangeMillis > 6_000L) {
-            val restore = preSessionStreamVolume
-            val manager = audioManager
-            if (restore >= 0 && manager != null) {
-                runCatching {
-                    manager.setStreamVolume(
-                        android.media.AudioManager.STREAM_NOTIFICATION,
-                        restore,
-                        0,
-                    )
-                }
+    fun endSession() {
+        val restore = preSessionStreamVolume
+        val manager = audioManager
+        if (restore >= 0 && manager != null) {
+            runCatching {
+                manager.setStreamVolume(
+                    android.media.AudioManager.STREAM_NOTIFICATION,
+                    restore,
+                    0,
+                )
             }
-            preSessionStreamVolume = -1
-            prayer = null
         }
+        preSessionStreamVolume = -1
+        prayer = null
     }
 }
 
@@ -2122,7 +2122,6 @@ fun PrayerTimesScreen(
                                             ) as android.media.AudioManager
                                             val receiver = object : android.content.BroadcastReceiver() {
                                                 override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
-                                                    AdhanVolumeCapture.maybeExpire()
                                                     if (AdhanVolumeCapture.prayer == prayerName) {
                                                         val streamVolume = audioManager.getStreamVolume(
                                                             android.media.AudioManager.STREAM_NOTIFICATION,
@@ -2151,7 +2150,12 @@ fun PrayerTimesScreen(
                                                 receiver,
                                                 android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
                                             )
-                                            onDispose { tileContext.unregisterReceiver(receiver) }
+                                            onDispose {
+                                                if (AdhanVolumeCapture.prayer == prayerName) {
+                                                    AdhanVolumeCapture.endSession()
+                                                }
+                                                tileContext.unregisterReceiver(receiver)
+                                            }
                                         }
                                         Box(
                                             modifier = Modifier
@@ -2175,6 +2179,12 @@ fun PrayerTimesScreen(
                                                     val maxVolume = audioManager.getStreamMaxVolume(
                                                         android.media.AudioManager.STREAM_NOTIFICATION,
                                                     ).coerceAtLeast(1)
+                                                    if (AdhanVolumeCapture.prayer != null &&
+                                                        AdhanVolumeCapture.prayer != prayerName
+                                                    ) {
+                                                        // Leaving another prayer's session; restore its stream first.
+                                                        AdhanVolumeCapture.endSession()
+                                                    }
                                                     AdhanVolumeCapture.audioManager = audioManager
                                                     AdhanVolumeCapture.preSessionStreamVolume =
                                                         audioManager.getStreamVolume(
