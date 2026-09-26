@@ -314,6 +314,24 @@ private sealed interface CurrentWeatherLoadState {
     data class Available(val weather: CurrentWeather) : CurrentWeatherLoadState
 }
 
+/**
+ * Which prayer's speaker tap opened the system volume bar. While set, the
+ * notification-stream volume changes are captured as THAT prayer's own adhan
+ * volume (as a percent of the stream max) instead of a shared value.
+ */
+private object AdhanVolumeCapture {
+    @Volatile var prayer: String? = null
+
+    @Volatile var lastChangeMillis: Long = 0L
+
+    /** Auto-close the capture session a few seconds after the bar stops moving. */
+    fun maybeExpire(nowMillis: Long = System.currentTimeMillis()) {
+        if (prayer != null && nowMillis - lastChangeMillis > 6_000L) {
+            prayer = null
+        }
+    }
+}
+
 @Composable
 private fun rememberCurrentWeatherLoadState(
     location: com.starception.submission.prayer.model.Location?,
@@ -2060,26 +2078,52 @@ fun PrayerTimesScreen(
                                 ) { showAdhanControl ->
                                     if (showAdhanControl) {
                                         val tileContext = LocalContext.current
-                                        // The adhan plays on the system notification stream, so a
-                                        // stream volume of 0 means it would be silent: the speaker
-                                        // must show the muted state even while the adhan is enabled.
-                                        val notificationVolume = remember {
-                                            val am = tileContext.getSystemService(
+                                        // Tapping the speaker opens the SYSTEM volume bar. The
+                                        // adjustment is captured as THIS prayer's own adhan volume
+                                        // (percent of the notification-stream max), so other
+                                        // prayers keep theirs. 0 shows the muted speaker.
+                                        var adhanVolume by remember(prayerName) {
+                                            androidx.compose.runtime.mutableIntStateOf(100)
+                                        }
+                                        androidx.compose.runtime.LaunchedEffect(prayerName) {
+                                            val entryPoint = EntryPointAccessors.fromApplication(
+                                                tileContext.applicationContext,
+                                                com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+                                            )
+                                            adhanVolume = entryPoint.prayerSettingsRepository()
+                                                .getNotificationPreferences()
+                                                .getAdhanVolumeForPrayer(prayerName)
+                                        }
+                                        val adhanAudible = adhanVolume > 0
+                                        androidx.compose.runtime.DisposableEffect(prayerName) {
+                                            val audioManager = tileContext.getSystemService(
                                                 Context.AUDIO_SERVICE,
                                             ) as android.media.AudioManager
-                                            androidx.compose.runtime.mutableIntStateOf(
-                                                am.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION),
-                                            )
-                                        }
-                                        androidx.compose.runtime.DisposableEffect(prayerName) {
                                             val receiver = object : android.content.BroadcastReceiver() {
                                                 override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
-                                                    val am = tileContext.getSystemService(
-                                                        Context.AUDIO_SERVICE,
-                                                    ) as android.media.AudioManager
-                                                    notificationVolume.intValue = am.getStreamVolume(
-                                                        android.media.AudioManager.STREAM_NOTIFICATION,
-                                                    )
+                                                    AdhanVolumeCapture.maybeExpire()
+                                                    if (AdhanVolumeCapture.prayer == prayerName) {
+                                                        val streamVolume = audioManager.getStreamVolume(
+                                                            android.media.AudioManager.STREAM_NOTIFICATION,
+                                                        )
+                                                        val maxVolume = audioManager.getStreamMaxVolume(
+                                                            android.media.AudioManager.STREAM_NOTIFICATION,
+                                                        ).coerceAtLeast(1)
+                                                        val percent = (streamVolume * 100 / maxVolume).coerceIn(0, 100)
+                                                        AdhanVolumeCapture.lastChangeMillis = System.currentTimeMillis()
+                                                        adhanVolume = percent
+                                                        CoroutineScope(Dispatchers.IO).launch {
+                                                            runCatching {
+                                                                val entryPoint =
+                                                                    EntryPointAccessors.fromApplication(
+                                                                        tileContext.applicationContext,
+                                                                        com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
+                                                                    )
+                                                                entryPoint.prayerSettingsRepository()
+                                                                    .setAdhanVolumeForPrayer(prayerName, percent)
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                             tileContext.registerReceiver(
@@ -2088,14 +2132,13 @@ fun PrayerTimesScreen(
                                             )
                                             onDispose { tileContext.unregisterReceiver(receiver) }
                                         }
-                                        val adhanAudible = adhanEnabled && notificationVolume.intValue > 0
                                         Box(
                                             modifier = Modifier
                                                 .padding(bottom = 2.dp)
                                                 .size(26.dp)
                                                 .clip(CircleShape)
                                                 .background(
-                                                    if (adhanEnabled) {
+                                                    if (adhanAudible) {
                                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                                                     } else {
                                                         Color.Transparent
@@ -2103,28 +2146,23 @@ fun PrayerTimesScreen(
                                                 )
                                                 .clickable {
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    val enable = !adhanEnabled
-                                                    onAdhanEnabledChange(enable)
-                                                    if (enable) {
-                                                        // Show the system volume bar for the
-                                                        // stream the adhan plays on.
-                                                        val audioManager = tileContext.getSystemService(
-                                                            Context.AUDIO_SERVICE,
-                                                        ) as android.media.AudioManager
-                                                        audioManager.adjustStreamVolume(
-                                                            android.media.AudioManager.STREAM_NOTIFICATION,
-                                                            android.media.AudioManager.ADJUST_SAME,
-                                                            android.media.AudioManager.FLAG_SHOW_UI,
-                                                        )
-                                                    }
+                                                    // Open the system bar and start capturing for this prayer.
+                                                    AdhanVolumeCapture.prayer = prayerName
+                                                    AdhanVolumeCapture.lastChangeMillis = System.currentTimeMillis()
+                                                    val audioManager = tileContext.getSystemService(
+                                                        Context.AUDIO_SERVICE,
+                                                    ) as android.media.AudioManager
+                                                    audioManager.adjustStreamVolume(
+                                                        android.media.AudioManager.STREAM_NOTIFICATION,
+                                                        android.media.AudioManager.ADJUST_SAME,
+                                                        android.media.AudioManager.FLAG_SHOW_UI,
+                                                    )
                                                 },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            // Flaticon sound icons (14925297 on / 14925198 muted).
-                                            // A silent stream (volume 0) shows the muted speaker.
-                                            // The on <-> mute swap morphs with the same
-                                            // fade+scale transition used for the badge and the
-                                            // bell <-> weather alert.
+                                            // Flaticon sound icons (14925297 on / 14925198 muted);
+                                            // 0 volume shows the muted speaker. The swap morphs with
+                                            // the same fade+scale as the badge and bell.
                                             androidx.compose.animation.AnimatedContent(
                                                 targetState = adhanAudible,
                                                 transitionSpec = {
@@ -2152,10 +2190,10 @@ fun PrayerTimesScreen(
                                                             R.drawable.flaticon_sound_14925198
                                                         },
                                                     ),
-                                                    contentDescription = when {
-                                                        audible -> "Mute adhan for $prayerName"
-                                                        adhanEnabled -> "Adhan for $prayerName is silent — raise the volume"
-                                                        else -> "Enable adhan for $prayerName"
+                                                    contentDescription = if (audible) {
+                                                        "Adjust adhan volume for $prayerName"
+                                                    } else {
+                                                        "Adhan for $prayerName is muted — tap to raise the volume"
                                                     },
                                                     tint = if (audible) {
                                                         MaterialTheme.colorScheme.primary

@@ -1071,22 +1071,42 @@ private fun PrayerCard(
                                     .clickable(enabled = isTuning, onClick = onToggleNotification),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                FlaticonIcon(
-                                    glyph = if (notificationEnabled) {
-                                        FlaticonIcons.NOTIFICATIONS_ACTIVE
-                                    } else {
-                                        FlaticonIcons.NOTIFICATIONS
+                                androidx.compose.animation.AnimatedContent(
+                                    targetState = notificationEnabled,
+                                    transitionSpec = {
+                                        (
+                                            fadeIn(tween(220)) +
+                                                scaleIn(
+                                                    initialScale = 0.72f,
+                                                    animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                                )
+                                            ) togetherWith (
+                                            fadeOut(tween(150)) +
+                                                scaleOut(
+                                                    targetScale = 0.78f,
+                                                    animationSpec = tween(190),
+                                                )
+                                            )
                                     },
-                                    contentDescription = if (notificationEnabled) {
-                                        "Disable ${slot.name} notification"
-                                    } else {
-                                        "Enable ${slot.name} notification"
-                                    },
-                                    tint = accentColor.copy(
-                                        alpha = if (notificationEnabled) 0.9f else 0.25f,
-                                    ),
-                                    fontSize = if (compact) 13.sp else 16.sp,
-                                )
+                                    label = "${slot.name}BellToggleMorph",
+                                ) { bellEnabled ->
+                                    FlaticonIcon(
+                                        glyph = if (bellEnabled) {
+                                            FlaticonIcons.NOTIFICATIONS_ACTIVE
+                                        } else {
+                                            FlaticonIcons.NOTIFICATIONS
+                                        },
+                                        contentDescription = if (bellEnabled) {
+                                            "Disable ${slot.name} notification"
+                                        } else {
+                                            "Enable ${slot.name} notification"
+                                        },
+                                        tint = accentColor.copy(
+                                            alpha = if (bellEnabled) 0.9f else 0.25f,
+                                        ),
+                                        fontSize = if (compact) 13.sp else 16.sp,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1157,18 +1177,38 @@ private fun PrayerCard(
                                     .clickable(onClick = onToggleAdhan),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                FlaticonIcon(
-                                    glyph = FlaticonIcons.VOLUME,
-                                    contentDescription = if (adhanEnabled) {
-                                        "Disable ${slot.name} adhan"
-                                    } else {
-                                        "Enable ${slot.name} adhan"
+                                androidx.compose.animation.AnimatedContent(
+                                    targetState = adhanEnabled,
+                                    transitionSpec = {
+                                        (
+                                            fadeIn(tween(220)) +
+                                                scaleIn(
+                                                    initialScale = 0.72f,
+                                                    animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                                )
+                                            ) togetherWith (
+                                            fadeOut(tween(150)) +
+                                                scaleOut(
+                                                    targetScale = 0.78f,
+                                                    animationSpec = tween(190),
+                                                )
+                                            )
                                     },
-                                    tint = accentColor.copy(
-                                        alpha = if (adhanEnabled) 0.9f else 0.25f,
-                                    ),
-                                    fontSize = if (compact) 13.sp else 16.sp,
-                                )
+                                    label = "${slot.name}SpeakerToggleMorph",
+                                ) { speakerEnabled ->
+                                    FlaticonIcon(
+                                        glyph = FlaticonIcons.VOLUME,
+                                        contentDescription = if (speakerEnabled) {
+                                            "Disable ${slot.name} adhan"
+                                        } else {
+                                            "Enable ${slot.name} adhan"
+                                        },
+                                        tint = accentColor.copy(
+                                            alpha = if (speakerEnabled) 0.9f else 0.25f,
+                                        ),
+                                        fontSize = if (compact) 13.sp else 16.sp,
+                                    )
+                                }
                             }
                         } else {
                             Box(

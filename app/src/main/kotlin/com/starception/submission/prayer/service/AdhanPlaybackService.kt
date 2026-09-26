@@ -59,12 +59,36 @@ class AdhanPlaybackService : Service() {
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
     private var foregroundStarted = false
+    private var screenOffReceiver: android.content.BroadcastReceiver? = null
 
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         createNotificationChannel()
         initializeMediaSession()
+        registerScreenOffReceiver()
+    }
+
+    /**
+     * The power button (screen off) must mute the adhan just like the volume
+     * keys do. A user silencing the screen expects the call to prayer to stop.
+     */
+    private fun registerScreenOffReceiver() {
+        screenOffReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                    Log.d(TAG, "Screen off (power button) — muting adhan")
+                    com.starception.submission.prayer.util.FileLogger.log(
+                        "INFO",
+                        TAG,
+                        "ADHAN_MUTED_BY_SCREEN_OFF",
+                    )
+                    mute()
+                }
+            }
+        }.also { receiver ->
+            registerReceiver(receiver, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -174,8 +198,8 @@ class AdhanPlaybackService : Service() {
             assetFd.close()
 
             // The system notification-stream volume is the adhan volume control
-            // (the tile/settings surface the system volume panel). Play at full
-            // player scale so the stream volume alone determines loudness.
+            // (the tile surfaces the system volume panel). Play at full player
+            // scale so the stream volume alone determines loudness.
             player.setVolume(1f, 1f)
 
             player.setOnCompletionListener {
@@ -334,6 +358,8 @@ class AdhanPlaybackService : Service() {
     }
 
     override fun onDestroy() {
+        screenOffReceiver?.let { runCatching { unregisterReceiver(it) } }
+        screenOffReceiver = null
         stopPlayback()
         mediaSession?.release()
         mediaSession = null
