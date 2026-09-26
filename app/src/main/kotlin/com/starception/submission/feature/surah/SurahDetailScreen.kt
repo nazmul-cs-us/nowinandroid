@@ -171,7 +171,6 @@ import com.starception.submission.feature.course.CourseCompletionInfo
 import com.starception.submission.feature.course.CourseProgressTracker
 import com.starception.submission.feature.quran.AudioLanguage
 import com.starception.submission.feature.quran.QuranPlaybackService
-import com.starception.submission.feature.quran.SurahArtwork
 import com.starception.submission.feature.quran.SurahArtworkResolver
 import com.starception.submission.util.toLocalizedDigits
 import com.starception.submission.voice.SherpaOnnxTtsEntryPoint
