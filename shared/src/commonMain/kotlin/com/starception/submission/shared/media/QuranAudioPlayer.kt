@@ -24,4 +24,16 @@ expect class QuranAudioPlayer() {
     fun play(url: String): Boolean
     fun pause()
     fun stop()
+
+    /** Stream position in seconds, 0f when nothing is loaded. */
+    fun positionSeconds(): Float
+
+    /** Stream duration in seconds, 0f when unknown. */
+    fun durationSeconds(): Float
+
+    /** True while the stream is actively playing. */
+    fun isPlaying(): Boolean
+
+    /** Seek to a position in seconds. */
+    fun seekTo(seconds: Float)
 }

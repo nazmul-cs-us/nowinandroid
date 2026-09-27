@@ -80,6 +80,10 @@ object PrayerSettingsRoute
 
 @Serializable data class TopicArticleRoute(val topicId: Int, val articleId: Int)
 
+@Serializable object FortressLibraryRoute
+
+@Serializable data class FortressChapterRoute(val id: Int)
+
 @Serializable object DuaLibraryRoute
 
 @Serializable data class DuaDetailRoute(val number: Int)
@@ -243,6 +247,22 @@ fun SharedNavHost(
                 onBack = { navController.popBackStack() },
             )
         }
+        composable<FortressLibraryRoute> {
+            FortressLibraryScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChapter = { chapterId ->
+                    navController.navigate(FortressChapterRoute(chapterId))
+                },
+            )
+        }
+        composable<FortressChapterRoute> { entry ->
+            val route = entry.toRoute<FortressChapterRoute>()
+            FortressChapterScreen(
+                chapterId = route.id,
+                player = quranPlayer,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable<DuaLibraryRoute> {
             SharedDuaLibraryScreen(
                 onBack = { navController.popBackStack() },
@@ -264,6 +284,7 @@ fun SharedNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
                 onOpenDuas = { navController.navigate(DuaLibraryRoute) },
+                onOpenFortress = { navController.navigate(FortressLibraryRoute) },
             )
         }
         composable<QuranDetailRoute> { entry ->
@@ -271,6 +292,16 @@ fun SharedNavHost(
                 number = entry.toRoute<QuranDetailRoute>().number,
                 store = contentStore,
                 player = quranPlayer,
+                onOpenSurah = { surahNumber ->
+                    // Prev/next surah replaces the current entry so swiping
+                    // through surahs doesn't pile up back-stack entries.
+                    navController.navigate(QuranDetailRoute(surahNumber)) {
+                        navController.currentDestination?.id?.let { id ->
+                            popUpTo(id) { inclusive = true }
+                        }
+                        launchSingleTop = true
+                    }
+                },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -281,6 +312,14 @@ fun SharedNavHost(
                     number = id - SURAH_NEWS_ID_OFFSET,
                     store = contentStore,
                     player = quranPlayer,
+                    onOpenSurah = { surahNumber ->
+                        navController.navigate(QuranDetailRoute(surahNumber)) {
+                            navController.currentDestination?.id?.let { destinationId ->
+                                popUpTo(destinationId) { inclusive = true }
+                            }
+                            launchSingleTop = true
+                        }
+                    },
                     onBack = { navController.popBackStack() },
                 )
             } else {

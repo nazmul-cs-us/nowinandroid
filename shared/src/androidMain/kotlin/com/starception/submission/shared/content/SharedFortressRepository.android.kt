@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.starception.submission.shared.audio
+package com.starception.submission.shared.content
 
-/** The shared module is not the Android app's media owner. */
-actual class QuranAudioPlayer actual constructor() {
-    actual fun play(url: String): Boolean = false
-    actual fun pause() = Unit
-    actual fun stop() = Unit
-    actual fun positionSeconds(): Float = 0f
-    actual fun durationSeconds(): Float = 0f
-    actual fun isPlaying(): Boolean = false
-    actual fun seekTo(seconds: Float) = Unit
+actual fun createSharedFortressRepository(): SharedFortressRepository = AndroidSharedFortressRepository
+
+private object AndroidSharedFortressRepository : SharedFortressRepository {
+    override suspend fun getChapters(): List<FortressChapter> {
+        error("The shared Fortress database is packaged by the iOS host only")
+    }
+
+    override suspend fun getChapterInvocations(chapterId: Int): List<FortressInvocation> {
+        error("The shared Fortress database is packaged by the iOS host only")
+    }
 }

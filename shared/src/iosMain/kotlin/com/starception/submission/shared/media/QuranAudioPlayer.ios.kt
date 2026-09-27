@@ -22,8 +22,15 @@ import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.setActive
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerItem
+import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
+import platform.AVFoundation.currentItem
+import platform.AVFoundation.currentTime
+import platform.AVFoundation.duration
 import platform.AVFoundation.pause
 import platform.AVFoundation.play
+import platform.AVFoundation.seekToTime
+import platform.AVFoundation.timeControlStatus
+import platform.CoreMedia.CMTimeMakeWithSeconds
 import platform.Foundation.NSURL
 
 @OptIn(ExperimentalForeignApi::class)
@@ -53,5 +60,24 @@ actual class QuranAudioPlayer actual constructor() {
         player = null
         currentUrl = null
         AVAudioSession.sharedInstance().setActive(false, withOptions = 0u, error = null)
+    }
+
+    actual fun positionSeconds(): Float {
+        val time = player?.currentTime() ?: return 0f
+        return platform.CoreMedia.CMTimeGetSeconds(time).toFloat()
+    }
+
+    actual fun durationSeconds(): Float {
+        val duration = player?.currentItem?.duration ?: return 0f
+        val seconds = platform.CoreMedia.CMTimeGetSeconds(duration)
+        return if (seconds.isNaN() || seconds.isInfinite()) 0f else seconds.toFloat()
+    }
+
+    actual fun isPlaying(): Boolean {
+        return player?.timeControlStatus() == AVPlayerTimeControlStatusPlaying
+    }
+
+    actual fun seekTo(seconds: Float) {
+        player?.seekToTime(CMTimeMakeWithSeconds(seconds.toDouble(), 600))
     }
 }

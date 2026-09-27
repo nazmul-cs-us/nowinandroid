@@ -54,6 +54,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -63,6 +65,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -102,12 +105,15 @@ import com.starception.submission.shared.audio.QuranAudioPlayer
 import com.starception.submission.shared.audio.quranAudioUrl
 import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
+import com.starception.submission.shared.content.FortressChapter
+import com.starception.submission.shared.content.FortressInvocation
 import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.SharedNewsResource
 import com.starception.submission.shared.content.SharedQuranicDua
 import com.starception.submission.shared.content.SharedTopic
 import com.starception.submission.shared.content.SharedTopicArticle
 import com.starception.submission.shared.content.createSharedDuaRepository
+import com.starception.submission.shared.content.createSharedFortressRepository
 import com.starception.submission.shared.content.createSharedNewsRepository
 import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
@@ -300,6 +306,7 @@ internal fun QuranLibraryScreen(
     onBack: () -> Unit,
     onOpenSurah: (Int) -> Unit,
     onOpenDuas: () -> Unit = {},
+    onOpenFortress: () -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(store.bookmarkedSurahs()) }
@@ -311,6 +318,32 @@ internal fun QuranLibraryScreen(
         }
     }
     SharedDetailScaffold(title = "The Quran", onBack = onBack, maxContentWidth = 900.dp) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onOpenFortress,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Fortress of the Muslim", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "132 chapters of authentic invocations",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -368,6 +401,7 @@ internal fun QuranDetailScreen(
     number: Int,
     store: SharedContentStore,
     player: QuranAudioPlayer,
+    onOpenSurah: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     val surah = QuranData.surahs.firstOrNull { it.number == number }
@@ -606,29 +640,89 @@ internal fun QuranDetailScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    if (playing) {
-                        player.pause()
-                        playing = false
-                    } else {
-                        playing = player.play(quranAudioUrl(number))
-                    }
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null)
-                Spacer(Modifier.size(6.dp))
-                Text(if (playing) "Pause" else "Play")
+        // Android-style surah audio bar: prev / play / next with a progress
+        // slider and time labels. Prev/next move between surahs (and continue
+        // playback when active), matching the Android mini-bar behavior.
+        var positionSeconds by remember(number) { mutableStateOf(0f) }
+        var durationSeconds by remember(number) { mutableStateOf(0f) }
+        LaunchedEffect(playing, number) {
+            if (playing) {
+                while (true) {
+                    positionSeconds = player.positionSeconds()
+                    durationSeconds = player.durationSeconds()
+                    kotlinx.coroutines.delay(500)
+                }
             }
-            OutlinedButton(
-                onClick = { saved = number in store.toggleSurah(number) },
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder, null)
-                Spacer(Modifier.size(6.dp))
-                Text(if (saved) "Saved" else "Save")
+        }
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(20.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { onOpenSurah(number - 1) }, enabled = number > 1) {
+                        Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous surah")
+                    }
+                    IconButton(
+                        onClick = {
+                            if (playing) {
+                                player.pause()
+                                playing = false
+                            } else {
+                                playing = player.play(quranAudioUrl(number))
+                            }
+                        },
+                    ) {
+                        Icon(
+                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playing) "Pause recitation" else "Play surah",
+                        )
+                    }
+                    IconButton(onClick = { onOpenSurah(number + 1) }, enabled = number < 114) {
+                        Icon(Icons.Filled.SkipNext, contentDescription = "Next surah")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { saved = number in store.toggleSurah(number) }) {
+                        Icon(
+                            if (saved) NiaIcons.Bookmark else NiaIcons.BookmarkBorder,
+                            contentDescription = if (saved) "Remove bookmark" else "Bookmark surah",
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        formatAudioSeconds(positionSeconds.toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = if (durationSeconds > 0f) {
+                            (positionSeconds / durationSeconds).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        },
+                        onValueChange = { fraction ->
+                            if (durationSeconds > 0f) {
+                                positionSeconds = fraction * durationSeconds
+                                player.seekTo(positionSeconds)
+                            }
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
+                    Text(
+                        formatAudioSeconds(durationSeconds.toInt()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -961,6 +1055,304 @@ private fun Int.toArabicIndicDigits(): String = toString().map { digit ->
 private fun versesMushafPages(verses: List<QuranVerse>): Int =
     verses.map { it.page }.distinct().size
 
+private fun formatAudioSeconds(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:" + if (seconds < 10) "0$seconds" else seconds.toString()
+}
+
+@Composable
+internal fun FortressLibraryScreen(
+    onBack: () -> Unit,
+    onOpenChapter: (Int) -> Unit,
+) {
+    val repository = remember { createSharedFortressRepository() }
+    var loadAttempt by remember { mutableStateOf(0) }
+    var chapters by remember { mutableStateOf<List<FortressChapter>>(emptyList()) }
+    var state by remember { mutableStateOf<FortressListState>(FortressListState.Loading) }
+    var query by remember { mutableStateOf("") }
+    LaunchedEffect(loadAttempt) {
+        state = FortressListState.Loading
+        try {
+            chapters = repository.getChapters()
+            state = if (chapters.isEmpty()) {
+                FortressListState.Error("No chapters were found in the database.")
+            } else {
+                FortressListState.Loaded
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            state = FortressListState.Error(error.message ?: "The Fortress database could not be read.")
+        }
+    }
+    SharedDetailScaffold(title = "Fortress of the Muslim", onBack = onBack) {
+        when (val current = state) {
+            FortressListState.Loading -> Box(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is FortressListState.Error -> Column(
+                Modifier.fillMaxWidth().weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SupportingCard("Unable to load chapters", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            FortressListState.Loaded -> {
+                val term = query.trim().lowercase()
+                val visible = if (term.isEmpty()) {
+                    chapters
+                } else {
+                    chapters.filter { it.title.lowercase().contains(term) }
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search ${chapters.size} chapters") },
+                    leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    items(visible, key = { it.id }) { chapter ->
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onOpenChapter(chapter.id) },
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "${chapter.id}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(end = 14.dp),
+                                )
+                                Text(
+                                    chapter.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun FortressChapterScreen(
+    chapterId: Int,
+    player: QuranAudioPlayer,
+    onBack: () -> Unit,
+) {
+    val repository = remember { createSharedFortressRepository() }
+    var loadAttempt by remember { mutableStateOf(0) }
+    var invocations by remember { mutableStateOf<List<FortressInvocation>>(emptyList()) }
+    var chapter by remember { mutableStateOf<FortressChapter?>(null) }
+    var state by remember { mutableStateOf<DuaDetailState>(DuaDetailState.Loading) }
+    LaunchedEffect(chapterId, loadAttempt) {
+        state = DuaDetailState.Loading
+        try {
+            chapter = repository.getChapters().firstOrNull { it.id == chapterId }
+            invocations = repository.getChapterInvocations(chapterId)
+            state = if (invocations.isEmpty()) {
+                DuaDetailState.Error("No invocations were found for chapter $chapterId.")
+            } else {
+                DuaDetailState.Loaded(
+                    invocations.first().let {
+                        SharedQuranicDua(
+                            id = it.id,
+                            duaNumber = it.position,
+                            title = chapter?.title.orEmpty(),
+                            surahReference = "",
+                            arabic = it.arabic,
+                            transliteration = it.transliteration,
+                            translation = it.translation,
+                            explanation = it.description,
+                        )
+                    },
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            state = DuaDetailState.Error(error.message ?: "The Fortress database could not be read.")
+        }
+    }
+    var playingId by remember { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { player.stop() }
+    }
+    ImmersiveDetailScaffold(onBack = onBack, header = {
+        Box(Modifier.fillMaxWidth().height(190.dp)) {
+            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    sheetActions = listOf(
+                        DetailAction(
+                            id = "stop_audio",
+                            label = if (playingId == null) "Stop recitation" else "Stop recitation",
+                            selected = playingId != null,
+                        ) {
+                            player.stop()
+                            playingId = null
+                        },
+                    ),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Chapter $chapterId",
+                )
+            }
+            ImmersiveDetailHeaderScrim(
+                title = "Fortress of the Muslim",
+                supportingText = chapter?.title ?: "Chapter $chapterId",
+                arabicTitle = "حصن المسلم",
+            )
+        }
+    }) {
+        when (val current = state) {
+            DuaDetailState.Loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            is DuaDetailState.Error -> Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                SupportingCard("Unable to load chapter", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is DuaDetailState.Loaded -> LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 28.dp),
+            ) {
+                items(invocations, key = { it.id }) { invocation ->
+                    FortressInvocationCard(
+                        invocation = invocation,
+                        playing = playingId == invocation.id,
+                        onTogglePlay = {
+                            if (playingId == invocation.id) {
+                                player.pause()
+                                playingId = null
+                            } else if (invocation.audioUrl.isNotBlank()) {
+                                player.stop()
+                                player.play(invocation.audioUrl)
+                                playingId = invocation.id
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One Fortress invocation: numbered position, Arabic, transliteration,
+ *  translation, context/instruction/note, and the recorded recitation. */
+@Composable
+private fun FortressInvocationCard(
+    invocation: FortressInvocation,
+    playing: Boolean,
+    onTogglePlay: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${invocation.chapterId}:${invocation.position}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.weight(1f))
+                if (invocation.audioUrl.isNotBlank()) {
+                    IconButton(onClick = onTogglePlay) {
+                        Icon(
+                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playing) "Pause recitation" else "Play recitation",
+                        )
+                    }
+                }
+            }
+            if (invocation.arabic.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    invocation.arabic,
+                    modifier = Modifier.fillMaxWidth(),
+                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
+                    fontSize = 27.sp,
+                    lineHeight = 46.sp,
+                    textAlign = TextAlign.End,
+                )
+            }
+            if (invocation.transliteration.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    invocation.transliteration,
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (invocation.translation.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    invocation.translation,
+                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                )
+            }
+            if (invocation.context.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    invocation.context,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (invocation.instruction.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    invocation.instruction,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (invocation.note.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    invocation.note,
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 20.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 internal fun SharedDuaLibraryScreen(
     onBack: () -> Unit,
@@ -1172,6 +1564,12 @@ internal fun SharedDuaDetailScreen(
             }
         }
     }
+}
+
+private sealed interface FortressListState {
+    data object Loading : FortressListState
+    data object Loaded : FortressListState
+    data class Error(val message: String) : FortressListState
 }
 
 private sealed interface DuaDetailState {
