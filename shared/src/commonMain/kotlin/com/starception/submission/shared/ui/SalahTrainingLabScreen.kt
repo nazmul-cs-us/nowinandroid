@@ -16,22 +16,26 @@
 
 package com.starception.submission.shared.ui
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -48,77 +52,212 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.ml.SalahPosture
+import com.starception.submission.shared.ml.SalahRecordingStore
 import com.starception.submission.shared.ml.SalahSensorRecorder
-import kotlinx.coroutines.delay
+import com.starception.submission.shared.ml.SalahSessionInfo
+import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import kotlin.time.Clock
 
-/** One guided recording pass, in seconds, matching Android's collection flow. */
-private const val RECORDING_SECONDS = 15
+/** Android's constants: 5s countdown, 3s trailing trim, 5s transition capture. */
+private const val COUNTDOWN_SECONDS = 5
+private const val TRIM_LAST_MS = 3000L
+private const val TRANSITION_DURATION_SECONDS = 5
+
+/**
+ * One guided step — Android's GuidedStep: a static posture held for the
+ * selected duration, or a transition captured over a short fixed window
+ * with a spoken movement cue at the instant capture begins.
+ */
+private data class GuidedStep(
+    val posture: SalahPosture,
+    val isTransition: Boolean,
+    val instruction: String,
+    val recordingLabel: String = posture.displayName,
+    val movementCue: String? = null,
+)
+
+/**
+ * Android's GUIDED_POSTURE_SEQUENCE: a rak'ah that continues into the next,
+ * so every model class is represented in each complete session.
+ */
+private val GUIDED_POSTURE_SEQUENCE = listOf(
+    GuidedStep(
+        SalahPosture.QIYAM,
+        isTransition = false,
+        instruction = "Stand upright in the prayer position, with your hands folded. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.RUKU,
+        isTransition = false,
+        instruction = "Now bow into ruku, with your hands on your knees. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.QIYAM_RISING,
+        isTransition = true,
+        instruction = "Stay in ruku. Do not move yet. When you hear move now, rise from ruku until you are fully upright. Stop in standing, and do not start going down.",
+        recordingLabel = "Ruku → Standing",
+        movementCue = "Move now. Rise from ruku until you are fully upright, then stop.",
+    ),
+    GuidedStep(
+        SalahPosture.GOING_TO_SUJUD,
+        isTransition = true,
+        instruction = "You should now be fully upright after ruku. Stay standing and do not move yet. When you hear move now, lower from standing into the first prostration.",
+        recordingLabel = "Standing → First Sujud",
+        movementCue = "Move now. From standing, lower smoothly into the first prostration.",
+    ),
+    GuidedStep(
+        SalahPosture.SUJUD,
+        isTransition = false,
+        instruction = "Remain in the first prostration, or sujud. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.JALSA,
+        isTransition = false,
+        instruction = "Now sit up into the seated position between the two prostrations. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.GOING_TO_SUJUD,
+        isTransition = true,
+        instruction = "You should now be seated between the two prostrations. Stay seated and do not move yet. When you hear move now, lower from sitting into the second prostration.",
+        recordingLabel = "Sitting → Second Sujud",
+        movementCue = "Move now. From sitting, lower smoothly into the second prostration.",
+    ),
+    GuidedStep(
+        SalahPosture.SUJUD,
+        isTransition = false,
+        instruction = "Remain in the second prostration, or sujud. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.TASHAHHUD,
+        isTransition = false,
+        instruction = "Now sit up into the seated position for tashahhud. Become still. Keep holding until the next instruction.",
+    ),
+    GuidedStep(
+        SalahPosture.RISING_TO_QIYAM,
+        isTransition = true,
+        instruction = "Remain seated after tashahhud and do not move yet. When you hear move now, rise naturally into the next rak'ah and stop fully upright.",
+        recordingLabel = "Tashahhud → Next Rak'ah",
+        movementCue = "Move now. Rise naturally into the next rak'ah and stop fully upright.",
+    ),
+)
+
+/** Android's GuidedRecordingState. */
+private enum class GuidedState { IDLE, COUNTDOWN, RECORDING, COMPLETED }
 
 /**
  * The Salah Training Lab — the shared counterpart of Android's
- * SalahDataCollectionScreen: guided 15-second posture recordings through the
- * 50Hz [SalahSensorRecorder], live window counters, and per-posture sample
- * totals persisted through the store.
+ * SalahDataCollectionScreen: a voice-guided pass through the rak'ah
+ * sequence whose labeled 50Hz windows persist as JSONL session files
+ * (auto-trimmed, descriptively named), with a session browser and
+ * per-posture totals.
  */
 @Composable
 internal fun SalahTrainingLabScreen(
-    store: SharedContentStore,
     onBack: () -> Unit,
 ) {
     val recorder = remember { SalahSensorRecorder() }
-    val mlPostures = remember {
-        listOf(
-            SalahPosture.QIYAM,
-            SalahPosture.RUKU,
-            SalahPosture.GOING_TO_SUJUD,
-            SalahPosture.SUJUD,
-            SalahPosture.JALSA,
-            SalahPosture.TASHAHHUD,
-            SalahPosture.QIYAM_RISING,
-            SalahPosture.RISING_TO_QIYAM,
-        )
-    }
-    var counts by remember { mutableStateOf(store.salahSampleCounts()) }
-    var recordingPosture by remember { mutableStateOf<SalahPosture?>(null) }
-    var countdown by remember { mutableIntStateOf(0) }
-    var windows by remember { mutableIntStateOf(0) }
-    var sensorsUnavailable by remember { mutableStateOf(false) }
+    val store = remember { SalahRecordingStore() }
+    val synthesizer = remember { PlatformSpeechSynthesizer() }
 
-    // The recording engine: 3-2-1 countdown, then stream windows for
-    // RECORDING_SECONDS, persisting the labeled count at the end.
-    LaunchedEffect(recordingPosture) {
-        val posture = recordingPosture ?: return@LaunchedEffect
-        windows = 0
-        val started = recorder.start("training-${Clock.System.now().toEpochMilliseconds()}") { sample ->
-            windows += 1
-            sample.hashCode() // keep the sample alive for the counter
-        }
-        if (!started) {
-            sensorsUnavailable = true
-            recordingPosture = null
-            return@LaunchedEffect
-        }
-        for (tick in 3 downTo 1) {
-            countdown = tick
-            delay(1000)
-        }
-        countdown = 0
-        val start = Clock.System.now().toEpochMilliseconds()
-        while (Clock.System.now().toEpochMilliseconds() - start < RECORDING_SECONDS * 1000) {
-            delay(100)
-        }
-        recorder.stop()
-        if (windows > 0) {
-            counts = store.addSalahSamples(posture, windows)
-        }
-        recordingPosture = null
+    var guidedState by remember { mutableStateOf(GuidedState.IDLE) }
+    var stepIndex by remember { mutableIntStateOf(0) }
+    var focusedPosture by remember { mutableStateOf<SalahPosture?>(null) }
+    var selectedDuration by remember { mutableIntStateOf(15) }
+    var countdown by remember { mutableIntStateOf(0) }
+    var stepSecondsLeft by remember { mutableIntStateOf(0) }
+    var stepSecondsTotal by remember { mutableIntStateOf(0) }
+    var windows by remember { mutableIntStateOf(0) }
+    var sessionWindows by remember { mutableIntStateOf(0) }
+    var sensorsUnavailable by remember { mutableStateOf(false) }
+    var sessions by remember { mutableStateOf(store.sessions()) }
+
+    val steps = remember(focusedPosture) {
+        focusedPosture?.let { posture ->
+            listOf(
+                GuidedStep(
+                    posture,
+                    isTransition = false,
+                    instruction = "Get into ${posture.displayName}. Become still and hold until the pass completes.",
+                ),
+            )
+        } ?: GUIDED_POSTURE_SEQUENCE
+    }
+
+    fun refreshSessions() {
+        sessions = store.sessions()
     }
 
     androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { recorder.stop() }
+        onDispose {
+            recorder.stop()
+            synthesizer.stop()
+        }
+    }
+
+    // The guided engine: countdown → per-step capture → advance → complete.
+    LaunchedEffect(guidedState, stepIndex) {
+        when (guidedState) {
+            GuidedState.IDLE -> Unit
+            GuidedState.COUNTDOWN -> {
+                val step = steps[stepIndex]
+                synthesizer.speak(text = step.instruction)
+                for (tick in COUNTDOWN_SECONDS downTo 1) {
+                    countdown = tick
+                    kotlinx.coroutines.delay(1000)
+                }
+                countdown = 0
+                guidedState = GuidedState.RECORDING
+            }
+            GuidedState.RECORDING -> {
+                val step = steps[stepIndex]
+                if (step.isTransition) {
+                    synthesizer.speak(text = step.movementCue ?: "Move now.")
+                }
+                val duration = if (step.isTransition) {
+                    TRANSITION_DURATION_SECONDS
+                } else {
+                    selectedDuration
+                }
+                stepSecondsTotal = duration
+                sessionWindows = 0
+                val sessionId = Clock.System.now().toEpochMilliseconds().toString(16).takeLast(8)
+                val sessionStart = store.startSession(prefix = "salah_guided_", sessionId = sessionId)
+                val started = if (sessionStart != null) {
+                    recorder.start(sessionId) { sample ->
+                        store.appendSample(sample.copy(posture = step.posture))
+                        sessionWindows += 1
+                    }
+                } else {
+                    false
+                }
+                if (!started) {
+                    sensorsUnavailable = true
+                    recorder.stop()
+                    guidedState = GuidedState.IDLE
+                    return@LaunchedEffect
+                }
+                val start = Clock.System.now().toEpochMilliseconds()
+                while (true) {
+                    val elapsed = ((Clock.System.now().toEpochMilliseconds() - start) / 1000).toInt()
+                    stepSecondsLeft = (duration - elapsed).coerceAtLeast(0)
+                    windows = sessionWindows
+                    if (elapsed >= duration) break
+                    kotlinx.coroutines.delay(200)
+                }
+                recorder.stop()
+                store.stopSession(trimLastMs = TRIM_LAST_MS)
+                refreshSessions()
+                if (stepIndex + 1 < steps.size) {
+                    stepIndex += 1
+                    guidedState = GuidedState.COUNTDOWN
+                } else {
+                    synthesizer.speak(text = "Recording complete.")
+                    guidedState = GuidedState.COMPLETED
+                }
+            }
+            GuidedState.COMPLETED -> Unit
+        }
     }
 
     SharedDetailScaffold(title = "Salah Training Lab", onBack = onBack) {
@@ -137,95 +276,183 @@ internal fun SalahTrainingLabScreen(
             }
             Spacer(Modifier.height(10.dp))
         }
-        Text(
-            "Hold the phone in your pocket and hold each posture for the full ${RECORDING_SECONDS}s pass. Each pass adds ~150 labeled windows to the on-device model's training set.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        val activePosture = recordingPosture
-        if (activePosture != null) {
-            RecordingPanel(
-                posture = activePosture,
-                countdown = countdown,
-                windows = windows,
-                totalSeconds = RECORDING_SECONDS,
-                onCancel = {
-                    recorder.stop()
-                    recordingPosture = null
-                },
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(mlPostures, key = { it.name }) { posture ->
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+
+        when (guidedState) {
+            GuidedState.IDLE, GuidedState.COMPLETED -> {
+                if (guidedState == GuidedState.COMPLETED) {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                posture.displayName,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                posture.arabicName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Text(
-                            "${counts[posture.name] ?: 0} windows",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 12.dp),
-                        )
-                        Button(
-                            onClick = { recordingPosture = posture },
-                            enabled = activePosture == null,
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text("Record")
+                            Text(
+                                "Session saved",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                "$sessionWindows labeled windows across ${steps.size} steps",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    guidedState = GuidedState.IDLE
+                                    stepIndex = 0
+                                },
+                            ) {
+                                Text("Record another session")
+                            }
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
                 }
-            }
-            item {
-                val total = counts.values.sum()
-                Text(
-                    "Collected: $total windows total. Samples feed the on-device posture model; they never leave the device.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                GuidedSetupPanel(
+                    steps = steps,
+                    selectedDuration = selectedDuration,
+                    onDurationChange = { selectedDuration = it },
+                    focusedMode = focusedPosture != null,
+                    onFocusPosture = { focusedPosture = it },
+                    onClearFocus = { focusedPosture = null },
+                    onStart = {
+                        stepIndex = 0
+                        guidedState = GuidedState.COUNTDOWN
+                    },
                 )
-                if (total > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            counts = store.clearSalahSamples()
-                        },
-                    ) {
-                        Text("Clear training data")
-                    }
-                }
+                Spacer(Modifier.height(14.dp))
+                SessionBrowser(
+                    sessions = sessions,
+                    onDelete = { name ->
+                        store.deleteSession(name)
+                        refreshSessions()
+                    },
+                    onDeleteAll = {
+                        store.deleteAllSessions()
+                        refreshSessions()
+                    },
+                )
+            }
+            GuidedState.COUNTDOWN -> {
+                val step = steps[stepIndex]
+                GuidedLivePanel(
+                    headline = "Step ${stepIndex + 1} of ${steps.size}",
+                    label = step.recordingLabel,
+                    body = step.instruction,
+                    countdown = countdown,
+                    progress = null,
+                    onCancel = {
+                        synthesizer.stop()
+                        guidedState = GuidedState.IDLE
+                    },
+                )
+            }
+            GuidedState.RECORDING -> {
+                val step = steps[stepIndex]
+                GuidedLivePanel(
+                    headline = "Step ${stepIndex + 1} of ${steps.size}",
+                    label = step.recordingLabel,
+                    body = "Recording — hold the posture steady",
+                    countdown = null,
+                    progress = stepSecondsLeft.toFloat() / stepSecondsTotal.toFloat(),
+                    windows = windows,
+                    onCancel = {
+                        recorder.stop()
+                        store.stopSession(trimLastMs = TRIM_LAST_MS)
+                        refreshSessions()
+                        synthesizer.stop()
+                        guidedState = GuidedState.IDLE
+                    },
+                )
             }
         }
     }
 }
 
-/** The live pass card: countdown, then a window counter + progress sweep. */
+/** Idle controls: duration chips, the mode toggle, and the start button. */
 @Composable
-private fun RecordingPanel(
-    posture: SalahPosture,
-    countdown: Int,
-    windows: Int,
-    totalSeconds: Int,
+private fun GuidedSetupPanel(
+    steps: List<GuidedStep>,
+    selectedDuration: Int,
+    onDurationChange: (Int) -> Unit,
+    focusedMode: Boolean,
+    onFocusPosture: (SalahPosture) -> Unit,
+    onClearFocus: () -> Unit,
+    onStart: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                if (focusedMode) {
+                    "Focused recording: one posture, your selected duration."
+                } else {
+                    "Guided pass: ${steps.size} steps through a full rak'ah. Hold each posture still; move only when told."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(10, 15, 20).forEach { seconds ->
+                    FilterChip(
+                        selected = selectedDuration == seconds,
+                        onClick = { onDurationChange(seconds) },
+                        label = { Text("${seconds}s") },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Focus on one posture",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SalahPosture.prayerPostures.take(4).forEach { posture ->
+                    FilterChip(
+                        selected = focusedMode && steps.firstOrNull()?.posture == posture,
+                        onClick = {
+                            if (focusedMode && steps.firstOrNull()?.posture == posture) {
+                                onClearFocus()
+                            } else {
+                                onFocusPosture(posture)
+                            }
+                        },
+                        label = { Text(posture.displayName, maxLines = 1) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onStart,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (focusedMode) "Start focused recording" else "Start guided pass")
+            }
+        }
+    }
+}
+
+/** The live recording card: countdown ring or progress sweep + cancel. */
+@Composable
+private fun GuidedLivePanel(
+    headline: String,
+    label: String,
+    body: String,
+    countdown: Int?,
+    progress: Float?,
+    windows: Int = 0,
     onCancel: () -> Unit,
 ) {
     Surface(
@@ -237,14 +464,28 @@ private fun RecordingPanel(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (countdown > 0) {
-                Box(
-                    modifier = Modifier.size(96.dp),
+            Text(
+                headline,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(10.dp))
+            if (countdown != null) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.height(96.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
-                        progress = { 1f - (countdown - 1) / 3f },
-                        modifier = Modifier.size(96.dp),
+                        progress = { countdown / COUNTDOWN_SECONDS.toFloat() },
+                        modifier = Modifier.height(96.dp).width(96.dp),
                         strokeWidth = 6.dp,
                     )
                     Text(
@@ -253,39 +494,94 @@ private fun RecordingPanel(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Get into ${posture.displayName} — recording starts soon",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-            } else {
-                val progress by animateFloatAsState(
-                    targetValue = (windows % (totalSeconds * 10)) / (totalSeconds * 10f),
-                    animationSpec = tween(100),
-                    label = "recordingProgress",
-                )
+            } else if (progress != null) {
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    "Recording ${posture.displayName} — $windows windows",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Hold the posture steady until the pass completes",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-                    textAlign = TextAlign.Center,
+                    "$windows windows · ${((progress * 100).toInt())}% complete",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(14.dp))
             OutlinedButton(onClick = onCancel) {
-                Text("Cancel")
+                Text("Stop and save what's recorded")
+            }
+        }
+    }
+}
+
+/** Saved session files: counts, sizes, posture badges, per-file delete. */
+@Composable
+private fun SessionBrowser(
+    sessions: List<SalahSessionInfo>,
+    onDelete: (String) -> Unit,
+    onDeleteAll: () -> Unit,
+) {
+    Text(
+        "Recorded sessions (${sessions.size} · ${sessions.sumOf { it.sizeKb }} KB)",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+    )
+    Spacer(Modifier.height(8.dp))
+    if (sessions.isEmpty()) {
+        Text(
+            "No sessions yet — a guided pass records labeled sensor windows that stay on this device and feed the on-device posture model.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.heightIn(max = 320.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(sessions, key = { it.fileName }) { session ->
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            session.fileName,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                        Text(
+                            "${session.sampleCount} windows · ${session.sizeKb} KB · ${session.postureCounts.size} postures",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { onDelete(session.fileName) }) {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = "Delete session",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            OutlinedButton(onClick = onDeleteAll, modifier = Modifier.fillMaxWidth()) {
+                Text("Delete all recordings")
             }
         }
     }

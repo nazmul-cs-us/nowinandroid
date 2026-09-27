@@ -161,6 +161,11 @@ targets:
         NSSpeechRecognitionUsageDescription: >-
           Speech recognition turns your test response into text so you can verify
           hands-free voice controls.
+        # CoreMotion (accelerometer + gyroscope) refuses to start without this
+        # on a real device — the Salah Training Lab's posture recordings use it.
+        NSMotionUsageDescription: >-
+          Motion sensors capture prayer posture recordings for the on-device
+          Salah training model. Recordings stay on your device.
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

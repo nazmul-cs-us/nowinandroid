@@ -399,7 +399,6 @@ fun SharedNavHost(
         }
         composable<SalahTrainingRoute> {
             SalahTrainingLabScreen(
-                store = contentStore,
                 onBack = { navController.popBackStack() },
             )
         }
