@@ -105,6 +105,8 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
             return false
         }
 
+        let entryToken = nextTtsToken()
+        NSLog("[SherpaTTS] speak: text=%d chars speaker=%d speed=%.2f ttsToken=%d", trimmedText.count, speakerId, speed, entryToken)
         _ = nextRecognitionToken()
         let token = nextTtsToken()
         runtimeQueue.async { [weak self] in
@@ -122,6 +124,12 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
             )
         }
         return true
+    }
+
+    private func currentTtsTokenUnlocked() -> Int {
+        tokenLock.lock()
+        defer { tokenLock.unlock() }
+        return ttsToken
     }
 
     func stopSpeaking() {
@@ -443,12 +451,17 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
             callback: ttsProgressCallback,
             arg: Unmanaged.passUnretained(context).toOpaque()
         )
-        guard isTtsTokenCurrent(token) else { return }
+        guard isTtsTokenCurrent(token) else {
+            NSLog("[SherpaTTS] generation finished but token %d is stale — dropping", token)
+            return
+        }
         guard audio.audio != nil else {
+            NSLog("[SherpaTTS] generation returned no audio for token %d", token)
             stopSpeakingOnQueue()
             emitTts(sink, token: token) { $0.onError(message: "Sherpa TTS generation failed") }
             return
         }
+        NSLog("[SherpaTTS] generated %d samples @ %d Hz for token %d", audio.samples.count, Int(audio.sampleRate), token)
 
         let samples = audio.samples
         let generatedSampleRate = Int(audio.sampleRate)
@@ -506,7 +519,11 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
             node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
                 guard let self else { return }
                 self.runtimeQueue.async {
-                    guard self.isTtsTokenCurrent(token) else { return }
+                    guard self.isTtsTokenCurrent(token) else {
+                        NSLog("[SherpaTTS] playback completed but token %d is stale — dropping", token)
+                        return
+                    }
+                    NSLog("[SherpaTTS] playback finished for token %d", token)
                     let completedSink = self.ttsSink
                     self.stopSpeakingOnQueue()
                     if let completedSink {
@@ -515,8 +532,10 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
                 }
             }
             node.play()
+            NSLog("[SherpaTTS] playback started for token %d", token)
             emitTts(sink, token: token) { $0.onTtsStarted(sampleRate: Int32(sampleRate)) }
         } catch {
+            NSLog("[SherpaTTS] playback error for token %d: %@", token, error.localizedDescription)
             stopSpeakingOnQueue()
             emitTts(sink, token: token) {
                 $0.onError(message: "TTS playback failed: \(error.localizedDescription)")

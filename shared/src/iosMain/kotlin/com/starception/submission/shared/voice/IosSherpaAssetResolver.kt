@@ -52,11 +52,40 @@ internal object IosSherpaAssetResolver {
             IosSherpaTtsPaths(
                 modelPath = model,
                 tokensPath = resolve("$KOKORO_PREFIX/tokens.txt") ?: return null,
-                dataDirPath = model.substringBeforeLast('/') + "/espeak-ng-data",
+                // Two layers read this one value with different expectations:
+                // sherpa's Kokoro Validate checks <data_dir>/phontab (the
+                // espeak-ng-data directory itself) while the bundled espeak-ng
+                // resolves <data_dir>/espeak-ng-data. A self-referential
+                // symlink inside the data dir satisfies both — no duplicate
+                // files, and both path shapes resolve the same phontab.
+                dataDirPath = ensureEspeakNestedLink(
+                    model.substringBeforeLast('/') + "/espeak-ng-data",
+                ),
                 voicesPath = resolve("$KOKORO_PREFIX/voices.bin") ?: return null,
                 language = "en-us",
             )
         }
+    }
+
+    @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+    private fun ensureEspeakNestedLink(espeakDataDir: String): String {
+        // sherpa's Kokoro Validate checks <data_dir>/phontab while the bundled
+        // espeak-ng resolves <data_dir>/espeak-ng-data. A nested real copy of
+        // the data dir satisfies both path shapes (symlinks are rejected in
+        // this container, so a one-time recursive copy it is).
+        val nested = "$espeakDataDir/espeak-ng-data"
+        val manager = platform.Foundation.NSFileManager.defaultManager()
+        if (!manager.fileExistsAtPath("$nested/phontab")) {
+            runCatching { manager.removeItemAtPath(nested, error = null) }
+            val copied = runCatching {
+                manager.copyItemAtPath(espeakDataDir, toPath = nested, error = null)
+            }.isSuccess
+            println(
+                "[SherpaTTS] nested espeak copy: $copied " +
+                    "(phontab=${manager.fileExistsAtPath("$nested/phontab")})",
+            )
+        }
+        return espeakDataDir
     }
 
     private suspend fun resolve(cdnKey: String): String? =
