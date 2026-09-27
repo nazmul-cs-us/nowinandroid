@@ -308,6 +308,34 @@ class PrayerNotificationServiceManager @Inject constructor(
                 )
             }
 
+            // Prayers already past today (Fajr after ~4:51 AM) get their
+            // TOMORROW occurrence armed now. The dozing phone can't run this
+            // scheduler after midnight, so without this the early-morning
+            // prayers silently have no alarm overnight. Cancels-first above
+            // keep repeated runs duplicate-free.
+            val tomorrow = LocalDate.now().plusDays(1)
+            val tomorrowTimes = getPrayerTimesFor(tomorrow)
+            if (tomorrowTimes.isNotEmpty()) {
+                val now = java.time.LocalTime.now()
+                prayerTimes.forEach { (prayerName, todayTime) ->
+                    val todayAt = runCatching {
+                        java.time.LocalTime.parse(todayTime, DateTimeFormatter.ofPattern("h:mm a"))
+                    }.getOrNull() ?: return@forEach
+                    if (todayAt.isBefore(now)) {
+                        val tomorrowTime = tomorrowTimes[prayerName] ?: return@forEach
+                        val reminderMinutes = notificationPrefs.getPriorMinutesForPrayer(prayerName)
+                        Log.d(TAG, "🌅 $prayerName passed today ($todayTime) — scheduling tomorrow at $tomorrowTime")
+                        PrayerNotificationScheduler.schedulePrayerNotification(
+                            context = context,
+                            prayerName = prayerName,
+                            prayerTime = tomorrowTime,
+                            reminderMinutes = reminderMinutes,
+                            scheduleDate = tomorrow,
+                        )
+                    }
+                }
+            }
+
             Log.d(TAG, "✅ Scheduled ${prayerTimes.size} backup prayer notifications")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule backup notifications", e)
@@ -317,17 +345,20 @@ class PrayerNotificationServiceManager @Inject constructor(
     /**
      * Get prayer times for today from the calculator service
      */
-    private suspend fun getPrayerTimesForToday(): Map<String, String> {
+    private suspend fun getPrayerTimesForToday(): Map<String, String> =
+        getPrayerTimesFor(LocalDate.now())
+
+    /** Prayer times for any date, offsets applied, as "h:mm a" strings. */
+    private suspend fun getPrayerTimesFor(date: LocalDate): Map<String, String> {
         return try {
-            val today = LocalDate.now()
             val formatter = DateTimeFormatter.ofPattern("h:mm a")
 
             // Get current settings
             val settings = prayerSettingsRepository.getSettings()
 
-            // Calculate prayer times for today
+            // Calculate prayer times for the requested date
             val dayPrayerTimes = prayerTimeCalculatorService.calculatePrayerTimes(
-                date = today,
+                date = date,
                 location = settings.location ?: return emptyMap(),
                 settings = settings,
             )
