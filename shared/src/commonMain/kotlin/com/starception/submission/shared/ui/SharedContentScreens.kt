@@ -390,15 +390,11 @@ internal fun QuranDetailScreen(
     ) {
         isBookmarked = number in store.toggleSurah(number)
     }
-    val translationAction = DetailAction(
-        id = "translation",
-        label = if (showTranslation) "Hide translation" else "Show translation",
-        selected = showTranslation,
-        trailingText = if (showTranslation) "ON" else "OFF",
-    ) { showTranslation = !showTranslation }
-    val listenAction = DetailAction(
-        id = "listen",
-        label = if (playing) "Stop recitation" else "Listen to surah",
+    // The ⋮ sheet mirrors the Android SurahFloatingToolbar actions:
+    // Play Audio, Bookmark, Share, Download, Info.
+    val playAudioAction = DetailAction(
+        id = "play_audio",
+        label = if (playing) "Pause recitation" else "Play surah audio",
         selected = playing,
         trailingText = translationLanguage.displayName,
     ) {
@@ -409,10 +405,26 @@ internal fun QuranDetailScreen(
             playing = player.play(quranAudioUrl(number))
         }
     }
-    val tafseerAction = DetailAction(
-        id = "tafseer",
-        label = "Word study / Tafseer",
-    ) { loadAttempt += 0 } // placeholder: opens the tafseer section via scrollTo
+    val bookmarkSheetAction = DetailAction(
+        id = "bookmark_sheet",
+        label = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
+        icon = NiaIcons.Bookmark.takeIf { isBookmarked } ?: NiaIcons.BookmarkBorder,
+        selected = isBookmarked,
+    ) {
+        isBookmarked = number in store.toggleSurah(number)
+    }
+    val shareAction = DetailAction(
+        id = "share",
+        label = "Share surah",
+    ) { }
+    val downloadAction = DetailAction(
+        id = "download",
+        label = "Download surah audio",
+    ) { }
+    val infoAction = DetailAction(
+        id = "info",
+        label = "Surah information",
+    ) { }
     ImmersiveDetailScaffold(onBack = onBack, header = {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
@@ -429,7 +441,13 @@ internal fun QuranDetailScreen(
                 DetailToolbar(
                     onBack = onBack,
                     inlineActions = listOf(bookmarkAction),
-                    sheetActions = listOf(translationAction, listenAction, tafseerAction),
+                    sheetActions = listOf(
+                        playAudioAction,
+                        bookmarkSheetAction,
+                        shareAction,
+                        downloadAction,
+                        infoAction,
+                    ),
                     contentColor = androidx.compose.ui.graphics.Color.White,
                     toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
                 )
