@@ -137,6 +137,54 @@ class PrayerNotificationServiceManager @Inject constructor(
                                     )
                                 }
 
+                                // Prayers whose time already passed today (Fajr after
+                                // ~4:51 AM, typically) get their TOMORROW occurrence
+                                // armed now. Without this the phone dozes overnight
+                                // with no way to run the scheduler after midnight, so
+                                // the Fajr adhan silently never fires — it only worked
+                                // when the app was opened past midnight. Each pass
+                                // cancels all alarms first, so no duplicates accrue.
+                                val tomorrow = today.plusDays(1)
+                                val tomorrowPrayerTimes = calculatorService.calculatePrayerTimes(
+                                    date = tomorrow,
+                                    location = location,
+                                    settings = settings,
+                                )
+                                if (tomorrowPrayerTimes != null) {
+                                    val tomorrowTimes = mapOf(
+                                        "Fajr" to applyOffsetToTime(tomorrowPrayerTimes.fajr, offsets.fajr).format(formatter),
+                                        "Dhuhr" to applyOffsetToTime(tomorrowPrayerTimes.dhuhr, offsets.dhuhr).format(formatter),
+                                        "Asr" to applyOffsetToTime(tomorrowPrayerTimes.asr, offsets.asr).format(formatter),
+                                        "Maghrib" to applyOffsetToTime(tomorrowPrayerTimes.maghrib, offsets.maghrib).format(formatter),
+                                        "Isha" to applyOffsetToTime(tomorrowPrayerTimes.isha, offsets.isha).format(formatter),
+                                    )
+                                    val now = java.time.LocalTime.now()
+                                    val todayTimes = mapOf(
+                                        "Fajr" to applyOffsetToTime(dayPrayerTimes.fajr, offsets.fajr),
+                                        "Dhuhr" to applyOffsetToTime(dayPrayerTimes.dhuhr, offsets.dhuhr),
+                                        "Asr" to applyOffsetToTime(dayPrayerTimes.asr, offsets.asr),
+                                        "Maghrib" to applyOffsetToTime(dayPrayerTimes.maghrib, offsets.maghrib),
+                                        "Isha" to applyOffsetToTime(dayPrayerTimes.isha, offsets.isha),
+                                    )
+                                    todayTimes.forEach { (prayerName, todayTime) ->
+                                        if (todayTime.isBefore(now)) {
+                                            val tomorrowTime = tomorrowTimes[prayerName] ?: return@forEach
+                                            val reminderMinutes = notificationPrefs.getPriorMinutesForPrayer(prayerName)
+                                            Log.d(
+                                                TAG,
+                                                "🌅 $prayerName passed today ($todayTime) — scheduling tomorrow at $tomorrowTime",
+                                            )
+                                            PrayerNotificationScheduler.schedulePrayerNotification(
+                                                context = context,
+                                                prayerName = prayerName,
+                                                prayerTime = tomorrowTime,
+                                                reminderMinutes = reminderMinutes,
+                                                scheduleDate = tomorrow,
+                                            )
+                                        }
+                                    }
+                                }
+
                                 Log.d(TAG, "✅ Rescheduled notifications with new settings")
                             }
                         }

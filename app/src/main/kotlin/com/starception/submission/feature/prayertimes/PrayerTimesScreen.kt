@@ -2183,18 +2183,24 @@ fun PrayerTimesScreen(
                                         // adjustment is captured as THIS prayer's own adhan volume
                                         // (percent of the notification-stream max), so other
                                         // prayers keep theirs. 0 shows the muted speaker.
-                                        var adhanVolume by remember(prayerName) {
-                                            androidx.compose.runtime.mutableIntStateOf(100)
-                                        }
-                                        androidx.compose.runtime.LaunchedEffect(prayerName) {
+                                        // Live-collect the repository's preferences
+                                        // flow: dragging the system bar to 0
+                                        // persists through this flow, so the
+                                        // speaker morphs to the muted icon the
+                                        // moment the capture lands — no re-enter
+                                        // of tune mode needed.
+                                        val adhanRepository = androidx.compose.runtime.remember(tileContext) {
                                             val entryPoint = EntryPointAccessors.fromApplication(
                                                 tileContext.applicationContext,
                                                 com.starception.submission.feature.prayertimes.data.PrayerTimeCalculatorEntryPoint::class.java,
                                             )
-                                            adhanVolume = entryPoint.prayerSettingsRepository()
-                                                .getNotificationPreferences()
-                                                .getAdhanVolumeForPrayer(prayerName)
+                                            entryPoint.prayerSettingsRepository()
                                         }
+                                        val livePreferences by adhanRepository
+                                            .notificationPreferencesFlow
+                                            .collectAsStateWithLifecycle()
+                                        val adhanVolume = livePreferences
+                                            .getAdhanVolumeForPrayer(prayerName)
                                         val adhanAudible = adhanVolume > 0
                                         // End the capture session when this tile leaves composition
                                         // (leaving tune mode): restore the stream.

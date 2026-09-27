@@ -66,6 +66,7 @@ object PrayerNotificationScheduler {
         prayerName: String,
         prayerTime: String,
         reminderMinutes: Int = 10,
+        scheduleDate: LocalDate = LocalDate.now(),
     ) {
         try {
             Log.d(TAG, "📅 Scheduling prayer notification: $prayerName at $prayerTime")
@@ -87,7 +88,7 @@ object PrayerNotificationScheduler {
                 return
             }
 
-            val prayerDateTime = parsePrayerTime(prayerTime)
+            val prayerDateTime = parsePrayerTime(prayerTime, scheduleDate)
             if (prayerDateTime == null) {
                 Log.e(TAG, "❌ Failed to parse prayer time: $prayerTime")
                 return
@@ -412,10 +413,13 @@ object PrayerNotificationScheduler {
         }
     }
 
-    private fun parsePrayerTime(prayerTime: String): LocalDateTime? {
+    private fun parsePrayerTime(
+        prayerTime: String,
+        date: LocalDate = LocalDate.now(),
+    ): LocalDateTime? {
         return try {
             val time = LocalTime.parse(prayerTime, DateTimeFormatter.ofPattern("h:mm a"))
-            LocalDateTime.of(LocalDate.now(), time)
+            LocalDateTime.of(date, time)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse prayer time: $prayerTime", e)
             null
