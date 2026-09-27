@@ -724,14 +724,21 @@ fun PrayerTimesViewController(
                                         narrationError = "The offline voice model is unavailable"
                                         return@launch
                                     }
-                                    narrationStatus = null
+                                    // The status STAYS through generation (~seconds
+                                    // for the offline model) — it clears the moment
+                                    // playback starts, so the button shows its
+                                    // generating state instead of a silent wait.
+                                    narrationStatus = "Generating voice with the offline model…"
                                     val sink = object : IosSherpaEventSink {
                                         override fun onRecognitionStarted() = Unit
                                         override fun onKeyword(keyword: String) = Unit
                                         override fun onPartialResult(text: String) = Unit
                                         override fun onFinalResult(text: String) = Unit
                                         override fun onTtsStarted(sampleRate: Int) {
-                                            if (session == narrationSession) isNarrationSpeaking = true
+                                            if (session == narrationSession) {
+                                                isNarrationSpeaking = true
+                                                narrationStatus = null
+                                            }
                                         }
 
                                         override fun onTtsFinished() {

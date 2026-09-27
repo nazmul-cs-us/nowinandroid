@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -387,20 +388,33 @@ fun NarrationSettingsSection(
                 onDelete = { contentStorageActions.onDeleteCategory(modelCategoryKey) },
             )
         }
+        // While the offline voice generates (isSpeaking with a status), the
+        // button itself becomes the progress affordance — the user sees the
+        // sample is being processed instead of a silent wait.
+        val generating = isSpeaking && status != null
         NiaOutlinedButton(
             onClick = if (isSpeaking) onStop else onPreview,
             enabled = isSpeaking || (voices.isNotEmpty() && modelAvailable),
             modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
-            FlaticonIcon(
-                glyph = if (isSpeaking) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
-                contentDescription = null,
-                fontSize = 19.sp,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(if (isSpeaking) "Stop voice sample" else "Play voice sample")
+            if (generating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Generating voice…")
+            } else {
+                FlaticonIcon(
+                    glyph = if (isSpeaking) FlaticonIcons.PAUSE else FlaticonIcons.VOLUME,
+                    contentDescription = null,
+                    fontSize = 19.sp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(if (isSpeaking) "Stop voice sample" else "Play voice sample")
+            }
         }
-        if (status != null) StatusCard("Preparing voice", status, error = false)
+        if (status != null && !generating) StatusCard("Preparing voice", status, error = false)
         if (error != null) StatusCard("Narration unavailable", error, error = true)
     }
 }
