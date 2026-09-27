@@ -77,11 +77,24 @@ internal object IosSherpaAssetResolver {
         val manager = platform.Foundation.NSFileManager.defaultManager()
         if (!manager.fileExistsAtPath("$nested/phontab")) {
             runCatching { manager.removeItemAtPath(nested, error = null) }
-            val copied = runCatching {
-                manager.copyItemAtPath(espeakDataDir, toPath = nested, error = null)
-            }.isSuccess
+            manager.createDirectoryAtPath(
+                nested,
+                withIntermediateDirectories = true,
+                attributes = null,
+                error = null,
+            )
+            // Flat files only: copying the whole directory would recurse
+            // into the destination we are creating inside the source.
+            val entries = (
+                manager.contentsOfDirectoryAtPath(espeakDataDir, error = null) as? List<String>
+                )?.filter { it != "espeak-ng-data" } ?: emptyList()
+            entries.forEach { entry ->
+                runCatching {
+                    manager.copyItemAtPath("$espeakDataDir/$entry", toPath = "$nested/$entry", error = null)
+                }
+            }
             println(
-                "[SherpaTTS] nested espeak copy: $copied " +
+                "[SherpaTTS] nested espeak copy: ${entries.size} files " +
                     "(phontab=${manager.fileExistsAtPath("$nested/phontab")})",
             )
         }

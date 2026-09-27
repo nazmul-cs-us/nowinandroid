@@ -421,11 +421,20 @@ final class SherpaSpeechService: NSObject, IosSherpaService {
             var config = sherpaOnnxOfflineTtsConfig(model: model)
             runtime = SherpaOnnxOfflineTtsWrapper(config: &config)
         } else {
+            // espeak-ng's path_home buffer is 255 bytes; the app-container
+            // path to the model (~290 chars) truncates inside espeak and it
+            // falls back to /usr/share, aborting the process. Hand sherpa and
+            // espeak a SHORT RELATIVE data dir instead, with the process
+            // working directory moved to the model folder. The CWD stays for
+            // espeak's lazy per-language dictionary loads during synthesis.
+            let baseDir = (paths.dataDirPath as NSString).deletingLastPathComponent
+            chdir(baseDir)
+            NSLog("[SherpaTTS] chdir to model base for short espeak paths")
             let kokoro = sherpaOnnxOfflineTtsKokoroModelConfig(
                 model: paths.modelPath,
                 voices: paths.voicesPath,
                 tokens: paths.tokensPath,
-                dataDir: paths.dataDirPath,
+                dataDir: "espeak-ng-data",
                 dictDir: paths.dictDirPath,
                 lexicon: paths.lexiconPath,
                 lang: paths.language
