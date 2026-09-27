@@ -48,13 +48,16 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Settings
@@ -63,11 +66,13 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -77,6 +82,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -162,12 +169,19 @@ fun PrayerTimesScreen(
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
+    onOpenBukhariBook: (Int) -> Unit = {},
     selectedBottomIndex: Int = 0,
     onSelectBottom: (Int) -> Unit = {},
     quranPlayer: QuranAudioPlayer = LocalQuranAudioPlayer.current,
 ) {
     var showAllPrayers by remember { mutableStateOf(false) }
     var isTuningSchedule by remember { mutableStateOf(false) }
+    // Inline search + profile sheet — the Android pattern: both open in
+    // place instead of navigating to separate pages.
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showProfileSheet by remember { mutableStateOf(false) }
+    val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
     val colorScheme = MaterialTheme.colorScheme
     val isDarkTheme = colorScheme.background.luminance() < 0.5f
     val homeCanvas = if (isDarkTheme) {
@@ -198,6 +212,11 @@ fun PrayerTimesScreen(
         onRefresh = onRefresh,
         syncResultText = syncResultText,
         prayerAlertState = nextPrayerState,
+        downloadProgress = downloadStatus?.progress ?: 0f,
+        downloadLabel = downloadStatus?.label?.let { label ->
+            val percent = ((downloadStatus?.progress ?: 0f) * 100).toInt()
+            "$label $percent%"
+        }.orEmpty(),
         modifier = modifier.fillMaxSize(),
     ) {
         Surface(
@@ -277,10 +296,57 @@ fun PrayerTimesScreen(
                         PrayerHomeHeader(
                             onOpenSettings = onOpenSettings,
                             onOpenProfile = onOpenProfile,
-                            onOpenSearch = onOpenSearch,
+                            onOpenSearch = { searchActive = true },
                             searchTerm = day.nextPrayer ?: day.currentPrayer,
                             onVoiceTap = onVoiceTap,
+                            searchActive = searchActive,
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it },
+                            onSearchActiveChange = { searchActive = it },
+                            onOpenSurah = {
+                                searchActive = false
+                                searchQuery = ""
+                                onOpenQuran(it)
+                            },
+                            onOpenBukhariBook = {
+                                searchActive = false
+                                searchQuery = ""
+                                onOpenBukhariBook(it)
+                            },
+                            onShowProfile = { showProfileSheet = true },
                         )
+                        if (searchActive) {
+                            SearchSuggestionsDropdown(
+                                query = searchQuery,
+                                onOpenSurah = {
+                                    searchActive = false
+                                    searchQuery = ""
+                                    onOpenQuran(it)
+                                },
+                                onOpenBukhariBook = {
+                                    searchActive = false
+                                    searchQuery = ""
+                                    onOpenBukhariBook(it)
+                                },
+                            )
+                        }
+                        if (showProfileSheet) {
+                            HomeProfileSheet(
+                                onOpenProfile = {
+                                    showProfileSheet = false
+                                    onOpenProfile()
+                                },
+                                onSelectSaved = {
+                                    showProfileSheet = false
+                                    onSelectBottom(2)
+                                },
+                                onOpenSettings = {
+                                    showProfileSheet = false
+                                    onOpenSettings()
+                                },
+                                onDismiss = { showProfileSheet = false },
+                            )
+                        }
                         Spacer(Modifier.height(10.dp))
 
                         if (useTwoPaneLayout) {
@@ -487,6 +553,13 @@ private fun PrayerHomeHeader(
     onOpenSearch: () -> Unit,
     searchTerm: String?,
     onVoiceTap: (() -> Unit)? = null,
+    searchActive: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
+    onSearchActiveChange: (Boolean) -> Unit = {},
+    onOpenSurah: (Int) -> Unit = {},
+    onOpenBukhariBook: (Int) -> Unit = {},
+    onShowProfile: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -501,45 +574,80 @@ private fun PrayerHomeHeader(
             visualSize = 34.dp,
             iconSize = 34.dp,
             showBackground = false,
-            onClick = onOpenProfile,
+            onClick = onShowProfile,
         )
-        Surface(
-            onClick = onOpenSearch,
-            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        // Inline expanding search — Android's SearchView expands in the bar
+        // with live suggestions instead of navigating to a search page.
+        if (searchActive) {
+            val focusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                focusRequester.requestFocus()
+            }
+            androidx.compose.material3.OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = { androidx.compose.material3.Text("Search Quran, Hadith and more") },
+                leadingIcon = { Icon(NiaIcons.Search, contentDescription = null) },
+                trailingIcon = {
+                    IconTapTarget(
+                        icon = Icons.Filled.Close,
+                        contentDescription = "Close search",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        visualSize = 30.dp,
+                        iconSize = 20.dp,
+                        showBackground = false,
+                        onClick = {
+                            onSearchQueryChange("")
+                            onSearchActiveChange(false)
+                        },
+                    )
+                },
+                singleLine = true,
+                shape = CircleShape,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .focusRequester(focusRequester),
+            )
+        } else {
+            Surface(
+                onClick = onOpenSearch,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-                Icon(
-                    imageVector = NiaIcons.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (onVoiceTap != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .clickable(onClick = onVoiceTap),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Mic,
-                            contentDescription = "Voice search",
-                            modifier = Modifier.size(20.dp),
-                        )
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = NiaIcons.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (onVoiceTap != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onVoiceTap),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Mic,
+                                contentDescription = "Voice search",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -553,6 +661,163 @@ private fun PrayerHomeHeader(
             showBackground = false,
             onClick = onOpenSettings,
         )
+    }
+}
+
+/** Live catalog suggestions under the expanded search field — the shared
+ *  counterpart of Android's SearchView suggestion dropdown. */
+@Composable
+private fun SearchSuggestionsDropdown(
+    query: String,
+    onOpenSurah: (Int) -> Unit,
+    onOpenBukhariBook: (Int) -> Unit,
+) {
+    val results = remember(query) {
+        com.starception.submission.shared.content.searchCatalog(query).take(6)
+    }
+    if (results.isEmpty()) return
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(vertical = 6.dp)) {
+            results.forEach { result ->
+                when (result) {
+                    is com.starception.submission.shared.content.CatalogResult.Quran -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenSurah(result.surah.number) }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${result.surah.number}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 12.dp),
+                            )
+                            Text(
+                                result.surah.nameEnglish,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                result.surah.nameArabic,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    is com.starception.submission.shared.content.CatalogResult.Bukhari -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenBukhariBook(result.book.id) }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${result.book.id}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.padding(end = 12.dp),
+                            )
+                            Text(
+                                result.book.nameEnglish,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Android's ProfileSheet pattern: the avatar opens a sheet, not a page. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeProfileSheet(
+    onOpenProfile: () -> Unit,
+    onSelectSaved: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val store = remember { com.starception.submission.shared.content.SharedContentStore() }
+    val profile = remember { store.profile() }
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    profile.displayName.trim().firstOrNull()?.uppercase() ?: "R",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                profile.displayName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = onSelectSaved,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(NiaIcons.Bookmark, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Saved")
+                }
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.Settings, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Settings")
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            androidx.compose.material3.OutlinedButton(
+                onClick = onOpenProfile,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Open full profile")
+            }
+        }
     }
 }
 

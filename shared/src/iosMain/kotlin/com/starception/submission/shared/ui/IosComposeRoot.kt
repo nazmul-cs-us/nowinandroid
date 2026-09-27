@@ -40,6 +40,8 @@ import com.starception.submission.core.model.data.DarkThemeConfig
 import com.starception.submission.core.model.data.ThemeBrand
 import com.starception.submission.prayer.model.prayerDefaultsFor
 import com.starception.submission.shared.PrayerSchedule
+import com.starception.submission.shared.assets.ContentDownloadBus
+import com.starception.submission.shared.assets.ContentDownloadStatus
 import com.starception.submission.shared.assets.iosCloudAssets
 import com.starception.submission.shared.location.DeviceLocation
 import com.starception.submission.shared.location.LocationProvider
@@ -236,6 +238,16 @@ fun PrayerTimesViewController(
                                     }
                                 },
                             )
+                            // Feed the app-level pull-to-sync banner — the same
+                            // progress the Android strip shows on every screen.
+                            ContentDownloadBus.publish(
+                                ContentDownloadStatus(
+                                    label = storageCategoryDisplayName(category),
+                                    progress = progress.fraction,
+                                    completedFiles = progress.completedFiles,
+                                    totalFiles = progress.totalFiles,
+                                ),
+                            )
                         }
                     }
                 }
@@ -248,6 +260,7 @@ fun PrayerTimesViewController(
                 message = error.message ?: "The content download failed"
             } finally {
                 if (contentDownloadJob === downloadJob) {
+                    ContentDownloadBus.publish(null)
                     contentStorageState = contentStorageState.copy(
                         categories = contentStorageState.categories.map {
                             if (it.categoryKey == category) it.copy(isDownloading = false) else it
@@ -472,6 +485,7 @@ fun PrayerTimesViewController(
                     onOpenSearch = actions.onOpenSearch,
                     onVoiceTap = actions.onOpenSearch,
                     onOpenQuran = actions.onOpenQuran,
+                    onOpenBukhariBook = actions.onOpenBukhariBook,
                     onOpenQibla = actions.onOpenQibla,
                     onOpenRecommendation = actions.onOpenRecommendation,
                     onSelectBottom = actions.onSelectBottom,
