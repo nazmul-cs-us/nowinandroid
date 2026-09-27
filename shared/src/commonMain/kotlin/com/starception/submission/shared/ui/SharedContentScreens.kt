@@ -390,13 +390,12 @@ internal fun QuranDetailScreen(
     ) {
         isBookmarked = number in store.toggleSurah(number)
     }
-    // The ⋮ sheet mirrors the Android SurahFloatingToolbar actions:
-    // Play Audio, Bookmark, Share, Download, Info.
+    // The ⋮ sheet mirrors the Android Reading Settings options (SurahDetailViewModel):
+    // Tajweed, Show Translation, Mushaf Page, Text Alignment, Arabic Font, Translation Language.
     val playAudioAction = DetailAction(
         id = "play_audio",
         label = if (playing) "Pause recitation" else "Play surah audio",
         selected = playing,
-        trailingText = translationLanguage.displayName,
     ) {
         if (playing) {
             player.pause()
@@ -405,6 +404,40 @@ internal fun QuranDetailScreen(
             playing = player.play(quranAudioUrl(number))
         }
     }
+    val showTranslationAction = DetailAction(
+        id = "show_translation",
+        label = if (showTranslation) "Hide translation" else "Show translation",
+        selected = showTranslation,
+        trailingText = if (showTranslation) "ON" else "OFF",
+    ) { showTranslation = !showTranslation }
+    val tajweedAction = DetailAction(
+        id = "tajweed",
+        label = "Tajweed colors",
+        trailingText = "OFF",
+    ) { }
+    val mushafPageAction = DetailAction(
+        id = "mushaf_page",
+        label = "Mushaf page view",
+    ) { }
+    val textAlignmentAction = DetailAction(
+        id = "text_alignment",
+        label = "Text alignment",
+        trailingText = "Justify",
+    ) { }
+    val arabicFontAction = DetailAction(
+        id = "arabic_font",
+        label = "Arabic font",
+        trailingText = "Uthmanic",
+    ) { }
+    val translationLanguageAction = DetailAction(
+        id = "translation_language",
+        label = "Translation language",
+        trailingText = translationLanguage.displayName,
+    ) { }
+    val tafseerAction = DetailAction(
+        id = "tafseer",
+        label = "Word study / Tafseer",
+    ) { }
     val bookmarkSheetAction = DetailAction(
         id = "bookmark_sheet",
         label = if (isBookmarked) "Remove bookmark" else "Bookmark surah",
@@ -413,18 +446,6 @@ internal fun QuranDetailScreen(
     ) {
         isBookmarked = number in store.toggleSurah(number)
     }
-    val shareAction = DetailAction(
-        id = "share",
-        label = "Share surah",
-    ) { }
-    val downloadAction = DetailAction(
-        id = "download",
-        label = "Download surah audio",
-    ) { }
-    val infoAction = DetailAction(
-        id = "info",
-        label = "Surah information",
-    ) { }
     ImmersiveDetailScaffold(onBack = onBack, header = {
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
@@ -443,10 +464,14 @@ internal fun QuranDetailScreen(
                     inlineActions = listOf(bookmarkAction),
                     sheetActions = listOf(
                         playAudioAction,
+                        showTranslationAction,
+                        tajweedAction,
+                        mushafPageAction,
+                        textAlignmentAction,
+                        arabicFontAction,
+                        translationLanguageAction,
+                        tafseerAction,
                         bookmarkSheetAction,
-                        shareAction,
-                        downloadAction,
-                        infoAction,
                     ),
                     contentColor = androidx.compose.ui.graphics.Color.White,
                     toolbarTitle = "Surah ${surah.number} · ${surah.nameEnglish}",
