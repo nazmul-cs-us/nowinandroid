@@ -32,6 +32,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -51,10 +52,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -93,6 +95,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -109,7 +112,17 @@ import com.starception.submission.prayer.model.PrayerTimeOffsets
 import com.starception.submission.shared.SharedPrayerDay
 import com.starception.submission.shared.SharedPrayerSlot
 import com.starception.submission.shared.audio.QuranAudioPlayer
+import com.starception.submission.shared.content.FortressInvocation
+import com.starception.submission.shared.content.SharedContentStore
+import com.starception.submission.shared.content.SharedQuranicDua
+import com.starception.submission.shared.content.createSharedDuaRepository
+import com.starception.submission.shared.content.createSharedFortressRepository
+import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.dashboardSlots
+import com.starception.submission.shared.hadith.SharedHadith
+import com.starception.submission.shared.hadith.createSharedHadithRepository
+import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.SalahProgress
 import com.starception.submission.shared.settings.formatOffset
 import kotlinx.datetime.LocalDate
@@ -169,6 +182,9 @@ fun PrayerTimesScreen(
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
     onOpenBukhariBook: (Int) -> Unit = {},
+    onOpenBukhariHadith: (Int) -> Unit = {},
+    onOpenQuranicDua: (Int) -> Unit = {},
+    onOpenFortressChapter: (Int) -> Unit = {},
     selectedBottomIndex: Int = 0,
     onSelectBottom: (Int) -> Unit = {},
     quranPlayer: QuranAudioPlayer = LocalQuranAudioPlayer.current,
@@ -180,6 +196,7 @@ fun PrayerTimesScreen(
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showProfileSheet by remember { mutableStateOf(false) }
+    val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
     val colorScheme = MaterialTheme.colorScheme
     val isDarkTheme = colorScheme.background.luminance() < 0.5f
@@ -317,16 +334,32 @@ fun PrayerTimesScreen(
                         if (searchActive) {
                             SearchSuggestionsDropdown(
                                 query = searchQuery,
-                                onOpenSurah = {
+                                onOpenSurah = { surah ->
                                     searchActive = false
                                     searchQuery = ""
-                                    onOpenQuran(it)
+                                    onOpenQuran(surah)
                                 },
                                 onOpenBukhariBook = {
                                     searchActive = false
                                     searchQuery = ""
                                     onOpenBukhariBook(it)
                                 },
+                                onOpenBukhariHadith = {
+                                    searchActive = false
+                                    searchQuery = ""
+                                    onOpenBukhariHadith(it)
+                                },
+                                onOpenQuranicDua = {
+                                    searchActive = false
+                                    searchQuery = ""
+                                    onOpenQuranicDua(it)
+                                },
+                                onOpenFortressChapter = {
+                                    searchActive = false
+                                    searchQuery = ""
+                                    onOpenFortressChapter(it)
+                                },
+                                onRecordRecent = { contentStore.addRecentSearch(it) },
                             )
                         }
                         if (showProfileSheet) {
@@ -696,18 +729,66 @@ private fun PrayerHomeHeader(
     }
 }
 
-/** Live catalog suggestions under the expanded search field — the shared
- *  counterpart of Android's SearchView suggestion dropdown. */
+/** Live suggestions under the expanded search field — the shared counterpart
+ *  of Android's SearchView dropdown: catalog names, full-text ayah and hadith
+ *  matches, Fortress/Quranic duas, recent chips, and popular shortcuts. */
 @Composable
 private fun SearchSuggestionsDropdown(
     query: String,
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
+    onOpenBukhariHadith: (Int) -> Unit,
+    onOpenQuranicDua: (Int) -> Unit,
+    onOpenFortressChapter: (Int) -> Unit,
+    onRecordRecent: (String) -> Unit,
 ) {
-    val results = remember(query) {
-        com.starception.submission.shared.content.searchCatalog(query).take(6)
+    val trimmed = query.trim()
+    val contentStore = remember { SharedContentStore() }
+    val recents = remember { contentStore.recentSearches() }
+
+    // Android's curated empty-state shortcuts, so the staples are one tap away.
+    data class Popular(val label: String, val surah: Int, val ayah: Int? = null)
+    val popular = remember {
+        listOf(
+            Popular("Ayatul Kursi", 2, 255),
+            Popular("Al-Fatiha", 1),
+            Popular("Ar-Rahman", 55),
+            Popular("Surah Yasin", 36),
+            Popular("Al-Kahf", 18),
+            Popular("Al-Mulk", 67),
+        )
     }
-    if (results.isEmpty()) return
+
+    // Catalog matches are synchronous; content searches run against the DBs.
+    val catalog = remember(trimmed) {
+        if (trimmed.isEmpty()) emptyList() else searchCatalog(trimmed).take(4)
+    }
+    var verses by remember { mutableStateOf<List<QuranVerse>>(emptyList()) }
+    var hadiths by remember { mutableStateOf<List<SharedHadith>>(emptyList()) }
+    var fortress by remember { mutableStateOf<List<FortressInvocation>>(emptyList()) }
+    var duas by remember { mutableStateOf<List<SharedQuranicDua>>(emptyList()) }
+    LaunchedEffect(trimmed) {
+        if (trimmed.length < 2) {
+            verses = emptyList()
+            hadiths = emptyList()
+            fortress = emptyList()
+            duas = emptyList()
+            return@LaunchedEffect
+        }
+        runCatching {
+            verses = createQuranVerseRepository().searchAyahs(trimmed, 4)
+        }
+        runCatching {
+            hadiths = createSharedHadithRepository().searchBukhari(trimmed, 3)
+        }
+        runCatching {
+            fortress = createSharedFortressRepository().searchFortressInvocations(trimmed, 3)
+        }
+        runCatching {
+            duas = createSharedDuaRepository().searchQuranicDuas(trimmed, 3)
+        }
+    }
+
     androidx.compose.material3.Surface(
         shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -717,66 +798,192 @@ private fun SearchSuggestionsDropdown(
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(vertical = 6.dp)) {
-            results.forEach { result ->
-                when (result) {
-                    is com.starception.submission.shared.content.CatalogResult.Quran -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenSurah(result.surah.number) }
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                "${result.surah.number}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(end = 12.dp),
-                            )
-                            Text(
-                                result.surah.nameEnglish,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                result.surah.nameArabic,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 6.dp),
+        ) {
+            if (trimmed.isEmpty()) {
+                if (recents.isNotEmpty()) {
+                    SuggestionHeader("RECENT")
+                    SuggestionChips(
+                        items = recents,
+                        onClick = { /* Re-filling the field happens through query state */ },
+                    )
+                }
+                SuggestionHeader("POPULAR")
+                SuggestionChips(
+                    items = popular.map { it.label },
+                    onClick = { label ->
+                        onRecordRecent(label)
+                        popular.firstOrNull { it.label == label }?.let {
+                            onOpenSurah(it.surah)
+                        }
+                    },
+                )
+            } else {
+                catalog.forEach { result ->
+                    when (result) {
+                        is com.starception.submission.shared.content.CatalogResult.Quran -> {
+                            SuggestionRow(
+                                badge = "${result.surah.number}",
+                                title = result.surah.nameEnglish,
+                                trailing = result.surah.nameArabic,
+                                onClick = {
+                                    onRecordRecent(trimmed)
+                                    onOpenSurah(result.surah.number)
+                                },
                             )
                         }
-                    }
-                    is com.starception.submission.shared.content.CatalogResult.Bukhari -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenBukhariBook(result.book.id) }
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                "${result.book.id}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(end = 12.dp),
-                            )
-                            Text(
-                                result.book.nameEnglish,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
+                        is com.starception.submission.shared.content.CatalogResult.Bukhari -> {
+                            SuggestionRow(
+                                badge = "${result.book.id}",
+                                title = result.book.nameEnglish,
+                                onClick = {
+                                    onRecordRecent(trimmed)
+                                    onOpenBukhariBook(result.book.id)
+                                },
                             )
                         }
                     }
                 }
+                if (verses.isNotEmpty()) {
+                    SuggestionHeader("QURAN VERSES")
+                    verses.forEach { verse ->
+                        SuggestionRow(
+                            badge = "${verse.surahNumber}:${verse.numberInSurah}",
+                            title = verse.arabicText,
+                            titleArabic = true,
+                            onClick = {
+                                onRecordRecent(trimmed)
+                                onOpenSurah(verse.surahNumber)
+                            },
+                        )
+                    }
+                }
+                if (hadiths.isNotEmpty()) {
+                    SuggestionHeader("SAHIH AL-BUKHARI")
+                    hadiths.forEach { hadith ->
+                        SuggestionRow(
+                            badge = "${hadith.id}",
+                            title = hadith.english,
+                            onClick = {
+                                onRecordRecent(trimmed)
+                                onOpenBukhariHadith(hadith.id)
+                            },
+                        )
+                    }
+                }
+                if (fortress.isNotEmpty()) {
+                    SuggestionHeader("FORTRESS OF THE MUSLIM")
+                    fortress.forEach { invocation ->
+                        SuggestionRow(
+                            badge = "${invocation.chapterId}:${invocation.position}",
+                            title = invocation.translation.ifBlank { invocation.description },
+                            onClick = {
+                                onRecordRecent(trimmed)
+                                onOpenFortressChapter(invocation.chapterId)
+                            },
+                        )
+                    }
+                }
+                if (duas.isNotEmpty()) {
+                    SuggestionHeader("QURANIC DUAS")
+                    duas.forEach { dua ->
+                        SuggestionRow(
+                            badge = "${dua.duaNumber}",
+                            title = dua.title,
+                            trailing = dua.surahReference,
+                            onClick = {
+                                onRecordRecent(trimmed)
+                                onOpenQuranicDua(dua.duaNumber)
+                            },
+                        )
+                    }
+                }
+                if (catalog.isEmpty() && verses.isEmpty() && hadiths.isEmpty() &&
+                    fortress.isEmpty() && duas.isEmpty()
+                ) {
+                    Text(
+                        "No matches for \"$trimmed\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionHeader(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun SuggestionChips(items: List<String>, onClick: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items.forEach { item ->
+            androidx.compose.material3.AssistChip(
+                onClick = { onClick(item) },
+                label = { Text(item, style = MaterialTheme.typography.labelMedium) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionRow(
+    badge: String,
+    title: String,
+    trailing: String? = null,
+    titleArabic: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            badge,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (titleArabic) TextAlign.End else null,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                trailing,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }

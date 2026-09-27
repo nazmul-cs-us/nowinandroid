@@ -79,6 +79,20 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(QURAN_TEXT_ALIGNMENT, alignment)
     }
 
+    fun recentSearches(): List<String> =
+        store.getString(RECENT_SEARCHES).orEmpty().split(SEPARATOR)
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .take(10)
+
+    fun addRecentSearch(query: String): List<String> {
+        val term = query.trim()
+        if (term.isEmpty()) return recentSearches()
+        val updated = (listOf(term) + recentSearches()).distinct().take(10)
+        store.putString(RECENT_SEARCHES, updated.joinToString(SEPARATOR))
+        return updated
+    }
+
     fun hadithTranslationLanguage(): String =
         store.getString(HADITH_TRANSLATION_LANGUAGE)?.takeUnless(String::isNullOrBlank) ?: "en"
 
@@ -327,6 +341,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
         private const val HADITH_TRANSLATION_LANGUAGE = "shared_hadith_translation_language"
+        private const val RECENT_SEARCHES = "shared_recent_searches"
         private const val HADITH_TRANSLATION_PROVIDER = "shared_hadith_translation_provider"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"

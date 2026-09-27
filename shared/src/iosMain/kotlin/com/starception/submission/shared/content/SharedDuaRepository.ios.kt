@@ -20,6 +20,8 @@ import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
 import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CFunction
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -27,6 +29,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,8 @@ import sqlite3.SQLITE_DONE
 import sqlite3.SQLITE_OK
 import sqlite3.SQLITE_OPEN_READONLY
 import sqlite3.SQLITE_ROW
+import sqlite3.sqlite3_bind_int
+import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_text
@@ -108,10 +113,87 @@ private class IosSharedDuaRepository : SharedDuaRepository {
         }
     }
 
+    override suspend fun searchQuranicDuas(query: String, limit: Int): List<SharedQuranicDua> =
+        withContext(Dispatchers.Default) {
+            val term = query.trim()
+            if (term.isEmpty()) {
+                emptyList()
+            } else {
+                readSearch(term, limit)
+            }
+        }
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readSearch(term: String, limit: Int): List<SharedQuranicDua> {
+        val databasePath = resolveDatabaseAsset(
+            bundledPath = NSBundle.mainBundle.pathForResource("quranic_duas", ofType = "db"),
+            remotePath = "databases/quran/quranic_duas.db",
+            cacheName = "quranic_duas.db",
+        )
+        return memScoped {
+            val database = alloc<CPointerVar<sqlite3>>()
+            val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+            if (openResult != SQLITE_OK) {
+                val message = database.value.errorMessage()
+                database.value?.let(::sqlite3_close)
+                error("Unable to open Quranic duas database: $message")
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
+                SELECT id, dua_number, title, surah_reference, arabic,
+                       transliteration, translation, explanation
+                FROM quranic_duas
+                WHERE translation LIKE ? OR title LIKE ?
+                ORDER BY dua_number ASC
+                LIMIT ?
+                """.trimIndent()
+                val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
+                if (prepareResult != SQLITE_OK) {
+                    error("Unable to prepare duas search: ${database.value.errorMessage()}")
+                }
+                try {
+                    sqlite3_bind_text(statement.value, 1, "%$term%", -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(statement.value, 2, "%$term%", -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_int(statement.value, 3, limit)
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    SharedQuranicDua(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        duaNumber = sqlite3_column_int(statement.value, 1),
+                                        title = columnText(statement.value, 2),
+                                        surahReference = columnText(statement.value, 3),
+                                        arabic = columnText(statement.value, 4),
+                                        transliteration = columnText(statement.value, 5),
+                                        translation = columnText(statement.value, 6),
+                                        explanation = columnText(statement.value, 7),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to step through duas search")
+                            }
+                        }
+                    }
+                } finally {
+                    sqlite3_finalize(statement.value)
+                }
+            } finally {
+                sqlite3_close(database.value)
+            }
+        }
+    }
+
     @OptIn(ExperimentalForeignApi::class)
     private fun columnText(statement: CPointer<sqlite3_stmt>?, index: Int): String =
         sqlite3_column_text(statement, index)?.reinterpret<ByteVar>()?.toKString().orEmpty()
 }
+
+/** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
+@OptIn(ExperimentalForeignApi::class)
+private val SQLITE_TRANSIENT: CPointer<CFunction<(COpaquePointer?) -> Unit>>? =
+    (-1L).toCPointer()
 
 @OptIn(ExperimentalForeignApi::class)
 private fun CPointer<sqlite3>?.errorMessage(): String =

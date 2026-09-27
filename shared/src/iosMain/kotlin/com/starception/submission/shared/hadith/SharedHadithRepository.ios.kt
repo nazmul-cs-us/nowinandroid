@@ -20,6 +20,8 @@ import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
 import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CFunction
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -27,6 +29,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,7 @@ import sqlite3.SQLITE_OK
 import sqlite3.SQLITE_OPEN_READONLY
 import sqlite3.SQLITE_ROW
 import sqlite3.sqlite3_bind_int
+import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_text
@@ -123,6 +127,69 @@ private class IosSharedHadithRepository : SharedHadithRepository {
         }
     }
 
+    override suspend fun searchBukhari(query: String, limit: Int): List<SharedHadith> =
+        withContext(Dispatchers.Default) {
+            val term = query.trim()
+            if (term.isEmpty()) {
+                emptyList()
+            } else {
+                readBukhariSearch(term, limit)
+            }
+        }
+
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun readBukhariSearch(term: String, limit: Int): List<SharedHadith> {
+        val path = resolveDatabaseAsset(
+            bundledPath = NSBundle.mainBundle.pathForResource("sahih_bukhari", ofType = "db"),
+            remotePath = "databases/hadith/sahih_bukhari.db",
+            cacheName = "sahih_bukhari.db",
+        )
+        return memScoped {
+            val database = alloc<CPointerVar<sqlite3>>()
+            check(sqlite3_open_v2(path, database.ptr, SQLITE_OPEN_READONLY, null) == SQLITE_OK) {
+                "Unable to open Sahih al-Bukhari database: ${database.value.errorMessage()}"
+            }
+            try {
+                val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                val sql = """
+                SELECT id, text_arabic, text_plain, elaboration
+                FROM hadiths
+                WHERE text_plain LIKE ? OR elaboration LIKE ?
+                ORDER BY id ASC
+                LIMIT ?
+                """.trimIndent()
+                check(sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null) == SQLITE_OK) {
+                    "Unable to prepare the Bukhari search: ${database.value.errorMessage()}"
+                }
+                try {
+                    sqlite3_bind_text(statement.value, 1, "%$term%", -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_text(statement.value, 2, "%$term%", -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_int(statement.value, 3, limit)
+                    buildList {
+                        while (true) {
+                            when (sqlite3_step(statement.value)) {
+                                SQLITE_ROW -> add(
+                                    SharedHadith(
+                                        id = sqlite3_column_int(statement.value, 0),
+                                        arabic = statement.value.text(1),
+                                        english = statement.value.text(2),
+                                        explanation = statement.value.text(3),
+                                    ),
+                                )
+                                SQLITE_DONE -> break
+                                else -> error("Unable to search Bukhari: ${database.value.errorMessage()}")
+                            }
+                        }
+                    }
+                } finally {
+                    statement.value?.let(::sqlite3_finalize)
+                }
+            } finally {
+                database.value?.let(::sqlite3_close)
+            }
+        }
+    }
+
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readHadiths(firstId: Int, lastId: Int): List<SharedHadith> {
         val path = resolveDatabaseAsset(
@@ -174,6 +241,11 @@ private class IosSharedHadithRepository : SharedHadithRepository {
         }
     }
 }
+
+/** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
+@OptIn(ExperimentalForeignApi::class)
+private val SQLITE_TRANSIENT: CPointer<CFunction<(COpaquePointer?) -> Unit>>? =
+    (-1L).toCPointer()
 
 @OptIn(ExperimentalForeignApi::class)
 private fun CPointer<sqlite3_stmt>?.text(index: Int): String =

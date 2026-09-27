@@ -20,6 +20,8 @@ import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
 import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CFunction
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -27,6 +29,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,7 @@ import sqlite3.SQLITE_OK
 import sqlite3.SQLITE_OPEN_READONLY
 import sqlite3.SQLITE_ROW
 import sqlite3.sqlite3_bind_int
+import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_text
@@ -56,6 +60,74 @@ private class IosQuranVerseRepository : QuranVerseRepository {
         require(surahNumber in 1..114) { "Surah number must be between 1 and 114" }
         return withContext(Dispatchers.Default) { readVerses(surahNumber, language) }
     }
+
+    @OptIn(ExperimentalForeignApi::class)
+    override suspend fun searchAyahs(query: String, limit: Int): List<QuranVerse> =
+        withContext(Dispatchers.Default) {
+            val term = query.trim()
+            if (term.isEmpty()) {
+                emptyList()
+            } else {
+                val databasePath = resolveDatabaseAsset(
+                    bundledPath = NSBundle.mainBundle.pathForResource("quran", ofType = "db"),
+                    remotePath = "databases/quran/quran.db",
+                    cacheName = "quran.db",
+                )
+                memScoped {
+                    val database = alloc<CPointerVar<sqlite3>>()
+                    val openResult = sqlite3_open_v2(databasePath, database.ptr, SQLITE_OPEN_READONLY, null)
+                    if (openResult != SQLITE_OK) {
+                        val message = database.value.errorMessage()
+                        database.value?.let(::sqlite3_close)
+                        error("Unable to open Quran database: $message")
+                    }
+                    try {
+                        val statement = alloc<CPointerVar<sqlite3_stmt>>()
+                        val sql = """
+                        SELECT id, surah_number, number_in_surah, text, page, juz_id
+                        FROM ayahs
+                        WHERE text LIKE ?
+                        ORDER BY id ASC
+                        LIMIT ?
+                        """.trimIndent()
+                        val prepareResult = sqlite3_prepare_v2(database.value, sql, -1, statement.ptr, null)
+                        if (prepareResult != SQLITE_OK) {
+                            error("Unable to prepare ayah search: ${database.value.errorMessage()}")
+                        }
+                        try {
+                            sqlite3_bind_text(statement.value, 1, "%$term%", -1, SQLITE_TRANSIENT)
+                            sqlite3_bind_int(statement.value, 2, limit)
+                            buildList {
+                                while (true) {
+                                    when (sqlite3_step(statement.value)) {
+                                        SQLITE_ROW -> add(
+                                            QuranVerse(
+                                                id = sqlite3_column_int(statement.value, 0),
+                                                surahNumber = sqlite3_column_int(statement.value, 1),
+                                                numberInSurah = sqlite3_column_int(statement.value, 2),
+                                                arabicText = cleanQuranText(
+                                                    sqlite3_column_text(statement.value, 3)
+                                                        ?.reinterpret<ByteVar>()?.toKString().orEmpty(),
+                                                ),
+                                                page = sqlite3_column_int(statement.value, 4),
+                                                juz = sqlite3_column_int(statement.value, 5),
+                                                translation = "",
+                                            ),
+                                        )
+                                        SQLITE_DONE -> break
+                                        else -> error("Unable to step through ayah search")
+                                    }
+                                }
+                            }
+                        } finally {
+                            sqlite3_finalize(statement.value)
+                        }
+                    } finally {
+                        sqlite3_close(database.value)
+                    }
+                }
+            }
+        }
 
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun readVerses(
@@ -196,6 +268,11 @@ private class IosQuranVerseRepository : QuranVerseRepository {
         }
     }
 }
+
+/** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
+@OptIn(ExperimentalForeignApi::class)
+private val SQLITE_TRANSIENT: CPointer<CFunction<(COpaquePointer?) -> Unit>>? =
+    (-1L).toCPointer()
 
 @OptIn(ExperimentalForeignApi::class)
 private fun CPointer<sqlite3>?.errorMessage(): String =

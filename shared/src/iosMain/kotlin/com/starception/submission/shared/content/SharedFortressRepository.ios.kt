@@ -20,6 +20,8 @@ import cnames.structs.sqlite3
 import cnames.structs.sqlite3_stmt
 import com.starception.submission.shared.database.resolveDatabaseAsset
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CFunction
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -27,6 +29,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +40,7 @@ import sqlite3.SQLITE_OK
 import sqlite3.SQLITE_OPEN_READONLY
 import sqlite3.SQLITE_ROW
 import sqlite3.sqlite3_bind_int
+import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_text
@@ -70,6 +74,45 @@ private class IosSharedFortressRepository : SharedFortressRepository {
             ) { statement ->
                 sqlite3_column_int(statement, 0) to columnText(statement, 1)
             }.toMap()
+        }
+
+    override suspend fun searchFortressInvocations(query: String, limit: Int): List<FortressInvocation> =
+        withContext(Dispatchers.Default) {
+            val term = query.trim()
+            if (term.isEmpty()) {
+                emptyList()
+            } else {
+                readRows(
+                    sql = """
+                    SELECT id, chapter_id, position, arabic, transliteration, translation,
+                           context, instruction, note, post_context, description, audio_url
+                    FROM invocations
+                    WHERE translation LIKE ? OR description LIKE ?
+                    ORDER BY chapter_id ASC, position ASC
+                    LIMIT ?
+                    """.trimIndent(),
+                    bind = { statement ->
+                        sqlite3_bind_text(statement, 1, "%$term%", -1, SQLITE_TRANSIENT)
+                        sqlite3_bind_text(statement, 2, "%$term%", -1, SQLITE_TRANSIENT)
+                        sqlite3_bind_int(statement, 3, limit)
+                    },
+                ) { statement ->
+                    FortressInvocation(
+                        id = sqlite3_column_int(statement, 0),
+                        chapterId = sqlite3_column_int(statement, 1),
+                        position = sqlite3_column_int(statement, 2),
+                        arabic = columnText(statement, 3),
+                        transliteration = columnText(statement, 4),
+                        translation = columnText(statement, 5),
+                        context = columnText(statement, 6),
+                        instruction = columnText(statement, 7),
+                        note = columnText(statement, 8),
+                        postContext = columnText(statement, 9),
+                        description = columnText(statement, 10),
+                        audioUrl = columnText(statement, 11),
+                    )
+                }
+            }
         }
 
     override suspend fun getChapterInvocations(chapterId: Int): List<FortressInvocation> =
@@ -151,6 +194,11 @@ private class IosSharedFortressRepository : SharedFortressRepository {
     private fun columnText(statement: CPointer<sqlite3_stmt>?, index: Int): String =
         sqlite3_column_text(statement, index)?.reinterpret<ByteVar>()?.toKString().orEmpty()
 }
+
+/** Tells SQLite to copy bound text before the Kotlin-managed bytes are freed. */
+@OptIn(ExperimentalForeignApi::class)
+private val SQLITE_TRANSIENT: CPointer<CFunction<(COpaquePointer?) -> Unit>>? =
+    (-1L).toCPointer()
 
 @OptIn(ExperimentalForeignApi::class)
 private fun CPointer<sqlite3>?.errorMessage(): String =
