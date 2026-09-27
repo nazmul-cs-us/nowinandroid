@@ -331,37 +331,6 @@ fun PrayerTimesScreen(
                             },
                             onShowProfile = { showProfileSheet = true },
                         )
-                        if (searchActive) {
-                            SearchSuggestionsDropdown(
-                                query = searchQuery,
-                                onOpenSurah = { surah ->
-                                    searchActive = false
-                                    searchQuery = ""
-                                    onOpenQuran(surah)
-                                },
-                                onOpenBukhariBook = {
-                                    searchActive = false
-                                    searchQuery = ""
-                                    onOpenBukhariBook(it)
-                                },
-                                onOpenBukhariHadith = {
-                                    searchActive = false
-                                    searchQuery = ""
-                                    onOpenBukhariHadith(it)
-                                },
-                                onOpenQuranicDua = {
-                                    searchActive = false
-                                    searchQuery = ""
-                                    onOpenQuranicDua(it)
-                                },
-                                onOpenFortressChapter = {
-                                    searchActive = false
-                                    searchQuery = ""
-                                    onOpenFortressChapter(it)
-                                },
-                                onRecordRecent = { contentStore.addRecentSearch(it) },
-                            )
-                        }
                         if (showProfileSheet) {
                             HomeProfileSheet(
                                 onOpenProfile = {
@@ -556,6 +525,135 @@ fun PrayerTimesScreen(
                         }
                     }
 
+                    // Android's SearchView: tapping the pill morphs it into a
+                    // full overlay surface — back arrow + input toolbar with the
+                    // suggestions scrolling underneath — not an inline expansion.
+                    if (searchActive) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                            modifier = Modifier.matchParentSize(),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .safeDrawingPadding()
+                                    .padding(horizontal = 16.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 56.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    IconTapTarget(
+                                        icon = NiaIcons.ArrowBack,
+                                        contentDescription = "Close search",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        visualSize = 34.dp,
+                                        iconSize = 22.dp,
+                                        showBackground = false,
+                                        onClick = {
+                                            searchQuery = ""
+                                            searchActive = false
+                                        },
+                                    )
+                                    val focusRequester = remember { FocusRequester() }
+                                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 48.dp)
+                                            .focusRequester(focusRequester),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                imageVector = NiaIcons.Search,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            androidx.compose.foundation.text.BasicTextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                singleLine = true,
+                                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                ),
+                                                cursorBrush = androidx.compose.ui.graphics.SolidColor(
+                                                    MaterialTheme.colorScheme.primary,
+                                                ),
+                                                decorationBox = { innerField ->
+                                                    Box(Modifier.weight(1f)) {
+                                                        if (searchQuery.isEmpty()) {
+                                                            Text(
+                                                                "Search Quran, Hadith and more",
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                            )
+                                                        }
+                                                        innerField()
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                            if (searchQuery.isNotEmpty()) {
+                                                IconTapTarget(
+                                                    icon = Icons.Filled.Close,
+                                                    contentDescription = "Clear query",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    visualSize = 30.dp,
+                                                    iconSize = 20.dp,
+                                                    showBackground = false,
+                                                    onClick = { searchQuery = "" },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Box(Modifier.weight(1f)) {
+                                    SearchSuggestionsOverlayContent(
+                                        query = searchQuery,
+                                        onOpenSurah = {
+                                            searchActive = false
+                                            searchQuery = ""
+                                            onOpenQuran(it)
+                                        },
+                                        onOpenBukhariBook = {
+                                            searchActive = false
+                                            searchQuery = ""
+                                            onOpenBukhariBook(it)
+                                        },
+                                        onOpenBukhariHadith = {
+                                            searchActive = false
+                                            searchQuery = ""
+                                            onOpenBukhariHadith(it)
+                                        },
+                                        onOpenQuranicDua = {
+                                            searchActive = false
+                                            searchQuery = ""
+                                            onOpenQuranicDua(it)
+                                        },
+                                        onOpenFortressChapter = {
+                                            searchActive = false
+                                            searchQuery = ""
+                                            onOpenFortressChapter(it)
+                                        },
+                                        onRecordRecent = { contentStore.addRecentSearch(it) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     if (useSideNavigation) {
                         FloatingSideBar(
                             items = SharedBottomBarItems,
@@ -608,111 +706,43 @@ private fun PrayerHomeHeader(
             showBackground = false,
             onClick = onShowProfile,
         )
-        // Inline expanding search — Android's SearchView expands in the bar
-        // with live suggestions instead of navigating to a search page.
-        if (searchActive) {
-            // Android's expanded SearchView input: a filled pill in
-            // surfaceContainerHigh — no outline, no indicator.
-            val focusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) {
-                focusRequester.requestFocus()
-            }
-            androidx.compose.material3.Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .focusRequester(focusRequester),
+        Surface(
+            onClick = onOpenSearch,
+            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(start = 16.dp, end = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = NiaIcons.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    androidx.compose.foundation.text.BasicTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                        decorationBox = { innerField ->
-                            Box(Modifier.weight(1f)) {
-                                if (searchQuery.isEmpty()) {
-                                    Text(
-                                        "Search Quran, Hadith and more",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                innerField()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconTapTarget(
-                        icon = Icons.Filled.Close,
-                        contentDescription = "Close search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        visualSize = 30.dp,
-                        iconSize = 20.dp,
-                        showBackground = false,
-                        onClick = {
-                            onSearchQueryChange("")
-                            onSearchActiveChange(false)
-                        },
-                    )
-                }
-            }
-        } else {
-            Surface(
-                onClick = onOpenSearch,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ) {
-                Row(
-                    modifier = Modifier.padding(start = 16.dp, end = if (onVoiceTap != null) 6.dp else 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = NiaIcons.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (onVoiceTap != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .clickable(onClick = onVoiceTap),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Mic,
-                                contentDescription = "Voice search",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                Icon(
+                    imageVector = NiaIcons.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = searchTerm?.let { "Search '$it'" } ?: "Search Quran, Hadith and more",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onVoiceTap != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onVoiceTap),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = "Voice search",
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
             }
@@ -729,11 +759,11 @@ private fun PrayerHomeHeader(
     }
 }
 
-/** Live suggestions under the expanded search field — the shared counterpart
- *  of Android's SearchView dropdown: catalog names, full-text ayah and hadith
+/** The SearchView overlay's scrollable suggestion list — Android's
+ *  renderSuggestions sections: catalog names, full-text ayah and hadith
  *  matches, Fortress/Quranic duas, recent chips, and popular shortcuts. */
 @Composable
-private fun SearchSuggestionsDropdown(
+private fun SearchSuggestionsOverlayContent(
     query: String,
     onOpenSurah: (Int) -> Unit,
     onOpenBukhariBook: (Int) -> Unit,
@@ -789,129 +819,119 @@ private fun SearchSuggestionsDropdown(
         }
     }
 
-    androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-        ),
-        modifier = Modifier.fillMaxWidth(),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 6.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 6.dp),
-        ) {
-            if (trimmed.isEmpty()) {
-                if (recents.isNotEmpty()) {
-                    SuggestionHeader("RECENT")
-                    SuggestionChips(
-                        items = recents,
-                        onClick = { /* Re-filling the field happens through query state */ },
-                    )
-                }
-                SuggestionHeader("POPULAR")
+        if (trimmed.isEmpty()) {
+            if (recents.isNotEmpty()) {
+                SuggestionHeader("RECENT")
                 SuggestionChips(
-                    items = popular.map { it.label },
-                    onClick = { label ->
-                        onRecordRecent(label)
-                        popular.firstOrNull { it.label == label }?.let {
-                            onOpenSurah(it.surah)
-                        }
-                    },
+                    items = recents,
+                    onClick = { /* Re-filling the field happens through query state */ },
                 )
-            } else {
-                catalog.forEach { result ->
-                    when (result) {
-                        is com.starception.submission.shared.content.CatalogResult.Quran -> {
-                            SuggestionRow(
-                                badge = "${result.surah.number}",
-                                title = result.surah.nameEnglish,
-                                trailing = result.surah.nameArabic,
-                                onClick = {
-                                    onRecordRecent(trimmed)
-                                    onOpenSurah(result.surah.number)
-                                },
-                            )
-                        }
-                        is com.starception.submission.shared.content.CatalogResult.Bukhari -> {
-                            SuggestionRow(
-                                badge = "${result.book.id}",
-                                title = result.book.nameEnglish,
-                                onClick = {
-                                    onRecordRecent(trimmed)
-                                    onOpenBukhariBook(result.book.id)
-                                },
-                            )
-                        }
+            }
+            SuggestionHeader("POPULAR")
+            SuggestionChips(
+                items = popular.map { it.label },
+                onClick = { label ->
+                    onRecordRecent(label)
+                    popular.firstOrNull { it.label == label }?.let {
+                        onOpenSurah(it.surah)
                     }
-                }
-                if (verses.isNotEmpty()) {
-                    SuggestionHeader("QURAN VERSES")
-                    verses.forEach { verse ->
+                },
+            )
+        } else {
+            catalog.forEach { result ->
+                when (result) {
+                    is com.starception.submission.shared.content.CatalogResult.Quran -> {
                         SuggestionRow(
-                            badge = "${verse.surahNumber}:${verse.numberInSurah}",
-                            title = verse.arabicText,
-                            titleArabic = true,
+                            badge = "${result.surah.number}",
+                            title = result.surah.nameEnglish,
+                            trailing = result.surah.nameArabic,
                             onClick = {
                                 onRecordRecent(trimmed)
-                                onOpenSurah(verse.surahNumber)
+                                onOpenSurah(result.surah.number)
+                            },
+                        )
+                    }
+                    is com.starception.submission.shared.content.CatalogResult.Bukhari -> {
+                        SuggestionRow(
+                            badge = "${result.book.id}",
+                            title = result.book.nameEnglish,
+                            onClick = {
+                                onRecordRecent(trimmed)
+                                onOpenBukhariBook(result.book.id)
                             },
                         )
                     }
                 }
-                if (hadiths.isNotEmpty()) {
-                    SuggestionHeader("SAHIH AL-BUKHARI")
-                    hadiths.forEach { hadith ->
-                        SuggestionRow(
-                            badge = "${hadith.id}",
-                            title = hadith.english,
-                            onClick = {
-                                onRecordRecent(trimmed)
-                                onOpenBukhariHadith(hadith.id)
-                            },
-                        )
-                    }
-                }
-                if (fortress.isNotEmpty()) {
-                    SuggestionHeader("FORTRESS OF THE MUSLIM")
-                    fortress.forEach { invocation ->
-                        SuggestionRow(
-                            badge = "${invocation.chapterId}:${invocation.position}",
-                            title = invocation.translation.ifBlank { invocation.description },
-                            onClick = {
-                                onRecordRecent(trimmed)
-                                onOpenFortressChapter(invocation.chapterId)
-                            },
-                        )
-                    }
-                }
-                if (duas.isNotEmpty()) {
-                    SuggestionHeader("QURANIC DUAS")
-                    duas.forEach { dua ->
-                        SuggestionRow(
-                            badge = "${dua.duaNumber}",
-                            title = dua.title,
-                            trailing = dua.surahReference,
-                            onClick = {
-                                onRecordRecent(trimmed)
-                                onOpenQuranicDua(dua.duaNumber)
-                            },
-                        )
-                    }
-                }
-                if (catalog.isEmpty() && verses.isEmpty() && hadiths.isEmpty() &&
-                    fortress.isEmpty() && duas.isEmpty()
-                ) {
-                    Text(
-                        "No matches for \"$trimmed\"",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            }
+            if (verses.isNotEmpty()) {
+                SuggestionHeader("QURAN VERSES")
+                verses.forEach { verse ->
+                    SuggestionRow(
+                        badge = "${verse.surahNumber}:${verse.numberInSurah}",
+                        title = verse.arabicText,
+                        titleArabic = true,
+                        onClick = {
+                            onRecordRecent(trimmed)
+                            onOpenSurah(verse.surahNumber)
+                        },
                     )
                 }
+            }
+            if (hadiths.isNotEmpty()) {
+                SuggestionHeader("SAHIH AL-BUKHARI")
+                hadiths.forEach { hadith ->
+                    SuggestionRow(
+                        badge = "${hadith.id}",
+                        title = hadith.english,
+                        onClick = {
+                            onRecordRecent(trimmed)
+                            onOpenBukhariHadith(hadith.id)
+                        },
+                    )
+                }
+            }
+            if (fortress.isNotEmpty()) {
+                SuggestionHeader("FORTRESS OF THE MUSLIM")
+                fortress.forEach { invocation ->
+                    SuggestionRow(
+                        badge = "${invocation.chapterId}:${invocation.position}",
+                        title = invocation.translation.ifBlank { invocation.description },
+                        onClick = {
+                            onRecordRecent(trimmed)
+                            onOpenFortressChapter(invocation.chapterId)
+                        },
+                    )
+                }
+            }
+            if (duas.isNotEmpty()) {
+                SuggestionHeader("QURANIC DUAS")
+                duas.forEach { dua ->
+                    SuggestionRow(
+                        badge = "${dua.duaNumber}",
+                        title = dua.title,
+                        trailing = dua.surahReference,
+                        onClick = {
+                            onRecordRecent(trimmed)
+                            onOpenQuranicDua(dua.duaNumber)
+                        },
+                    )
+                }
+            }
+            if (catalog.isEmpty() && verses.isEmpty() && hadiths.isEmpty() &&
+                fortress.isEmpty() && duas.isEmpty()
+            ) {
+                Text(
+                    "No matches for \"$trimmed\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                )
             }
         }
     }
