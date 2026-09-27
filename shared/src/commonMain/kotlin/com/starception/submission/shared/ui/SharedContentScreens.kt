@@ -51,6 +51,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -103,8 +104,10 @@ import com.starception.submission.shared.content.CatalogResult
 import com.starception.submission.shared.content.DailyRecommendation
 import com.starception.submission.shared.content.SharedContentStore
 import com.starception.submission.shared.content.SharedNewsResource
+import com.starception.submission.shared.content.SharedQuranicDua
 import com.starception.submission.shared.content.SharedTopic
 import com.starception.submission.shared.content.SharedTopicArticle
+import com.starception.submission.shared.content.createSharedDuaRepository
 import com.starception.submission.shared.content.createSharedNewsRepository
 import com.starception.submission.shared.content.createSharedTopicRepository
 import com.starception.submission.shared.content.dailyRecommendation
@@ -112,6 +115,8 @@ import com.starception.submission.shared.content.searchCatalog
 import com.starception.submission.shared.content.sharedTopic
 import com.starception.submission.shared.hadith.SharedHadith
 import com.starception.submission.shared.hadith.createSharedHadithRepository
+import com.starception.submission.shared.quran.AyahNumberChip
+import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
@@ -291,6 +296,7 @@ internal fun QuranLibraryScreen(
     store: SharedContentStore,
     onBack: () -> Unit,
     onOpenSurah: (Int) -> Unit,
+    onOpenDuas: () -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(store.bookmarkedSurahs()) }
@@ -302,6 +308,32 @@ internal fun QuranLibraryScreen(
         }
     }
     SharedDetailScaffold(title = "The Quran", onBack = onBack, maxContentWidth = 900.dp) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onOpenDuas,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Quranic Duas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "40 invocations from the Quran",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -375,7 +407,11 @@ internal fun QuranDetailScreen(
             QuranAyahState.Error(error.message ?: "The Quran database could not be read.")
         }
     }
-    var showTranslation by remember(number) { mutableStateOf(true) }
+    // Reading settings — the Android SurahDetailViewModel set, persisted here.
+    var showTranslation by remember { mutableStateOf(store.quranShowTranslation()) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
+    var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     LaunchedEffect(number, translationLanguage) {
         // Reload the ayahs when the translation language changes.
         loadAttempt += 1
@@ -409,7 +445,10 @@ internal fun QuranDetailScreen(
         label = if (showTranslation) "Hide translation" else "Show translation",
         selected = showTranslation,
         trailingText = if (showTranslation) "ON" else "OFF",
-    ) { showTranslation = !showTranslation }
+    ) {
+        showTranslation = !showTranslation
+        store.saveQuranShowTranslation(showTranslation)
+    }
     val tajweedAction = DetailAction(
         id = "tajweed",
         label = "Tajweed colors",
@@ -422,18 +461,31 @@ internal fun QuranDetailScreen(
     val textAlignmentAction = DetailAction(
         id = "text_alignment",
         label = "Text alignment",
-        trailingText = "Justify",
-    ) { }
+        trailingText = if (textAlignment == "center") "Center" else "Justify",
+    ) {
+        textAlignment = if (textAlignment == "center") "justify" else "center"
+        store.saveQuranTextAlignment(textAlignment)
+    }
     val arabicFontAction = DetailAction(
         id = "arabic_font",
         label = "Arabic font",
-        trailingText = "Uthmanic",
-    ) { }
+        trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+    ) {
+        val order = QuranArabicFonts.selectionOrder
+        val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
+        val next = order[(currentIndex + 1) % order.size]
+        selectedArabicFont = next
+        store.saveQuranArabicFont(next)
+    }
     val translationLanguageAction = DetailAction(
         id = "translation_language",
         label = "Translation language",
         trailingText = translationLanguage.displayName,
-    ) { }
+    ) {
+        val entries = QuranTranslationLanguage.entries
+        translationLanguage = entries[(entries.indexOf(translationLanguage) + 1) % entries.size]
+        store.saveQuranTranslationLanguage(translationLanguage.code)
+    }
     val tafseerAction = DetailAction(
         id = "tafseer",
         label = "Word study / Tafseer",
@@ -685,11 +737,42 @@ internal fun QuranDetailScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        if (showTranslation) "Double-tap to hide translation" else "Double-tap to show translation",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    // Android's Arabic font-size stepper (28..60sp).
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "A-",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable {
+                                    if (arabicFontSize > 28f) {
+                                        arabicFontSize -= 1f
+                                        store.saveQuranArabicFontSize(arabicFontSize)
+                                    }
+                                }
+                                .padding(horizontal = 6.dp),
+                        )
+                        Text(
+                            arabicFontSize.toInt().toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "A+",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable {
+                                    if (arabicFontSize < 60f) {
+                                        arabicFontSize += 1f
+                                        store.saveQuranArabicFontSize(arabicFontSize)
+                                    }
+                                }
+                                .padding(horizontal = 6.dp),
+                        )
+                    }
                 }
                 if (filteredVerses.isEmpty()) {
                     Box(
@@ -708,6 +791,9 @@ internal fun QuranDetailScreen(
                             QuranAyahReadingBlock(
                                 verse = verse,
                                 showTranslation = showTranslation,
+                                arabicFont = selectedArabicFont,
+                                arabicFontSize = arabicFontSize,
+                                textAlignment = textAlignment,
                                 onToggleTranslation = { showTranslation = !showTranslation },
                                 onOpenTafseer = { verseId, preselectBook ->
                                     tafseerSelectedBook = preselectBook
@@ -737,9 +823,13 @@ internal fun QuranDetailScreen(
 private fun QuranAyahReadingBlock(
     verse: QuranVerse,
     showTranslation: Boolean,
+    arabicFont: String,
+    arabicFontSize: Float,
+    textAlignment: String,
     onToggleTranslation: () -> Unit,
     onOpenTafseer: (ayahNumber: Int, preselectBook: Int) -> Unit = { _, _ -> },
 ) {
+    val arabicFontFamily = QuranArabicFonts.fontFamily(arabicFont)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -756,14 +846,24 @@ private fun QuranAyahReadingBlock(
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(5.dp))
-        Text(
-            text = "${verse.arabicText} \u06DD${verse.numberInSurah.toArabicIndicDigits()}",
-            modifier = Modifier.fillMaxWidth(),
-            fontSize = 30.sp,
-            lineHeight = 48.sp,
-            textAlign = TextAlign.Justify,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        // Arabic in the selected Quran typeface at Android's default 41sp with
+        // 1.7x leading; the ayah number sits in its rosette chip.
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = verse.arabicText,
+                modifier = Modifier.weight(1f),
+                fontFamily = arabicFontFamily,
+                fontSize = arabicFontSize.sp,
+                lineHeight = (arabicFontSize * 1.7f).sp,
+                textAlign = if (textAlignment == "center") TextAlign.Center else TextAlign.Justify,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            AyahNumberChip(
+                ayahNumber = verse.numberInSurah,
+                fontSize = (arabicFontSize * 0.5f).sp,
+                modifier = Modifier.padding(start = 6.dp, bottom = 6.dp),
+            )
+        }
         if (showTranslation && verse.translation.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -797,6 +897,225 @@ private fun QuranAyahReadingBlock(
 private fun Int.toArabicIndicDigits(): String = toString().map { digit ->
     if (digit in '0'..'9') ('٠'.code + (digit - '0')).toChar() else digit
 }.joinToString("")
+
+@Composable
+internal fun SharedDuaLibraryScreen(
+    onBack: () -> Unit,
+    onOpenDua: (Int) -> Unit,
+) {
+    val repository = remember { createSharedDuaRepository() }
+    var loadAttempt by remember { mutableStateOf(0) }
+    var state by remember { mutableStateOf<DuaDetailState>(DuaDetailState.Loading) }
+    var duas by remember { mutableStateOf<List<SharedQuranicDua>>(emptyList()) }
+    LaunchedEffect(loadAttempt) {
+        state = DuaDetailState.Loading
+        try {
+            duas = repository.getQuranicDuas()
+            state = if (duas.isEmpty()) {
+                DuaDetailState.Error("No duas were found in the database.")
+            } else {
+                DuaDetailState.Loaded(duas.first())
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            state = DuaDetailState.Error(error.message ?: "The Quranic duas database could not be read.")
+        }
+    }
+    SharedDetailScaffold(title = "Quranic Duas", onBack = onBack) {
+        when (val current = state) {
+            DuaDetailState.Loading -> Box(
+                Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            is DuaDetailState.Error -> Column(
+                Modifier.fillMaxWidth().weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SupportingCard("Unable to load duas", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is DuaDetailState.Loaded -> LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
+            ) {
+                items(duas, key = { it.id }) { dua ->
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onOpenDua(dua.duaNumber) },
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(
+                                "${dua.duaNumber}. ${dua.title}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "Surah ${dua.surahReference}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SharedDuaDetailScreen(
+    number: Int,
+    onBack: () -> Unit,
+) {
+    val repository = remember { createSharedDuaRepository() }
+    var loadAttempt by remember { mutableStateOf(0) }
+    var state by remember { mutableStateOf<DuaDetailState>(DuaDetailState.Loading) }
+    LaunchedEffect(number, loadAttempt) {
+        state = DuaDetailState.Loading
+        state = try {
+            val dua = repository.getQuranicDuas().firstOrNull { it.duaNumber == number }
+            dua?.let { DuaDetailState.Loaded(it) }
+                ?: DuaDetailState.Error("Dua $number was not found.")
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            DuaDetailState.Error(error.message ?: "The Quranic duas database could not be read.")
+        }
+    }
+    var listening by remember(number) { mutableStateOf(false) }
+    ImmersiveDetailScaffold(onBack = onBack, header = {
+        Box(Modifier.fillMaxWidth().height(190.dp)) {
+            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+            Column {
+                DetailToolbar(
+                    onBack = onBack,
+                    sheetActions = listOf(
+                        DetailAction(
+                            id = "listen",
+                            label = if (listening) "Stop narration" else "Listen (TTS)",
+                            selected = listening,
+                        ) { listening = !listening },
+                    ),
+                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    toolbarTitle = "Quranic Dua $number",
+                )
+            }
+            ImmersiveDetailHeaderScrim(
+                title = "Quranic Dua",
+                supportingText = "Dua $number",
+                arabicTitle = "دعاء",
+            )
+        }
+    }) {
+        when (val current = state) {
+            DuaDetailState.Loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            is DuaDetailState.Error -> Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                SupportingCard("Unable to load dua", current.message)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { loadAttempt++ }) { Text("Try again") }
+            }
+            is DuaDetailState.Loaded -> {
+                val dua = current.dua
+                val arabicFontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM)
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    item {
+                        Column {
+                            Text(
+                                "${dua.duaNumber}. ${dua.title}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ReaderTag("DUA ${dua.duaNumber}")
+                                ReaderTag("SURAH ${dua.surahReference}", selected = false)
+                            }
+                        }
+                    }
+                    item {
+                        HadithListenButton(dua.translation) { enabled ->
+                            if (enabled) {
+                                PlatformSpeechSynthesizer().speak(text = dua.translation)
+                            } else {
+                                PlatformSpeechSynthesizer().stop()
+                            }
+                        }
+                    }
+                    if (dua.arabic.isNotBlank()) {
+                        item {
+                            ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                                Text(
+                                    dua.arabic,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    fontFamily = arabicFontFamily,
+                                    fontSize = 34.sp,
+                                    lineHeight = 56.sp,
+                                    textAlign = TextAlign.End,
+                                )
+                            }
+                        }
+                    }
+                    if (dua.transliteration.isNotBlank()) {
+                        item {
+                            ReaderSection("Transliteration", MaterialTheme.colorScheme.secondary) {
+                                Text(
+                                    dua.transliteration,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                                )
+                            }
+                        }
+                    }
+                    if (dua.translation.isNotBlank()) {
+                        item {
+                            ReaderSection("Translation", MaterialTheme.colorScheme.tertiary) {
+                                Text(
+                                    dua.translation,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 26.sp),
+                                )
+                            }
+                        }
+                    }
+                    if (dua.explanation.isNotBlank()) {
+                        item {
+                            ReaderSection("Explanation", MaterialTheme.colorScheme.primary) {
+                                Text(
+                                    dua.explanation,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 24.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private sealed interface DuaDetailState {
+    data object Loading : DuaDetailState
+    data class Loaded(val dua: SharedQuranicDua) : DuaDetailState
+    data class Error(val message: String) : DuaDetailState
+}
 
 @Composable
 internal fun BukhariBookDetailScreen(
@@ -1064,8 +1383,9 @@ internal fun BukhariHadithDetailScreen(
                                 Text(
                                     hadith.arabic,
                                     modifier = Modifier.fillMaxWidth(),
-                                    fontSize = 29.sp,
-                                    lineHeight = 46.sp,
+                                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
+                                    fontSize = 26.sp,
+                                    lineHeight = 44.sp,
                                     textAlign = TextAlign.End,
                                 )
                             }
@@ -1255,8 +1575,9 @@ internal fun ShamayelHadithDetailScreen(
                                 Text(
                                     hadith.arabic,
                                     modifier = Modifier.fillMaxWidth(),
-                                    fontSize = 29.sp,
-                                    lineHeight = 46.sp,
+                                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
+                                    fontSize = 26.sp,
+                                    lineHeight = 44.sp,
                                     textAlign = TextAlign.End,
                                 )
                             }

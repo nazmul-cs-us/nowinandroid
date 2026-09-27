@@ -16,6 +16,7 @@
 
 package com.starception.submission.shared.content
 
+import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.storage.KeyValueStore
 import com.starception.submission.shared.storage.platformKeyValueStore
@@ -53,6 +54,36 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
 
     fun saveQuranTranslationLanguage(code: String) {
         store.putString(QURAN_TRANSLATION_LANGUAGE, code)
+    }
+
+    fun quranArabicFont(): String =
+        store.getString(QURAN_ARABIC_FONT)?.takeUnless(String::isNullOrBlank)
+            ?: QuranArabicFonts.PDMS_SALEEM
+
+    fun saveQuranArabicFont(font: String) {
+        store.putString(QURAN_ARABIC_FONT, font)
+    }
+
+    fun quranArabicFontSize(): Float =
+        store.getString(QURAN_ARABIC_FONT_SIZE)?.toFloatOrNull()
+            ?.coerceIn(28f, 60f) ?: 41f
+
+    fun saveQuranArabicFontSize(size: Float) {
+        store.putString(QURAN_ARABIC_FONT_SIZE, size.coerceIn(28f, 60f).toString())
+    }
+
+    fun quranTextAlignment(): String =
+        store.getString(QURAN_TEXT_ALIGNMENT)?.takeUnless(String::isNullOrBlank) ?: "justify"
+
+    fun saveQuranTextAlignment(alignment: String) {
+        store.putString(QURAN_TEXT_ALIGNMENT, alignment)
+    }
+
+    fun quranShowTranslation(): Boolean =
+        store.getString(QURAN_SHOW_TRANSLATION)?.toBoolean() ?: true
+
+    fun saveQuranShowTranslation(show: Boolean) {
+        store.putString(QURAN_SHOW_TRANSLATION, show.toString())
     }
 
     fun savedBukhariBooks(): Set<Int> = intSet(SAVED_BUKHARI, 1..97)
@@ -253,6 +284,10 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val VIEWED_NEWS_IDS = "shared_viewed_news_ids"
         private const val ONBOARDING_HIDDEN = "shared_onboarding_hidden"
         private const val QURAN_TRANSLATION_LANGUAGE = "shared_quran_translation_language"
+        private const val QURAN_ARABIC_FONT = "shared_quran_arabic_font"
+        private const val QURAN_ARABIC_FONT_SIZE = "shared_quran_arabic_font_size"
+        private const val QURAN_TEXT_ALIGNMENT = "shared_quran_text_alignment"
+        private const val QURAN_SHOW_TRANSLATION = "shared_quran_show_translation"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"
         private const val SURAH_NEWS_ID_OFFSET = 2000

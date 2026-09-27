@@ -80,6 +80,10 @@ object PrayerSettingsRoute
 
 @Serializable data class TopicArticleRoute(val topicId: Int, val articleId: Int)
 
+@Serializable object DuaLibraryRoute
+
+@Serializable data class DuaDetailRoute(val number: Int)
+
 @Serializable object QiblaRoute
 
 @Serializable object RecommendationRoute
@@ -239,11 +243,27 @@ fun SharedNavHost(
                 onBack = { navController.popBackStack() },
             )
         }
+        composable<DuaLibraryRoute> {
+            SharedDuaLibraryScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDua = { duaNumber ->
+                    navController.navigate(DuaDetailRoute(duaNumber))
+                },
+            )
+        }
+        composable<DuaDetailRoute> { entry ->
+            val route = entry.toRoute<DuaDetailRoute>()
+            SharedDuaDetailScreen(
+                number = route.number,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable<QuranLibraryRoute> {
             QuranLibraryScreen(
                 store = contentStore,
                 onBack = { navController.popBackStack() },
                 onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                onOpenDuas = { navController.navigate(DuaLibraryRoute) },
             )
         }
         composable<QuranDetailRoute> { entry ->
