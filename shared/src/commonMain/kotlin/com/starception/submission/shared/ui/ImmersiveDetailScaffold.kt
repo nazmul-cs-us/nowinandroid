@@ -26,11 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.starception.submission.core.designsystem.icon.NiaIcons
 
 /**
  * Immersive detail scaffold matching the Android app's album-header pages
@@ -74,21 +69,10 @@ internal fun ImmersiveDetailScaffold(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                 ) {
+                    // The header's DetailToolbar owns the back button — an
+                    // extra floating circle here stacked on the toolbar's and
+                    // overlapped the scrim title on every detail page.
                     header()
-                    // Floating back over the artwork, Android-style.
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                NiaIcons.ArrowBack,
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 Column(

@@ -42,6 +42,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -76,6 +79,7 @@ import com.starception.submission.core.images.resources.insight_qibla_foreground
 import com.starception.submission.core.images.resources.insight_quran_background
 import com.starception.submission.core.images.resources.insight_quran_foreground_v2
 import com.starception.submission.core.images.resources.insight_suggestion
+import com.starception.submission.feature.quran.QuranData
 import com.starception.submission.feature.quran.dailyReading
 import com.starception.submission.feature.quran.subtitle
 import com.starception.submission.prayer.model.PrayerNotificationPreferences
@@ -94,6 +98,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -310,7 +315,22 @@ fun InsightPager(
                         }
 
                         2 -> {
-                            val surah = dailyReading(today)
+                            // Android's DailyStatsTile: a surah selector with
+                            // skip buttons, a play control, and a progress
+                            // slider with time labels.
+                            var surahOffset by remember(today) {
+                                mutableStateOf(dailyReading(today).number - 1)
+                            }
+                            val surah = QuranData.surahs[surahOffset.coerceIn(0, QuranData.surahs.size - 1)]
+                            var position by remember { mutableStateOf(0f) }
+                            var duration by remember { mutableStateOf(0f) }
+                            LaunchedEffect(isReadingAudio) {
+                                while (isReadingAudio) {
+                                    position = quranPlayer.positionSeconds()
+                                    duration = quranPlayer.durationSeconds()
+                                    kotlinx.coroutines.delay(500)
+                                }
+                            }
                             ArtworkTile(
                                 artwork = Res.drawable.insight_quran_background,
                                 foreground = Res.drawable.insight_quran_foreground_v2,
@@ -327,36 +347,123 @@ fun InsightPager(
                                     onOpenQuran(surah.number)
                                 },
                                 content = {
-                                    Surface(
-                                        onClick = {
-                                            if (isReadingAudio) {
-                                                quranPlayer.pause()
-                                                isReadingAudio = false
-                                            } else {
-                                                isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
-                                            }
-                                        },
-                                        shape = CircleShape,
-                                        color = Color.Black.copy(alpha = 0.38f),
-                                        contentColor = Color.White,
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
-                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 10.dp, start = 12.dp, end = 12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                                         ) {
-                                            Icon(
-                                                imageVector = if (isReadingAudio) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                                contentDescription = if (isReadingAudio) "Pause recitation" else "Play recitation",
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                            Text(
-                                                text = if (isReadingAudio) "Pause" else "Listen",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                            )
+                                            Surface(
+                                                onClick = {
+                                                    quranPlayer.stop()
+                                                    isReadingAudio = false
+                                                    surahOffset = (surahOffset - 1)
+                                                        .mod(QuranData.surahs.size)
+                                                },
+                                                shape = CircleShape,
+                                                color = Color.Black.copy(alpha = 0.38f),
+                                                contentColor = Color.White,
+                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.SkipPrevious,
+                                                    contentDescription = "Previous surah",
+                                                    modifier = Modifier.size(22.dp).padding(4.dp),
+                                                )
+                                            }
+                                            Surface(
+                                                onClick = {
+                                                    if (isReadingAudio) {
+                                                        quranPlayer.pause()
+                                                        isReadingAudio = false
+                                                    } else {
+                                                        isReadingAudio = quranPlayer.play(quranAudioUrl(surah.number))
+                                                    }
+                                                },
+                                                shape = CircleShape,
+                                                color = Color.Black.copy(alpha = 0.38f),
+                                                contentColor = Color.White,
+                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isReadingAudio) {
+                                                            Icons.Filled.Pause
+                                                        } else {
+                                                            Icons.Filled.PlayArrow
+                                                        },
+                                                        contentDescription = if (isReadingAudio) {
+                                                            "Pause recitation"
+                                                        } else {
+                                                            "Play recitation"
+                                                        },
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                    Text(
+                                                        text = if (isReadingAudio) "Pause" else "Listen",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                    )
+                                                }
+                                            }
+                                            Surface(
+                                                onClick = {
+                                                    quranPlayer.stop()
+                                                    isReadingAudio = false
+                                                    surahOffset = (surahOffset + 1)
+                                                        .mod(QuranData.surahs.size)
+                                                },
+                                                shape = CircleShape,
+                                                color = Color.Black.copy(alpha = 0.38f),
+                                                contentColor = Color.White,
+                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.SkipNext,
+                                                    contentDescription = "Next surah",
+                                                    modifier = Modifier.size(22.dp).padding(4.dp),
+                                                )
+                                            }
+                                        }
+                                        if (isReadingAudio && duration > 0f) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.fillMaxWidth(),
+                                            ) {
+                                                Text(
+                                                    formatTileSeconds(position.toInt()),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White,
+                                                )
+                                                androidx.compose.material3.Slider(
+                                                    value = (position / duration).coerceIn(0f, 1f),
+                                                    onValueChange = { fraction ->
+                                                        position = fraction * duration
+                                                        quranPlayer.seekTo(position)
+                                                    },
+                                                    colors = androidx.compose.material3.SliderDefaults.colors(
+                                                        thumbColor = Color.White,
+                                                        activeTrackColor = Color.White,
+                                                        inactiveTrackColor = Color.White.copy(alpha = 0.35f),
+                                                    ),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .padding(horizontal = 8.dp),
+                                                )
+                                                Text(
+                                                    formatTileSeconds(duration.toInt()),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color.White,
+                                                )
+                                            }
                                         }
                                     }
                                 },
@@ -376,6 +483,16 @@ fun InsightPager(
                             ),
                             tileHeight = tileHeight,
                             onClick = onOpenQibla,
+                            content = {
+                                // Android's compass tiles: a live dial that
+                                // rotates with the device heading while the
+                                // Qibla needle stays fixed at the bearing.
+                                QiblaCompassDial(
+                                    qiblaBearing = qiblaBearing,
+                                    headingDegrees = heading.headingDegrees,
+                                    modifier = Modifier.padding(bottom = 10.dp),
+                                )
+                            },
                         )
 
                         else -> {
@@ -394,6 +511,56 @@ fun InsightPager(
             }
         }
     }
+}
+
+/** A rotating Qibla compass dial — the shared counterpart of Android's
+ *  QiblaCompass: the dial rotates with the live heading, the Qibla needle
+ *  holds the bearing, cardinal letters mark the ring. */
+@Composable
+private fun QiblaCompassDial(
+    qiblaBearing: Int,
+    headingDegrees: Double?,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.size(74.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val stroke = 1.6.dp.toPx()
+            val ringColor = Color.White.copy(alpha = 0.85f)
+            val needleColor = Color.White
+            drawCircle(ringColor, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+            val ticks = 12
+            repeat(ticks) { index ->
+                val angle = (index * 360f / ticks - (headingDegrees?.toFloat() ?: 0f)) * PI / 180f
+                val start = Offset(
+                    x = center.x + (size.minDimension / 2 - 6.dp.toPx()) * kotlin.math.sin(angle).toFloat(),
+                    y = center.y - (size.minDimension / 2 - 6.dp.toPx()) * kotlin.math.cos(angle).toFloat(),
+                )
+                val end = Offset(
+                    x = center.x + (size.minDimension / 2 - 2.dp.toPx()) * kotlin.math.sin(angle).toFloat(),
+                    y = center.y - (size.minDimension / 2 - 2.dp.toPx()) * kotlin.math.cos(angle).toFloat(),
+                )
+                drawLine(ringColor.copy(alpha = 0.6f), start, end, strokeWidth = stroke)
+            }
+            // Qibla needle — fixed at the bearing against the rotating dial.
+            val needleAngle = (qiblaBearing - (headingDegrees?.toFloat() ?: 0f)) * PI / 180f
+            val tip = Offset(
+                x = center.x + (size.minDimension / 2 - 10.dp.toPx()) * kotlin.math.sin(needleAngle).toFloat(),
+                y = center.y - (size.minDimension / 2 - 10.dp.toPx()) * kotlin.math.cos(needleAngle).toFloat(),
+            )
+            drawLine(needleColor, center, tip, strokeWidth = 2.4.dp.toPx())
+            drawCircle(needleColor, radius = 2.4.dp.toPx(), center = tip)
+            drawCircle(needleColor, radius = 2.dp.toPx(), center = center)
+        }
+    }
+}
+
+private fun formatTileSeconds(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:" + if (seconds < 10) "0$seconds" else seconds.toString()
 }
 
 private fun qiblaGuidance(qiblaBearing: Int, headingDegrees: Double?): String {
