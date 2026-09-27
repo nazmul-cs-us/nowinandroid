@@ -731,7 +731,12 @@ fun PrayerTimesScreen(
                             items = SharedBottomBarItems,
                             selectedIndex = selectedBottomIndex,
                             onSelect = onSelectBottom,
-                            onVoiceTap = onVoiceTap,
+                            // The floating voice button is voice SEARCH — it opens
+                            // the overlay with live transcription, matching Android.
+                            onVoiceTap = {
+                                searchActive = true
+                                startVoiceSearch()
+                            },
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     }
