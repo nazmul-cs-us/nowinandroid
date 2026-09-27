@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -53,10 +54,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -2527,6 +2531,9 @@ internal fun ForYouScreen(
     onSelectBottom: (Int) -> Unit,
     onOpenNews: (Int) -> Unit = {},
     onOpenTopic: (Int) -> Unit = {},
+    searchController: SharedSearchController? = null,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
 ) {
     val topicRepository = remember { createSharedTopicRepository() }
     val newsRepository = remember { createSharedNewsRepository() }
@@ -2570,6 +2577,9 @@ internal fun ForYouScreen(
         title = "For you",
         selectedIndex = 1,
         onSelectBottom = onSelectBottom,
+        searchController = searchController,
+        onOpenSettings = onOpenSettings,
+        onOpenProfile = onOpenProfile,
         adaptiveGrid = true,
     ) { expanded ->
         if (!onboardingHidden) {
@@ -2715,6 +2725,9 @@ internal fun SavedScreen(
     onSelectBottom: (Int) -> Unit,
     onOpenNews: (Int) -> Unit = {},
     onOpenTopic: (Int) -> Unit = {},
+    searchController: SharedSearchController? = null,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
 ) {
     val newsRepository = remember { createSharedNewsRepository() }
     val topicRepository = remember { createSharedTopicRepository() }
@@ -2754,6 +2767,9 @@ internal fun SavedScreen(
         title = "Saved",
         selectedIndex = 2,
         onSelectBottom = onSelectBottom,
+        searchController = searchController,
+        onOpenSettings = onOpenSettings,
+        onOpenProfile = onOpenProfile,
         adaptiveGrid = true,
     ) { expanded ->
         removedForUndo?.let { removed ->
@@ -2834,9 +2850,22 @@ internal fun SavedScreen(
 }
 
 @Composable
-internal fun CourseScreen(store: SharedContentStore, onSelectBottom: (Int) -> Unit) {
+internal fun CourseScreen(
+    store: SharedContentStore,
+    onSelectBottom: (Int) -> Unit,
+    searchController: SharedSearchController? = null,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+) {
     var completed by remember { mutableStateOf(store.completedLessons()) }
-    TopLevelScaffold(title = "Course", selectedIndex = 3, onSelectBottom = onSelectBottom) { _ ->
+    TopLevelScaffold(
+        title = "Course",
+        selectedIndex = 3,
+        onSelectBottom = onSelectBottom,
+        searchController = searchController,
+        onOpenSettings = onOpenSettings,
+        onOpenProfile = onOpenProfile,
+    ) { _ ->
         item {
             Text(
                 "Foundations · ${completed.size}/${SharedCourseLessons.size} complete",
@@ -2859,6 +2888,9 @@ internal fun InterestsScreen(
     store: SharedContentStore,
     onSelectBottom: (Int) -> Unit,
     onOpenTopic: (Int) -> Unit,
+    searchController: SharedSearchController? = null,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
 ) {
     val repository = remember { createSharedTopicRepository() }
     var topics by remember { mutableStateOf(emptyList<SharedTopic>()) }
@@ -2889,6 +2921,9 @@ internal fun InterestsScreen(
         title = "Interests",
         selectedIndex = 4,
         onSelectBottom = onSelectBottom,
+        searchController = searchController,
+        onOpenSettings = onOpenSettings,
+        onOpenProfile = onOpenProfile,
         itemSpacing = 0.dp,
         expandedPane = { modifier ->
             val selectedTopic = topics.firstOrNull { it.id == selectedTopicId }
@@ -3845,6 +3880,9 @@ private fun TopLevelScaffold(
     title: String,
     selectedIndex: Int,
     onSelectBottom: (Int) -> Unit,
+    searchController: SharedSearchController? = null,
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
     itemSpacing: Dp = 10.dp,
     adaptiveGrid: Boolean = false,
     expandedPane: (@Composable (Modifier) -> Unit)? = null,
@@ -3867,7 +3905,17 @@ private fun TopLevelScaffold(
                         end = 16.dp,
                     ),
             ) {
-                ScreenHeader(title)
+                // The SAME top bar as the home screen on every page — Android's
+                // AppTopSearchBar: avatar + search pill with voice + settings.
+                if (searchController != null) {
+                    SharedUnifiedHeaderRow(
+                        searchController = searchController,
+                        onOpenSettings = onOpenSettings,
+                        onOpenProfile = onOpenProfile,
+                    )
+                } else {
+                    ScreenHeader(title)
+                }
                 val grid: @Composable (Modifier) -> Unit = { modifier ->
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(if (adaptiveGrid && expanded) 2 else 1),
@@ -3910,6 +3958,74 @@ private fun TopLevelScaffold(
                 )
             }
         }
+    }
+}
+
+/** The shared top bar — identical to the home header on every tab page. */
+@Composable
+private fun SharedUnifiedHeaderRow(
+    searchController: SharedSearchController,
+    onOpenSettings: () -> Unit,
+    onOpenProfile: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTapTarget(
+            icon = androidx.compose.material.icons.Icons.Filled.AccountCircle,
+            contentDescription = "Open local profile",
+            tint = MaterialTheme.colorScheme.onBackground,
+            visualSize = 34.dp,
+            iconSize = 34.dp,
+            showBackground = false,
+            onClick = onOpenProfile,
+        )
+        Surface(
+            onClick = { searchController.open() },
+            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = NiaIcons.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = "Search Quran, Hadith and more",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                IconTapTarget(
+                    icon = androidx.compose.material.icons.Icons.Filled.Mic,
+                    contentDescription = "Voice search",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    visualSize = 36.dp,
+                    iconSize = 20.dp,
+                    showBackground = false,
+                    onClick = { searchController.openVoice() },
+                )
+            }
+        }
+        IconTapTarget(
+            icon = androidx.compose.material.icons.Icons.Outlined.Settings,
+            contentDescription = "Settings",
+            tint = MaterialTheme.colorScheme.onBackground,
+            visualSize = 36.dp,
+            iconSize = 26.dp,
+            showBackground = false,
+            onClick = onOpenSettings,
+        )
     }
 }
 

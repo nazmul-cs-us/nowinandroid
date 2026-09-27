@@ -17,8 +17,6 @@
 package com.starception.submission.shared.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -227,47 +225,50 @@ fun SharedNavHost(
                 )
             }
             composable<ForYouRoute> {
-                Column(Modifier.fillMaxSize()) {
-                    SharedTabSearchHeader(searchController, title = "For You")
-                    ForYouScreen(
-                        date = today,
-                        store = contentStore,
-                        onOpenRecommendation = { navController.navigate(RecommendationRoute) },
-                        onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                        onSelectBottom = selectBottom,
-                        onOpenNews = openNews,
-                        onOpenTopic = openTopic,
-                    )
-                }
+                ForYouScreen(
+                    date = today,
+                    store = contentStore,
+                    onOpenRecommendation = { navController.navigate(RecommendationRoute) },
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onSelectBottom = selectBottom,
+                    onOpenNews = openNews,
+                    onOpenTopic = openTopic,
+                    searchController = searchController,
+                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
             }
             composable<SavedRoute> {
-                Column(Modifier.fillMaxSize()) {
-                    SharedTabSearchHeader(searchController, title = "Saved")
-                    SavedScreen(
-                        store = contentStore,
-                        onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
-                        onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
-                        onSelectBottom = selectBottom,
-                        onOpenNews = openNews,
-                        onOpenTopic = openTopic,
-                    )
-                }
+                SavedScreen(
+                    store = contentStore,
+                    onOpenSurah = { navController.navigate(QuranDetailRoute(it)) },
+                    onOpenBukhariBook = { navController.navigate(BukhariBookRoute(it)) },
+                    onSelectBottom = selectBottom,
+                    onOpenNews = openNews,
+                    onOpenTopic = openTopic,
+                    searchController = searchController,
+                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
             }
             composable<CourseRoute> {
-                Column(Modifier.fillMaxSize()) {
-                    SharedTabSearchHeader(searchController, title = "Course")
-                    CourseScreen(contentStore, selectBottom)
-                }
+                CourseScreen(
+                    store = contentStore,
+                    onSelectBottom = selectBottom,
+                    searchController = searchController,
+                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
             }
             composable<InterestsRoute> {
-                Column(Modifier.fillMaxSize()) {
-                    SharedTabSearchHeader(searchController, title = "Interests")
-                    InterestsScreen(
-                        store = contentStore,
-                        onSelectBottom = selectBottom,
-                        onOpenTopic = openTopic,
-                    )
-                }
+                InterestsScreen(
+                    store = contentStore,
+                    onSelectBottom = selectBottom,
+                    onOpenTopic = openTopic,
+                    searchController = searchController,
+                    onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
             }
             composable<SearchRoute> {
                 SearchScreen(
