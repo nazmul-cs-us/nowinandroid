@@ -308,10 +308,17 @@ private fun AdhanPlaybackSection(
         adhanToggles.forEachIndexed { index, adhanEntry ->
             val (prayer, enabled) = adhanEntry.first
             val volumePercent = adhanEntry.second
-            // Speaker row — same icons, morph, and interaction as the home tune
-            // tile: on/mute reflects the per-prayer volume; tapping opens the
-            // system volume bar armed for this prayer. No on/off switch.
-            val audible = volumePercent > 0
+            // Speaker row — same icons and morph as the home tune tile. On
+            // Android, tapping opens the system volume bar armed for this
+            // prayer (the adhan plays on the notification stream). When no
+            // speaker tap is wired — iOS, which has no system volume overlay
+            // and plays the adhan at the system volume — tapping the speaker
+            // toggles this prayer's adhan instead, persisting immediately.
+            val audible = if (onAdhanSpeakerTap != null || true) {
+                enabled && volumePercent > 0
+            } else {
+                volumePercent > 0
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -359,7 +366,17 @@ private fun AdhanPlaybackSection(
                             if (tap != null) {
                                 tap(prayer)
                             } else {
-                                onShowSystemVolume()
+                                // No platform volume capture: toggle the
+                                // adhan for this prayer instead (iOS path).
+                                onPreferencesChanged(
+                                    preferences.copy(
+                                        fajrAdhanEnabled = if (prayer == "Fajr") !enabled else preferences.fajrAdhanEnabled,
+                                        dhuhrAdhanEnabled = if (prayer == "Dhuhr") !enabled else preferences.dhuhrAdhanEnabled,
+                                        asrAdhanEnabled = if (prayer == "Asr") !enabled else preferences.asrAdhanEnabled,
+                                        maghribAdhanEnabled = if (prayer == "Maghrib") !enabled else preferences.maghribAdhanEnabled,
+                                        ishaAdhanEnabled = if (prayer == "Isha") !enabled else preferences.ishaAdhanEnabled,
+                                    ),
+                                )
                             }
                         },
                     contentAlignment = Alignment.Center,
