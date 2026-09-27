@@ -54,6 +54,7 @@ import com.starception.submission.settings.components.AboutSection
 import com.starception.submission.settings.components.AppearanceSection
 import com.starception.submission.settings.components.NotificationsSection
 import com.starception.submission.settings.components.PrayerTimesSection
+import com.starception.submission.settings.components.SalahTrainingSection
 import com.starception.submission.settings.components.SettingsSection
 import com.starception.submission.settings.components.TravelDuaSection
 import com.starception.submission.shared.settings.VoiceRecognitionMode
@@ -77,6 +78,7 @@ fun PrayerSettingsScreen(
     onSettingsChange: (PrayerSettings) -> Unit,
     onRestore: () -> Unit,
     onBack: () -> Unit,
+    onOpenSalahTraining: () -> Unit = {},
     notifications: PrayerNotificationPreferences = PrayerNotificationPreferences(),
     onNotificationsChange: (PrayerNotificationPreferences) -> Unit = {},
     themeSettings: ThemeSettingsState = ThemeSettingsState(),
@@ -295,6 +297,20 @@ fun PrayerSettingsScreen(
                     }
 
                     SettingsSection(
+                        title = "Salah Training",
+                        subtitle = "Improve the on-device prayer posture model",
+                        iconGlyph = FlaticonIcons.DEVELOPER,
+                        isExpanded = expanded == SECTION_SALAH_TRAINING,
+                        onToggleExpanded = {
+                            expanded = if (expanded == SECTION_SALAH_TRAINING) null else SECTION_SALAH_TRAINING
+                        },
+                    ) {
+                        SalahTrainingSection(
+                            onOpenTrainingLab = onOpenSalahTraining,
+                        )
+                    }
+
+                    SettingsSection(
                         title = "About",
                         subtitle = "Version & attributions",
                         iconGlyph = FlaticonIcons.INFO,
@@ -336,4 +352,5 @@ private const val SECTION_ABOUT = "about"
 private const val SECTION_TRAVEL = "travel"
 private const val SECTION_VOICE = "voice"
 private const val SECTION_NARRATION = "narration"
+private const val SECTION_SALAH_TRAINING = "salah_training"
 private const val SECTION_CONTENT = "content"

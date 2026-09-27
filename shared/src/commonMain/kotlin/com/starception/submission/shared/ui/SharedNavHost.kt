@@ -88,6 +88,8 @@ object PrayerSettingsRoute
 
 @Serializable data class DuaDetailRoute(val number: Int)
 
+@Serializable object SalahTrainingRoute
+
 @Serializable object QiblaRoute
 
 @Serializable object RecommendationRoute
@@ -130,7 +132,7 @@ fun SharedNavHost(
     longitude: Double,
     today: LocalDate,
     home: @Composable (SharedHomeActions) -> Unit,
-    settings: @Composable (onBack: () -> Unit) -> Unit,
+    settings: @Composable (onBack: () -> Unit, onOpenSalahTraining: () -> Unit) -> Unit,
 ) {
     val contentStore = remember { SharedContentStore() }
     val quranPlayer = remember { QuranAudioPlayer() }
@@ -205,7 +207,10 @@ fun SharedNavHost(
             // popBackStack rather than navigate(home): navigating would push a
             // second copy of the home screen and leave settings on the stack,
             // so the system back gesture would return to it.
-            settings { navController.popBackStack() }
+            settings(
+                { navController.popBackStack() },
+                { navController.navigate(SalahTrainingRoute) },
+            )
         }
         composable<ForYouRoute> {
             ForYouScreen(
@@ -388,6 +393,12 @@ fun SharedNavHost(
             TopicArticleDetailScreen(
                 topicId = route.topicId,
                 articleId = route.articleId,
+                store = contentStore,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<SalahTrainingRoute> {
+            SalahTrainingLabScreen(
                 store = contentStore,
                 onBack = { navController.popBackStack() },
             )

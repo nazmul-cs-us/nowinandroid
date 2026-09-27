@@ -16,6 +16,7 @@
 
 package com.starception.submission.shared.content
 
+import com.starception.submission.shared.ml.SalahPosture
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.storage.KeyValueStore
@@ -77,6 +78,27 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
 
     fun saveQuranTextAlignment(alignment: String) {
         store.putString(QURAN_TEXT_ALIGNMENT, alignment)
+    }
+
+    fun salahSampleCounts(): Map<String, Int> =
+        store.getString(SALAH_SAMPLE_COUNTS).orEmpty().split(SEPARATOR)
+            .mapNotNull { entry ->
+                val (name, count) = entry.split(":").let {
+                    if (it.size == 2) it[0] to it[1].toIntOrNull() else null to null
+                }
+                if (name != null && count != null) name to count else null
+            }.toMap()
+
+    fun addSalahSamples(posture: SalahPosture, windows: Int): Map<String, Int> {
+        val updated = salahSampleCounts().toMutableMap()
+        updated[posture.name] = (updated[posture.name] ?: 0) + windows
+        store.putString(SALAH_SAMPLE_COUNTS, updated.entries.joinToString(SEPARATOR) { "${it.key}:${it.value}" })
+        return updated
+    }
+
+    fun clearSalahSamples(): Map<String, Int> {
+        store.putString(SALAH_SAMPLE_COUNTS, "")
+        return emptyMap()
     }
 
     fun recentSearches(): List<String> =
@@ -342,6 +364,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_AUTOPLAY_PENDING = "shared_quran_autoplay_pending"
         private const val HADITH_TRANSLATION_LANGUAGE = "shared_hadith_translation_language"
         private const val RECENT_SEARCHES = "shared_recent_searches"
+        private const val SALAH_SAMPLE_COUNTS = "shared_salah_sample_counts"
         private const val HADITH_TRANSLATION_PROVIDER = "shared_hadith_translation_provider"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"

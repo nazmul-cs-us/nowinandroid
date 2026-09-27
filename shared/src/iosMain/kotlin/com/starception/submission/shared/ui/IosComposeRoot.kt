@@ -494,7 +494,7 @@ fun PrayerTimesViewController(
                     onSelectBottom = actions.onSelectBottom,
                 )
             },
-            settings = { onBack ->
+            settings = { onBack, onOpenSalahTraining ->
                 PrayerSettingsScreen(
                     settings = prayerSettings,
                     countryName = country?.countryName,
@@ -508,6 +508,7 @@ fun PrayerTimesViewController(
                         prayerSettings = settingsStore.settings(place.countryCode, country)
                     },
                     onBack = onBack,
+                    onOpenSalahTraining = onOpenSalahTraining,
                     notifications = notificationPrefs,
                     onNotificationsChange = { updated ->
                         notificationPrefs = updated

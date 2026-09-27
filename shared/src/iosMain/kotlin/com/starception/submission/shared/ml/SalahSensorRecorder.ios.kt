@@ -17,8 +17,10 @@
 package com.starception.submission.shared.ml
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
 import platform.CoreMotion.CMMotionManager
 import platform.Foundation.NSDate
+import platform.Foundation.NSOperationQueue
 import platform.Foundation.timeIntervalSince1970
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -28,9 +30,10 @@ private const val SAMPLE_HZ = 50.0
 private const val WINDOW_SIZE = 5
 
 /**
- * Streams 50Hz sensor windows through CoreMotion's accelerometer and gyroscope
- * (50Hz updates), assembling 5-sample / 100ms [SalahDataSample] windows —
- * the same cadence as the Android SalahDataCollectionService.
+ * Streams 50Hz sensor windows through CoreMotion's accelerometer and gyroscope,
+ * assembling 5-sample / 100ms [SalahDataSample] windows — the same cadence as
+ * the Android SalahDataCollectionService. The handler queues are the main
+ * queue; keep [start]/[stop] on the composition thread.
  */
 @OptIn(ExperimentalForeignApi::class)
 actual class SalahSensorRecorder actual constructor() {
@@ -55,18 +58,44 @@ actual class SalahSensorRecorder actual constructor() {
     private var lastGyroZ = 0.0
 
     actual fun start(sessionId: String, onSample: (SalahDataSample) -> Unit): Boolean {
-        // TODO: CValue<CMAcceleration> field interop — the CoreMotion struct
-        // accessors need a cinterop pass; returns unavailable until wired.
         stop()
-        this.sessionId = sessionId
-        this.onSample = onSample
-        return false
-        stop()
+        if (!motion.isAccelerometerAvailable() || !motion.isGyroAvailable()) {
+            return false
+        }
         this.sessionId = sessionId
         this.onSample = onSample
         windowFill = 0
         val interval = 1.0 / SAMPLE_HZ
-        return false
+        motion.accelerometerUpdateInterval = interval
+        motion.gyroUpdateInterval = interval
+        val queue = NSOperationQueue.mainQueue()
+        motion.startAccelerometerUpdatesToQueue(queue) { data, _ ->
+            val reading = data ?: return@startAccelerometerUpdatesToQueue
+            // CValue<CMAcceleration> — the struct fields are only addressable
+            // inside use{} (scoped placement).
+            reading.acceleration.useContents {
+                lastAccelX = x
+                lastAccelY = y
+                lastAccelZ = z
+            }
+            maybeEmitWindow()
+        }
+        motion.startGyroUpdatesToQueue(queue) { data, _ ->
+            val reading = data ?: return@startGyroUpdatesToQueue
+            reading.rotationRate.useContents {
+                lastGyroX = x
+                lastGyroY = y
+                lastGyroZ = z
+            }
+        }
+        return true
+    }
+
+    actual fun stop() {
+        motion.stopAccelerometerUpdates()
+        motion.stopGyroUpdates()
+        onSample = null
+        windowFill = 0
     }
 
     private fun maybeEmitWindow() {
@@ -93,9 +122,9 @@ actual class SalahSensorRecorder actual constructor() {
         val sample = SalahDataSample(
             timestamp = (NSDate().timeIntervalSince1970 * 1000).toLong(),
             sessionId = sessionId,
-            // The shared recorder captures raw windows; classification happens
-            // in the detection engine, not from a labeled posture.
-            posture = SalahPosture.SUJUD,
+            // The shared recorder captures raw windows; the caller labels the
+            // posture when persisting training data.
+            posture = SalahPosture.QIYAM,
             accelX = ax.copyOf(),
             accelY = ay.copyOf(),
             accelZ = az.copyOf(),
@@ -108,13 +137,6 @@ actual class SalahSensorRecorder actual constructor() {
             gyroMagnitude = gyroMag,
         )
         onSample?.invoke(sample)
-        windowFill = 0
-    }
-
-    actual fun stop() {
-        runCatching { if (motion.isAccelerometerActive()) motion.stopAccelerometerUpdates() }
-        runCatching { if (motion.isGyroActive()) motion.stopGyroUpdates() }
-        onSample = null
         windowFill = 0
     }
 }
