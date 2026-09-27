@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +46,8 @@ import com.starception.submission.feature.quran.Surah
 import com.starception.submission.shared.quran.AyahNumberChip
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.SharedTajweedAnnotation
+import com.starception.submission.shared.quran.SharedTajweedRules
 
 /**
  * The Mushaf page view — the shared counterpart of Android's MushafPagerView.
@@ -62,6 +65,7 @@ internal fun MushafPagerView(
     arabicFontSize: Float,
     showTranslation: Boolean,
     textAlignment: String,
+    tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>? = null,
     modifier: Modifier = Modifier,
 ) {
     val pages = remember(verses) {
@@ -85,6 +89,7 @@ internal fun MushafPagerView(
                 arabicFontSize = arabicFontSize,
                 showTranslation = showTranslation,
                 textAlignment = textAlignment,
+                tajweedAnnotations = tajweedAnnotations,
             )
         }
         Row(
@@ -113,6 +118,7 @@ private fun MushafPageView(
     arabicFontSize: Float,
     showTranslation: Boolean,
     textAlignment: String,
+    tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>?,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -156,6 +162,7 @@ private fun MushafPageView(
                 arabicFontSize = arabicFontSize,
                 showTranslation = showTranslation,
                 textAlignment = textAlignment,
+                tajweedAnnotations = tajweedAnnotations,
             )
         }
     }
@@ -169,18 +176,41 @@ private fun MushafPageFlow(
     arabicFontSize: Float,
     showTranslation: Boolean,
     textAlignment: String,
+    tajweedAnnotations: Map<Int, List<SharedTajweedAnnotation>>?,
 ) {
     val fontFamily = QuranArabicFonts.fontFamily(arabicFont)
     val chipIdPrefix = "ayah-marker-${page.page}-"
-    val annotated = remember(page, arabicFontSize, showTranslation) {
+    val annotated = remember(page, arabicFontSize, tajweedAnnotations) {
+        // Tajweed spans are authored against each ayah's own text, so rebase
+        // their ranges onto the page flow by the running cursor. Styles apply
+        // only after the whole string is built — builder ranges are validated
+        // against the current length at addStyle time.
+        val tajweedSpans = mutableListOf<Triple<Long, Int, Int>>()
         buildAnnotatedString {
             page.verses.forEachIndexed { index, verse ->
                 if (index > 0) append(" ")
+                val verseStart = length
+                val rules = tajweedAnnotations?.get(verse.numberInSurah).orEmpty()
+                rules.filter { it.startIndex < it.endIndex }
+                    .sortedBy { it.startIndex }
+                    .forEach { annotation ->
+                        val color = SharedTajweedRules.colors[annotation.ruleKey] ?: return@forEach
+                        val start = (verseStart + annotation.startIndex)
+                            .coerceIn(verseStart, verseStart + verse.arabicText.length)
+                        val end = (verseStart + annotation.endIndex)
+                            .coerceIn(verseStart, verseStart + verse.arabicText.length)
+                        if (start < end) {
+                            tajweedSpans.add(Triple(color, start, end))
+                        }
+                    }
                 append(verse.arabicText)
                 append(" ")
                 pushStringAnnotation(tag = "ayah", annotation = verse.numberInSurah.toString())
                 appendInlineContent(id = "$chipIdPrefix${verse.numberInSurah}", alternateText = "﴿${verse.numberInSurah}﴾")
                 pop()
+            }
+            tajweedSpans.forEach { (color, start, end) ->
+                addStyle(SpanStyle(color = androidx.compose.ui.graphics.Color(color)), start, end)
             }
         }
     }

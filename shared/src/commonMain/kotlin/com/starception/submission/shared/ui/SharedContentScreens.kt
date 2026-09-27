@@ -119,9 +119,12 @@ import com.starception.submission.shared.quran.AyahNumberChip
 import com.starception.submission.shared.quran.QuranArabicFonts
 import com.starception.submission.shared.quran.QuranTranslationLanguage
 import com.starception.submission.shared.quran.QuranVerse
+import com.starception.submission.shared.quran.SharedTajweedAnnotation
 import com.starception.submission.shared.quran.createQuranVerseRepository
+import com.starception.submission.shared.quran.createSharedTajweedRepository
 import com.starception.submission.shared.quran.filterQuranVerses
 import com.starception.submission.shared.quran.metadataLabel
+import com.starception.submission.shared.quran.tajweedAnnotatedString
 import com.starception.submission.shared.voice.PlatformSpeechSynthesizer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -413,6 +416,24 @@ internal fun QuranDetailScreen(
     var arabicFontSize by remember { mutableStateOf(store.quranArabicFontSize()) }
     var textAlignment by remember { mutableStateOf(store.quranTextAlignment()) }
     var mushafMode by remember { mutableStateOf(store.quranMushafMode()) }
+    var tajweedEnabled by remember { mutableStateOf(store.quranTajweedEnabled()) }
+    var tajweedAnnotations by remember { mutableStateOf<Map<Int, List<SharedTajweedAnnotation>>?>(null) }
+    var tajweedUnavailable by remember { mutableStateOf(false) }
+    val tajweedRepository = remember { createSharedTajweedRepository() }
+    LaunchedEffect(number, tajweedEnabled) {
+        if (tajweedEnabled && tajweedAnnotations == null) {
+            // First enable downloads/loads the 5.5 MB CDN asset once, then caches.
+            val annotations = runCatching { tajweedRepository.annotationsForSurah(number) }.getOrNull()
+            if (annotations == null) {
+                tajweedUnavailable = true
+                tajweedEnabled = false
+                store.saveQuranTajweedEnabled(false)
+            } else {
+                tajweedUnavailable = false
+                tajweedAnnotations = annotations
+            }
+        }
+    }
     LaunchedEffect(number, translationLanguage) {
         // Reload the ayahs when the translation language changes.
         loadAttempt += 1
@@ -453,8 +474,16 @@ internal fun QuranDetailScreen(
     val tajweedAction = DetailAction(
         id = "tajweed",
         label = "Tajweed colors",
-        trailingText = "OFF",
-    ) { }
+        selected = tajweedEnabled,
+        trailingText = when {
+            tajweedEnabled -> "ON"
+            tajweedUnavailable -> "N/A"
+            else -> "OFF"
+        },
+    ) {
+        tajweedEnabled = !tajweedEnabled
+        store.saveQuranTajweedEnabled(tajweedEnabled)
+    }
     val mushafPageAction = DetailAction(
         id = "mushaf_page",
         label = if (mushafMode) "Ayah list view" else "Mushaf page view",
@@ -796,6 +825,7 @@ internal fun QuranDetailScreen(
                         arabicFontSize = arabicFontSize,
                         showTranslation = showTranslation,
                         textAlignment = textAlignment,
+                        tajweedAnnotations = if (tajweedEnabled) tajweedAnnotations else null,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
                 } else if (filteredVerses.isEmpty()) {
@@ -818,6 +848,11 @@ internal fun QuranDetailScreen(
                                 arabicFont = selectedArabicFont,
                                 arabicFontSize = arabicFontSize,
                                 textAlignment = textAlignment,
+                                tajweedAnnotations = if (tajweedEnabled) {
+                                    tajweedAnnotations?.get(verse.numberInSurah)
+                                } else {
+                                    null
+                                },
                                 onToggleTranslation = { showTranslation = !showTranslation },
                                 onOpenTafseer = { verseId, preselectBook ->
                                     tafseerSelectedBook = preselectBook
@@ -850,6 +885,7 @@ private fun QuranAyahReadingBlock(
     arabicFont: String,
     arabicFontSize: Float,
     textAlignment: String,
+    tajweedAnnotations: List<SharedTajweedAnnotation>? = null,
     onToggleTranslation: () -> Unit,
     onOpenTafseer: (ayahNumber: Int, preselectBook: Int) -> Unit = { _, _ -> },
 ) {
@@ -874,7 +910,7 @@ private fun QuranAyahReadingBlock(
         // 1.7x leading; the ayah number sits in its rosette chip.
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text = verse.arabicText,
+                text = tajweedAnnotatedString(verse.arabicText, tajweedAnnotations),
                 modifier = Modifier.weight(1f),
                 fontFamily = arabicFontFamily,
                 fontSize = arabicFontSize.sp,
@@ -1309,129 +1345,187 @@ private fun BukhariHadithTile(hadith: SharedHadith, onClick: () -> Unit) {
 @Composable
 internal fun BukhariHadithDetailScreen(
     hadithId: Int,
+    store: SharedContentStore,
     onBack: () -> Unit,
 ) {
     val book = BukhariBooks.findByHadithId(hadithId)
     val repository = remember { createSharedHadithRepository() }
-    var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
     LaunchedEffect(hadithId) {
+        state = HadithsState.Loading
         state = try {
-            repository.getHadith(hadithId)?.let { HadithsState.Loaded(listOf(it)) }
-                ?: HadithsState.Error("Hadith $hadithId was not found.")
+            // Load the whole book so the pager can swipe between narrations —
+            // matching Android's prev/next hadith navigation.
+            val hadiths = if (book != null) {
+                repository.getHadiths(book.firstHadithId, book.lastHadithId)
+            } else {
+                listOfNotNull(repository.getHadith(hadithId))
+            }
+            if (hadiths.isEmpty()) {
+                HadithsState.Error("Hadith $hadithId was not found.")
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
-    var listening by remember(hadithId) { mutableStateOf(false) }
-    val listenAct = DetailAction(
-        id = "listen",
-        label = if (listening) "Stop narration" else "Listen (TTS)",
-        selected = listening,
+    var listening by remember { mutableStateOf(false) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    val arabicFontAction = DetailAction(
+        id = "arabic_font",
+        label = "Arabic font",
+        trailingText = QuranArabicFonts.displayName(selectedArabicFont),
     ) {
-        if (listening) {
-            PlatformSpeechSynthesizer().stop()
-            listening = false
-        } else {
-            listening = true
-            PlatformSpeechSynthesizer().speak(text = "") // placeholder — actual text set below
-        }
+        val order = QuranArabicFonts.selectionOrder
+        val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
+        val next = order[(currentIndex + 1) % order.size]
+        selectedArabicFont = next
+        store.saveQuranArabicFont(next)
     }
     val listenAction = DetailAction(
         id = "listen",
         label = if (listening) "Stop narration" else "Listen (TTS)",
         selected = listening,
-    ) {}
-    ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(190.dp)) {
-            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
-            Column {
-                DetailToolbar(
-                    onBack = onBack,
-                    sheetActions = listOf(
-                        DetailAction(id = "listen", label = if (listening) "Stop narration" else "Listen (TTS)", selected = listening) {
-                            listening = !listening
-                        },
-                    ),
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                    toolbarTitle = "Sahih al-Bukhari · Hadith $hadithId",
-                )
-            }
-            ImmersiveDetailHeaderScrim(
-                title = "Sahih al-Bukhari",
-                supportingText = "Hadith $hadithId",
-                arabicTitle = "صحيح البخاري",
-            )
-        }
-    }) {
-        when (val current = state) {
-            HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    ) {
+        listening = !listening
+    }
+    when (val current = state) {
+        HadithsState.Loading -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is HadithsState.Error -> SupportingCard("Unable to load hadith", current.message)
-            is HadithsState.Loaded -> {
-                val hadith = current.hadiths.first()
-                // Stop TTS when leaving the screen.
-                androidx.compose.runtime.DisposableEffect(hadithId) {
-                    onDispose {
-                        if (listening) PlatformSpeechSynthesizer().stop()
+        }
+        is HadithsState.Error -> SharedDetailScaffold(title = "Sahih al-Bukhari", onBack = onBack) {
+            SupportingCard("Unable to load hadith", current.message)
+        }
+        is HadithsState.Loaded -> {
+            val hadiths = current.hadiths
+            val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
+            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+                initialPage = initialIndex,
+            ) { hadiths.size }
+            // Stop narration when the user swipes to another hadith.
+            LaunchedEffect(pagerState.currentPage) {
+                PlatformSpeechSynthesizer().stop()
+                listening = false
+            }
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose { PlatformSpeechSynthesizer().stop() }
+            }
+            val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
+            ImmersiveDetailScaffold(onBack = onBack, header = {
+                Box(Modifier.fillMaxWidth().height(190.dp)) {
+                    NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                    Column {
+                        DetailToolbar(
+                            onBack = onBack,
+                            sheetActions = listOf(listenAction, arabicFontAction),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            toolbarTitle = "Sahih al-Bukhari · Hadith ${currentHadith.id}",
+                        )
                     }
+                    ImmersiveDetailHeaderScrim(
+                        title = "Sahih al-Bukhari",
+                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        arabicTitle = "صحيح البخاري",
+                    )
                 }
-                LazyColumn(
+            }) {
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 28.dp),
-                ) {
-                    item {
-                        Column {
-                            Text("Hadith $hadithId", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ReaderTag("HADITH $hadithId")
-                                if (book != null) {
-                                    ReaderTag("BOOK ${book.id} · ${book.nameEnglish.uppercase()}", selected = false)
-                                }
-                            }
-                        }
-                    }
-                    item {
-                        HadithListenButton(hadith.english) { enabled ->
+                ) { index ->
+                    HadithDetailPage(
+                        hadith = hadiths[index],
+                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
+                        arabicFont = selectedArabicFont,
+                        listening = listening && index == pagerState.currentPage,
+                        onListeningChange = { enabled ->
+                            listening = enabled
                             if (enabled) {
-                                PlatformSpeechSynthesizer().speak(text = hadith.english)
+                                PlatformSpeechSynthesizer().speak(text = hadiths[index].english)
                             } else {
                                 PlatformSpeechSynthesizer().stop()
                             }
-                        }
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One hadith page: tags, listen button, Arabic, translation, explanation. */
+@Composable
+private fun HadithDetailPage(
+    hadith: SharedHadith,
+    bookTag: String?,
+    arabicFont: String,
+    listening: Boolean,
+    onListeningChange: (Boolean) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 28.dp),
+    ) {
+        item {
+            Column {
+                Text("Hadith ${hadith.id}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ReaderTag("HADITH ${hadith.id}")
+                    if (bookTag != null) {
+                        ReaderTag(bookTag, selected = false)
                     }
-                    if (hadith.arabic.isNotBlank()) {
-                        item {
-                            ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
-                                Text(
-                                    hadith.arabic,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
-                                    fontSize = 26.sp,
-                                    lineHeight = 44.sp,
-                                    textAlign = TextAlign.End,
-                                )
-                            }
-                        }
-                    }
-                    if (hadith.english.isNotBlank()) {
-                        item {
-                            ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
-                                Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
-                            }
-                        }
-                    }
-                    if (hadith.explanation.isNotBlank()) {
-                        item {
-                            ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
-                                Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
-                            }
-                        }
-                    }
+                }
+            }
+        }
+        item {
+            HadithListenButton(hadith.english) { enabled ->
+                onListeningChange(enabled)
+            }
+        }
+        if (hadith.arabic.isNotBlank()) {
+            item {
+                ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
+                    Text(
+                        hadith.arabic,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontFamily = QuranArabicFonts.fontFamily(arabicFont),
+                        fontSize = 26.sp,
+                        lineHeight = 44.sp,
+                        textAlign = TextAlign.End,
+                    )
+                }
+            }
+        }
+        if (hadith.english.isNotBlank()) {
+            item {
+                ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
+                    Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
+                }
+            }
+        }
+        if (hadith.explanation.isNotBlank()) {
+            item {
+                ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
+                    Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
                 }
             }
         }
@@ -1525,116 +1619,130 @@ internal fun ShamayelBookDetailScreen(
 @Composable
 internal fun ShamayelHadithDetailScreen(
     hadithId: Int,
+    store: SharedContentStore,
     onBack: () -> Unit,
 ) {
     val book = com.starception.submission.core.model.data.ShamayelBooks.findByHadithId(hadithId)
     val repository = remember { createSharedHadithRepository() }
-    var state by remember(hadithId) { mutableStateOf<HadithsState>(HadithsState.Loading) }
+    var state by remember { mutableStateOf<HadithsState>(HadithsState.Loading) }
     LaunchedEffect(hadithId) {
+        state = HadithsState.Loading
         state = try {
-            repository.getShamayelHadith(hadithId)?.let { HadithsState.Loaded(listOf(it)) }
-                ?: HadithsState.Error("Hadith $hadithId was not found.")
+            // The whole book loads so the pager can swipe between chapters,
+            // matching the Android prev/next hadith navigation.
+            val hadiths = if (book != null) {
+                repository.getShamayelHadiths(book.firstHadithId, book.lastHadithId)
+            } else {
+                listOfNotNull(repository.getShamayelHadith(hadithId))
+            }
+            if (hadiths.isEmpty()) {
+                HadithsState.Error("Hadith $hadithId was not found.")
+            } else {
+                HadithsState.Loaded(hadiths)
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
             HadithsState.Error(error.message ?: "Unable to read this hadith.")
         }
     }
-    var listening by remember(hadithId) { mutableStateOf(false) }
-    ImmersiveDetailScaffold(onBack = onBack, header = {
-        Box(Modifier.fillMaxWidth().height(190.dp)) {
-            NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
-            Column {
-                DetailToolbar(
-                    onBack = onBack,
-                    sheetActions = listOf(
-                        DetailAction(id = "listen", label = if (listening) "Stop narration" else "Listen (TTS)", selected = listening) {
-                            listening = !listening
-                        },
-                    ),
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                    toolbarTitle = "Shama'il At-Tirmidhi · Hadith $hadithId",
-                )
-            }
-            ImmersiveDetailHeaderScrim(
-                title = "Shama'il At-Tirmidhi",
-                supportingText = "Hadith $hadithId",
-                arabicTitle = "شمائل الترمذي",
-            )
-        }
-    }) {
-        when (val current = state) {
-            HadithsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    var listening by remember { mutableStateOf(false) }
+    var selectedArabicFont by remember { mutableStateOf(store.quranArabicFont()) }
+    when (val current = state) {
+        HadithsState.Loading -> SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            is HadithsState.Error -> SupportingCard("Unable to load hadith", current.message)
-            is HadithsState.Loaded -> {
-                val hadith = current.hadiths.first()
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 28.dp),
-                ) {
-                    item {
-                        Column {
-                            Text("Hadith $hadithId", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ReaderTag("HADITH $hadithId")
-                                if (book != null) {
-                                    ReaderTag("BOOK ${book.id} · ${book.nameEnglish.uppercase()}", selected = false)
-                                }
-                            }
-                        }
+        }
+        is HadithsState.Error -> SharedDetailScaffold(title = "Shama'il At-Tirmidhi", onBack = onBack) {
+            SupportingCard("Unable to load hadith", current.message)
+        }
+        is HadithsState.Loaded -> {
+            val hadiths = current.hadiths
+            val initialIndex = hadiths.indexOfFirst { it.id == hadithId }.coerceAtLeast(0)
+            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+                initialPage = initialIndex,
+            ) { hadiths.size }
+            LaunchedEffect(pagerState.currentPage) {
+                PlatformSpeechSynthesizer().stop()
+                listening = false
+            }
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose { PlatformSpeechSynthesizer().stop() }
+            }
+            val currentHadith = hadiths.getOrNull(pagerState.currentPage) ?: hadiths.first()
+            val arabicFontAction = DetailAction(
+                id = "arabic_font",
+                label = "Arabic font",
+                trailingText = QuranArabicFonts.displayName(selectedArabicFont),
+            ) {
+                val order = QuranArabicFonts.selectionOrder
+                val currentIndex = order.indexOf(selectedArabicFont).coerceAtLeast(0)
+                val next = order[(currentIndex + 1) % order.size]
+                selectedArabicFont = next
+                store.saveQuranArabicFont(next)
+            }
+            val listenAction = DetailAction(
+                id = "listen",
+                label = if (listening) "Stop narration" else "Listen (TTS)",
+                selected = listening,
+            ) {
+                listening = !listening
+            }
+            ImmersiveDetailScaffold(onBack = onBack, header = {
+                Box(Modifier.fillMaxWidth().height(190.dp)) {
+                    NewsHeaderArtwork("masjid_al_nawabi", Modifier.fillMaxSize())
+                    Column {
+                        DetailToolbar(
+                            onBack = onBack,
+                            sheetActions = listOf(listenAction, arabicFontAction),
+                            contentColor = androidx.compose.ui.graphics.Color.White,
+                            toolbarTitle = "Shama'il At-Tirmidhi · Hadith ${currentHadith.id}",
+                        )
                     }
-                    item {
-                        HadithListenButton(hadith.english) { enabled ->
+                    ImmersiveDetailHeaderScrim(
+                        title = "Shama'il At-Tirmidhi",
+                        supportingText = "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        arabicTitle = "شمائل الترمذي",
+                    )
+                }
+            }) {
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f),
+                ) { index ->
+                    HadithDetailPage(
+                        hadith = hadiths[index],
+                        bookTag = book?.let { "BOOK ${it.id} · ${it.nameEnglish.uppercase()}" },
+                        arabicFont = selectedArabicFont,
+                        listening = listening && index == pagerState.currentPage,
+                        onListeningChange = { enabled ->
+                            listening = enabled
                             if (enabled) {
-                                PlatformSpeechSynthesizer().speak(text = hadith.english)
+                                PlatformSpeechSynthesizer().speak(text = hadiths[index].english)
                             } else {
                                 PlatformSpeechSynthesizer().stop()
                             }
-                        }
-                    }
-                    if (hadith.arabic.isNotBlank()) {
-                        item {
-                            ReaderSection("Arabic", MaterialTheme.colorScheme.primary) {
-                                Text(
-                                    hadith.arabic,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    fontFamily = QuranArabicFonts.fontFamily(QuranArabicFonts.PDMS_SALEEM),
-                                    fontSize = 26.sp,
-                                    lineHeight = 44.sp,
-                                    textAlign = TextAlign.End,
-                                )
-                            }
-                        }
-                    }
-                    if (hadith.english.isNotBlank()) {
-                        item {
-                            ReaderSection("English translation", MaterialTheme.colorScheme.secondary) {
-                                Text(hadith.english, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
-                            }
-                        }
-                    }
-                    if (hadith.explanation.isNotBlank()) {
-                        item {
-                            ReaderSection("Explanation", MaterialTheme.colorScheme.tertiary) {
-                                Text(hadith.explanation, style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 27.sp))
-                            }
-                        }
-                    }
+                        },
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        "Hadith ${currentHadith.id} of ${hadiths.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
     }
 }
 
-/**
- * Listen/Stop toggle that TTS-reads the English translation through the
- * shared PlatformSpeechSynthesizer (AVSpeechSynthesizer on iOS, the host's
- * engine elsewhere). Stops automatically when the screen disposes.
- */
 @Composable
 private fun HadithListenButton(
     englishText: String,

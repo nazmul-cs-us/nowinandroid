@@ -302,6 +302,7 @@ fun SharedNavHost(
         composable<BukhariHadithRoute> { entry ->
             BukhariHadithDetailScreen(
                 hadithId = entry.toRoute<BukhariHadithRoute>().id,
+                store = contentStore,
                 onBack = { navController.popBackStack() },
             )
         }
@@ -316,6 +317,7 @@ fun SharedNavHost(
         composable<ShamayelHadithRoute> { entry ->
             ShamayelHadithDetailScreen(
                 hadithId = entry.toRoute<ShamayelHadithRoute>().id,
+                store = contentStore,
                 onBack = { navController.popBackStack() },
             )
         }

@@ -79,6 +79,13 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         store.putString(QURAN_TEXT_ALIGNMENT, alignment)
     }
 
+    fun quranTajweedEnabled(): Boolean =
+        store.getString(QURAN_TAJWEED_ENABLED)?.toBoolean() ?: false
+
+    fun saveQuranTajweedEnabled(enabled: Boolean) {
+        store.putString(QURAN_TAJWEED_ENABLED, enabled.toString())
+    }
+
     fun quranMushafMode(): Boolean =
         store.getString(QURAN_MUSHAF_MODE)?.toBoolean() ?: false
 
@@ -296,6 +303,7 @@ class SharedContentStore(private val store: KeyValueStore = platformKeyValueStor
         private const val QURAN_TEXT_ALIGNMENT = "shared_quran_text_alignment"
         private const val QURAN_SHOW_TRANSLATION = "shared_quran_show_translation"
         private const val QURAN_MUSHAF_MODE = "shared_quran_mushaf_mode"
+        private const val QURAN_TAJWEED_ENABLED = "shared_quran_tajweed_enabled"
         private const val TOPIC_ORDER = "shared_topic_order"
         private const val BOOKMARK_MIGRATION_COMPLETE = "shared_news_bookmark_migration_complete"
         private const val SURAH_NEWS_ID_OFFSET = 2000
