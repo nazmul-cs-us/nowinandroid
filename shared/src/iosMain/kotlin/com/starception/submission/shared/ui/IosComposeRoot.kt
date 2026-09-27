@@ -483,7 +483,7 @@ fun PrayerTimesViewController(
                     },
                     onOpenProfile = actions.onOpenProfile,
                     onOpenSearch = actions.onOpenSearch,
-                    onVoiceTap = actions.onOpenSearch,
+                    searchController = actions.searchController,
                     onOpenQuran = actions.onOpenQuran,
                     onOpenBukhariBook = actions.onOpenBukhariBook,
                     onOpenBukhariHadith = actions.onOpenBukhariHadith,

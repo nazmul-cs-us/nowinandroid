@@ -59,7 +59,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Settings
@@ -83,8 +82,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -124,10 +121,7 @@ import com.starception.submission.shared.hadith.createSharedHadithRepository
 import com.starception.submission.shared.quran.QuranVerse
 import com.starception.submission.shared.quran.createQuranVerseRepository
 import com.starception.submission.shared.salah.SalahProgress
-import com.starception.submission.shared.settings.VoiceRecognitionMode
 import com.starception.submission.shared.settings.formatOffset
-import com.starception.submission.shared.voice.PlatformSpeechRecognizer
-import com.starception.submission.shared.voice.SpeechRecognitionEvent
 import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
@@ -180,7 +174,7 @@ fun PrayerTimesScreen(
     onTogglePrayerAdhan: (String) -> Unit = {},
     onOpenProfile: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
-    onVoiceTap: (() -> Unit)? = null,
+    searchController: SharedSearchController? = null,
     onOpenQuran: (Int) -> Unit = {},
     onOpenQibla: () -> Unit = {},
     onOpenRecommendation: () -> Unit = {},
@@ -196,36 +190,9 @@ fun PrayerTimesScreen(
     var isTuningSchedule by remember { mutableStateOf(false) }
     // Inline search + profile sheet — the Android pattern: both open in
     // place instead of navigating to separate pages.
-    var searchActive by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    // Voice search — Android's mic on the search bar: spoken words stream
-    // into the search field as live transcription.
-    var voiceSearchActive by remember { mutableStateOf(false) }
-    val voiceRecognizer = remember { PlatformSpeechRecognizer() }
-    val startVoiceSearch: () -> Unit = {
-        searchActive = true
-        voiceSearchActive = true
-        voiceRecognizer.start(VoiceRecognitionMode.TRANSCRIPTION) { event ->
-            when (event) {
-                SpeechRecognitionEvent.Listening -> voiceSearchActive = true
-                is SpeechRecognitionEvent.Partial -> searchQuery = event.text
-                is SpeechRecognitionEvent.Result -> {
-                    searchQuery = event.text
-                    voiceSearchActive = false
-                }
-                is SpeechRecognitionEvent.Error -> voiceSearchActive = false
-            }
-        }
-    }
-    LaunchedEffect(searchActive) {
-        if (!searchActive) {
-            voiceRecognizer.stop()
-            voiceSearchActive = false
-        }
-    }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { voiceRecognizer.stop() }
-    }
+    // ONE search surface app-wide: the shared controller hosted by the nav
+    // renders the overlay above every page; the home's pill, mic, and FAB all
+    // drive it instead of keeping a private copy.
     var showProfileSheet by remember { mutableStateOf(false) }
     val contentStore = remember { SharedContentStore() }
     val downloadStatus by com.starception.submission.shared.assets.ContentDownloadBus.state.collectAsState()
@@ -343,26 +310,9 @@ fun PrayerTimesScreen(
                         PrayerHomeHeader(
                             onOpenSettings = onOpenSettings,
                             onOpenProfile = onOpenProfile,
-                            onOpenSearch = { searchActive = true },
+                            onOpenSearch = { searchController?.open() ?: onOpenSearch() },
                             searchTerm = day.nextPrayer ?: day.currentPrayer,
-                            onVoiceTap = {
-                                searchActive = true
-                                startVoiceSearch()
-                            },
-                            searchActive = searchActive,
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { searchQuery = it },
-                            onSearchActiveChange = { searchActive = it },
-                            onOpenSurah = {
-                                searchActive = false
-                                searchQuery = ""
-                                onOpenQuran(it)
-                            },
-                            onOpenBukhariBook = {
-                                searchActive = false
-                                searchQuery = ""
-                                onOpenBukhariBook(it)
-                            },
+                            onVoiceTap = { searchController?.openVoice() },
                             onShowProfile = { showProfileSheet = true },
                         )
                         if (showProfileSheet) {
@@ -559,165 +509,9 @@ fun PrayerTimesScreen(
                         }
                     }
 
-                    // Android's SearchView: tapping the pill morphs it into a
-                    // full overlay surface — back arrow + input toolbar with the
-                    // suggestions scrolling underneath — not an inline expansion.
-                    if (searchActive) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            modifier = Modifier.matchParentSize(),
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .safeDrawingPadding()
-                                    .padding(horizontal = 16.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 56.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    IconTapTarget(
-                                        icon = NiaIcons.ArrowBack,
-                                        contentDescription = "Close search",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        visualSize = 34.dp,
-                                        iconSize = 22.dp,
-                                        showBackground = false,
-                                        onClick = {
-                                            searchQuery = ""
-                                            searchActive = false
-                                        },
-                                    )
-                                    val focusRequester = remember { FocusRequester() }
-                                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .heightIn(min = 48.dp)
-                                            .focusRequester(focusRequester),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(start = 16.dp, end = 6.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Icon(
-                                                imageVector = NiaIcons.Search,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                            androidx.compose.foundation.text.BasicTextField(
-                                                value = searchQuery,
-                                                onValueChange = { searchQuery = it },
-                                                singleLine = true,
-                                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                ),
-                                                cursorBrush = androidx.compose.ui.graphics.SolidColor(
-                                                    MaterialTheme.colorScheme.primary,
-                                                ),
-                                                decorationBox = { innerField ->
-                                                    Box(Modifier.weight(1f)) {
-                                                        if (searchQuery.isEmpty()) {
-                                                            Text(
-                                                                "Search Quran, Hadith and more",
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                            )
-                                                        }
-                                                        innerField()
-                                                    }
-                                                },
-                                                modifier = Modifier.weight(1f),
-                                            )
-                                            if (searchQuery.isNotEmpty()) {
-                                                IconTapTarget(
-                                                    icon = Icons.Filled.Close,
-                                                    contentDescription = "Clear query",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    visualSize = 30.dp,
-                                                    iconSize = 20.dp,
-                                                    showBackground = false,
-                                                    onClick = { searchQuery = "" },
-                                                )
-                                            }
-                                            IconTapTarget(
-                                                icon = Icons.Filled.Mic,
-                                                contentDescription = if (voiceSearchActive) {
-                                                    "Stop voice search"
-                                                } else {
-                                                    "Voice search"
-                                                },
-                                                tint = if (voiceSearchActive) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                                visualSize = 30.dp,
-                                                iconSize = 20.dp,
-                                                showBackground = false,
-                                                onClick = {
-                                                    if (voiceSearchActive) {
-                                                        voiceRecognizer.stop()
-                                                        voiceSearchActive = false
-                                                    } else {
-                                                        startVoiceSearch()
-                                                    }
-                                                },
-                                            )
-                                            if (voiceSearchActive) {
-                                                Text(
-                                                    "Listening…",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                Box(Modifier.weight(1f)) {
-                                    SearchSuggestionsOverlayContent(
-                                        query = searchQuery,
-                                        onOpenSurah = {
-                                            searchActive = false
-                                            searchQuery = ""
-                                            onOpenQuran(it)
-                                        },
-                                        onOpenBukhariBook = {
-                                            searchActive = false
-                                            searchQuery = ""
-                                            onOpenBukhariBook(it)
-                                        },
-                                        onOpenBukhariHadith = {
-                                            searchActive = false
-                                            searchQuery = ""
-                                            onOpenBukhariHadith(it)
-                                        },
-                                        onOpenQuranicDua = {
-                                            searchActive = false
-                                            searchQuery = ""
-                                            onOpenQuranicDua(it)
-                                        },
-                                        onOpenFortressChapter = {
-                                            searchActive = false
-                                            searchQuery = ""
-                                            onOpenFortressChapter(it)
-                                        },
-                                        onRecordRecent = { contentStore.addRecentSearch(it) },
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    // The search overlay itself lives at the NAV level
+                    // (SharedSearchOverlay above every destination), so the
+                    // home no longer renders a private copy.
 
                     if (useSideNavigation) {
                         FloatingSideBar(
@@ -731,12 +525,9 @@ fun PrayerTimesScreen(
                             items = SharedBottomBarItems,
                             selectedIndex = selectedBottomIndex,
                             onSelect = onSelectBottom,
-                            // The floating voice button is voice SEARCH — it opens
-                            // the overlay with live transcription, matching Android.
-                            onVoiceTap = {
-                                searchActive = true
-                                startVoiceSearch()
-                            },
+                            // The floating voice button is voice SEARCH — the same
+                            // shared surface as the header mic, matching Android.
+                            onVoiceTap = { searchController?.openVoice() },
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     }
@@ -753,12 +544,6 @@ private fun PrayerHomeHeader(
     onOpenSearch: () -> Unit,
     searchTerm: String?,
     onVoiceTap: (() -> Unit)? = null,
-    searchActive: Boolean = false,
-    searchQuery: String = "",
-    onSearchQueryChange: (String) -> Unit = {},
-    onSearchActiveChange: (Boolean) -> Unit = {},
-    onOpenSurah: (Int) -> Unit = {},
-    onOpenBukhariBook: (Int) -> Unit = {},
     onShowProfile: () -> Unit = {},
 ) {
     Row(

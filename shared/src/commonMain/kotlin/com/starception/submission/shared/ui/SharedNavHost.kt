@@ -96,6 +96,7 @@ object PrayerSettingsRoute
 @Serializable object RecommendationRoute
 
 data class SharedHomeActions(
+    val searchController: SharedSearchController? = null,
     val onOpenSettings: () -> Unit,
     val onOpenProfile: () -> Unit,
     val onOpenSearch: () -> Unit,
@@ -199,6 +200,7 @@ fun SharedNavHost(
                 CompositionLocalProvider(LocalQuranAudioPlayer provides quranPlayer) {
                     home(
                         SharedHomeActions(
+                            searchController = searchController,
                             onOpenSettings = { navController.navigate(PrayerSettingsRoute) },
                             onOpenProfile = { navController.navigate(ProfileRoute) },
                             onOpenSearch = { navController.navigate(SearchRoute) },
